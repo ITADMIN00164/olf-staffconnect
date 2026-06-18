@@ -1,0 +1,424 @@
+<!-- pages/employees.html -->
+<div class="employees-page">
+
+    <div class="page-header-emp">
+        <div>
+            <h1 class="page-title">Employee Directory</h1>
+            <p class="page-subtitle">Browse and manage all staff records.</p>
+        </div>
+        <div id="adminToolbar" style="display:none;">
+            <div class="admin-btn-group">
+                <button class="btn-add" id="addEmployeeBtn">+ Add Employee</button>
+                <button class="btn-sample-excel" id="downloadSampleExcelBtn">⬇ Sample Format</button>
+                <label class="btn-upload-excel" id="uploadExcelLabel" title="Upload employees from Excel">
+                    📤 Upload via Excel
+                    <input type="file" id="uploadExcelInput" accept=".xlsx,.xlsm" style="display:none;">
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="table-toolbar">
+            <input
+                type="text"
+                id="searchBox"
+                class="search-input"
+                placeholder="🔍  Search by name, department, location…">
+            <div class="toolbar-right">
+                <div class="table-meta" id="tableMeta"></div>
+                <button class="btn-excel" id="downloadExcelBtn">⬇ Download Excel</button>
+            </div>
+        </div>
+
+        <div class="table-wrap">
+            <table>
+                <thead id="tableHead"></thead>
+                <tbody id="employeeTable"></tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<!-- Employee Modal — body is injected dynamically based on Firebase schema -->
+<div id="employeeModal" class="modal-overlay">
+    <div class="modal-box">
+
+        <div class="modal-header">
+            <h2 id="modalTitle">Add Employee</h2>
+            <button class="modal-close" id="closeModalBtn">✕</button>
+        </div>
+
+        <!-- Dynamic form fields are rendered here by app.js -->
+        <div class="modal-body" id="modalBody"></div>
+
+        <div class="modal-footer">
+            <button class="btn-cancel" id="closeModalBtn2">Cancel</button>
+            <button class="btn-save"   id="saveEmployeeBtn">Save</button>
+        </div>
+
+    </div>
+</div>
+
+<style>
+.employees-page { width: 100%; }
+
+.page-header-emp {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.page-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1a1d23;
+    letter-spacing: -0.4px;
+    margin-bottom: 4px;
+}
+
+.page-subtitle { font-size: 13.5px; color: #6b7280; }
+
+.admin-btn-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.btn-add {
+    background: #4f8ef7;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.2s;
+    white-space: nowrap;
+}
+
+.btn-add:hover { background: #3a7de8; }
+
+.btn-sample-excel {
+    background: #fff;
+    color: #374151;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.btn-sample-excel:hover { background: #f3f4f6; border-color: #9ca3af; }
+
+.btn-upload-excel {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #f0fdf4;
+    color: #16a34a;
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.btn-upload-excel:hover { background: #dcfce7; border-color: #86efac; }
+
+.table-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    gap: 12px;
+}
+
+.search-input {
+    padding: 9px 14px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 13.5px;
+    font-family: inherit;
+    width: 320px;
+    outline: none;
+    transition: border 0.2s;
+}
+
+.search-input:focus {
+    border-color: #4f8ef7;
+    box-shadow: 0 0 0 3px rgba(79,142,247,0.1);
+}
+
+.table-meta { font-size: 12.5px; color: #9ca3af; }
+
+.toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.btn-excel {
+    background: #16a34a;
+    color: white;
+    border: none;
+    border-radius: 7px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+    transition: background 0.2s;
+}
+
+.btn-excel:hover { background: #15803d; }
+
+/* Table: don't stretch to fill — let it be natural width, scroll if needed */
+.table-wrap { width: 100%; overflow-x: auto; }
+
+table { border-collapse: collapse; white-space: nowrap; }
+
+thead tr { border-bottom: 2px solid #f3f4f6; }
+
+th {
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: #fafafa;
+    white-space: nowrap;
+}
+
+/* Actions column: compact, sticky left */
+th.col-actions, td.col-actions {
+    width: 64px;
+    min-width: 64px;
+    position: sticky;
+    left: 0;
+    background: #fafafa;
+    z-index: 2;
+    box-shadow: 2px 0 4px rgba(0,0,0,0.04);
+    text-align: center;
+}
+
+td.col-actions {
+    background: #fff;
+}
+
+tbody tr:hover td.col-actions {
+    background: #fafbff;
+}
+
+td {
+    padding: 13px 14px;
+    font-size: 13.5px;
+    color: #374151;
+    border-bottom: 1px solid #f3f4f6;
+    white-space: nowrap;
+}
+
+tbody tr:hover { background: #fafbff; }
+
+.badge-dept {
+    background: #f0f4ff;
+    color: #4f8ef7;
+    border-radius: 5px;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.btn-edit, .btn-delete {
+    border: none;
+    border-radius: 6px;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.btn-edit  { background: #eef3fe; color: #4f8ef7; margin-right: 6px; }
+.btn-edit:hover  { background: #dce8fd; }
+.btn-delete { background: #fef2f2; color: #ef4444; }
+.btn-delete:hover { background: #fee2e2; }
+
+.empty-state {
+    text-align: center;
+    padding: 48px;
+    color: #9ca3af;
+    font-size: 13.5px;
+}
+
+.empty-icon { font-size: 40px; margin-bottom: 10px; }
+
+/* ── Modal ── */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(10,11,15,0.65);
+    z-index: 500;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 40px 16px;
+    overflow-y: auto;
+}
+
+.modal-overlay.open { display: flex; }
+
+.modal-box {
+    background: #fff;
+    border-radius: 14px;
+    width: 640px;
+    max-width: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    overflow: hidden;
+    margin: auto;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    border-bottom: 1px solid #f3f4f6;
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 1;
+}
+
+.modal-header h2 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a1d23;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 16px;
+    color: #9ca3af;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 5px;
+}
+
+.modal-close:hover { background: #f3f4f6; color: #374151; }
+
+/* Dynamic modal body */
+.modal-body {
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 5px;
+}
+
+.req { color: #ef4444; }
+
+.form-group input {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 7px;
+    font-size: 13.5px;
+    font-family: inherit;
+    outline: none;
+    transition: border 0.2s;
+}
+
+.form-group input:focus {
+    border-color: #4f8ef7;
+    box-shadow: 0 0 0 3px rgba(79,142,247,0.1);
+}
+
+/* Highlight dynamically added (non-core) fields */
+.form-group input.dynamic-field {
+    border-color: #d1d5db;
+    background: #fafffe;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 16px 24px;
+    border-top: 1px solid #f3f4f6;
+    background: #fafafa;
+    position: sticky;
+    bottom: 0;
+}
+
+.btn-cancel {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    color: #374151;
+    padding: 9px 20px;
+    border-radius: 7px;
+    font-size: 13.5px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.btn-save {
+    background: #4f8ef7;
+    color: white;
+    border: none;
+    padding: 9px 22px;
+    border-radius: 7px;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.2s;
+}
+
+.btn-save:hover { background: #3a7de8; }
+
+@media (max-width: 600px) {
+    .form-row { grid-template-columns: 1fr; }
+    .search-input { width: 100%; }
+    .table-toolbar { flex-direction: column; align-items: flex-start; }
+}
+</style>

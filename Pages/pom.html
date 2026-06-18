@@ -1,0 +1,230 @@
+<div class="pom-page">
+
+    <style>
+        .pom-page { padding: 24px; background: #f4f5f7; min-height: 100%; color: #1a1d23; }
+
+        .pom-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; }
+        .pom-title { font-size: 26px; font-weight: 800; letter-spacing: -0.4px; color: #1a1d23; }
+        .pom-subtitle { color: #6b7280; font-size: 13.5px; margin-top: 4px; }
+        .pom-badge { background: #fef3c7; color: #92400e; padding: 6px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 600; }
+
+        .pom-filter-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+        .pom-select { width: 100%; padding: 11px 14px; background: #fff; border: 1px solid #e5e7eb; color: #1a1d23; border-radius: 9px; font-size: 13.5px; font-family: inherit; outline: none; transition: border 0.2s; }
+        .pom-select:focus { border-color: #4f8ef7; box-shadow: 0 0 0 3px rgba(79,142,247,0.1); }
+
+        .pom-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+        .pom-table { width: 100%; border-collapse: collapse; }
+        .pom-table th { background: #fafafa; color: #6b7280; text-align: left; padding: 12px 14px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 2px solid #f3f4f6; }
+        .pom-table td { padding: 12px 14px; border-bottom: 1px solid #f3f4f6; font-size: 13.5px; color: #374151; vertical-align: middle; }
+
+        /* Detail table: fixed widths so columns stay compact + wrap */
+        .pom-table.fixed { table-layout: fixed; }
+        .pom-table.fixed td, .pom-table.fixed th { white-space: normal; overflow-wrap: anywhere; }
+
+        /* Month summary table */
+        .month-row { cursor: pointer; transition: background .15s; }
+        .month-row:hover { background: #fafbff; }
+        .month-row .m-name { font-weight: 600; color: #1a1d23; }
+        .month-row .ok { color: #16a34a; font-weight: 600; }
+        .month-row .late { color: #dc2626; font-weight: 600; }
+        .month-row .warn { color: #d97706; font-weight: 600; }
+        .month-row .tot-aw { color: #1a1d23; font-weight: 700; }
+        .month-row .vok { color: #2563eb; font-weight: 600; }
+        .pom-table.centered th, .pom-table.centered td { text-align: center; }
+        .month-row .chev { color: #9ca3af; text-align: right; }
+        .pom-msg { text-align: center; color: #9ca3af; padding: 28px; }
+        .pom-msg.error { color: #ef4444; }
+
+        /* Detail view */
+        .pom-detail-head { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+        .pom-back-btn { display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #e5e7eb; color: #374151; padding: 8px 16px; border-radius: 8px; font-size: 13.5px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.2s; }
+        .pom-back-btn:hover { background: #f3f4f6; border-color: #9ca3af; }
+        .pom-detail-title { font-size: 18px; font-weight: 700; color: #1a1d23; }
+        .pom-refresh-btn { margin-left: auto; }
+
+        .name-cell .nc-name { font-weight: 600; color: #1a1d23; font-size: 13.5px; }
+        .name-cell .nc-sub  { color: #9ca3af; font-size: 11.5px; margin-top: 2px; }
+        .award-col { font-size: 12.5px; color: #4b5563; }
+        .who-col { font-size: 10.5px; color: #9ca3af; line-height: 1.4; }
+
+        .award-select, .award-input { width: 100%; padding: 7px 8px; background: #fff; border: 1px solid #e5e7eb; color: #1a1d23; border-radius: 7px; font-size: 12.5px; font-family: inherit; outline: none; transition: border 0.2s; }
+        .award-select:focus, .award-input:focus { border-color: #4f8ef7; box-shadow: 0 0 0 3px rgba(79,142,247,0.1); }
+        .date-compact { padding: 6px 6px; }
+
+        /* Image cell + icons */
+        .img-cell { white-space: nowrap; }
+        .icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 1px solid #e5e7eb; background: #fff; color: #4f8ef7; border-radius: 7px; cursor: pointer; margin-right: 5px; padding: 0; transition: all .15s; vertical-align: middle; }
+        .icon-btn:hover:not([disabled]) { background: #eef3fe; border-color: #4f8ef7; }
+        .icon-btn[disabled] { color: #cbd5e1; cursor: not-allowed; }
+        .img-status { font-size: 11px; color: #6b7280; display: inline-block; margin-top: 3px; }
+        .img-status.ok { color: #16a34a; font-weight: 600; }
+        .img-status.error { color: #ef4444; font-weight: 600; }
+
+        /* Verify */
+        .verify-btn { background: #eef3fe; color: #4f8ef7; border: 1px solid #cfe0fd; border-radius: 7px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all .15s; }
+        .verify-btn:hover { background: #dce8fd; }
+        .verified-badge { display: inline-flex; align-items: center; gap: 5px; color: #16a34a; font-weight: 700; font-size: 12.5px; }
+        .verify-na { font-size: 11.5px; color: #9ca3af; }
+        .unlock-btn { margin-left: 8px; background: #fff; border: 1px solid #fde68a; color: #b45309; border-radius: 7px; padding: 5px 10px; font-size: 11.5px; font-weight: 600; cursor: pointer; font-family: inherit; }
+        .unlock-btn:hover { background: #fffbeb; }
+        .locked-row { background: #fbfdff; }
+        .locked-row .award-select[disabled], .locked-row .award-input[disabled] { background: #f3f4f6; color: #9ca3af; cursor: not-allowed; }
+        .locked-row .icon-btn[disabled] { color: #cbd5e1; cursor: not-allowed; }
+
+        .save-bar { margin-top: 18px; text-align: right; }
+        .save-btn { background: #4f8ef7; color: #fff; border: none; padding: 11px 22px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13.5px; font-family: inherit; transition: background 0.2s; }
+        .save-btn:hover { background: #3a7de8; }
+
+        /* Image popup */
+        .pom-img-overlay { display: none; position: fixed; inset: 0; background: rgba(10,11,15,0.75); z-index: 600; align-items: center; justify-content: center; padding: 24px; }
+        .pom-img-overlay.open { display: flex; }
+        .pom-img-box { position: relative; max-width: 90vw; max-height: 88vh; }
+        .pom-img-box img { max-width: 90vw; max-height: 88vh; border-radius: 10px; box-shadow: 0 20px 60px rgba(0,0,0,0.4); background: #fff; }
+        .pom-img-close { position: absolute; top: -14px; right: -14px; width: 32px; height: 32px; border-radius: 50%; border: none; background: #fff; color: #374151; font-size: 15px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+
+        /* Confirm popup */
+        .pom-confirm-overlay { display: none; position: fixed; inset: 0; background: rgba(10,11,15,0.55); z-index: 650; align-items: center; justify-content: center; padding: 24px; }
+        .pom-confirm-overlay.open { display: flex; }
+        .pom-confirm-box { background: #fff; border-radius: 14px; width: 380px; max-width: 100%; padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+        .pom-confirm-title { font-size: 16px; font-weight: 700; color: #1a1d23; margin-bottom: 8px; }
+        .pom-confirm-msg { font-size: 13.5px; color: #6b7280; line-height: 1.6; margin-bottom: 20px; }
+        .pom-confirm-actions { display: flex; justify-content: flex-end; gap: 10px; }
+        .btn-cancel-c { background: #fff; border: 1px solid #e5e7eb; color: #374151; padding: 9px 18px; border-radius: 8px; font-size: 13.5px; font-weight: 600; cursor: pointer; font-family: inherit; }
+        .btn-cancel-c:hover { background: #f3f4f6; }
+        .btn-override { background: #ef4444; border: none; color: #fff; padding: 9px 18px; border-radius: 8px; font-size: 13.5px; font-weight: 600; cursor: pointer; font-family: inherit; }
+        .btn-override:hover { background: #dc2626; }
+
+        .pom-card.scroll { overflow-x: auto; }
+        @media(max-width:1280px) { .pom-table.fixed { min-width: 1160px; } }
+
+        /* Circle loader with blurred backdrop */
+        .pom-loader-overlay { display: none; position: fixed; inset: 0; z-index: 700; align-items: center; justify-content: center; background: rgba(244,245,247,0.45); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+        .pom-loader-overlay.open { display: flex; }
+        .pom-spinner { width: 46px; height: 46px; border: 4px solid #d7e3fb; border-top-color: #4f8ef7; border-radius: 50%; animation: pom-spin 0.8s linear infinite; }
+        @keyframes pom-spin { to { transform: rotate(360deg); } }
+
+        /* Toasts */
+        .pom-toasts { position: fixed; top: 18px; right: 18px; z-index: 800; display: flex; flex-direction: column; gap: 10px; }
+        .pom-toast { min-width: 200px; max-width: 340px; padding: 12px 16px; border-radius: 9px; font-size: 13.5px; font-weight: 600; color: #fff; box-shadow: 0 6px 20px rgba(0,0,0,0.18); opacity: 1; transform: translateY(0); transition: opacity .3s, transform .3s; }
+        .pom-toast.hide { opacity: 0; transform: translateY(-8px); }
+        .pom-toast.success { background: #16a34a; }
+        .pom-toast.error   { background: #ef4444; }
+        .pom-toast.info    { background: #4f8ef7; }
+
+        /* Generic modal */
+        .pom-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(10,11,15,0.55); z-index: 750; align-items: center; justify-content: center; padding: 24px; }
+        .pom-modal-overlay.open { display: flex; }
+        .pom-modal-box { background: #fff; border-radius: 14px; width: 400px; max-width: 100%; padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+        .pom-modal-title { font-size: 16px; font-weight: 700; color: #1a1d23; margin-bottom: 8px; }
+        .pom-modal-msg { font-size: 13.5px; color: #6b7280; line-height: 1.6; margin-bottom: 20px; white-space: pre-line; }
+        .pom-modal-actions { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+        .pmbtn { padding: 9px 18px; border-radius: 8px; font-size: 13.5px; font-weight: 600; cursor: pointer; font-family: inherit; border: 1px solid transparent; }
+        .pmbtn.cancel  { background: #fff; border-color: #e5e7eb; color: #374151; }
+        .pmbtn.cancel:hover { background: #f3f4f6; }
+        .pmbtn.primary { background: #4f8ef7; color: #fff; }
+        .pmbtn.primary:hover { background: #3a7de8; }
+        .pmbtn.danger  { background: #ef4444; color: #fff; }
+        .pmbtn.danger:hover { background: #dc2626; }
+
+        /* Prompt (description) modal */
+        .pom-prompt-overlay { display: none; position: fixed; inset: 0; background: rgba(10,11,15,0.55); z-index: 760; align-items: center; justify-content: center; padding: 24px; }
+        .pom-prompt-overlay.open { display: flex; }
+        .pom-prompt-box { background: #fff; border-radius: 14px; width: 460px; max-width: 100%; padding: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+        .pom-prompt-title { font-size: 16px; font-weight: 700; color: #1a1d23; margin-bottom: 12px; }
+        .pom-prompt-input { width: 100%; min-height: 110px; resize: vertical; padding: 11px 13px; border: 1px solid #e5e7eb; border-radius: 9px; font-size: 13.5px; font-family: inherit; color: #1a1d23; outline: none; }
+        .pom-prompt-input:focus { border-color: #4f8ef7; box-shadow: 0 0 0 3px rgba(79,142,247,0.1); }
+        .pom-prompt-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+    </style>
+
+    <div class="pom-header">
+        <div>
+            <div class="pom-title">🏆 POM Award Management</div>
+            <div class="pom-subtitle">Program Operations Manager Award Tracking</div>
+        </div>
+        <div class="pom-badge">AY 2026-27</div>
+    </div>
+
+    <!-- ── LIST VIEW ── -->
+    <div id="pomListView">
+        <div class="pom-filter-card">
+            <select id="pomDistrict" class="pom-select">
+                <option value="">Select District</option>
+            </select>
+        </div>
+
+        <div class="pom-card">
+            <table class="pom-table centered">
+                <thead>
+                    <tr><th>Month</th><th>Total</th><th>Awarded In Time</th><th>Awarded Late</th><th>Pending</th><th>Total Awarded</th><th>Verified</th><th></th></tr>
+                </thead>
+                <tbody id="pomMonthBody">
+                    <tr><td colspan="8" class="pom-msg">Select a District to begin</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ── DETAIL VIEW ── -->
+    <div id="pomDetailWrap" style="display:none;">
+        <div class="pom-detail-head">
+            <button id="pomBackBtn" class="pom-back-btn">← Back</button>
+            <div class="pom-detail-title" id="pomDetailTitle">Records</div>
+            <button id="pomRefreshBtn" class="pom-back-btn pom-refresh-btn" title="Reload latest records">⟳ Refresh Records</button>
+        </div>
+
+        <div class="pom-card scroll">
+            <table class="pom-table fixed">
+                <colgroup>
+                    <col style="width:17%"><col style="width:14%"><col style="width:6%">
+                    <col style="width:12%"><col style="width:10%"><col style="width:7%">
+                    <col style="width:8%"><col style="width:9%"><col style="width:9%"><col style="width:8%">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>Name</th><th>Award</th><th>Awarded</th>
+                        <th>Awarded By</th><th>Date</th><th>Image</th><th>Description</th>
+                        <th>Uploaded By</th><th>Verify</th><th>Verified By</th>
+                    </tr>
+                </thead>
+                <tbody id="pomTableBody">
+                    <tr><td colspan="9" style="text-align:center;color:#9ca3af;padding:28px;">No month selected</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="save-bar">
+            <button id="savePomBtn" class="save-btn">💾 Save All Changes</button>
+        </div>
+    </div>
+
+    <!-- ── Image popup ── -->
+    <div id="pomImgModal" class="pom-img-overlay">
+        <div class="pom-img-box">
+            <button id="pomImgClose" class="pom-img-close">✕</button>
+            <img id="pomImgEl" src="" alt="Award image">
+        </div>
+    </div>
+
+
+    <!-- ── Loader, toasts, generic modal ── -->
+    <div id="pomLoader" class="pom-loader-overlay"><div class="pom-spinner"></div></div>
+    <div id="pomToasts" class="pom-toasts"></div>
+    <div id="pomModal" class="pom-modal-overlay">
+        <div class="pom-modal-box">
+            <div class="pom-modal-title" id="pomModalTitle"></div>
+            <div class="pom-modal-msg" id="pomModalMsg"></div>
+            <div class="pom-modal-actions" id="pomModalActions"></div>
+        </div>
+    </div>
+    <div id="pomPrompt" class="pom-prompt-overlay">
+        <div class="pom-prompt-box">
+            <div class="pom-prompt-title" id="pomPromptTitle">Description</div>
+            <textarea id="pomPromptInput" class="pom-prompt-input" placeholder="Write a description…"></textarea>
+            <div class="pom-prompt-actions">
+                <button id="pomPromptCancel" class="pmbtn cancel">Cancel</button>
+                <button id="pomPromptOk" class="pmbtn primary">Save</button>
+            </div>
+        </div>
+    </div>
+
+</div>

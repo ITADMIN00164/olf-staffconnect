@@ -1,0 +1,123 @@
+<!-- pages/home.html -->
+<div class="home-page">
+
+    <!-- News banners placeholder (hidden — kept for app.js compat) -->
+    <div id="newsBannerSection" style="display:none;"></div>
+
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Welcome back, <span id="homeUserName">—</span></h1>
+            <p class="page-subtitle">Here's an overview of your organization's staff directory.</p>
+        </div>
+    </div>
+
+    <div class="stats-row" id="statsRow">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(79,142,247,0.12); color:#4f8ef7;">👥</div>
+            <div class="stat-info">
+                <div class="stat-value" id="statTotal">—</div>
+                <div class="stat-label">Total Employees</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(52,199,89,0.12); color:#34c759;">🏢</div>
+            <div class="stat-info">
+                <div class="stat-value" id="statDepts">—</div>
+                <div class="stat-label">Departments</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background: rgba(255,159,10,0.12); color:#ff9f0a;">📍</div>
+            <div class="stat-info">
+                <div class="stat-value" id="statLocations">—</div>
+                <div class="stat-label">Locations</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── News Section ── -->
+    <div class="news-section">
+        <div class="news-section-header">
+            <div class="news-section-title">
+                <span class="ns-icon">📢</span> Announcements
+            </div>
+            <!-- Admin only — rendered by app.js -->
+            <button class="btn-add-news-inline" id="addNewsBtn" style="display:none;">
+                + Add News
+            </button>
+        </div>
+        <div class="news-cards-grid" id="newsCardsGrid">
+            <div class="news-empty-state">
+                <div class="news-empty-icon">⏳</div>
+                Loading announcements…
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<style>
+.home-page { max-width: 1000px; }
+
+.page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 26px;
+}
+
+.page-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1a1d23;
+    letter-spacing: -0.4px;
+    margin-bottom: 4px;
+}
+
+.page-title span { color: #4f8ef7; }
+
+.page-subtitle { font-size: 13.5px; color: #6b7280; }
+
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.stat-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+}
+
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+}
+
+.stat-value {
+    font-size: 26px;
+    font-weight: 700;
+    color: #1a1d23;
+    line-height: 1;
+    margin-bottom: 4px;
+}
+
+.stat-label { font-size: 12.5px; color: #6b7280; font-weight: 500; }
+
+@media (max-width: 768px) {
+    .stats-row { grid-template-columns: 1fr; }
+    .news-cards-grid { grid-template-columns: 1fr; }
+}
+</style>
