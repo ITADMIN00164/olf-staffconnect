@@ -1,21 +1,26 @@
 <div class="pom-page">
 
     <style>
-        .pom-page { padding: 24px; background: #f4f5f7; min-height: 100%; color: #1a1d23; }
+        .pom-page { padding: 20px 24px 0; background: #f4f5f7; height: 100%; display: flex; flex-direction: column; color: #1a1d23; }
 
-        .pom-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; }
-        .pom-title { font-size: 26px; font-weight: 800; letter-spacing: -0.4px; color: #1a1d23; }
-        .pom-subtitle { color: #6b7280; font-size: 13.5px; margin-top: 4px; }
+        .pom-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-shrink: 0; }
+        .pom-title { font-size: 20px; font-weight: 800; letter-spacing: -0.4px; color: #1a1d23; }
+        .pom-subtitle { color: #6b7280; font-size: 12px; margin-top: 2px; }
         .pom-badge { background: #fef3c7; color: #92400e; padding: 6px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 600; }
 
-        .pom-filter-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
-        .pom-select { width: 100%; padding: 11px 14px; background: #fff; border: 1px solid #e5e7eb; color: #1a1d23; border-radius: 9px; font-size: 13.5px; font-family: inherit; outline: none; transition: border 0.2s; }
+        .pom-filter-card { background: transparent; border: none; padding: 0; margin-bottom: 12px; box-shadow: none; flex-shrink: 0; }
+        .pom-select { padding: 10px 14px; background: #fff; border: 1px solid #e5e7eb; color: #1a1d23; border-radius: 9px; font-size: 13.5px; font-family: inherit; outline: none; transition: border 0.2s; min-width: 180px; max-width: 300px; width: auto; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
         .pom-select:focus { border-color: #4f8ef7; box-shadow: 0 0 0 3px rgba(79,142,247,0.1); }
+        .pom-detail-filters { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; }
+        .pom-detail-filter-label { font-size: 11px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+        .pom-detail-select { padding: 8px 12px; background: #fff; border: 1px solid #e5e7eb; color: #1a1d23; border-radius: 8px; font-size: 13px; font-family: inherit; outline: none; transition: border 0.2s; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        .pom-detail-select:focus { border-color: #4f8ef7; box-shadow: 0 0 0 3px rgba(79,142,247,0.1); }
+        .pom-filter-sep { width: 1px; height: 20px; background: #e5e7eb; margin: 0 2px; }
 
         .pom-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
         .pom-table { width: 100%; border-collapse: collapse; }
-        .pom-table th { background: #fafafa; color: #6b7280; text-align: left; padding: 12px 14px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 2px solid #f3f4f6; }
-        .pom-table td { padding: 12px 14px; border-bottom: 1px solid #f3f4f6; font-size: 13.5px; color: #374151; vertical-align: middle; }
+        .pom-table th { background: #fafafa; color: #6b7280; text-align: left; padding: 9px 10px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 2px solid #f3f4f6; position: sticky; top: 0; z-index: 3; white-space: nowrap; }
+        .pom-table td { padding: 9px 10px; border-bottom: 1px solid #f3f4f6; font-size: 12px; color: #374151; vertical-align: middle; }
 
         /* Detail table: fixed widths so columns stay compact + wrap */
         .pom-table.fixed { table-layout: fixed; }
@@ -36,24 +41,24 @@
         .pom-msg.error { color: #ef4444; }
 
         /* Detail view */
-        .pom-detail-head { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+        .pom-detail-head { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; flex-wrap: wrap; flex-shrink: 0; }
         .pom-back-btn { display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #e5e7eb; color: #374151; padding: 8px 16px; border-radius: 8px; font-size: 13.5px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.2s; }
         .pom-back-btn:hover { background: #f3f4f6; border-color: #9ca3af; }
-        .pom-detail-title { font-size: 18px; font-weight: 700; color: #1a1d23; }
+        .pom-detail-title { font-size: 18px; font-weight: 700; color: #1a1d23; display: none; }
         .pom-refresh-btn { margin-left: auto; }
 
-        .name-cell .nc-name { font-weight: 600; color: #1a1d23; font-size: 13.5px; }
-        .name-cell .nc-sub  { color: #9ca3af; font-size: 11.5px; margin-top: 2px; }
-        .award-col { font-size: 12.5px; color: #4b5563; }
-        .who-col { font-size: 10.5px; color: #9ca3af; line-height: 1.4; }
+        .name-cell .nc-name { font-weight: 600; color: #1a1d23; font-size: 12px; }
+        .name-cell .nc-sub  { color: #9ca3af; font-size: 10px; margin-top: 1px; }
+        .award-col { font-size: 11.5px; color: #4b5563; }
+        .who-col { font-size: 10px; color: #9ca3af; line-height: 1.4; }
 
-        .award-select, .award-input { width: 100%; padding: 7px 8px; background: #fff; border: 1px solid #e5e7eb; color: #1a1d23; border-radius: 7px; font-size: 12.5px; font-family: inherit; outline: none; transition: border 0.2s; }
+        .award-select, .award-input { width: 100%; padding: 5px 6px; background: #fff; border: 1px solid #e5e7eb; color: #1a1d23; border-radius: 6px; font-size: 11.5px; font-family: inherit; outline: none; transition: border 0.2s; }
         .award-select:focus, .award-input:focus { border-color: #4f8ef7; box-shadow: 0 0 0 3px rgba(79,142,247,0.1); }
         .date-compact { padding: 6px 6px; }
 
         /* Image cell + icons */
         .img-cell { white-space: nowrap; }
-        .icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 1px solid #e5e7eb; background: #fff; color: #4f8ef7; border-radius: 7px; cursor: pointer; margin-right: 5px; padding: 0; transition: all .15s; vertical-align: middle; }
+        .icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: 1px solid #e5e7eb; background: #fff; color: #4f8ef7; border-radius: 6px; cursor: pointer; margin-right: 3px; padding: 0; transition: all .15s; vertical-align: middle; }
         .icon-btn:hover:not([disabled]) { background: #eef3fe; border-color: #4f8ef7; }
         .icon-btn[disabled] { color: #cbd5e1; cursor: not-allowed; }
         .img-status { font-size: 11px; color: #6b7280; display: inline-block; margin-top: 3px; }
@@ -61,18 +66,23 @@
         .img-status.error { color: #ef4444; font-weight: 600; }
 
         /* Verify */
-        .verify-btn { background: #eef3fe; color: #4f8ef7; border: 1px solid #cfe0fd; border-radius: 7px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all .15s; }
+        .verify-btn { background: #eef3fe; color: #4f8ef7; border: 1px solid #cfe0fd; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all .15s; white-space: nowrap; }
         .verify-btn:hover { background: #dce8fd; }
-        .verified-badge { display: inline-flex; align-items: center; gap: 5px; color: #16a34a; font-weight: 700; font-size: 12.5px; }
-        .verify-na { font-size: 11.5px; color: #9ca3af; }
-        .unlock-btn { margin-left: 8px; background: #fff; border: 1px solid #fde68a; color: #b45309; border-radius: 7px; padding: 5px 10px; font-size: 11.5px; font-weight: 600; cursor: pointer; font-family: inherit; }
+        .verified-badge { display: inline-flex; align-items: center; gap: 4px; color: #16a34a; font-weight: 700; font-size: 11px; white-space: nowrap; }
+        .verify-na { font-size: 10.5px; color: #9ca3af; }
+        .unlock-btn { margin-left: 4px; background: #fff; border: 1px solid #fde68a; color: #b45309; border-radius: 6px; padding: 3px 8px; font-size: 10.5px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; display: block; margin-top: 4px; }
         .unlock-btn:hover { background: #fffbeb; }
         .locked-row { background: #fbfdff; }
         .locked-row .award-select[disabled], .locked-row .award-input[disabled] { background: #f3f4f6; color: #9ca3af; cursor: not-allowed; }
         .locked-row .icon-btn[disabled] { color: #cbd5e1; cursor: not-allowed; }
 
-        .save-bar { margin-top: 18px; text-align: right; }
-        .save-btn { background: #4f8ef7; color: #fff; border: none; padding: 11px 22px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13.5px; font-family: inherit; transition: background 0.2s; }
+        .save-bar { margin-top: 0; padding: 12px 0 16px; text-align: right; flex-shrink: 0; background: #f4f5f7; }
+
+        /* Detail wrap fills remaining height as a flex column */
+        #pomDetailWrap { display: none; flex-direction: column; flex: 1; min-height: 0; }
+        /* List view also fills remaining height */
+        #pomListView { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+        .save-btn { background: #4f8ef7; color: #fff; border: none; padding: 10px 22px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; font-family: inherit; transition: background 0.2s; box-shadow: 0 2px 10px rgba(79,142,247,0.3); }
         .save-btn:hover { background: #3a7de8; }
 
         /* Image popup */
@@ -94,8 +104,8 @@
         .btn-override { background: #ef4444; border: none; color: #fff; padding: 9px 18px; border-radius: 8px; font-size: 13.5px; font-weight: 600; cursor: pointer; font-family: inherit; }
         .btn-override:hover { background: #dc2626; }
 
-        .pom-card.scroll { overflow-x: auto; }
-        @media(max-width:1280px) { .pom-table.fixed { min-width: 1160px; } }
+        .pom-card.scroll { overflow-x: auto; overflow-y: auto; flex: 1; min-height: 0; }
+        .pom-table.fixed { min-width: 1100px; }
 
         /* Circle loader with blurred backdrop */
         .pom-loader-overlay { display: none; position: fixed; inset: 0; z-index: 700; align-items: center; justify-content: center; background: rgba(244,245,247,0.45); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
@@ -168,7 +178,13 @@
     <div id="pomDetailWrap" style="display:none;">
         <div class="pom-detail-head">
             <button id="pomBackBtn" class="pom-back-btn">← Back</button>
-            <div class="pom-detail-title" id="pomDetailTitle">Records</div>
+            <div class="pom-detail-filters">
+                <span class="pom-detail-filter-label">District</span>
+                <select id="pomDetailDistrict" class="pom-detail-select"></select>
+                <span class="pom-filter-sep"></span>
+                <span class="pom-detail-filter-label">Month</span>
+                <select id="pomDetailMonth" class="pom-detail-select"></select>
+            </div>
             <button id="pomRefreshBtn" class="pom-back-btn pom-refresh-btn" title="Reload latest records">⟳ Refresh Records</button>
         </div>
 

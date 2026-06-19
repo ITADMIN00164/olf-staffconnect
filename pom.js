@@ -288,7 +288,7 @@ function updateMonthRow(month) {
 // ===============================
 function showList() {
   document.getElementById("pomDetailWrap").style.display = "none";
-  document.getElementById("pomListView").style.display = "block";
+  document.getElementById("pomListView").style.display = "flex";
   document.querySelectorAll(".month-row").forEach(r => r.classList.remove("active"));
   selectedMonth = "";
   window.scrollTo(0, 0);
@@ -334,6 +334,26 @@ async function refreshRecords() {
   }
 }
 
+function syncDetailSelects() {
+  // Populate detail district dropdown from the list view district
+  const listDistrict = document.getElementById("pomDistrict");
+  const detailDistrict = document.getElementById("pomDetailDistrict");
+  if (!detailDistrict || !listDistrict) return;
+
+  // Copy all options from list-view select into detail select
+  detailDistrict.innerHTML = listDistrict.innerHTML;
+  detailDistrict.value = listDistrict.value;
+
+  // Populate month dropdown from available months (those with records)
+  const detailMonth = document.getElementById("pomDetailMonth");
+  if (!detailMonth) return;
+  const availMonths = allMonths.filter(m => (monthCache[m] || []).length);
+  detailMonth.innerHTML = availMonths
+    .map(m => `<option value="${m}">${m}</option>`)
+    .join("");
+  detailMonth.value = selectedMonth;
+}
+
 function selectMonth(month) {
   selectedMonth = month;
   currentRecords = monthCache[month] || [];
@@ -341,10 +361,10 @@ function selectMonth(month) {
   document.querySelectorAll(".month-row").forEach(r =>
     r.classList.toggle("active", r.dataset.month === month)
   );
-  document.getElementById("pomDetailTitle").textContent = `Records — ${month}`;
   document.getElementById("pomListView").style.display = "none";
-  document.getElementById("pomDetailWrap").style.display = "block";
+  document.getElementById("pomDetailWrap").style.display = "flex";
   window.scrollTo(0, 0);
+  syncDetailSelects();
   renderTable();
 }
 
@@ -721,6 +741,51 @@ window.initPomPageUI = function () {
     const fresh = saveBtn.cloneNode(true);
     saveBtn.parentNode.replaceChild(fresh, saveBtn);
     fresh.addEventListener("click", saveRecords);
+  }
+
+  // Detail view — district change: reload whole summary then re-enter month if possible
+  const detailDistrictEl = document.getElementById("pomDetailDistrict");
+  if (detailDistrictEl) {
+    detailDistrictEl.addEventListener("change", async function () {
+      if (dirty) {
+        const choice = await confirmUnsaved();
+        if (choice === "cancel") { this.value = document.getElementById("pomDistrict").value; return; }
+        if (choice === "save") await saveRecords();
+      }
+      dirty = false;
+      // Sync back to list-view select so loadDistrictSummary reads correct value
+      const listDistrict = document.getElementById("pomDistrict");
+      if (listDistrict) listDistrict.value = this.value;
+      // Show list briefly while loading, then re-enter if months still exist
+      showList();
+      await loadDistrictSummary();
+      // If current month still has records in new district, jump straight in
+      const months = allMonths.filter(m => (monthCache[m] || []).length);
+      if (months.length) {
+        const target = months.includes(selectedMonth || "") ? selectedMonth : months[0];
+        selectMonth(target || months[0]);
+      }
+      // else stays on list view
+    });
+  }
+
+  // Detail view — month change: switch records inline, no back needed
+  const detailMonthEl = document.getElementById("pomDetailMonth");
+  if (detailMonthEl) {
+    detailMonthEl.addEventListener("change", async function () {
+      if (dirty) {
+        const choice = await confirmUnsaved();
+        if (choice === "cancel") { this.value = selectedMonth; return; }
+        if (choice === "save") await saveRecords();
+      }
+      dirty = false;
+      selectedMonth = this.value;
+      currentRecords = monthCache[selectedMonth] || [];
+      document.querySelectorAll(".month-row").forEach(r =>
+        r.classList.toggle("active", r.dataset.month === selectedMonth)
+      );
+      renderTable();
+    });
   }
 
   const imgClose = document.getElementById("pomImgClose");

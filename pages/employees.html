@@ -187,8 +187,13 @@
 
 .btn-excel:hover { background: #15803d; }
 
-/* Table: don't stretch to fill — let it be natural width, scroll if needed */
-.table-wrap { width: 100%; overflow-x: auto; }
+/* Table: fixed height box — scrolls both axes independently */
+.table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: calc(100vh - 260px); /* viewport minus topbar + page header + toolbar */
+}
 
 table { border-collapse: collapse; white-space: nowrap; }
 
@@ -204,15 +209,30 @@ th {
     letter-spacing: 0.5px;
     background: #fafafa;
     white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 3;
 }
 
-/* Actions column: compact, sticky left */
-th.col-actions, td.col-actions {
+/* Actions column: compact, sticky on BOTH axes (corner cell) */
+th.col-actions {
     width: 64px;
     min-width: 64px;
     position: sticky;
     left: 0;
+    top: 0;          /* sticky vertically AND horizontally */
     background: #fafafa;
+    z-index: 5;      /* highest — sits above all other sticky th (z-index:3) and td (z-index:4) */
+    box-shadow: 2px 0 4px rgba(0,0,0,0.04);
+    text-align: center;
+}
+
+td.col-actions {
+    width: 64px;
+    min-width: 64px;
+    position: sticky;
+    left: 0;
+    background: #fff;
     z-index: 2;
     box-shadow: 2px 0 4px rgba(0,0,0,0.04);
     text-align: center;
