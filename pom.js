@@ -379,17 +379,28 @@ function awardedByOptions(value) {
     opts.map(o => `<option value="${o}" ${o === value ? "selected" : ""}>${o}</option>`).join("");
 }
 
+function nameFromEmail(emailOrName) {
+  if (!emailOrName) return "";
+  // If it already looks like a plain name (no @), return as-is
+  if (!emailOrName.includes("@")) return emailOrName;
+  const local = emailOrName.split("@")[0];                // e.g. "onkar.kale"
+  return local.split(/[._-]/).map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(" ");
+}
+
 function renderImageCell(index, justUploaded, locked) {
-  const has = !!currentRecords[index].folderLink;
+  const rec = currentRecords[index];
+  const has = !!rec.folderLink;
   const uploadCtl = locked
     ? `<button class="icon-btn" disabled title="${LOCK_MSG}">${UPLOAD_SVG}</button>`
     : `<label class="icon-btn" title="Upload image">${UPLOAD_SVG}
          <input type="file" accept="image/*" style="display:none" onchange="uploadImage(${index}, this.files[0])">
        </label>`;
+  const uploaderName = nameFromEmail(rec.uploadedBy || "");
   return `
     ${uploadCtl}
     <button class="icon-btn" title="View image" ${has ? "" : "disabled"} onclick="viewImage(${index})">${EYE_SVG}</button>
-    ${justUploaded ? '<span class="img-status ok">Uploaded</span>' : ""}`;
+    ${justUploaded ? '<span class="img-status ok">Uploaded</span>' : ""}
+    ${uploaderName ? `<span class="cell-sublabel" title="${rec.uploadedBy}">${uploaderName}</span>` : ""}`;
 }
 
 function renderDescCell(index, locked) {
@@ -403,9 +414,8 @@ function renderDescCell(index, locked) {
 function renderVerifyCell(index) {
   const r = currentRecords[index];
   if (r.verified === "Yes") {
-    let html = `<span class="verified-badge">${CHECK_SVG} Verified</span>`;
-    if (isVerifier) html += `<button class="unlock-btn" onclick="unlockRecord(${index})">Unlock</button>`;
-    return html;
+    const verifierName = nameFromEmail(r.verifiedBy || "");
+    return `<span class="verified-badge">${CHECK_SVG} Verified</span>${verifierName ? `<span class="cell-sublabel" title="${r.verifiedBy}">${verifierName}</span>` : ""}`;
   }
   if (!isVerifier)
     return `<span class="verify-na" title="Verifier access required">🔒 No access</span>`;
@@ -445,16 +455,15 @@ function renderTable() {
       <td ${lt}><input type="date" class="award-input date-compact" ${dis} value="${formatDate(r.awardedDate)}" onchange="updateField(${i},'awardedDate',this.value)"></td>
       <td class="img-cell" id="imgcell-${i}">${renderImageCell(i, false, locked)}</td>
       <td class="img-cell" id="desccell-${i}">${renderDescCell(i, locked)}</td>
-      <td class="who-col" id="upby-${i}">${r.uploadedBy || ""}</td>
-      <td class="verify-cell" id="verify-${i}">${renderVerifyCell(i)}</td>
-      <td class="who-col" id="vby-${i}">${r.verifiedBy || ""}</td>
+      <td class="verify-cell col-center" id="verify-${i}">${renderVerifyCell(i)}</td>
+      <td class="col-center" id="unlock-${i}">${locked && isVerifier ? `<button class="unlock-btn" onclick="unlockRecord(${i})">Unlock</button>` : ""}</td>
     </tr>`;
   }).join("");
 }
 
 function resetDetail(msg) {
   document.getElementById("pomTableBody").innerHTML =
-    `<tr><td colspan="10" style="text-align:center;color:#9ca3af;padding:28px;">${msg}</td></tr>`;
+    `<tr><td colspan="9" style="text-align:center;color:#9ca3af;padding:28px;">${msg}</td></tr>`;
 }
 
 window.updateField = function (index, field, value) {
@@ -511,9 +520,7 @@ window.uploadImage = async function (index, file) {
 
     currentRecords[index].folderLink = out.url;
     currentRecords[index].uploadedBy = currentUser();
-    cell.innerHTML = renderImageCell(index, true);
-    const up = document.getElementById("upby-" + index);
-    if (up) up.textContent = currentRecords[index].uploadedBy;
+    cell.innerHTML = renderImageCell(index, true, false);
     showToast("Image uploaded.");
   } catch (e) {
     console.error(e);
@@ -603,6 +610,8 @@ window.verifyRecord = async function (index) {
     console.error(e);
     rec.verified = ""; rec.verifiedBy = "";
     cell.innerHTML = renderVerifyCell(index);
+    const unlockCell = document.getElementById("unlock-" + index);
+    if (unlockCell) unlockCell.innerHTML = "";
     showToast("Verification failed.", "error");
   }
 };
