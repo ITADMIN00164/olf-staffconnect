@@ -18,6 +18,8 @@
         .pom-filter-sep { width: 1px; height: 20px; background: #e5e7eb; margin: 0 2px; }
 
         .pom-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+        /* Scrollable card (detail records table): take available height in the flex column and scroll vertically */
+        .pom-card.scroll { flex: 0 1 auto; min-height: 0; overflow-y: auto; }
         .pom-table { width: 100%; border-collapse: collapse; }
         .pom-table th { background: #fafafa; color: #6b7280; text-align: left; padding: 9px 10px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 2px solid #f3f4f6; position: sticky; top: 0; z-index: 3; white-space: nowrap; }
         .pom-table td { padding: 9px 10px; border-bottom: 1px solid #f3f4f6; font-size: 12px; color: #374151; vertical-align: middle; }
@@ -92,9 +94,13 @@
         /* Image popup */
         .pom-img-overlay { display: none; position: fixed; inset: 0; background: rgba(10,11,15,0.75); z-index: 600; align-items: center; justify-content: center; padding: 24px; }
         .pom-img-overlay.open { display: flex; }
-        .pom-img-box { position: relative; max-width: 90vw; max-height: 88vh; }
+        .pom-img-box { position: relative; max-width: 90vw; max-height: 88vh; min-width: 240px; min-height: 160px; display: flex; align-items: center; justify-content: center; }
         .pom-img-box img { max-width: 90vw; max-height: 88vh; border-radius: 10px; box-shadow: 0 20px 60px rgba(0,0,0,0.4); background: #fff; }
-        .pom-img-close { position: absolute; top: -14px; right: -14px; width: 32px; height: 32px; border-radius: 50%; border: none; background: #fff; color: #374151; font-size: 15px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+        .pom-img-close { position: absolute; top: -14px; right: -14px; width: 32px; height: 32px; border-radius: 50%; border: none; background: #fff; color: #374151; font-size: 15px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.3); z-index: 2; }
+        .pom-img-loading { display: none; align-items: center; justify-content: center; width: 240px; height: 160px; background: #fff; border-radius: 10px; }
+        .pom-img-fallback { display: none; flex-direction: column; align-items: center; gap: 12px; background: #fff; border-radius: 10px; padding: 28px 32px; text-align: center; color: #374151; font-size: 14px; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
+        .pom-img-fallback a { color: #4f8ef7; font-weight: 600; text-decoration: none; }
+        .pom-img-fallback a:hover { text-decoration: underline; }
 
         /* Confirm popup */
         .pom-confirm-overlay { display: none; position: fixed; inset: 0; background: rgba(10,11,15,0.55); z-index: 650; align-items: center; justify-content: center; padding: 24px; }
@@ -108,8 +114,88 @@
         .btn-override { background: #ef4444; border: none; color: #fff; padding: 9px 18px; border-radius: 8px; font-size: 13.5px; font-weight: 600; cursor: pointer; font-family: inherit; }
         .btn-override:hover { background: #dc2626; }
 
-        .pom-card.scroll { overflow-x: auto; overflow-y: auto; flex: 1; min-height: 0; }
-        .pom-table.fixed { min-width: 960px; }
+        /* ── Page tabs ── */
+        .pom-tabs { display: flex; gap: 4px; background: #eef0f4; border-radius: 10px; padding: 4px; }
+        .pom-tab { padding: 7px 18px; border-radius: 7px; font-size: 13px; font-weight: 600; border: none; background: transparent; color: #6b7280; cursor: pointer; font-family: inherit; transition: all .18s; white-space: nowrap; display: inline-flex; align-items: center; }
+        .pom-tab.active { background: #fff; color: #1a1d23; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+        .pom-tab:hover:not(.active):not(.loading) { color: #374151; }
+        /* Dashboard tab stays disabled (with a spinner) until its data is loaded */
+        .pom-tab.loading { pointer-events: none; cursor: default; color: #9ca3af; }
+        .pom-tab-spinner { display: none; width: 12px; height: 12px; border: 2px solid rgba(120,130,150,0.35); border-top-color: #6b7280; border-radius: 50%; animation: pom-spin 0.8s linear infinite; margin-left: 8px; }
+        .pom-tab.loading .pom-tab-spinner { display: inline-block; }
+        .pom-tab-progress { display: none; font-size: 11px; font-weight: 600; color: #9ca3af; margin-left: 6px; min-width: 30px; text-align: left; }
+        .pom-tab.loading .pom-tab-progress { display: inline-block; }
+
+        /* ── Dashboard view ── */
+        #pomDashView { display: none; flex-direction: column; flex: 1; min-height: 0; gap: 16px; overflow-y: auto; padding-bottom: 24px; }
+        #pomDashView.active { display: flex; }
+
+        .dash-filter-bar { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px 20px; display: flex; align-items: flex-start; gap: 24px; flex-wrap: wrap; box-shadow: 0 1px 4px rgba(0,0,0,0.05); flex-shrink: 0; }
+        .dash-refresh-btn { margin-left: auto; align-self: center; display: inline-flex; align-items: center; gap: 7px; background: #fff; border: 1px solid #e5e7eb; color: #374151; padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background .15s, border-color .15s; white-space: nowrap; }
+        .dash-refresh-btn:hover { background: #f3f4f6; border-color: #9ca3af; }
+        .dash-refresh-btn:disabled { opacity: 0.65; cursor: default; }
+        .dash-refresh-ico { display: inline-block; font-size: 16px; line-height: 1; }
+        .dash-refresh-btn.spinning .dash-refresh-ico { animation: dash-spin 0.8s linear infinite; }
+        @keyframes dash-spin { to { transform: rotate(360deg); } }
+
+        /* Dropdown-checkbox widget */
+        .dash-filter-group { display: flex; flex-direction: column; gap: 5px; position: relative; min-width: 160px; }
+        .dash-filter-label { font-size: 10.5px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; }
+        .dash-dd-trigger { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 13px; font-family: inherit; color: #1a1d23; cursor: pointer; min-width: 160px; white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,0.05); user-select: none; }
+        .dash-dd-trigger:hover { border-color: #9ca3af; }
+        .dash-dd-trigger .dd-caret { font-size: 10px; color: #9ca3af; transition: transform .15s; }
+        .dash-dd-trigger.open .dd-caret { transform: rotate(180deg); }
+        .dash-dd-panel { display: none; flex-direction: column; position: absolute; top: calc(100% + 4px); left: 0; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,0.12); z-index: 200; min-width: 220px; max-height: 300px; overflow: hidden; }
+        .dash-dd-panel.open { display: flex; }
+        .dash-dd-all { padding: 9px 14px; font-size: 12.5px; font-weight: 700; color: #4f8ef7; cursor: pointer; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #f3f4f6; flex-shrink: 0; }
+        .dash-dd-all:hover { background: #f0f6ff; }
+        .dash-dd-items { flex: 1 1 auto; overflow-y: auto; min-height: 0; padding: 4px 0; }
+        .dash-dd-item { padding: 6px 14px; font-size: 12.5px; color: #374151; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+        .dash-dd-item:hover { background: #f9fafb; }
+        .dash-dd-item input[type=checkbox], .dash-dd-all input[type=checkbox] { accent-color: #4f8ef7; width: 14px; height: 14px; cursor: pointer; }
+
+        /* Community is a plain select */
+        .dash-community-select { padding: 8px 12px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 13px; font-family: inherit; color: #1a1d23; outline: none; cursor: pointer; min-width: 160px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .dash-community-select:focus { border-color: #4f8ef7; box-shadow: 0 0 0 3px rgba(79,142,247,0.1); }
+        .dash-community-select:disabled { opacity: 0.6; cursor: default; }
+
+        /* Apply ("Save") footer pinned to the bottom of the multi-select panels */
+        .dash-dd-footer { flex-shrink: 0; background: #fff; border-top: 1px solid #f3f4f6; padding: 8px 12px; display: flex; justify-content: flex-end; }
+        .dash-dd-apply { background: #4f8ef7; color: #fff; border: none; border-radius: 7px; padding: 7px 18px; font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background .2s; }
+        .dash-dd-apply:hover { background: #3a7de8; }
+
+        /* Loading state shown inside the filters while dashboard data loads */
+        .dash-dd-trigger.loading { pointer-events: none; opacity: 0.6; }
+        .dash-mini-spinner { display: inline-block; width: 13px; height: 13px; border: 2px solid #d7e3fb; border-top-color: #4f8ef7; border-radius: 50%; animation: pom-spin 0.8s linear infinite; vertical-align: -2px; margin-right: 5px; }
+        .dash-retry { background: #4f8ef7; color: #fff; border: none; border-radius: 6px; padding: 4px 12px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; margin-left: 8px; }
+        .dash-retry:hover { background: #3a7de8; }
+
+        /* Dash content: table + chart side by side */
+        .dash-content-row { display: flex; gap: 16px; align-items: flex-start; }
+        .dash-table-wrap { flex: 1; min-width: 0; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow-x: auto; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+        .dash-chart-wrap { width: 260px; flex-shrink: 0; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; align-items: center; gap: 14px; }
+
+        .dash-tbl { width: 100%; border-collapse: collapse; }
+        .dash-tbl th { background: #fafafa; color: #6b7280; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; padding: 9px 10px; border-bottom: 2px solid #f3f4f6; white-space: nowrap; text-align: center; position: sticky; top: 0; z-index: 2; }
+        .dash-tbl th.left { text-align: left; }
+        .dash-tbl td { padding: 9px 10px; border-bottom: 1px solid #f3f4f6; font-size: 12px; color: #374151; text-align: center; white-space: nowrap; }
+        .dash-tbl td.left { text-align: left; font-weight: 600; color: #1a1d23; }
+        .dash-tbl tr:last-child td { border-bottom: none; font-weight: 700; background: #f8faff; }
+        .dash-tbl .pct { font-size: 10.5px; color: #9ca3af; }
+        .dash-tbl .c-ok   { color: #16a34a; font-weight: 700; }
+        .dash-tbl .c-late { color: #dc2626; font-weight: 700; }
+        .dash-tbl .c-warn { color: #d97706; font-weight: 700; }
+        .dash-tbl .c-blue { color: #2563eb; font-weight: 700; }
+        .dash-tbl .c-dark { color: #1a1d23; font-weight: 700; }
+
+        .dash-chart-title { font-size: 13px; font-weight: 700; color: #1a1d23; text-align: center; }
+        .dash-legend { display: flex; flex-direction: column; gap: 7px; width: 100%; }
+        .dash-legend-item { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: #374151; }
+        .dash-legend-dot { width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0; }
+        .dash-legend-val { margin-left: auto; font-weight: 700; color: #1a1d23; }
+        .dash-legend-pct { font-size: 10px; color: #9ca3af; }
+
+        .dash-empty { text-align: center; padding: 40px; color: #9ca3af; font-size: 13.5px; }
 
         /* Circle loader with blurred backdrop */
         .pom-loader-overlay { display: none; position: fixed; inset: 0; z-index: 700; align-items: center; justify-content: center; background: rgba(244,245,247,0.45); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
@@ -153,10 +239,17 @@
     <div class="pom-header">
         <div>
             <div class="pom-title">🏆 POM Award Management</div>
-            <div class="pom-subtitle">Program Operations Manager Award Tracking</div>
+            <div class="pom-subtitle">One Stop Solution For Awards Data</div>
+        </div>
+        <div class="pom-tabs">
+            <button class="pom-tab active" id="tabManage" onclick="switchPomTab('manage')">Award Management</button>
+            <button class="pom-tab" id="tabDash" onclick="switchPomTab('dash')">Award Data Dashboard<span class="pom-tab-spinner" id="dashTabSpinner" aria-hidden="true"></span><span class="pom-tab-progress" id="dashTabProgress"></span></button>
         </div>
         <div class="pom-badge">AY 2026-27</div>
     </div>
+
+    <!-- ── MANAGEMENT VIEW ── -->
+    <div id="pomManageView" style="display:flex; flex-direction:column; flex:1; min-height:0;">
 
     <!-- ── LIST VIEW ── -->
     <div id="pomListView">
@@ -217,11 +310,18 @@
         </div>
     </div>
 
+    </div><!-- end pomManageView -->
+
     <!-- ── Image popup ── -->
     <div id="pomImgModal" class="pom-img-overlay">
         <div class="pom-img-box">
             <button id="pomImgClose" class="pom-img-close">✕</button>
             <img id="pomImgEl" src="" alt="Award image">
+            <div id="pomImgLoading" class="pom-img-loading"><div class="pom-spinner"></div></div>
+            <div id="pomImgFallback" class="pom-img-fallback">
+                <div>Couldn't preview this image here.</div>
+                <a href="#" target="_blank" rel="noopener">Open in Google Drive ↗</a>
+            </div>
         </div>
     </div>
 
@@ -245,6 +345,108 @@
                 <button id="pomPromptOk" class="pmbtn primary">Save</button>
             </div>
         </div>
+    </div>
+
+    <!-- ── DASHBOARD VIEW ── -->
+    <div id="pomDashView">
+
+        <!-- Filter bar -->
+        <div class="dash-filter-bar">
+
+            <!-- Community: multi-checkbox dropdown (drives District + Month options) -->
+            <div class="dash-filter-group" id="dashCommunityGroup">
+                <div class="dash-filter-label">Community</div>
+                <div class="dash-dd-trigger" id="dashCommunityTrigger">
+                    <span id="dashCommunityLabel">All Communities</span>
+                    <span class="dd-caret">▼</span>
+                </div>
+                <div class="dash-dd-panel" id="dashCommunityPanel">
+                    <label class="dash-dd-all">
+                        <input type="checkbox" id="dashCommunityAll" checked> Select All
+                    </label>
+                    <div id="dashCommunityItems" class="dash-dd-items"></div>
+                    <div class="dash-dd-footer">
+                        <button class="dash-dd-apply" id="dashCommunityApply">Apply</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- District: multi-checkbox dropdown -->
+            <div class="dash-filter-group" id="dashDistrictGroup">
+                <div class="dash-filter-label">District</div>
+                <div class="dash-dd-trigger" id="dashDistrictTrigger">
+                    <span id="dashDistrictLabel">All Districts</span>
+                    <span class="dd-caret">▼</span>
+                </div>
+                <div class="dash-dd-panel" id="dashDistrictPanel">
+                    <label class="dash-dd-all">
+                        <input type="checkbox" id="dashDistrictAll" checked> Select All
+                    </label>
+                    <div id="dashDistrictItems" class="dash-dd-items"></div>
+                    <div class="dash-dd-footer">
+                        <button class="dash-dd-apply" id="dashDistrictApply">Apply</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Month: multi-checkbox dropdown -->
+            <div class="dash-filter-group" id="dashMonthGroup">
+                <div class="dash-filter-label">Month</div>
+                <div class="dash-dd-trigger" id="dashMonthTrigger">
+                    <span id="dashMonthLabel">All Months</span>
+                    <span class="dd-caret">▼</span>
+                </div>
+                <div class="dash-dd-panel" id="dashMonthPanel">
+                    <label class="dash-dd-all">
+                        <input type="checkbox" id="dashMonthAll" checked> Select All
+                    </label>
+                    <div id="dashMonthItems" class="dash-dd-items"></div>
+                    <div class="dash-dd-footer">
+                        <button class="dash-dd-apply" id="dashMonthApply">Apply</button>
+                    </div>
+                </div>
+            </div>
+
+            <button class="dash-refresh-btn" id="dashRefreshBtn" title="Reload the latest data from Award Management">
+                <span class="dash-refresh-ico">⟳</span><span id="dashRefreshTxt">Refresh Data</span>
+            </button>
+
+        </div>
+
+        <!-- Table + Chart -->
+        <div class="dash-content-row">
+            <div class="dash-table-wrap">
+                <table class="dash-tbl">
+                    <thead>
+                        <tr>
+                            <th class="left">Month</th>
+                            <th>Total<br>Awards</th>
+                            <th>Awarded<br>In Time</th>
+                            <th>%</th>
+                            <th>Awarded<br>Late</th>
+                            <th>%</th>
+                            <th>Pending</th>
+                            <th>%</th>
+                            <th>Total<br>Awarded</th>
+                            <th>%</th>
+                            <th>Verified</th>
+                            <th>%</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dashTableBody">
+                        <tr><td colspan="12" class="dash-empty">Loading data…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pie chart -->
+            <div class="dash-chart-wrap">
+                <div class="dash-chart-title">Award Distribution</div>
+                <canvas id="dashPieCanvas" width="200" height="200"></canvas>
+                <div class="dash-legend" id="dashLegend"></div>
+            </div>
+        </div>
+
     </div>
 
 </div>
