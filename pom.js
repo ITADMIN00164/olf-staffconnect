@@ -25,6 +25,8 @@ const UPLOAD_SVG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" 
 const EYE_SVG    = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
 const PENCIL_SVG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
 const CHECK_SVG  = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+const SAVE_SVG   = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>';
+const X_SVG      = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
 
 // ── State ──
 let currentRecords = [];
@@ -168,6 +170,18 @@ async function refetchMonth(month) {
   );
   const recs = await res.json();
   monthCache[month] = Array.isArray(recs) ? recs : [];
+}
+
+// Pull the current month's authoritative records WITHOUT touching the cache.
+// Used by every mutating action to check the live situation before acting, so a
+// stale page can't verify/edit/erase something that changed underneath it.
+async function getFreshRecords() {
+  const district = document.getElementById("pomDistrict").value;
+  const res = await fetch(
+    `${API_URL}?action=getRecords&month=${encodeURIComponent(selectedMonth)}&district=${encodeURIComponent(district)}`
+  );
+  const recs = await res.json();
+  return Array.isArray(recs) ? recs : [];
 }
 
 // ===============================
@@ -370,17 +384,63 @@ function selectMonth(month) {
   renderTable();
 }
 
-// Snapshot which records currently have a saved entry in Awarded Data. A record
-// merged from getRecords has only default values when it ISN'T in Awarded Data,
-// so any non-default app-owned field means it exists there. Used to decide when
-// flipping a row to "No" should delete its saved data.
+// True when a record has a saved entry in Awarded Data. A record merged from
+// getRecords has only default values when it ISN'T there, so any non-default
+// app-owned field means it exists.
+function recInAwardedData(r) {
+  return !!(
+    r.awarded === "Yes" || r.awardedBy || r.awardedDate ||
+    r.folderLink || r.uploadedBy || r.description || r.verified === "Yes"
+  );
+}
+
+// Stable identity for matching the same row across a fresh re-fetch.
+function recKey(r) {
+  return [r.mobile, r.fullName, r.awardName, r.schoolName]
+    .map(x => String(x || "").trim().toLowerCase()).join("¦");
+}
+
+// Snapshot which records currently have a saved entry in Awarded Data, and reset
+// their per-row dirty flag. Used to decide when flipping a row to "No" should
+// delete its saved data.
 function markExisting(records) {
   (records || []).forEach(r => {
-    r._existed = !!(
-      r.awarded === "Yes" || r.awardedBy || r.awardedDate ||
-      r.folderLink || r.uploadedBy || r.description || r.verified === "Yes"
-    );
+    r._existed = recInAwardedData(r);
+    r._dirty = false;   // freshly loaded from the server ⇒ in sync
   });
+}
+
+// ===============================
+// ROW COMPLETENESS (mandatory: Awarded=Yes + Awarded By + Date + Image + Description)
+// ===============================
+function rowHasBy(r)   { return !!(r.awardedBy && String(r.awardedBy).trim()); }
+function rowHasDate(r) { return /^\d{4}-\d{2}-\d{2}$/.test(formatDate(r.awardedDate) || ""); }
+function rowHasImg(r)  { return !!r.folderLink; }
+function rowHasDesc(r) { return !!String(r.description || "").trim(); }
+
+// A row is "complete" (all mandatory fields present) and thus saveable on its own.
+function rowComplete(r) {
+  return r.awarded === "Yes" && rowHasBy(r) && rowHasDate(r) && rowHasImg(r) && rowHasDesc(r);
+}
+
+// A row the user is actively awarding but hasn't finished — blocks "Save All".
+function rowIncompleteYes(r) {
+  return r.verified !== "Yes" && r.awarded === "Yes" && !rowComplete(r);
+}
+
+// List the mandatory fields still missing on a Yes row (for error messages).
+function rowMissingFields(r) {
+  const missing = [];
+  if (!rowHasBy(r))   missing.push("Awarded By");
+  if (!rowHasDate(r)) missing.push("Date");
+  if (!rowHasImg(r))  missing.push("Image");
+  if (!rowHasDesc(r)) missing.push("Description");
+  return missing;
+}
+
+// Keep the global `dirty` flag in sync with per-row `_dirty` markers.
+function recomputeDirty() {
+  dirty = (currentRecords || []).some(r => r._dirty);
 }
 
 // ===============================
@@ -405,9 +465,10 @@ function nameFromEmail(emailOrName) {
 function renderImageCell(index, justUploaded, locked) {
   const rec = currentRecords[index];
   const has = !!rec.folderLink;
-  const uploadCtl = locked
-    ? `<button class="icon-btn" disabled title="${LOCK_MSG}">${UPLOAD_SVG}</button>`
-    : `<label class="icon-btn" title="Upload image">${UPLOAD_SVG}
+  let uploadCtl;
+  if (isVerifier)      uploadCtl = "";           // verifier is view-only — no upload
+  else if (locked)     uploadCtl = `<button class="icon-btn" disabled title="${LOCK_MSG}">${UPLOAD_SVG}</button>`;
+  else                 uploadCtl = `<label class="icon-btn" title="Upload image">${UPLOAD_SVG}
          <input type="file" accept="image/*" style="display:none" onchange="uploadImage(${index}, this.files[0])">
        </label>`;
   const uploaderName = nameFromEmail(rec.uploadedBy || "");
@@ -420,21 +481,90 @@ function renderImageCell(index, justUploaded, locked) {
 
 function renderDescCell(index, locked) {
   const has = !!String(currentRecords[index].description || "").trim();
-  const editCtl = locked
-    ? `<button class="icon-btn" disabled title="${LOCK_MSG}">${PENCIL_SVG}</button>`
-    : `<button class="icon-btn" title="Write description" onclick="editDescription(${index})">${PENCIL_SVG}</button>`;
+  let editCtl;
+  if (isVerifier)      editCtl = "";             // verifier is view-only — no edit
+  else if (locked)     editCtl = `<button class="icon-btn" disabled title="${LOCK_MSG}">${PENCIL_SVG}</button>`;
+  else                 editCtl = `<button class="icon-btn" title="Write description" onclick="editDescription(${index})">${PENCIL_SVG}</button>`;
   return `${editCtl}<button class="icon-btn" title="View description" ${has ? "" : "disabled"} onclick="viewDescription(${index})">${EYE_SVG}</button>`;
 }
 
 function renderVerifyCell(index) {
   const r = currentRecords[index];
-  if (r.verified === "Yes") {
-    const verifierName = nameFromEmail(r.verifiedBy || "");
-    return `<span class="verified-badge">${CHECK_SVG} Verified</span>${verifierName ? `<span class="cell-sublabel" title="${r.verifiedBy}">${verifierName}</span>` : ""}`;
+  const who = (email) => {
+    const n = nameFromEmail(email || "");
+    return n ? `<span class="cell-sublabel" title="${email}">${n}</span>` : "";
+  };
+
+  if (r.verified === "Yes")
+    return `<span class="verified-badge">${CHECK_SVG} Verified</span>${who(r.verifiedBy)}`;
+  if (r.verified === "Rejected")
+    return `<span class="rejected-badge">${X_SVG} Rejected</span>${who(r.verifiedBy)}`;
+
+  // Pending: only meaningful once the record is actually in Awarded Data
+  // (awarded = Yes with an uploaded image).
+  const submitted = r.awarded === "Yes" && r.folderLink;
+  if (!submitted)
+    return isVerifier ? `<span class="verify-na" title="Nothing to verify">—</span>` : "";
+
+  if (isVerifier) {
+    const sub = nameFromEmail(r.uploadedBy || "");
+    const tip = sub ? `Submitted by ${sub} — verify or reject` : "Verify or reject";
+    return `<span class="vr-actions" title="${tip}">`
+      + `<button class="vr-btn approve" title="Verify" onclick="verifyRecord(${index})">${CHECK_SVG}</button>`
+      + `<button class="vr-btn reject" title="Reject" onclick="rejectRecord(${index})">${X_SVG}</button>`
+      + `</span>`;
   }
-  if (!isVerifier)
-    return `<span class="verify-na" title="Verifier access required">🔒 No access</span>`;
-  return `<button class="verify-btn" onclick="verifyRecord(${index})">Verify</button>`;
+  // Data-entry user: show the submitted status.
+  return `<span class="submitted-badge">Submitted</span>${who(r.uploadedBy)}`;
+}
+
+// Per-row Save control.
+//  • Awarded = Yes: solid ("ready") when all mandatory fields are filled; outlined
+//    while something's missing (clicking explains what); "Saved" once persisted
+//    with no pending edits. Editing a saved row flips it back to a Save button.
+//  • Awarded = No on a row that was previously saved: a red Save button that, on
+//    click, confirms erasing that user's saved data. Rows never saved show nothing.
+function renderRowSaveCell(index) {
+  const r = currentRecords[index];
+  if (isVerifier)           return "";          // verifier is view-only — cannot save
+  if (r.verified === "Yes") return "";          // verified → locked (rejected rows stay editable)
+
+  if (r.awarded !== "Yes") {
+    // Only offer an action if there is saved data to erase and the user changed it.
+    if (r._existed && r._dirty) {
+      return `<button class="rowsave-btn danger" title="Erase this user's saved data" onclick="saveSingleRecord(${index})">${SAVE_SVG}Save</button>`;
+    }
+    return "";                                  // nothing awarded, nothing to save/erase
+  }
+
+  const complete = rowComplete(r);
+  if (complete && r._existed && !r._dirty) {
+    if (r.verified === "Rejected") return "";   // rejected & untouched → edit to resubmit (status shown in Verify column)
+    return `<span class="rowsave-saved" title="This record is saved">${CHECK_SVG} Saved</span>`;
+  }
+  const cls = complete ? "rowsave-btn ready" : "rowsave-btn";
+  const title = complete
+    ? "Save this record"
+    : "Fill Awarded By, Date, Image and Description, then save";
+  return `<button class="${cls}" title="${title}" onclick="saveSingleRecord(${index})">${SAVE_SVG}Save</button>`;
+}
+
+// Re-render just one row's Save cell (used after inline edits, without a full table redraw).
+function refreshRowControls(index) {
+  const cell = document.getElementById("rowsave-" + index);
+  if (cell) cell.innerHTML = renderRowSaveCell(index);
+}
+
+// Show the "Save All Changes" bar only when there is something to commit:
+// at least one complete-but-unsaved row, or a previously-saved row flipped to "No".
+function updateSaveAllBar() {
+  const bar = document.getElementById("pomSaveBar");
+  if (!bar) return;
+  if (isVerifier) { bar.style.display = "none"; return; }   // verifier is view-only
+  const recs = currentRecords || [];
+  const anyUnsavedComplete = recs.some(r => r.verified !== "Yes" && rowComplete(r) && (r._dirty || !r._existed));
+  const anyPendingDelete   = recs.some(r => r._existed && r.awarded === "No" && r.verified !== "Yes");
+  bar.style.display = (anyUnsavedComplete || anyPendingDelete) ? "block" : "none";
 }
 
 function renderTable() {
@@ -446,9 +576,10 @@ function renderTable() {
   }
 
   tbody.innerHTML = currentRecords.map((r, i) => {
-    const locked = r.verified === "Yes";
-    const dis = locked ? "disabled" : "";
-    const lt = locked ? `title="${LOCK_MSG}"` : "";
+    const locked   = r.verified === "Yes";       // verified → locked for the user
+    const viewOnly = locked || isVerifier;        // editing controls disabled (verified row, or verifier)
+    const dis = viewOnly ? "disabled" : "";
+    const lt  = locked ? `title="${LOCK_MSG}"` : (isVerifier ? `title="View only — verifier access"` : "");
     return `
     <tr class="${locked ? "locked-row" : ""}" ${lt}>
       <td class="name-cell">
@@ -468,23 +599,30 @@ function renderTable() {
         </select>
       </td>
       <td ${lt}><input type="date" class="award-input date-compact" ${dis} value="${formatDate(r.awardedDate)}" onchange="updateField(${i},'awardedDate',this.value)"></td>
-      <td class="img-cell" id="imgcell-${i}">${renderImageCell(i, false, locked)}</td>
-      <td class="img-cell" id="desccell-${i}">${renderDescCell(i, locked)}</td>
+      <td class="img-cell" id="imgcell-${i}">${renderImageCell(i, false, viewOnly)}</td>
+      <td class="img-cell" id="desccell-${i}">${renderDescCell(i, viewOnly)}</td>
+      <td class="col-center" id="rowsave-${i}">${renderRowSaveCell(i)}</td>
       <td class="verify-cell col-center" id="verify-${i}">${renderVerifyCell(i)}</td>
       <td class="col-center" id="unlock-${i}">${locked && isVerifier ? `<button class="unlock-btn" onclick="unlockRecord(${i})">Unlock</button>` : ""}</td>
     </tr>`;
   }).join("");
+
+  updateSaveAllBar();
 }
 
 function resetDetail(msg) {
   document.getElementById("pomTableBody").innerHTML =
-    `<tr><td colspan="9" style="text-align:center;color:#9ca3af;padding:28px;">${msg}</td></tr>`;
+    `<tr><td colspan="10" style="text-align:center;color:#9ca3af;padding:28px;">${msg}</td></tr>`;
+  updateSaveAllBar();
 }
 
 window.updateField = function (index, field, value) {
   currentRecords[index][field] = value;
+  currentRecords[index]._dirty = true;
   dirty = true;
   if ((field === "awarded" || field === "awardedDate") && selectedMonth) updateMonthRow(selectedMonth);
+  refreshRowControls(index);
+  updateSaveAllBar();
 };
 
 // ===============================
@@ -506,8 +644,35 @@ function driveId(url) {
 window.uploadImage = async function (index, file) {
   if (!file) return;
   const cell = document.getElementById("imgcell-" + index);
-  const existingUrl = currentRecords[index].folderLink;
+  const rec  = currentRecords[index];
 
+  // Guard: this record may have been verified (locked) since the page loaded.
+  // Check Awarded Data BEFORE uploading anything, so a stale page can't push a new
+  // image to Drive for a locked record (which could never be saved anyway).
+  cell.innerHTML = '<span class="img-status">⏳ Checking…</span>';
+  try {
+    const fresh = await getFreshRecords();
+    const match = fresh.find(f => recKey(f) === recKey(rec));
+    if (match && match.verified === "Yes") {          // verified elsewhere → locked
+      adoptFreshInto(rec, match);
+      if (selectedMonth) { monthCache[selectedMonth] = currentRecords; updateMonthRow(selectedMonth); }
+      recomputeDirty();
+      renderTable();                                  // lock the row to match reality
+      await showModal({
+        title: "Record is locked",
+        message: `This record was verified by ${nameFromEmail(match.verifiedBy) || "a verifier"} and is locked, so a new image can't be uploaded. The latest status is now shown.`,
+        buttons: [{ label: "OK", value: true, variant: "primary" }]
+      });
+      return;
+    }
+  } catch (e) {
+    console.error(e);
+    cell.innerHTML = renderImageCell(index);
+    showToast("Couldn't reach the server. Try again.", "error");
+    return;
+  }
+
+  const existingUrl = rec.folderLink;
   if (existingUrl) {
     const ok = await confirmOverride();
     if (!ok) { cell.innerHTML = renderImageCell(index); return; } // Cancel → keep old image
@@ -535,12 +700,10 @@ window.uploadImage = async function (index, file) {
 
     currentRecords[index].folderLink = out.url;
     currentRecords[index].uploadedBy = currentUser();
+    currentRecords[index]._dirty = true;      // image is on Drive but NOT yet written to the record — user must Save
     cell.innerHTML = renderImageCell(index, true, false);
-
-    // Persist the new link to the sheet right away so Drive and the sheet never
-    // diverge — otherwise an upload that isn't saved orphans the file and leaves
-    // the record pointing at the old (now-deleted) image.
-    persistImageLink(index);
+    refreshRowControls(index);                // row now shows its Save button (not "Saved")
+    updateSaveAllBar();
 
     if (payload.replaceId && out.deletedOld === false) {
       console.warn("Old image not deleted. replaceId:", payload.replaceId, "error:", out.deleteError);
@@ -556,19 +719,9 @@ window.uploadImage = async function (index, file) {
   }
 };
 
-// Save just this record so a freshly-uploaded image link is persisted
-// immediately (image uploads hit Drive instantly, so the sheet must follow).
-async function persistImageLink(index) {
-  try {
-    const rec = currentRecords[index];
-    await fetch(API_URL, {
-      method: "POST",
-      body: JSON.stringify({ action: "saveRecords", records: [{ ...rec }] })
-    });
-  } catch (e) {
-    console.warn("Could not auto-save the image link:", e);
-  }
-};
+// ===============================
+// IMAGE VIEW
+// ===============================
 
 window.viewImage = function (index) {
   const url = currentRecords[index].folderLink;
@@ -657,9 +810,12 @@ window.editDescription = async function (index) {
   const text = await showPrompt("Description", currentRecords[index].description || "");
   if (text === null) return;               // Cancel → no change
   currentRecords[index].description = text;
+  currentRecords[index]._dirty = true;
   dirty = true;
   const cell = document.getElementById("desccell-" + index);
   if (cell) cell.innerHTML = renderDescCell(index, currentRecords[index].verified === "Yes");
+  refreshRowControls(index);
+  updateSaveAllBar();
 };
 
 window.viewDescription = function (index) {
@@ -671,71 +827,272 @@ window.viewDescription = function (index) {
 };
 
 // ===============================
-// VERIFY (verifier-only; persists immediately)
+// VERIFY / REJECT (verifier-only; persists immediately)
+// Both record a verifier decision in Awarded Data (verified = "Yes" or "Rejected"),
+// which is then visible to the data-entry user. Guards against a stale page: the
+// user may have erased the record after this page loaded, so we re-pull
+// authoritative data first and refuse to decide (never re-insert) anything no
+// longer present in Awarded Data.
 // ===============================
-window.verifyRecord = async function (index) {
+async function decideRecord(index, decision) {   // decision: "Yes" (verify) | "Rejected" (reject)
   if (!isVerifier) { showToast("You don't have verifier access.", "error"); return; }
+  const verb = decision === "Yes" ? "Verifying" : "Rejecting";
+  const done = decision === "Yes" ? "verified" : "rejected";
 
   const cell = document.getElementById("verify-" + index);
-  cell.innerHTML = '<span class="img-status">⏳ Verifying…</span>';
+  if (cell) cell.innerHTML = `<span class="img-status">⏳ ${verb}…</span>`;
 
-  const me = currentUser();
   const rec = currentRecords[index];
-  rec.verified = "Yes";
-  rec.verifiedBy = me;
-  rec.late = isLate(rec, selectedMonth) ? "Yes" : "No";
+  const me  = currentUser();
 
   try {
+    // 1) Re-pull the month straight from the server (source of truth).
+    const district = document.getElementById("pomDistrict").value;
+    const fresh = await (await fetch(
+      `${API_URL}?action=getRecords&month=${encodeURIComponent(selectedMonth)}&district=${encodeURIComponent(district)}`
+    )).json();
+    const freshArr = Array.isArray(fresh) ? fresh : [];
+    const match = freshArr.find(f => recKey(f) === recKey(rec));
+
+    // 2) No longer in Awarded Data → the user erased it. Do NOT re-insert.
+    if (!match || !recInAwardedData(match)) {
+      Object.assign(rec, {
+        awarded: "No", awardedBy: "", awardedDate: "", folderLink: "",
+        uploadedBy: "", description: "", verified: "", verifiedBy: "", late: ""
+      });
+      rec._existed = false; rec._dirty = false;
+      if (selectedMonth) updateMonthRow(selectedMonth);
+      renderTable();
+      await showModal({
+        title: "Record no longer available",
+        message: `This record was deleted by the user, so it's no longer in Awarded Data and can't be ${done}.`,
+        buttons: [{ label: "OK", value: true, variant: "primary" }]
+      });
+      return;
+    }
+
+    // 3) Still present → record the decision on the current (authoritative) record.
+    const decided = { ...match, verified: decision, verifiedBy: me };
+    decided.late = isLate(decided, selectedMonth) ? "Yes" : "No";
+
     const res = await fetch(API_URL, {
       method: "POST",
-      body: JSON.stringify({ action: "saveRecords", records: [{ ...rec, _override: true }] })
+      body: JSON.stringify({ action: "saveRecords", records: [{ ...decided, _override: true }] })
     });
     const out = await res.json();
     if (!out.success) throw new Error("Save failed");
 
+    // 4) Reflect the decision locally (adopt fresh data for this row).
+    Object.assign(rec, decided);
+    rec._existed = true; rec._dirty = false;
     if (selectedMonth) { monthCache[selectedMonth] = currentRecords; updateMonthRow(selectedMonth); }
-    renderTable();   // re-render so the row locks
-    showToast("Record verified.");
+    renderTable();   // re-render so the row locks with its badge
+    showToast(`Record ${done}.`);
   } catch (e) {
     console.error(e);
-    rec.verified = ""; rec.verifiedBy = "";
-    cell.innerHTML = renderVerifyCell(index);
+    if (cell) cell.innerHTML = renderVerifyCell(index);
     const unlockCell = document.getElementById("unlock-" + index);
     if (unlockCell) unlockCell.innerHTML = "";
-    showToast("Verification failed.", "error");
+    showToast(`${decision === "Yes" ? "Verification" : "Rejection"} failed.`, "error");
   }
-};
+}
+
+window.verifyRecord = (index) => decideRecord(index, "Yes");
+window.rejectRecord = (index) => decideRecord(index, "Rejected");
 
 // ===============================
-// UNLOCK (verifier-only): clears verification so the row becomes editable.
+// UNLOCK (verifier-only): reverts a verified record to pending (Submitted) so it
+// becomes editable again. Re-checks Awarded Data first so it can't re-insert a
+// record the user has since erased.
 // ===============================
 window.unlockRecord = async function (index) {
   if (!isVerifier) { showToast("Only a verifier can unlock a record.", "error"); return; }
 
   const cell = document.getElementById("verify-" + index);
-  cell.innerHTML = '<span class="img-status">⏳ Unlocking…</span>';
+  if (cell) cell.innerHTML = '<span class="img-status">⏳ Unlocking…</span>';
 
   const rec = currentRecords[index];
-  const prevV = rec.verified, prevBy = rec.verifiedBy;
-  rec.verified = "";
-  rec.verifiedBy = "";
 
   try {
+    const fresh = await getFreshRecords();
+    const match = fresh.find(f => recKey(f) === recKey(rec));
+
+    // No longer in Awarded Data → the user erased it. Don't re-insert.
+    if (!match || !recInAwardedData(match)) {
+      Object.assign(rec, { awarded: "No", awardedBy: "", awardedDate: "", folderLink: "",
+        uploadedBy: "", description: "", verified: "", verifiedBy: "", late: "" });
+      rec._existed = false; rec._dirty = false;
+      if (selectedMonth) updateMonthRow(selectedMonth);
+      renderTable();
+      await showModal({
+        title: "Record no longer available",
+        message: "This record was deleted by the user, so there's nothing to unlock.",
+        buttons: [{ label: "OK", value: true, variant: "primary" }]
+      });
+      return;
+    }
+
+    // Still present → clear the decision (back to Submitted / pending).
+    const reopened = { ...match, verified: "", verifiedBy: "" };
     const res = await fetch(API_URL, {
       method: "POST",
-      body: JSON.stringify({ action: "saveRecords", records: [{ ...rec, _override: true }] })
+      body: JSON.stringify({ action: "saveRecords", records: [{ ...reopened, _override: true }] })
     });
     const out = await res.json();
     if (!out.success) throw new Error("Save failed");
 
+    Object.assign(rec, reopened);
+    rec._existed = true; rec._dirty = false;
     if (selectedMonth) { monthCache[selectedMonth] = currentRecords; updateMonthRow(selectedMonth); }
     renderTable();   // re-render so the row unlocks
     showToast("Row unlocked.");
   } catch (e) {
     console.error(e);
-    rec.verified = prevV; rec.verifiedBy = prevBy;
-    cell.innerHTML = renderVerifyCell(index);
+    if (cell) cell.innerHTML = renderVerifyCell(index);
     showToast("Unlock failed.", "error");
+  }
+};
+
+// ===============================
+// SAVE ONE ROW (from the per-row Save button).
+//  • Awarded = Yes → persist the row if every mandatory field is filled, else say
+//    what's missing. Re-checks the whole row each time (so edits after a save are
+//    re-validated before saving again).
+//  • Awarded = No on a previously-saved row → confirm, then permanently erase that
+//    user's saved award data.
+// ===============================
+// ===============================
+// SAVE ONE ROW (from the per-row Save button).
+//  • Awarded = Yes → persist the row if every mandatory field is filled, else say
+//    what's missing. Saving (re)submits the record, so its status becomes
+//    "Submitted" (clearing any prior Rejected decision).
+//  • Awarded = No on a previously-saved row → confirm, then permanently erase.
+// Every path first re-checks Awarded Data: if the record was verified underneath a
+// stale page it refuses; if it was already erased it just syncs.
+// ===============================
+function adoptFreshInto(rec, fresh) {
+  Object.assign(rec, fresh);
+  rec._existed = recInAwardedData(fresh);
+  rec._dirty = false;
+}
+async function refuseBecauseVerified(rec, fresh) {
+  adoptFreshInto(rec, fresh);
+  if (selectedMonth) { monthCache[selectedMonth] = currentRecords; updateMonthRow(selectedMonth); }
+  recomputeDirty();
+  renderTable();
+  await showModal({
+    title: "Already verified",
+    message: `This record was just verified by ${nameFromEmail(fresh.verifiedBy) || "a verifier"} and can no longer be changed. The latest status is now shown.`,
+    buttons: [{ label: "OK", value: true, variant: "primary" }]
+  });
+}
+
+window.saveSingleRecord = async function (index) {
+  const r = currentRecords[index];
+  if (!r || isVerifier || r.verified === "Yes") return;   // verifier / verified → can't save here
+
+  // --- Erase path: row was saved, now set to "No" ---
+  if (r.awarded !== "Yes") {
+    if (!r._existed || !r._dirty) return;       // only if there's saved data the user just un-awarded
+
+    // Stale check before erasing.
+    let fresh;
+    try { fresh = await getFreshRecords(); }
+    catch (e) { console.error(e); showToast("Couldn't reach the server. Try again.", "error"); return; }
+    const match = fresh.find(f => recKey(f) === recKey(r));
+    if (match && match.verified === "Yes") { await refuseBecauseVerified(r, match); return; }
+    if (!match || !recInAwardedData(match)) {   // already gone → just sync
+      Object.assign(r, { awarded: "No", awardedBy: "", awardedDate: "", folderLink: "",
+        uploadedBy: "", description: "", verified: "", verifiedBy: "", late: "" });
+      r._existed = false; r._dirty = false;
+      if (selectedMonth) { monthCache[selectedMonth] = currentRecords; updateMonthRow(selectedMonth); }
+      recomputeDirty(); renderTable();
+      showToast("This record was already removed.");
+      return;
+    }
+
+    const who = r.fullName ? `${r.fullName}'s` : "this user's";
+    const choice = await showModal({
+      title: "Erase this record?",
+      message: `${who} saved award data will be erased permanently. Do you want to perform this action?`,
+      buttons: [
+        { label: "No", value: "no", variant: "cancel" },
+        { label: "Yes, erase", value: "yes", variant: "danger" }
+      ]
+    });
+    if (choice !== "yes") return;
+
+    const eCell = document.getElementById("rowsave-" + index);
+    if (eCell) eCell.innerHTML = '<span class="img-status">⏳ Erasing…</span>';
+    try {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        body: JSON.stringify({ action: "deleteRecords", records: [{ ...r }] })
+      });
+      const out = await res.json();
+      if (!out.success) throw new Error(out.error || "Delete failed");
+
+      r.awardedBy = ""; r.awardedDate = ""; r.folderLink = "";
+      r.uploadedBy = ""; r.description = ""; r.verified = ""; r.verifiedBy = ""; r.late = "";
+      r._existed = false; r._dirty = false;
+
+      if (selectedMonth) { monthCache[selectedMonth] = currentRecords; updateMonthRow(selectedMonth); }
+      recomputeDirty();
+      renderTable();
+      showToast((r.fullName ? r.fullName + " — " : "") + "data erased permanently."
+        + (out.imageDeleteFailed ? " (image file could not be removed)" : ""));
+    } catch (e) {
+      console.error(e);
+      refreshRowControls(index);
+      showToast("Failed to erase this record.", "error");
+    }
+    return;
+  }
+
+  // --- Save path: Awarded = Yes ---
+  if (!rowComplete(r)) {
+    showToast("Fill all mandatory fields for this record: " + rowMissingFields(r).join(", ") + ".", "error");
+    return;
+  }
+
+  const cell = document.getElementById("rowsave-" + index);
+  if (cell) cell.innerHTML = '<span class="img-status">⏳ Saving…</span>';
+
+  try {
+    // Stale check: did this record get verified underneath us?
+    const fresh = await getFreshRecords();
+    const match = fresh.find(f => recKey(f) === recKey(r));
+    if (match && match.verified === "Yes") { await refuseBecauseVerified(r, match); return; }
+
+    // Saving (re)submits → status becomes "Submitted" (clears any prior decision).
+    r.verified = ""; r.verifiedBy = "";
+    r.late = isLate(r, selectedMonth) ? "Yes" : "No";
+
+    const res = await fetch(API_URL, {
+      method: "POST",
+      body: JSON.stringify({ action: "saveRecords", records: [{ ...r }] })
+    });
+    const out = await res.json();
+    if (!out.success) throw new Error(out.error || "Save failed");
+    if (out.locked && out.locked.length) {
+      await showModal({ title: "Record is locked", message: LOCK_MSG,
+        buttons: [{ label: "OK", value: true, variant: "primary" }] });
+      refreshRowControls(index);
+      return;
+    }
+
+    r._existed = true; r._dirty = false;
+    if (selectedMonth) { monthCache[selectedMonth] = currentRecords; updateMonthRow(selectedMonth); }
+    recomputeDirty();
+    refreshRowControls(index);
+    const vCell = document.getElementById("verify-" + index);
+    if (vCell) vCell.innerHTML = renderVerifyCell(index);   // → "Submitted"
+    updateSaveAllBar();
+    showToast((r.fullName ? r.fullName + " — " : "") + "submitted successfully.");
+  } catch (e) {
+    console.error(e);
+    refreshRowControls(index);
+    showToast("Failed to save this record.", "error");
   }
 };
 
@@ -744,9 +1101,21 @@ window.unlockRecord = async function (index) {
 // Re-pulls the month afterwards so the saved state shows without a reload.
 // ===============================
 async function saveRecords() {
+  // Guard: any row being awarded (Yes) that isn't fully filled blocks the whole
+  // save. Rows left untouched ("No") are fine — they're simply skipped below.
+  const incomplete = currentRecords.filter(rowIncompleteYes);
+  if (incomplete.length) {
+    const names = incomplete.map(r => r.fullName || "a record").slice(0, 4).join(", ");
+    const extra = incomplete.length > 4 ? ` and ${incomplete.length - 4} more` : "";
+    showToast(`Fill all mandatory fields (Awarded By, Date, Image, Description) for ${names}${extra} before saving.`, "error");
+    return false;
+  }
+
+  // Complete awarded rows that aren't already verified. Saving them (re)submits
+  // each, so their status becomes "Submitted" (any prior Rejected is cleared).
   const toSave = currentRecords
-    .filter(r => r.awarded === "Yes")
-    .map(r => ({ ...r, late: isLate(r, selectedMonth) ? "Yes" : "No" }));
+    .filter(r => r.awarded === "Yes" && r.verified !== "Yes")
+    .map(r => ({ ...r, verified: "", verifiedBy: "", late: isLate(r, selectedMonth) ? "Yes" : "No" }));
 
   // Unlocked rows that already had saved data but are now set to "No" →
   // their data (and image) should be deleted from Awarded Data.
@@ -755,26 +1124,68 @@ async function saveRecords() {
   );
 
   if (!toSave.length && !toDelete.length) {
-    showToast("No awarded (Yes) records to save.", "error");
+    showToast("No completely-filled records to save.", "info");
     return false;
   }
 
-  // Confirm the permanent deletion before touching anything.
-  if (toDelete.length) {
-    const names = toDelete.map(r => r.fullName || "this record").join(", ");
-    const message = toDelete.length === 1
-      ? `${names}'s data will be deleted permanently. Are you sure you want to delete this data?`
-      : `The following records will be deleted permanently:\n\n${names}\n\nThis cannot be undone. Are you sure?`;
-    const choice = await showModal({
-      title: "Delete record data?",
-      message,
-      buttons: [
-        { label: "Cancel", value: "cancel", variant: "cancel" },
-        { label: "Delete", value: "delete", variant: "danger" }
-      ]
+  // Stale check: re-pull Awarded Data and refuse if any row we're about to save or
+  // delete was verified underneath this (possibly stale) page. Adopt the fresh
+  // state for those rows so the page reflects reality, then abort.
+  let freshAll;
+  try { freshAll = await getFreshRecords(); }
+  catch (e) { console.error(e); showToast("Couldn't reach the server. Try again.", "error"); return false; }
+  const freshByKey = {};
+  freshAll.forEach(f => { freshByKey[recKey(f)] = f; });
+  const conflicts = [...toSave, ...toDelete].filter(r => {
+    const f = freshByKey[recKey(r)];
+    return f && f.verified === "Yes";           // became verified on the server
+  });
+  if (conflicts.length) {
+    conflicts.forEach(r => {
+      const local = currentRecords.find(c => recKey(c) === recKey(r));
+      const f = freshByKey[recKey(r)];
+      if (local && f) adoptFreshInto(local, f);
     });
-    if (choice !== "delete") return false;   // cancel → nothing saved or deleted
+    recomputeDirty();
+    renderTable();
+    const names = conflicts.map(r => r.fullName || "a record").slice(0, 4).join(", ");
+    const extra = conflicts.length > 4 ? ` and ${conflicts.length - 4} more` : "";
+    showToast(`These records were just verified and can no longer be changed: ${names}${extra}. The latest status is now shown.`, "error");
+    return false;
   }
+
+  // Confirm before committing. Complete rows get saved; rows flipped to "No" that
+  // previously had saved data get permanently deleted.
+  const saveCount = toSave.length;
+  let confirmTitle, confirmMsg, confirmLabel, confirmVariant;
+  if (toDelete.length) {
+    const delNames = toDelete.map(r => r.fullName || "this record").join(", ");
+    const parts = [];
+    if (saveCount) {
+      parts.push(`${saveCount} record${saveCount === 1 ? " is" : "s are"} filled completely and will be saved.`);
+    }
+    parts.push(
+      `${toDelete.length} record${toDelete.length === 1 ? " was" : "s were"} set to "No" and ${toDelete.length === 1 ? "its" : "their"} saved data will be permanently deleted:\n${delNames}\n\nThis cannot be undone.`
+    );
+    confirmTitle = "Save changes?";
+    confirmMsg = parts.join("\n\n");
+    confirmLabel = saveCount ? "Save & Delete" : "Delete";
+    confirmVariant = "danger";
+  } else {
+    confirmTitle = "Save changes?";
+    confirmMsg = `${saveCount} record${saveCount === 1 ? " is" : "s are"} filled completely. Are you sure you want to save ${saveCount === 1 ? "it" : "them all"}?`;
+    confirmLabel = "Save";
+    confirmVariant = "primary";
+  }
+  const choice = await showModal({
+    title: confirmTitle,
+    message: confirmMsg,
+    buttons: [
+      { label: "Cancel", value: "cancel", variant: "cancel" },
+      { label: confirmLabel, value: "go", variant: confirmVariant }
+    ]
+  });
+  if (choice !== "go") return false;   // cancel → nothing saved or deleted
 
   const btn = document.getElementById("savePomBtn");
   btn.disabled = true;
@@ -991,6 +1402,10 @@ let dashLoading      = false;   // background fetch in progress
 let dashDistrictsList = [];     // canonical district list (server order)
 let dashDistrictSel  = null;    // committed district selection (applied on "Apply")
 let dashMonthSel     = null;    // committed month selection (applied on "Apply")
+let dashCategorySel  = null;    // committed award-category selection (applied on "Apply")
+let dashAwardSel     = null;    // committed award-name selection (applied on "Apply")
+let dashLastRows     = [];      // rows currently shown in the table (for Excel export)
+let dashLastTotals   = null;    // totals row currently shown (for Excel export)
 let dashCommunitySel = null;    // committed community selection (drives District + Month)
 let dashRetryTimer   = null;    // pending background-load retry
 let dashRetryDelay   = 3000;    // backoff between retries (grows to a cap)
@@ -999,6 +1414,8 @@ async function initDashboard() {
   setupDropdownToggle("dashCommunityTrigger", "dashCommunityPanel");
   setupDropdownToggle("dashDistrictTrigger", "dashDistrictPanel");
   setupDropdownToggle("dashMonthTrigger", "dashMonthPanel");
+  setupDropdownToggle("dashCategoryTrigger", "dashCategoryPanel");
+  setupDropdownToggle("dashAwardTrigger", "dashAwardPanel");
   document.addEventListener("click", closeDashDropdowns);
 
   // "Apply" buttons: a selection is only committed (and the dashboard
@@ -1010,9 +1427,16 @@ async function initDashboard() {
   if (dApply) dApply.onclick = (e) => { e.stopPropagation(); applyDashFilter("district"); };
   const mApply = document.getElementById("dashMonthApply");
   if (mApply) mApply.onclick = (e) => { e.stopPropagation(); applyDashFilter("month"); };
+  const catApply = document.getElementById("dashCategoryApply");
+  if (catApply) catApply.onclick = (e) => { e.stopPropagation(); applyDashFilter("category"); };
+  const awdApply = document.getElementById("dashAwardApply");
+  if (awdApply) awdApply.onclick = (e) => { e.stopPropagation(); applyDashFilter("award"); };
 
   const refreshBtn = document.getElementById("dashRefreshBtn");
   if (refreshBtn) refreshBtn.onclick = (e) => { e.stopPropagation(); refreshDashData(); };
+
+  const exportBtn = document.getElementById("dashExportBtn");
+  if (exportBtn) exportBtn.onclick = (e) => { e.stopPropagation(); downloadDashboardExcel(); };
 
   // Navigating away and back re-injects empty filter panels. If the data was
   // already loaded earlier this session, rebuild the filters right away so the
@@ -1104,6 +1528,8 @@ function closeDashDropdowns(e) {
     updateDashCommunityLabelFrom(dashCommunitySel || []);
     updateDashDistrictLabelFrom(dashDistrictSel || []);
     updateDashMonthLabelFrom(dashMonthSel || []);
+    updateDashCategoryLabelFrom(dashCategorySel || []);
+    updateDashAwardLabelFrom(dashAwardSel || []);
   }
 }
 
@@ -1294,7 +1720,7 @@ function scheduleDashRetry() {
 
 // Loading state shown inside the three filters while data is being fetched.
 function setDashFiltersLoading(on) {
-  [["dashCommunityTrigger", "dashCommunityLabel"], ["dashDistrictTrigger", "dashDistrictLabel"], ["dashMonthTrigger", "dashMonthLabel"]].forEach(([tid, lid]) => {
+  [["dashCommunityTrigger", "dashCommunityLabel"], ["dashDistrictTrigger", "dashDistrictLabel"], ["dashMonthTrigger", "dashMonthLabel"], ["dashCategoryTrigger", "dashCategoryLabel"], ["dashAwardTrigger", "dashAwardLabel"]].forEach(([tid, lid]) => {
     const t = document.getElementById(tid);
     const l = document.getElementById(lid);
     if (t) t.classList.toggle("loading", on);
@@ -1312,6 +1738,11 @@ function communityFilterFn() {
   const selC = new Set(dashCommunitySel || []);
   return r => selC.size === 0 || selC.has(r.community);
 }
+// Award category lives on each record next to awardName. Field name isn't
+// referenced elsewhere in the frontend, so read it defensively.
+function recAwardCategory(r) {
+  return r.awardCategory || r.awardCat || r.category || r.award_category || "";
+}
 function availableDistricts() {
   const inC = communityFilterFn();
   return dashDistrictsList.filter(d => dashAllData.some(r => inC(r) && r._district === d));
@@ -1319,6 +1750,14 @@ function availableDistricts() {
 function availableMonths() {
   const inC = communityFilterFn();
   return allMonths.filter(m => dashAllData.some(r => inC(r) && r._month === m));
+}
+function availableCategories() {
+  const inC = communityFilterFn();
+  return [...new Set(dashAllData.filter(inC).map(recAwardCategory).filter(Boolean))].sort();
+}
+function availableAwardNames() {
+  const inC = communityFilterFn();
+  return [...new Set(dashAllData.filter(inC).map(r => r.awardName || "").filter(Boolean))].sort();
 }
 
 function populateDashFilters(districts) {
@@ -1338,26 +1777,46 @@ function populateDashFilters(districts) {
   buildCheckboxList("dashDistrictItems", "dashDistrictAll", availD, dashDistrictSel);
   buildCheckboxList("dashMonthItems",    "dashMonthAll",    availM, dashMonthSel);
 
+  // Award Category + Award Name: also scoped to the selected communities.
+  const availCat = availableCategories();
+  const availAwd = availableAwardNames();
+  dashCategorySel = dashCategorySel === null ? [...availCat] : dashCategorySel.filter(c => availCat.includes(c));
+  dashAwardSel    = dashAwardSel    === null ? [...availAwd] : dashAwardSel.filter(a => availAwd.includes(a));
+
+  buildCheckboxList("dashCategoryItems", "dashCategoryAll", availCat, dashCategorySel);
+  buildCheckboxList("dashAwardItems",    "dashAwardAll",    availAwd, dashAwardSel);
+
   // Clear the loading visuals and show the committed labels.
-  ["dashCommunityTrigger", "dashDistrictTrigger", "dashMonthTrigger"].forEach(id => {
+  ["dashCommunityTrigger", "dashDistrictTrigger", "dashMonthTrigger", "dashCategoryTrigger", "dashAwardTrigger"].forEach(id => {
     const t = document.getElementById(id); if (t) t.classList.remove("loading");
   });
   updateDashCommunityLabelFrom(dashCommunitySel);
   updateDashDistrictLabelFrom(dashDistrictSel);
   updateDashMonthLabelFrom(dashMonthSel);
+  updateDashCategoryLabelFrom(dashCategorySel);
+  updateDashAwardLabelFrom(dashAwardSel);
 }
 
-// When the community selection changes, rebuild District + Month to only the
-// values available for those communities, and select them all by default.
+// When the community selection changes, rebuild the child filters (District,
+// Month, Award Category, Award Name) to only the values available for those
+// communities, and select them all by default.
 function rebuildDistrictMonthForCommunity() {
-  const availD = availableDistricts();
-  const availM = availableMonths();
+  const availD   = availableDistricts();
+  const availM   = availableMonths();
+  const availCat = availableCategories();
+  const availAwd = availableAwardNames();
   dashDistrictSel = [...availD];
   dashMonthSel    = [...availM];
-  buildCheckboxList("dashDistrictItems", "dashDistrictAll", availD, dashDistrictSel);
-  buildCheckboxList("dashMonthItems",    "dashMonthAll",    availM, dashMonthSel);
+  dashCategorySel = [...availCat];
+  dashAwardSel    = [...availAwd];
+  buildCheckboxList("dashDistrictItems", "dashDistrictAll", availD,   dashDistrictSel);
+  buildCheckboxList("dashMonthItems",    "dashMonthAll",    availM,   dashMonthSel);
+  buildCheckboxList("dashCategoryItems", "dashCategoryAll", availCat, dashCategorySel);
+  buildCheckboxList("dashAwardItems",    "dashAwardAll",    availAwd, dashAwardSel);
   updateDashDistrictLabelFrom(dashDistrictSel);
   updateDashMonthLabelFrom(dashMonthSel);
+  updateDashCategoryLabelFrom(dashCategorySel);
+  updateDashAwardLabelFrom(dashAwardSel);
 }
 
 // Build the checkbox list. Ticking boxes updates ONLY the draft label preview —
@@ -1409,6 +1868,12 @@ function syncPanelToCommitted(panelId) {
   } else if (panelId === "dashCommunityPanel") {
     setChecks("dashCommunityItems", "dashCommunityAll", dashCommunitySel || []);
     updateDashCommunityLabelFrom(dashCommunitySel || []);
+  } else if (panelId === "dashCategoryPanel") {
+    setChecks("dashCategoryItems", "dashCategoryAll", dashCategorySel || []);
+    updateDashCategoryLabelFrom(dashCategorySel || []);
+  } else if (panelId === "dashAwardPanel") {
+    setChecks("dashAwardItems", "dashAwardAll", dashAwardSel || []);
+    updateDashAwardLabelFrom(dashAwardSel || []);
   }
 }
 
@@ -1437,8 +1902,14 @@ function applyDashFilter(kind) {
   } else if (kind === "community") {
     dashCommunitySel = getChecked("dashCommunityItems");
     updateDashCommunityLabelFrom(dashCommunitySel);
-    // Community is the parent filter → rebuild District + Month to match.
+    // Community is the parent filter → rebuild the child filters to match.
     rebuildDistrictMonthForCommunity();
+  } else if (kind === "category") {
+    dashCategorySel = getChecked("dashCategoryItems");
+    updateDashCategoryLabelFrom(dashCategorySel);
+  } else if (kind === "award") {
+    dashAwardSel = getChecked("dashAwardItems");
+    updateDashAwardLabelFrom(dashAwardSel);
   }
   closeDashDropdowns();
   renderDashboard();
@@ -1446,9 +1917,11 @@ function applyDashFilter(kind) {
 
 // Live preview of the (un-applied) draft selection in the trigger label.
 function draftLabelUpdate(containerId) {
-  if (containerId === "dashDistrictItems")      updateDashDistrictLabelFrom(getChecked("dashDistrictItems"));
-  else if (containerId === "dashMonthItems")    updateDashMonthLabelFrom(getChecked("dashMonthItems"));
+  if (containerId === "dashDistrictItems")       updateDashDistrictLabelFrom(getChecked("dashDistrictItems"));
+  else if (containerId === "dashMonthItems")     updateDashMonthLabelFrom(getChecked("dashMonthItems"));
   else if (containerId === "dashCommunityItems") updateDashCommunityLabelFrom(getChecked("dashCommunityItems"));
+  else if (containerId === "dashCategoryItems")  updateDashCategoryLabelFrom(getChecked("dashCategoryItems"));
+  else if (containerId === "dashAwardItems")     updateDashAwardLabelFrom(getChecked("dashAwardItems"));
 }
 
 function labelText(arr, total, allWord, manyWord) {
@@ -1476,6 +1949,18 @@ function updateDashMonthLabelFrom(arr) {
   if (label) label.textContent = labelText(arr, total, "All Months", "Months");
 }
 
+function updateDashCategoryLabelFrom(arr) {
+  const total = document.querySelectorAll("#dashCategoryItems .dash-cb-item").length;
+  const label = document.getElementById("dashCategoryLabel");
+  if (label) label.textContent = labelText(arr, total, "All Categories", "Categories");
+}
+
+function updateDashAwardLabelFrom(arr) {
+  const total = document.querySelectorAll("#dashAwardItems .dash-cb-item").length;
+  const label = document.getElementById("dashAwardLabel");
+  if (label) label.textContent = labelText(arr, total, "All Awards", "Awards");
+}
+
 function pct(num, den) {
   if (!den) return "0%";
   return Math.round((num / den) * 100) + "%";
@@ -1494,12 +1979,16 @@ function renderDashboard() {
   const selCommunities = new Set(dashCommunitySel || []);
   const selDistricts   = new Set(dashDistrictSel || []);
   const selMonths      = new Set(dashMonthSel || []);
+  const selCategories  = new Set(dashCategorySel || []);
+  const selAwards      = new Set(dashAwardSel || []);
 
   // Filter flat data
   let filtered = dashAllData.filter(r =>
     (selCommunities.size === 0 || selCommunities.has(r.community)) &&
     (selDistricts.size === 0   || selDistricts.has(r._district)) &&
-    (selMonths.size === 0      || selMonths.has(r._month))
+    (selMonths.size === 0      || selMonths.has(r._month)) &&
+    (selCategories.size === 0  || selCategories.has(recAwardCategory(r))) &&
+    (selAwards.size === 0      || selAwards.has(r.awardName || ""))
   );
 
   // Group by month, preserving allMonths order
@@ -1521,6 +2010,10 @@ function renderDashboard() {
     acc.verified     += r.verified;
     return acc;
   }, { total: 0, awarded: 0, late: 0, pending: 0, totalAwarded: 0, verified: 0 });
+
+  // Remember exactly what's on screen so the Excel export matches the visible table.
+  dashLastRows   = rows;
+  dashLastTotals = tot;
 
   const tbody = document.getElementById("dashTableBody");
   if (!rows.length) {
@@ -1602,4 +2095,171 @@ function drawPie(inTime, late, pending) {
         <span class="dash-legend-val">${val} <span class="dash-legend-pct">(${pct(val, total)})</span></span>
       </div>`).join("");
   }
+}
+// ===============================
+// DASHBOARD → EXCEL EXPORT
+// Downloads the currently visible dashboard table as a real .xlsx file. Row 1
+// records the applied filters. Self-contained (no external library): builds a
+// minimal OOXML workbook and packs it into a stored ZIP in the browser.
+// ===============================
+
+// A readable summary of each filter's committed selection (matches the labels
+// the user sees: "All X" when everything is selected, otherwise the list).
+function _dashFilterPart(label, sel, itemsContainerId, allWord) {
+  const arr = sel || [];
+  const total = document.querySelectorAll(`#${itemsContainerId} .dash-cb-item`).length;
+  let val;
+  if (arr.length === 0)                     val = "None";
+  else if (total && arr.length === total)   val = allWord;
+  else                                      val = arr.join(", ");
+  return `${label}: ${val}`;
+}
+function dashFilterSummary() {
+  return "Filters applied —  " + [
+    _dashFilterPart("Community",      dashCommunitySel, "dashCommunityItems", "All Communities"),
+    _dashFilterPart("District",       dashDistrictSel,  "dashDistrictItems",  "All Districts"),
+    _dashFilterPart("Month",          dashMonthSel,     "dashMonthItems",     "All Months"),
+    _dashFilterPart("Award Category", dashCategorySel,  "dashCategoryItems",  "All Categories"),
+    _dashFilterPart("Award Name",     dashAwardSel,     "dashAwardItems",     "All Awards"),
+  ].join("    |    ");
+}
+
+function downloadDashboardExcel() {
+  if (!dashLoaded) { showToast("Dashboard data is still loading.", "info"); return; }
+  const rows = dashLastRows || [];
+  if (!rows.length) { showToast("No data to export for the current filters.", "info"); return; }
+  const tot = dashLastTotals || { total: 0, awarded: 0, late: 0, pending: 0, totalAwarded: 0, verified: 0 };
+
+  const header = ["Month", "Total Awards", "Awarded In Time", "In Time %", "Awarded Late",
+    "Late %", "Pending", "Pending %", "Total Awarded", "Awarded %", "Verified", "Verified %"];
+  const rowFor = (label, c) => [
+    label, c.total,
+    c.awarded, pct(c.awarded, c.total),
+    c.late, pct(c.late, c.total),
+    c.pending, pct(c.pending, c.total),
+    c.totalAwarded, pct(c.totalAwarded, c.total),
+    c.verified, pct(c.verified, c.total),
+  ];
+
+  const aoa = [
+    [dashFilterSummary()],   // Row 1: applied filters
+    [],                      // Row 2: spacer
+    header,                  // Row 3: column headers
+    ...rows.map(r => rowFor(r.month, r)),
+    rowFor("Total", tot),
+  ];
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  try {
+    const bytes = _buildXlsx(aoa, "Award Data");
+    _downloadBytes(bytes, `POM_Award_Data_${stamp}.xlsx`,
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    showToast("Excel downloaded.");
+  } catch (e) {
+    console.error("Excel export failed:", e);
+    showToast("Could not generate the Excel file.", "error");
+  }
+}
+
+function _downloadBytes(bytes, filename, mime) {
+  const blob = new Blob([bytes], { type: mime || "application/octet-stream" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ---- Minimal, dependency-free .xlsx writer ----
+function _xmlEsc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function _colLetter(n) { let s = ""; n++; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; }
+
+function _sheetXml(aoa) {
+  let body = "";
+  aoa.forEach((row, r) => {
+    const cells = (row || []).map((val, c) => {
+      if (val === null || val === undefined || val === "") return "";
+      const ref = _colLetter(c) + (r + 1);
+      if (typeof val === "number" && isFinite(val)) return `<c r="${ref}"><v>${val}</v></c>`;
+      return `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${_xmlEsc(val)}</t></is></c>`;
+    }).join("");
+    body += `<row r="${r + 1}">${cells}</row>`;
+  });
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n` +
+    `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
+    `<sheetData>${body}</sheetData></worksheet>`;
+}
+
+function _buildXlsx(aoa, sheetName) {
+  const name = _xmlEsc((sheetName || "Sheet1").slice(0, 31));
+  const files = [
+    ["[Content_Types].xml",
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>`],
+    ["_rels/.rels",
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+    ["xl/workbook.xml",
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${name}" sheetId="1" r:id="rId1"/></sheets></workbook>`],
+    ["xl/_rels/workbook.xml.rels",
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`],
+    ["xl/worksheets/sheet1.xml", _sheetXml(aoa)],
+  ];
+  return _zipStore(files);
+}
+
+// CRC-32 (used by the ZIP container).
+function _crc32(bytes) {
+  let crc = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) {
+    crc ^= bytes[i];
+    for (let j = 0; j < 8; j++) crc = (crc >>> 1) ^ (0xEDB88320 & -(crc & 1));
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+// Pack files into a STORED (uncompressed) ZIP → returns a Uint8Array.
+function _zipStore(files) {
+  const enc = new TextEncoder();
+  const u16 = (n) => [n & 255, (n >> 8) & 255];
+  const u32 = (n) => [n & 255, (n >> 8) & 255, (n >> 16) & 255, (n >>> 24) & 255];
+
+  const parts = [];   // local headers + data
+  const central = [];
+  let offset = 0;
+
+  files.forEach(([fname, content]) => {
+    const nameB = enc.encode(fname);
+    const dataB = enc.encode(content);
+    const crc = _crc32(dataB);
+    const size = dataB.length;
+
+    const local = new Uint8Array([].concat(
+      u32(0x04034b50), u16(20), u16(0), u16(0), u16(0), u16(0),
+      u32(crc), u32(size), u32(size), u16(nameB.length), u16(0)
+    ));
+    parts.push(local, nameB, dataB);
+
+    central.push(new Uint8Array([].concat(
+      u32(0x02014b50), u16(20), u16(20), u16(0), u16(0), u16(0), u16(0),
+      u32(crc), u32(size), u32(size), u16(nameB.length),
+      u16(0), u16(0), u16(0), u16(0), u32(0), u32(offset)
+    )), nameB);
+
+    offset += local.length + nameB.length + dataB.length;
+  });
+
+  const cdStart = offset;
+  let cdSize = 0; central.forEach(c => cdSize += c.length);
+  const eocd = new Uint8Array([].concat(
+    u32(0x06054b50), u16(0), u16(0), u16(files.length), u16(files.length),
+    u32(cdSize), u32(cdStart), u16(0)
+  ));
+
+  const all = parts.concat(central, [eocd]);
+  let total = 0; all.forEach(a => total += a.length);
+  const out = new Uint8Array(total);
+  let p = 0; all.forEach(a => { out.set(a, p); p += a.length; });
+  return out;
 }

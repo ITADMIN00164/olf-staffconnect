@@ -72,9 +72,30 @@
         .verify-btn { background: #eef3fe; color: #4f8ef7; border: 1px solid #cfe0fd; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all .15s; white-space: nowrap; }
         .verify-btn:hover { background: #dce8fd; }
         .verified-badge { display: inline-flex; align-items: center; gap: 4px; color: #16a34a; font-weight: 700; font-size: 11px; white-space: nowrap; }
+        .rejected-badge { display: inline-flex; align-items: center; gap: 4px; color: #ef4444; font-weight: 700; font-size: 11px; white-space: nowrap; }
+        .submitted-badge { display: inline-flex; align-items: center; gap: 4px; color: #2563eb; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 5px; padding: 2px 8px; font-weight: 600; font-size: 10.5px; white-space: nowrap; }
+        /* Verifier's two-tick approve / reject controls */
+        .vr-actions { display: inline-flex; gap: 5px; justify-content: center; }
+        .vr-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 26px; border-radius: 6px; border: 1px solid transparent; cursor: pointer; padding: 0; font-family: inherit; transition: all .15s; }
+        .vr-btn.approve { background: #ecfdf5; color: #16a34a; border-color: #bbf7d0; }
+        .vr-btn.approve:hover { background: #16a34a; color: #fff; border-color: #16a34a; }
+        .vr-btn.reject { background: #fef2f2; color: #ef4444; border-color: #fecaca; }
+        .vr-btn.reject:hover { background: #ef4444; color: #fff; border-color: #ef4444; }
         .verify-na { font-size: 10.5px; color: #9ca3af; }
+        /* View-only inputs (decided rows and verifier view) */
+        .award-select[disabled], .award-input[disabled] { background: #f3f4f6; color: #9ca3af; cursor: not-allowed; }
         .unlock-btn { background: #fff; border: 1px solid #fde68a; color: #b45309; border-radius: 6px; padding: 3px 8px; font-size: 10.5px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; }
         .unlock-btn:hover { background: #fffbeb; }
+
+        /* Per-row save button */
+        .rowsave-btn { display: inline-flex; align-items: center; gap: 3px; background: #fff; color: #4f8ef7; border: 1px solid #cfe0fd; border-radius: 6px; padding: 4px 9px; font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; transition: all .15s; }
+        .rowsave-btn:hover { background: #eef3fe; border-color: #4f8ef7; }
+        .rowsave-btn.ready { background: #4f8ef7; color: #fff; border-color: #4f8ef7; box-shadow: 0 1px 5px rgba(79,142,247,0.3); }
+        .rowsave-btn.ready:hover { background: #3a7de8; }
+        .rowsave-btn.danger { background: #fff; color: #ef4444; border-color: #fecaca; }
+        .rowsave-btn.danger:hover { background: #fef2f2; border-color: #ef4444; }
+        .rowsave-btn[disabled] { opacity: .55; cursor: default; }
+        .rowsave-saved { display: inline-flex; align-items: center; gap: 3px; color: #16a34a; font-weight: 700; font-size: 11px; white-space: nowrap; }
 
         /* Sub-label shown below upload icon and verified badge */
         .cell-sublabel { display: block; font-size: 9.5px; color: #9ca3af; margin-top: 3px; line-height: 1.3; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; margin-left: auto; margin-right: auto; }
@@ -131,9 +152,11 @@
         #pomDashView.active { display: flex; }
 
         .dash-filter-bar { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px 20px; display: flex; align-items: flex-start; gap: 24px; flex-wrap: wrap; box-shadow: 0 1px 4px rgba(0,0,0,0.05); flex-shrink: 0; }
-        .dash-refresh-btn { margin-left: auto; align-self: center; display: inline-flex; align-items: center; gap: 7px; background: #fff; border: 1px solid #e5e7eb; color: #374151; padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background .15s, border-color .15s; white-space: nowrap; }
+        .dash-refresh-btn { align-self: center; display: inline-flex; align-items: center; gap: 7px; background: #fff; border: 1px solid #e5e7eb; color: #374151; padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background .15s, border-color .15s; white-space: nowrap; }
         .dash-refresh-btn:hover { background: #f3f4f6; border-color: #9ca3af; }
         .dash-refresh-btn:disabled { opacity: 0.65; cursor: default; }
+        .dash-export-btn { margin-left: auto; align-self: center; display: inline-flex; align-items: center; gap: 7px; background: #ecfdf5; border: 1px solid #bbf7d0; color: #15803d; padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background .15s, border-color .15s; white-space: nowrap; }
+        .dash-export-btn:hover { background: #d1fae5; border-color: #16a34a; }
         .dash-refresh-ico { display: inline-block; font-size: 16px; line-height: 1; }
         .dash-refresh-btn.spinning .dash-refresh-ico { animation: dash-spin 0.8s linear infinite; }
         @keyframes dash-spin { to { transform: rotate(360deg); } }
@@ -288,25 +311,21 @@
         <div class="pom-card scroll">
             <table class="pom-table fixed">
                 <colgroup>
-                    <col style="width:17%"><col style="width:14%"><col style="width:7%">
-                    <col style="width:13%"><col style="width:10%"><col style="width:9%">
-                    <col style="width:9%"><col style="width:9%"><col style="width:9%">
+                    <col style="width:15%"><col style="width:12%"><col style="width:7%">
+                    <col style="width:11%"><col style="width:10%"><col style="width:8%">
+                    <col style="width:8%"><col style="width:9%"><col style="width:9%"><col style="width:8%">
                 </colgroup>
                 <thead>
                     <tr>
                         <th>Name</th><th>Award</th><th>Awarded</th>
                         <th>Awarded By</th><th>Date</th><th class="col-center">Image</th><th class="col-center">Description</th>
-                        <th class="col-center">Verify</th><th class="col-center">Unlock</th>
+                        <th class="col-center">Save</th><th class="col-center">Verify</th><th class="col-center">Unlock</th>
                     </tr>
                 </thead>
                 <tbody id="pomTableBody">
-                    <tr><td colspan="9" style="text-align:center;color:#9ca3af;padding:28px;">No month selected</td></tr>
+                    <tr><td colspan="10" style="text-align:center;color:#9ca3af;padding:28px;">No month selected</td></tr>
                 </tbody>
             </table>
-        </div>
-
-        <div class="save-bar">
-            <button id="savePomBtn" class="save-btn">💾 Save All Changes</button>
         </div>
     </div>
 
@@ -406,6 +425,47 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Award Category: multi-checkbox dropdown -->
+            <div class="dash-filter-group" id="dashCategoryGroup">
+                <div class="dash-filter-label">Award Category</div>
+                <div class="dash-dd-trigger" id="dashCategoryTrigger">
+                    <span id="dashCategoryLabel">All Categories</span>
+                    <span class="dd-caret">▼</span>
+                </div>
+                <div class="dash-dd-panel" id="dashCategoryPanel">
+                    <label class="dash-dd-all">
+                        <input type="checkbox" id="dashCategoryAll" checked> Select All
+                    </label>
+                    <div id="dashCategoryItems" class="dash-dd-items"></div>
+                    <div class="dash-dd-footer">
+                        <button class="dash-dd-apply" id="dashCategoryApply">Apply</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Award name: multi-checkbox dropdown -->
+            <div class="dash-filter-group" id="dashAwardGroup">
+                <div class="dash-filter-label">Award Name</div>
+                <div class="dash-dd-trigger" id="dashAwardTrigger">
+                    <span id="dashAwardLabel">All Awards</span>
+                    <span class="dd-caret">▼</span>
+                </div>
+                <div class="dash-dd-panel" id="dashAwardPanel">
+                    <label class="dash-dd-all">
+                        <input type="checkbox" id="dashAwardAll" checked> Select All
+                    </label>
+                    <div id="dashAwardItems" class="dash-dd-items"></div>
+                    <div class="dash-dd-footer">
+                        <button class="dash-dd-apply" id="dashAwardApply">Apply</button>
+                    </div>
+                </div>
+            </div>
+
+            <button class="dash-export-btn" id="dashExportBtn" title="Download the current table as an Excel file">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>Download Excel</span>
+            </button>
 
             <button class="dash-refresh-btn" id="dashRefreshBtn" title="Reload the latest data from Award Management">
                 <span class="dash-refresh-ico">⟳</span><span id="dashRefreshTxt">Refresh Data</span>
