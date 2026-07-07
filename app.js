@@ -320,6 +320,29 @@ async function isEmailAdmin(email) {
 }
 
 /* ====================================
+   CALENDAR ADMIN CHECK (Firestore)
+   Emails in the "Calendar Admin" collection
+   can add events + open Settings on the
+   Program Calendar page. Everyone else
+   is view-only.
+==================================== */
+
+async function isCalendarAdmin(email) {
+    try {
+        const snapshot = await getDocs(collection(db, "Calendar Admin"));
+        for (const d of snapshot.docs) {
+            const data = d.data();
+            const val = data["Email"] || data["Email ID"] || data["email"];
+            if (val && String(val).toLowerCase() === email) return true;
+        }
+        return false;
+    } catch (err) {
+        console.error("Calendar admin check failed:", err);
+        return false;
+    }
+}
+
+/* ====================================
    EMAIL WHITELIST CHECK
 ==================================== */
 
@@ -410,7 +433,7 @@ window.navigate = async function (page) {
     }
 
     // Highlight correct nav item using data-page attribute
-    document.querySelectorAll(".nav-item").forEach(el => {
+    document.querySelectorAll("#appSidebar .nav-item").forEach(el => {
         el.classList.toggle("active", el.dataset.page === page);
     });
 
@@ -427,6 +450,17 @@ window.navigate = async function (page) {
     else if (page === "pom") {
         if (typeof window.initPomPageUI === "function") {
             window.initPomPageUI();
+        }
+    }
+
+    else if (page === "calendar") {
+        const user = window.__olfUser;
+        if (user) {
+            const isCalAdmin = await isCalendarAdmin(user.email.toLowerCase());
+            window.PROGRAM_CALENDAR_USER = { email: user.email, isAdmin: isCalAdmin };
+        }
+        if (window.ProgramCalendar && typeof window.ProgramCalendar.mount === "function") {
+            window.ProgramCalendar.mount();
         }
     }
 
