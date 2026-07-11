@@ -343,6 +343,62 @@ async function isCalendarAdmin(email) {
 }
 
 /* ====================================
+   SMART GOALS ADMIN CHECK (Firestore)
+   Emails in the "Plan Admin" collection
+   can edit goals/tasks/reviews and open
+   Settings on the Smart Goals page.
+   Everyone else is mapped to their member
+   record (view/edit own) via email.
+==================================== */
+
+async function isSmartGoalsAdmin(email) {
+    try {
+        const snapshot = await getDocs(collection(db, "Plan Admin"));
+        for (const d of snapshot.docs) {
+            const data = d.data();
+            const val = data["Email"] || data["Email ID"] || data["email"];
+            if (val && String(val).toLowerCase() === email) return true;
+        }
+        return false;
+    } catch (err) {
+        console.error("Smart Goals admin check failed:", err);
+        return false;
+    }
+}
+
+/* ====================================
+   PLAN ADMIN WRITES (exposed to smartgoal.js)
+   Lets the Smart Goals "Add / remove Admin"
+   buttons grant/revoke real Settings access by
+   writing to the Firestore "Plan Admin" collection.
+   Doc id = the email (idempotent, easy to delete).
+==================================== */
+
+window.PlanAdmins = {
+    async add(email) {
+        const clean = String(email || "").trim().toLowerCase();
+        if (!clean) throw new Error("Email is required to grant admin access");
+        await setDoc(doc(db, "Plan Admin", clean), { Email: clean });
+        return clean;
+    },
+    async remove(email) {
+        const clean = String(email || "").trim().toLowerCase();
+        if (!clean) return;
+        // remove the email-keyed doc (if present)
+        try { await deleteDoc(doc(db, "Plan Admin", clean)); } catch (e) {}
+        // also remove any legacy docs (auto-id or "1") whose Email field matches
+        try {
+            const snap = await getDocs(collection(db, "Plan Admin"));
+            for (const d of snap.docs) {
+                const v = d.data();
+                const val = String(v.Email || v["Email ID"] || v.email || "").toLowerCase();
+                if (val === clean) { try { await deleteDoc(doc(db, "Plan Admin", d.id)); } catch (e) {} }
+            }
+        } catch (e) {}
+    }
+};
+
+/* ====================================
    EMAIL WHITELIST CHECK
 ==================================== */
 
@@ -461,6 +517,17 @@ window.navigate = async function (page) {
         }
         if (window.ProgramCalendar && typeof window.ProgramCalendar.mount === "function") {
             window.ProgramCalendar.mount();
+        }
+    }
+
+    else if (page === "smart-goals") {
+        const user = window.__olfUser;
+        if (user) {
+            const isPlanAdmin = await isSmartGoalsAdmin(user.email.toLowerCase());
+            window.SMART_GOALS_USER = { email: user.email, isAdmin: isPlanAdmin };
+        }
+        if (window.SmartGoals && typeof window.SmartGoals.mount === "function") {
+            window.SmartGoals.mount();
         }
     }
 

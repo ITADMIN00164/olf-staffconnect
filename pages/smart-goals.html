@@ -1,0 +1,721 @@
+<!-- pages/smart-goals.html -->
+<div id="sg-app">
+<style>
+
+/* ── TOKENS ── */
+#sg-app {
+  --bg:        #F4F7FA;
+  --surface:   #FFFFFF;
+  --surface2:  #F7FAFC;
+  --border:    #D8E4EC;
+  --border2:   #B0C4D4;
+  --text:      #1A2533;
+  --text2:     #5A6B7A;
+  --text3:     #8A9AAA;
+  --brand:        #0D6B5E;
+  --brand-dark:   #084D44;
+  --brand-lt:     #E8F5F3;
+  --brand-border: #1A8577;
+  --green:  #3F6B2A; --green-lt:  #D7E6CF; --green-bd: #A8C596;
+  --amber:  #C07C0A; --amber-lt:  #FDF3E2; --amber-bd: #E7C287;
+  --red:    #C0392B; --red-lt:    #F8E3E0; --red-bd:   #E0AEA6;
+  --blue:   #2E5FA3; --blue-lt:   #DCE7F5; --blue-bd:  #A9C1E0;
+  --slate:  #5A6B7A; --slate-lt:  #F7FAFC; --slate-bd: #D8E4EC;
+  --violet: #4C1D95; --violet-lt: #F5F3FF; --violet-bd:#C4B5FD;
+  --col-a-hd: #1F3F6E;   --col-a-hdt:#DCE7F5;   --col-a-bg: #EEF4FB;
+  --col-b-hd: #084D44;   --col-b-hdt:#E8F5F3;   --col-b-bg: #F2FAF9;
+  --col-c-hd: #084D44;   --col-c-hdt:#E8F5F3;   --col-c-bg: #F2FAF9;
+  --col-d-hd: #8A5A06;   --col-d-hdt:#FDF3E2;   --col-d-bg: #FFFBF3;
+  --col-e-hd: #1A2533;   --col-e-hdt:#F4F7FA;   --col-e-bg: #F7FAFC;
+  --radius:    6px;
+  --radius-lg: 10px;
+  --shadow:    0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+}
+
+#sg-app * { box-sizing: border-box; margin: 0; padding: 0; }
+#sg-app { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; min-height: 100vh; }
+
+/* ── NAV ── */
+#sg-app .app-nav { background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 24px; height: 54px; position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+#sg-app .nav-brand { font-size: 15px; font-weight: 800; color: var(--brand); letter-spacing: -.03em; margin-right: 36px; white-space: nowrap; }
+#sg-app .nav-brand span { color: var(--text3); font-weight: 400; letter-spacing: 0; }
+#sg-app .nav-tabs { display: flex; }
+#sg-app .nav-tab { padding: 0 18px; height: 54px; display: flex; align-items: center; font-size: 13px; cursor: pointer; border: none; background: none; color: var(--text2); border-bottom: 2.5px solid transparent; transition: all .15s; white-space: nowrap; font-family: inherit; font-weight: 500; }
+#sg-app .nav-tab:hover { color: var(--text); }
+#sg-app .nav-tab.active { color: var(--brand); border-bottom-color: var(--brand); }
+#sg-app .nav-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+
+/* ── DEPT SELECTOR ── */
+#sg-app .dept-selector { display: flex; align-items: center; gap: 8px; padding: 0 12px; background: var(--brand-lt); border: 1px solid var(--brand-border); border-radius: var(--radius); }
+#sg-app .dept-selector label { font-size: 11px; font-weight: 600; color: var(--brand); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+#sg-app .dept-selector select { border: none; background: transparent; color: var(--brand); font-weight: 600; font-size: 13px; cursor: pointer; padding: 0; font-family: inherit; }
+#sg-app .dept-selector select:focus { outline: none; }
+
+/* ── LAYOUT ── */
+#sg-app .app-body { display: flex; min-height: calc(100vh - 54px); }
+
+#sg-app .sidebar {
+  width: 240px;
+  min-width: 240px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  transition: width .22s ease, min-width .22s ease;
+  overflow: hidden;
+  position: sticky;
+  top: 54px;
+  height: calc(100vh - 54px);
+  z-index: 90;
+}
+#sg-app .sidebar.collapsed { width: 48px; min-width: 48px; }
+
+#sg-app .sidebar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+  cursor: pointer;
+  user-select: none;
+}
+#sg-app .sidebar-toggle-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+  color: var(--text3);
+  white-space: nowrap;
+  overflow: hidden;
+  transition: opacity .15s;
+}
+#sg-app .sidebar.collapsed .sidebar-toggle-label { opacity: 0; width: 0; }
+#sg-app .sidebar-toggle-icon {
+  font-size: 14px;
+  color: var(--text3);
+  transition: transform .22s;
+  flex-shrink: 0;
+}
+#sg-app .sidebar.collapsed .sidebar-toggle-icon { transform: rotate(180deg); }
+
+#sg-app .sidebar-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 8px 0; }
+#sg-app .sidebar-scroll::-webkit-scrollbar { width: 4px; }
+#sg-app .sidebar-scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+#sg-app .sb-dept { margin: 0 6px 2px; border-radius: var(--radius); overflow: hidden; }
+#sg-app .sb-dept-hd { display: flex; align-items: center; gap: 8px; padding: 7px 8px; cursor: pointer; border-radius: var(--radius); transition: background .12s; white-space: nowrap; overflow: hidden; }
+#sg-app .sb-dept-hd:hover { background: var(--brand-lt); }
+#sg-app .sb-dept-hd.active-dept { background: var(--brand-lt); }
+#sg-app .sb-dept-icon { width: 24px; height: 24px; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; background: var(--brand); color: #fff; font-weight: 700; }
+#sg-app .sb-dept-name { font-size: 12.5px; font-weight: 600; color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; transition: opacity .15s; }
+#sg-app .sidebar.collapsed .sb-dept-name { opacity: 0; width: 0; }
+#sg-app .sb-dept-arrow { font-size: 10px; color: var(--text3); transition: transform .18s; flex-shrink: 0; }
+#sg-app .sidebar.collapsed .sb-dept-arrow { opacity: 0; }
+#sg-app .sb-dept-hd.open .sb-dept-arrow { transform: rotate(90deg); }
+
+#sg-app .sb-dept-children { display: none; padding: 2px 0 4px 0; border-top: 1px solid var(--border); background: var(--surface2); }
+#sg-app .sb-dept-hd.open + .sb-dept-children { display: block; }
+#sg-app .sidebar.collapsed .sb-dept-children { display: none; }
+
+#sg-app .sb-member { display: flex; align-items: center; gap: 8px; padding: 5px 10px 5px 36px; font-size: 12px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; border-radius: var(--radius); margin: 0 4px; transition: background .1s; }
+#sg-app .sb-member:hover { background: var(--brand-lt); color: var(--brand); }
+#sg-app .sb-member-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brand-border); flex-shrink: 0; }
+
+#sg-app .sb-dept-stats { display: flex; gap: 6px; padding: 4px 8px 4px 36px; flex-wrap: wrap; }
+#sg-app .sb-stat-pill { font-size: 10px; padding: 1px 7px; border-radius: 20px; font-weight: 600; white-space: nowrap; }
+
+#sg-app .sb-divider { height: 1px; background: var(--border); margin: 6px 10px; }
+
+#sg-app .sb-all { display: flex; align-items: center; gap: 8px; padding: 7px 14px; cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--text2); white-space: nowrap; overflow: hidden; border-radius: var(--radius); margin: 0 6px 4px; transition: background .12s; }
+#sg-app .sb-all:hover { background: var(--surface2); }
+#sg-app .sb-all.active-dept { background: var(--brand-lt); color: var(--brand); }
+#sg-app .sb-all-icon { font-size: 15px; flex-shrink: 0; }
+
+#sg-app .page-content { flex: 1; overflow: auto; }
+#sg-app .page { display: none; padding: 24px; max-width: 1440px; margin: 0 auto; }
+#sg-app .page.active { display: block; }
+
+/* ── CARDS ── */
+#sg-app .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow); }
+#sg-app .card-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+#sg-app .card-title { font-size: 13px; font-weight: 600; color: var(--text); }
+#sg-app .card-body { padding: 18px; }
+
+/* ── METRICS ── */
+#sg-app .metrics-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px; }
+#sg-app .metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+#sg-app .metric-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; font-weight: 600; }
+#sg-app .metric-val { font-size: 28px; font-weight: 800; line-height: 1; letter-spacing: -.02em; }
+#sg-app .metric-sub { font-size: 11px; color: var(--text3); margin-top: 4px; }
+#sg-app .bar { height: 4px; background: var(--border); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+#sg-app .bar-fill { height: 100%; border-radius: 2px; transition: width .4s; }
+
+/* ── BADGES ── */
+#sg-app .badge { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; letter-spacing: .01em; }
+#sg-app .badge-done { background: var(--green-lt);  color: var(--green);  border: 1px solid var(--green-bd);  }
+#sg-app .badge-ip { background: var(--amber-lt);  color: var(--amber);  border: 1px solid var(--amber-bd);  }
+#sg-app .badge-pend { background: var(--red-lt);    color: var(--red);    border: 1px solid var(--red-bd);    }
+#sg-app .badge-hold { background: var(--blue-lt);   color: var(--blue);   border: 1px solid var(--blue-bd);   }
+#sg-app .badge-cancel { background: var(--slate-lt);  color: var(--slate);  border: 1px solid var(--slate-bd);  }
+#sg-app .badge-plan { background: var(--violet-lt); color: var(--violet); border: 1px solid var(--violet-bd); }
+#sg-app .badge-yes { background: var(--green-lt);  color: var(--green); }
+#sg-app .badge-no { background: var(--red-lt);    color: var(--red);   }
+#sg-app .badge-role-member { background: var(--slate-lt); color: var(--slate); border:1px solid var(--slate-bd); }
+#sg-app .badge-role-depthead { background: var(--blue-lt);  color: var(--blue);  border:1px solid var(--blue-bd); }
+#sg-app .badge-role-admin { background: var(--brand-lt); color: var(--brand); border:1px solid var(--brand-border); }
+
+/* ── BUTTONS ── */
+#sg-app .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius); font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: all .15s; font-family: inherit; }
+#sg-app .btn-primary { background: var(--brand); color: #fff; border-color: var(--brand); }
+#sg-app .btn-primary:hover { background: #063F37; }
+#sg-app .btn-secondary { background: var(--surface); color: var(--text2); border-color: var(--border2); }
+#sg-app .btn-secondary:hover { background: var(--surface2); }
+#sg-app .btn-save { background: #EFF6FF; color: var(--blue); border-color: var(--blue-bd); }
+#sg-app .btn-save:hover { background: #DBEAFE; }
+#sg-app .btn-sm { padding: 4px 10px; font-size: 12px; }
+#sg-app .btn-danger { background: var(--red-lt); color: var(--red); border-color: var(--red-bd); }
+#sg-app .btn-danger:hover { background: #FEE2E2; }
+
+/* ── MONTHLY PLAN TABLE ── */
+#sg-app .plan-tbl-wrap { overflow: auto; max-height: 62vh; min-height: 220px; resize: vertical; border-radius: var(--radius-lg); border: 1px solid var(--border); box-shadow: var(--shadow); }
+#sg-app .plan-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+
+#sg-app .plan-tbl .grp-hd th { padding: 7px 10px; text-align: center; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; border-bottom: 1px solid rgba(255,255,255,.15); white-space: nowrap; position: sticky; top: 0; z-index: 4; }
+#sg-app .plan-tbl .grp-hd .g-plan { background: var(--col-a-hd); color: var(--col-a-hdt); }
+#sg-app .plan-tbl .grp-hd .g-status { background: var(--col-c-hd); color: var(--col-c-hdt); }
+#sg-app .plan-tbl .grp-hd .g-act { background: var(--col-e-hd); color: var(--col-e-hdt); }
+
+#sg-app .plan-tbl .col-hd th { padding: 8px 10px; text-align: left; font-size: 11px; font-weight: 600; white-space: nowrap; border-bottom: 2px solid var(--border); position: sticky; top: 28px; z-index: 3; }
+
+/* compact date chip in the plan table */
+#sg-app .sg-date-btn { background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius); padding: 3px 8px; font-size: 11px; font-family: inherit; color: var(--text2); cursor: pointer; white-space: nowrap; }
+#sg-app .sg-date-btn:hover { background: var(--brand-lt); color: var(--brand); border-color: var(--brand); }
+#sg-app .plan-tbl .col-hd .h-plan { background: #2E5FA3; color: #DCE7F5; }
+#sg-app .plan-tbl .col-hd .h-status { background: #1A8577; color: #E8F5F3; }
+#sg-app .plan-tbl .col-hd .h-act { background: #33404D; color: #F4F7FA; }
+
+#sg-app .plan-tbl tbody tr { border-bottom: 1px solid var(--border); }
+#sg-app .plan-tbl tbody tr:last-child { border-bottom: none; }
+#sg-app .plan-tbl tbody tr:nth-child(even) td { filter: brightness(.98); }
+#sg-app .plan-tbl tbody tr:hover td { filter: brightness(.96); }
+#sg-app .plan-tbl tbody tr.plan-total-row td.plan-total-cell { font-weight: 700; background: var(--surface2); border-top: 2px solid var(--border2); filter: none; }
+#sg-app .plan-tbl tbody tr.plan-total-row:hover td.plan-total-cell { filter: none; }
+
+#sg-app .plan-tbl td { padding: 7px 10px; vertical-align: middle; }
+#sg-app .plan-tbl td.c-plan { background: var(--col-a-bg); }
+#sg-app .plan-tbl td.c-status { background: var(--col-c-bg); }
+#sg-app .plan-tbl td.c-act { background: var(--col-e-bg); }
+
+#sg-app .tbl-input { border: 1px solid var(--border2); border-radius: 4px; padding: 4px 7px; font-size: 12px; font-family: inherit; color: var(--text); background: rgba(255,255,255,.85); width: 100%; }
+#sg-app .tbl-input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 2px rgba(27,79,57,.12); background: #fff; }
+#sg-app .tbl-select { border: 1px solid var(--border2); border-radius: 4px; padding: 4px 6px; font-size: 12px; font-family: inherit; color: var(--text); background: rgba(255,255,255,.85); width: 100%; }
+#sg-app .tbl-select:focus { outline: none; border-color: var(--brand); }
+
+#sg-app .actions-cell { display: flex; gap: 4px; }
+
+/* ── GENERIC TABLE ── */
+#sg-app .tbl-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
+#sg-app .tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+#sg-app .tbl th { background: var(--brand); padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: #fff; white-space: nowrap; border-bottom: 1px solid var(--border); }
+#sg-app .tbl td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+#sg-app .tbl tr:last-child td { border-bottom: none; }
+#sg-app .tbl tbody tr:nth-child(even) td { background: var(--surface2); }
+#sg-app .tbl tr:hover td { background: var(--brand-lt); }
+#sg-app .tbl .goal-pill { display: inline-block; padding: 1px 7px; border-radius: 12px; font-size: 10px; font-weight: 700; letter-spacing: .02em; }
+#sg-app .gp-prog { background: var(--green-lt); color: var(--green); }
+#sg-app .gp-supp { background: var(--blue-lt); color: var(--blue); }
+#sg-app .gp-road { background: var(--amber-lt); color: var(--amber); }
+#sg-app .gp-team { background: var(--violet-lt); color: var(--violet); }
+#sg-app .gp-def { background: var(--slate-lt); color: var(--slate); }
+
+/* ── FORMS ── */
+#sg-app .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+#sg-app .form-full { grid-column: 1 / -1; }
+#sg-app .field { display: flex; flex-direction: column; gap: 4px; }
+#sg-app .field label { font-size: 12px; font-weight: 600; color: var(--text2); }
+#sg-app .req { color: var(--red); margin-left: 2px; }
+#sg-app .field input, #sg-app .field select, #sg-app .field textarea { border: 1px solid var(--border2); border-radius: var(--radius); padding: 7px 10px; font-size: 13px; color: var(--text); background: var(--surface); transition: border .15s; font-family: inherit; }
+#sg-app .field input:focus, #sg-app .field select:focus, #sg-app .field textarea:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(27,79,57,.1); }
+#sg-app .field textarea { resize: vertical; min-height: 70px; }
+
+/* ── MODAL ── */
+#sg-app .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 200; align-items: center; justify-content: center; padding: 16px; backdrop-filter: blur(2px); }
+#sg-app .modal-backdrop.open { display: flex; }
+#sg-app .modal { background: var(--surface); border-radius: var(--radius-lg); box-shadow: 0 24px 64px rgba(0,0,0,.22); width: 100%; max-width: 700px; max-height: 90vh; display: flex; flex-direction: column; }
+#sg-app .modal-head { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--surface2); border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+#sg-app .modal-title { font-size: 15px; font-weight: 700; }
+#sg-app .modal-close { background: none; border: none; cursor: pointer; font-size: 20px; color: var(--text3); line-height: 1; padding: 2px 6px; border-radius: 4px; }
+#sg-app .modal-close:hover { background: var(--border); }
+#sg-app .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+#sg-app .modal-foot { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; background: var(--surface2); border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
+
+#sg-app .section-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--text3); margin-bottom: 10px; margin-top: 18px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+#sg-app .section-label:first-child { margin-top: 0; }
+
+#sg-app .goal-tree { display: flex; flex-direction: column; gap: 8px; }
+#sg-app .goal-group { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 4px; }
+#sg-app .goal-group-header { padding: 11px 14px; background: var(--brand-lt); border-bottom: 1px solid var(--brand-border); font-weight: 700; display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+#sg-app .goal-group-title { font-size: 13px; font-weight: 600; flex: 1; }
+#sg-app .goal-group-stats { display: flex; gap: 6px; font-size: 11px; }
+#sg-app .goal-items-list { display: flex; flex-direction: column; }
+#sg-app .goal-item-row { display: grid; align-items: center; padding: 9px 14px; border-top: 1px solid var(--border); font-size: 12px; gap: 10px; }
+#sg-app .goal-item-row:hover { background: var(--surface2); }
+#sg-app .goal-item-row.goal-col-head { background: var(--brand); border-top: none; padding: 10px 14px; font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: #fff; }
+#sg-app .goal-item-row.goal-col-head span { color: #fff; }
+#sg-app .goal-item-row.goal-col-head:hover { background: var(--brand); }
+#sg-app .gi-name { font-weight: 500; }
+#sg-app .gi-cat { color: var(--text2); }
+#sg-app .pct-bar-wrap { display: flex; align-items: center; gap: 6px; }
+#sg-app .pct-bar { flex: 1; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+#sg-app .pct-fill { height: 100%; border-radius: 3px; }
+#sg-app .score-cell { text-align: center; }
+#sg-app .score-input-sm { width: 60px; border: 1px solid var(--border2); border-radius: 4px; padding: 3px 6px; font-size: 12px; text-align: center; font-family: inherit; }
+#sg-app .score-input-sm:focus { outline: none; border-color: var(--brand); }
+#sg-app .score-badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+#sg-app .score-hi { background: var(--green-lt); color: var(--green); }
+#sg-app .score-mid { background: var(--amber-lt); color: var(--amber); }
+#sg-app .score-lo { background: var(--red-lt); color: var(--red); }
+
+#sg-app .filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+#sg-app .filter-bar select, #sg-app .filter-bar input { border: 1px solid var(--border2); border-radius: var(--radius); padding: 6px 10px; font-size: 12.5px; color: var(--text); background: var(--surface); font-family: inherit; }
+#sg-app .filter-bar select:focus, #sg-app .filter-bar input:focus { outline: none; border-color: var(--brand); }
+
+#sg-app .empty { text-align: center; padding: 48px 24px; color: var(--text3); }
+#sg-app .empty-icon { font-size: 32px; margin-bottom: 10px; }
+#sg-app .empty p { font-size: 13px; }
+
+#sg-app .toast { position: fixed; bottom: 24px; right: 24px; background: var(--text); color: #fff; padding: 10px 18px; border-radius: var(--radius); font-size: 13px; font-weight: 500; opacity: 0; transform: translateY(8px); transition: all .2s; z-index: 999; pointer-events: none; border-left: 3px solid var(--brand); }
+#sg-app .toast.show { opacity: 1; transform: translateY(0); }
+
+#sg-app .col-legend { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+#sg-app .col-legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text2); font-weight: 500; }
+#sg-app .col-legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+#sg-app .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
+#sg-app .page-title { margin: 0; }
+
+/* ── COLUMNS PANEL ── */
+#sg-app .cols-panel-wrap { position: relative; display: inline-block; }
+#sg-app .cols-panel { display: none; position: absolute; right: 0; top: calc(100% + 6px); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 12px 28px rgba(0,0,0,.16); padding: 10px; z-index: 150; min-width: 220px; max-height: 340px; overflow-y: auto; }
+#sg-app .cols-panel.open { display: block; }
+#sg-app .cols-panel-group { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text3); margin: 8px 0 4px; }
+#sg-app .cols-panel-group:first-child { margin-top: 0; }
+#sg-app .cols-panel label { display: flex; align-items: center; gap: 7px; font-size: 12px; padding: 3px 4px; border-radius: 4px; cursor: pointer; }
+#sg-app .cols-panel label:hover { background: var(--surface2); }
+
+#sg-app .review-section { margin-bottom: 18px; }
+#sg-app .review-section-hd { font-size: 13px; font-weight: 700; margin-bottom: 6px; display:flex; align-items:center; gap:8px; }
+
+
+/* ── injected: blocking loader (blur backdrop + spinner) + host reset ── */
+#sg-app { color: var(--text); }#sg-app .sg-loader-overlay {
+  display: none; position: fixed; inset: 0; z-index: 6000;
+  align-items: center; justify-content: center;
+  background: rgba(244,247,250,0.45);
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+}
+#sg-app .sg-loader-overlay.open { display: flex; }
+#sg-app .sg-spinner {
+  width: 46px; height: 46px; border: 4px solid var(--brand-lt);
+  border-top-color: var(--brand); border-radius: 50%;
+  animation: sgSpin 0.8s linear infinite;
+}
+@keyframes sgSpin { to { transform: rotate(360deg); } }
+
+/* ── injected: SMART Goal accordion ── */
+#sg-app .sg-goal-hd { cursor: pointer; user-select: none; }
+#sg-app .sg-goal-hd:hover { background: var(--surface2); }
+#sg-app .sg-goal-chevron { display: inline-block; font-size: 11px; color: var(--text3); transition: transform .15s; }
+#sg-app .goal-group.sg-open .sg-goal-chevron { transform: rotate(90deg); }
+#sg-app .sg-goal-hd .actions-cell { display: inline-flex; gap: 6px; }
+
+</style>
+<nav class="app-nav">
+  <div class="nav-brand">OLF <span>Tracker</span></div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('dashboard')">Dashboard</button>
+    <button class="nav-tab" onclick="showPage('smart-goals')">SMART Goals</button>
+    <button class="nav-tab" onclick="showPage('monthly-plan')">Monthly Plan</button>
+    <button class="nav-tab" id="nav-tab-reviews" onclick="showPage('reviews')">Reviews</button>
+    <button class="nav-tab" id="nav-tab-settings" onclick="showPage('settings')">Settings</button>
+  </div>
+  <div class="nav-right" style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:11px;color:var(--text3)" id="nav-dept-label"></span>
+    <div id="user-badge" style="display:flex;align-items:center"></div>
+  </div>
+</nav>
+
+<select id="global-dept" style="display:none" onchange="changeDept()"><option value="">All Departments</option></select>
+
+<div class="app-body">
+
+<div class="page-content">
+
+<!-- ══════════ DASHBOARD ══════════ -->
+<div id="page-dashboard" class="page active">
+  <div style="margin-bottom:16px">
+    <h1 style="font-size:20px;font-weight:800;letter-spacing:-.02em">Dashboard</h1>
+    <p style="font-size:12px;color:var(--text3);margin-top:3px" id="dash-dept-label">Overview of all SMART Goals and task progress</p>
+  </div>
+  <div class="filter-bar">
+    <select id="dash-year-filter" onchange="renderDashboard()"><option value="">All Academic Years</option></select>
+    <select id="dash-month-filter" onchange="renderDashboard()"><option value="">All Months</option></select>
+    <select id="dash-dept-filter" onchange="renderDashboard()"><option value="">All Departments</option></select>
+  </div>
+  <div class="metrics-row" id="dash-metrics"></div>
+
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-header"><span class="card-title">Monthly Plan Progress — by Department</span></div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:20px;align-items:center" id="dash-plan-progress"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><span class="card-title">Review Score — by Department</span></div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:20px;align-items:center" id="dash-review-score"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ SMART GOALS ══════════ -->
+<div id="page-smart-goals" class="page">
+  <div class="page-header">
+    <div>
+      <h1 style="font-size:20px;font-weight:800;letter-spacing:-.02em">SMART Goals</h1>
+      <p style="font-size:12px;color:var(--text3);margin-top:3px" id="sg-dept-label">Define goals → categories, specific to each member</p>
+    </div>
+    <button class="btn btn-primary" onclick="openGoalModal()">+ Add SMART Goal</button>
+  </div>
+  <div class="filter-bar">
+    <select id="sg-year-filter" onchange="renderSmartGoals()"><option value="">All Academic Years</option></select>
+    <select id="sg-dept-filter" onchange="onSgDeptChange()"><option value="">Select Department…</option></select>
+    <select id="sg-member-filter" onchange="renderSmartGoals()"><option value="">Select Department first…</option></select>
+  </div>
+  <div id="smart-goals-list"></div>
+</div>
+
+<!-- ══════════ MONTHLY PLAN ══════════ -->
+<div id="page-monthly-plan" class="page">
+  <div class="page-header">
+    <div>
+      <h1 style="font-size:20px;font-weight:800;letter-spacing:-.02em">Monthly Plan</h1>
+      <p style="font-size:12px;color:var(--text3);margin-top:3px" id="mp-dept-label">Week-wise task tracking linked to SMART Goals</p>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div class="cols-panel-wrap">
+        <button class="btn btn-secondary" onclick="toggleColsPanel()">☰ Columns</button>
+        <div class="cols-panel" id="cols-panel"></div>
+      </div>
+      <button class="btn btn-primary" onclick="openAddTask()">+ Add Task</button>
+    </div>
+  </div>
+
+  <div class="col-legend">
+    <div class="col-legend-item"><div class="col-legend-dot" style="background:#2E5FA3"></div>Plan</div>
+    <div class="col-legend-item"><div class="col-legend-dot" style="background:#1A8577"></div>Status Update</div>
+    <div class="col-legend-item"><div class="col-legend-dot" style="background:#33404D"></div>Actions</div>
+  </div>
+
+  <div class="filter-bar">
+    <select id="mp-year" onchange="renderPlan()"><option value="">All Academic Years</option></select>
+    <select id="mp-month" onchange="renderPlan()"><option value="">All Months</option></select>
+    <select id="mp-week" onchange="renderPlan()"><option value="">All Weeks</option></select>
+    <select id="mp-dept" onchange="renderPlan()"><option value="">All Departments</option></select>
+    <select id="mp-goal" onchange="renderPlan()"><option value="">All SMART Goals</option></select>
+    <select id="mp-member" onchange="renderPlan()"><option value="">All Members</option></select>
+    <select id="mp-status" onchange="renderPlan()">
+      <option value="">All Status</option>
+      <option>Planned</option><option>Completed</option><option>In Process</option><option>Pending</option><option>On Hold</option><option>Cancelled</option>
+    </select>
+    <input id="mp-search" type="text" placeholder="Search tasks…" oninput="renderPlan()" style="min-width:160px">
+  </div>
+
+  <div class="plan-tbl-wrap">
+    <table class="plan-tbl">
+      <thead id="plan-thead"></thead>
+      <tbody id="plan-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════ REVIEWS ══════════ -->
+<div id="page-reviews" class="page">
+  <div class="page-header">
+    <div>
+      <h1 style="font-size:20px;font-weight:800;letter-spacing:-.02em">Monthly Reviews</h1>
+      <p style="font-size:12px;color:var(--text3);margin-top:3px" id="rv-dept-label">Self-review by member · Manager score by Dept Head / Admin</p>
+    </div>
+    <button class="btn btn-primary" id="rv-add-btn" onclick="openReviewModal()">+ New Review</button>
+  </div>
+  <div class="filter-bar" id="rv-filter-bar">
+    <select id="rv-year" onchange="renderReviews()"><option value="">All Academic Years</option></select>
+    <select id="rv-month" onchange="renderReviews()"><option value="">All Months</option></select>
+    <select id="rv-dept" onchange="onRvDeptChange()"><option value="">All Depts</option></select>
+    <select id="rv-member" onchange="renderReviews()"><option value="">Select Member…</option></select>
+  </div>
+  <div id="review-list"></div>
+</div>
+
+<!-- ══════════ SETTINGS ══════════ -->
+<div id="page-settings" class="page">
+  <h1 style="font-size:20px;font-weight:800;letter-spacing:-.02em;margin-bottom:20px">Settings</h1>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:900px">
+    <div class="card"><div class="card-header"><span class="card-title">Departments</span><button class="btn btn-secondary btn-sm" onclick="addSetting('depts','Department')">+ Add</button></div><div class="card-body" id="settings-depts"></div></div>
+    <div class="card"><div class="card-header"><span class="card-title">Team Members</span><button class="btn btn-secondary btn-sm" onclick="openAddMemberModal()">+ Add Member</button></div><div class="card-body" id="settings-members"></div></div>
+  </div>
+  <div style="margin-top:20px;max-width:900px">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Admins</span>
+        <button class="btn btn-secondary btn-sm" onclick="openAddAdminModal()">+ Add Admin</button>
+      </div>
+      <div class="card-body">
+        <p style="font-size:12px;color:var(--text3);margin-bottom:10px">Admins have full access to manage this page and the entire system, across all departments.</p>
+        <div id="settings-admins"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /page-content -->
+</div><!-- /app-body -->
+
+<!-- ══════════ MODALS ══════════ -->
+<div class="modal-backdrop" id="task-modal">
+  <div class="modal" style="max-width:760px">
+    <div class="modal-head">
+      <span class="modal-title" id="task-modal-title">Add Task</span>
+      <button class="modal-close" onclick="closeModal('task-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:var(--text3);margin-bottom:16px">Fields marked <span style="color:var(--red)">*</span> are mandatory.</p>
+
+      <!-- Line 1: Year / Month / Week -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="field"><label>Academic Year <span class="req">*</span></label><select id="tf-year"></select></div>
+        <div class="field"><label>Month <span class="req">*</span></label><select id="tf-month"></select></div>
+        <div class="field"><label>Week <span class="req">*</span></label><select id="tf-week"></select></div>
+      </div>
+
+      <!-- Line 2: Dept / Member -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="field">
+          <label>Department <span class="req">*</span></label>
+          <select id="tf-dept" onchange="populateTaskMemberDropdown();populateTaskGoalDropdown()"><option value="">Select Department…</option></select>
+        </div>
+        <div class="field">
+          <label>Member <span class="req">*</span></label>
+          <select id="tf-member" onchange="populateTaskGoalDropdown()"><option value="">Select Member…</option></select>
+        </div>
+      </div>
+
+      <div style="height:1px;background:var(--border);margin-bottom:14px"></div>
+
+      <!-- SMART Goal + Category -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="field"><label>SMART Goal <span class="req">*</span></label><select id="tf-goal" onchange="populateCatDropdown()"><option value="">Select…</option></select></div>
+        <div class="field"><label>Category <span class="req">*</span></label><select id="tf-cat"><option value="">Select…</option></select></div>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <div class="field"><label>Sub-category</label><input id="tf-subcat" placeholder="(optional)"></div>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <div class="field"><label>Action Point <span class="req">*</span></label><textarea id="tf-action" placeholder="Describe the task / action to be done…"></textarea></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="field"><label>Planned Status <span class="req">*</span></label><select id="tf-planned"><option value="Yes">Yes</option><option value="No">No</option></select></div>
+        <div class="field"><label>Planned Items</label><input id="tf-planneditems" type="number" min="0" placeholder="(optional)"></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="field"><label>Est. Hrs <span class="req">*</span></label><input id="tf-est" type="number" step="0.5" min="0" placeholder="0"></div>
+        <div class="field"><label>Target Date <span class="req">*</span></label><input id="tf-tgtdate" type="date"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('task-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTask()">Save Task</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="goal-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title" id="goal-modal-title">Add SMART Goal</span>
+      <button class="modal-close" onclick="closeModal('goal-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:var(--text3);margin-bottom:16px">Fields marked <span style="color:var(--red)">*</span> are mandatory.</p>
+
+      <div class="field" style="margin-bottom:14px"><label>Academic Year <span class="req">*</span></label><select id="gf-year"></select></div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="field"><label>Department <span class="req">*</span></label><select id="gf-dept" onchange="populateGoalMemberDropdown()"><option value="">Select…</option></select></div>
+        <div class="field"><label>Team Member <span class="req">*</span></label><select id="gf-member"><option value="">Select…</option></select></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="field"><label>SMART Goal <span class="req">*</span></label><input id="gf-goal" placeholder="e.g. Program Implementation"></div>
+        <div class="field"><label>Weightage (%) <span class="req">*</span></label><input id="gf-weightage" type="number" min="0" max="100" placeholder="e.g. 25"></div>
+      </div>
+
+      <div class="field" style="margin-bottom:14px"><label>Description</label><textarea id="gf-description" placeholder="(optional) — description of this SMART Goal"></textarea></div>
+
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="field"><label>Category <span class="req">*</span></label><input id="gf-cat" placeholder="e.g. BA & Product"></div>
+        <div class="field"><label>Max Score <span class="req">*</span></label><input id="gf-maxscore" type="number" min="0" placeholder="e.g. 10"></div>
+      </div>
+
+      <div class="field"><label>Particulars</label><textarea id="gf-particulars" placeholder="(optional) — specific to this Category"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('goal-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveGoal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="goalgroup-modal">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-head">
+      <span class="modal-title">Edit SMART Goal</span>
+      <button class="modal-close" onclick="closeModal('goalgroup-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:var(--text3);margin-bottom:6px" id="gg-context"></p>
+      <p style="font-size:11px;color:var(--text3);margin-bottom:16px">Changes apply to every category under this SMART Goal.</p>
+      <div class="field" style="margin-bottom:14px"><label>SMART Goal <span class="req">*</span></label><input id="gg-goal" list="goalnames-list" placeholder="e.g. Program Implementation"></div>
+      <div class="field" style="margin-bottom:14px"><label>Description</label><textarea id="gg-description" placeholder="(optional) — description of this SMART Goal"></textarea></div>
+      <div class="field"><label>Weightage (%) <span class="req">*</span></label><input id="gg-weightage" type="number" min="0" max="100" placeholder="e.g. 25"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('goalgroup-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveGoalGroup()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="review-modal">
+  <div class="modal" style="max-width:960px">
+    <div class="modal-head">
+      <span class="modal-title">Monthly Review</span>
+      <button class="modal-close" onclick="closeModal('review-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid" style="margin-bottom:14px">
+        <div class="field"><label>Academic Year <span class="req">*</span></label><select id="rf-year"></select></div>
+        <div class="field"><label>Month <span class="req">*</span></label><select id="rf-month"></select></div>
+        <div class="field"><label>Department <span class="req">*</span></label><select id="rf-dept" onchange="populateReviewMemberDropdown()"><option value="">Select…</option></select></div>
+        <div class="field"><label>Team Member <span class="req">*</span></label><select id="rf-member"><option value="">Select…</option></select></div>
+        <div class="field"><label>Review Date</label><input id="rf-date" type="date"></div>
+      </div>
+      <div class="form-grid" style="margin-bottom:16px" id="rf-reviewer-row">
+        <div class="field"><label>Reviewer (Manager)</label><input id="rf-reviewer" placeholder="Manager name"></div>
+        <div class="field form-full"><label>Overall Remarks</label><input id="rf-remarks" placeholder="Overall comment…"></div>
+      </div>
+      <div class="section-label">Score each SMART Goal / Category</div>
+      <p style="font-size:12px;color:var(--text3);margin-bottom:12px">
+        Select year, dept &amp; member above, then click <strong>Load Goals</strong>.
+        <span style="color:var(--green);font-weight:600">Member Score</span> = filled by team member &nbsp;·&nbsp;
+        <span style="color:var(--blue);font-weight:600">Manager Score</span> = filled by Dept Head / Admin.
+      </p>
+      <button class="btn btn-secondary" style="margin-bottom:14px" onclick="loadGoalsForReview()">⟳ Load Goals</button>
+      <div id="review-score-table"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('review-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveReview()">Save Review</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="add-member-modal">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-head">
+      <span class="modal-title" id="am-modal-title">Add Team Member</span>
+      <button class="modal-close" onclick="closeModal('add-member-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid" style="grid-template-columns:1fr">
+        <div class="field">
+          <label>Department <span class="req">*</span></label>
+          <select id="am-dept"><option value="">Select…</option></select>
+        </div>
+        <div class="field">
+          <label>Member Name <span class="req">*</span></label>
+          <input id="am-name" placeholder="e.g. AB" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Role <span class="req">*</span></label>
+          <select id="am-role">
+            <option value="member">Member</option>
+            <option value="dept_head">Dept Head</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Email ID</label>
+          <input id="am-email" type="email" placeholder="e.g. name@olf.org" autocomplete="off">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('add-member-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveNewMember()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="add-admin-modal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-head">
+      <span class="modal-title">Add Admin</span>
+      <button class="modal-close" onclick="closeModal('add-admin-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid" style="grid-template-columns:1fr">
+        <div class="field"><label>Name <span class="req">*</span></label><input id="aa-name" placeholder="e.g. Prashant"></div>
+        <div class="field"><label>Email</label><input id="aa-email" type="email" placeholder="name@example.org (optional)"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('add-admin-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveNewAdmin()">Add Admin</button>
+    </div>
+  </div>
+</div>
+
+
+
+<datalist id="members-list"></datalist>
+<datalist id="goalnames-list"></datalist>
+<datalist id="cats-list"></datalist>
+<div class="toast" id="toast"></div>
+<div class="modal-backdrop" id="sg-confirm-modal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-head">
+      <span class="modal-title" id="sg-confirm-title">Please confirm</span>
+      <button class="modal-close" onclick="sgConfirmCancel()">×</button>
+    </div>
+    <div class="modal-body">
+      <p id="sg-confirm-msg" style="font-size:13.5px;color:var(--text2);line-height:1.6;margin:0"></p>
+      <div class="field" id="sg-confirm-input-wrap" style="margin-top:14px;display:none">
+        <label id="sg-confirm-input-label"></label>
+        <input id="sg-confirm-input" type="text" onkeydown="if(event.key==='Enter'){event.preventDefault();sgConfirmOk();}">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="sgConfirmCancel()">Cancel</button>
+      <button class="btn btn-primary" id="sg-confirm-ok" onclick="sgConfirmOk()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div class="sg-loader-overlay" id="sg-loader"><div class="sg-spinner"></div></div>
+</div>
