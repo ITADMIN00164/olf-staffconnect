@@ -33,10 +33,15 @@
 }
 
 #sg-app * { box-sizing: border-box; margin: 0; padding: 0; }
-#sg-app { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; min-height: 100vh; }
+#sg-app { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+
+/* Host override: this app is injected into .content-area, which has its own
+   padding + scroll. Cancel those so #sg-app fills the pane and owns its scroll,
+   keeping the nav genuinely fixed (no content bleeding above/behind it). */
+.content-area:has(> #sg-app) { padding: 0; overflow: hidden; }
 
 /* ── NAV ── */
-#sg-app .app-nav { background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 24px; height: 54px; position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+#sg-app .app-nav { background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 24px; height: 54px; flex-shrink: 0; position: relative; z-index: 100; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
 #sg-app .nav-brand { font-size: 15px; font-weight: 800; color: var(--brand); letter-spacing: -.03em; margin-right: 36px; white-space: nowrap; }
 #sg-app .nav-brand span { color: var(--text3); font-weight: 400; letter-spacing: 0; }
 #sg-app .nav-tabs { display: flex; }
@@ -52,7 +57,7 @@
 #sg-app .dept-selector select:focus { outline: none; }
 
 /* ── LAYOUT ── */
-#sg-app .app-body { display: flex; min-height: calc(100vh - 54px); }
+#sg-app .app-body { display: flex; flex: 1; min-height: 0; overflow: hidden; }
 
 #sg-app .sidebar {
   width: 240px;
@@ -132,7 +137,7 @@
 #sg-app .sb-all.active-dept { background: var(--brand-lt); color: var(--brand); }
 #sg-app .sb-all-icon { font-size: 15px; flex-shrink: 0; }
 
-#sg-app .page-content { flex: 1; overflow: auto; }
+#sg-app .page-content { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
 #sg-app .page { display: none; padding: 24px; max-width: 1440px; margin: 0 auto; }
 #sg-app .page.active { display: block; }
 
