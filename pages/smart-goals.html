@@ -335,6 +335,17 @@
 #sg-app .goal-group.sg-open .sg-goal-chevron { transform: rotate(90deg); }
 #sg-app .sg-goal-hd .actions-cell { display: inline-flex; gap: 6px; }
 
+/* ── injected: in-app refresh button spin ── */
+#sg-app #sg-refresh-btn { gap: 6px; }
+#sg-app #sg-refresh-btn.loading { opacity: .65; pointer-events: none; }
+#sg-app #sg-refresh-btn .sg-refresh-ico { display: inline-block; }
+#sg-app #sg-refresh-btn.loading .sg-refresh-ico { animation: sgSpin .8s linear infinite; }
+
+/* ── injected: Review cards collapse to a single header line ── */
+#sg-app .sg-review-hd { cursor: pointer; user-select: none; }
+#sg-app .sg-review-hd:hover { background: var(--surface2); }
+#sg-app .sg-review-chevron { display: inline-block; font-size: 11px; color: var(--text3); transition: transform .15s; flex-shrink: 0; }
+
 </style>
 <nav class="app-nav">
   <div class="nav-brand">OLF <span>Tracker</span></div>
@@ -346,6 +357,9 @@
     <button class="nav-tab" id="nav-tab-settings" onclick="showPage('settings')">Settings</button>
   </div>
   <div class="nav-right" style="display:flex;align-items:center;gap:8px">
+    <button class="btn btn-secondary btn-sm" id="sg-refresh-btn" onclick="sgRefresh()" title="Reload the latest data from the server (no page reload needed)">
+      <span class="sg-refresh-ico">⟳</span> Refresh
+    </button>
     <span style="font-size:11px;color:var(--text3)" id="nav-dept-label"></span>
     <div id="user-badge" style="display:flex;align-items:center"></div>
   </div>

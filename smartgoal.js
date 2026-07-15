@@ -1321,9 +1321,11 @@ function renderReviews() {
       </div>`;
     }).join('');
 
-    html += `<div class="card" style="margin-bottom:16px">
-      <div class="card-header" style="flex-wrap:wrap;gap:8px">
+    // Collapsed by default: only this header line shows. Click the row to expand details.
+    html += `<div class="card sg-review-card" style="margin-bottom:16px">
+      <div class="card-header sg-review-hd" onclick="toggleReviewCard(this)" style="flex-wrap:wrap;gap:8px">
         <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
+          <span class="sg-review-chevron">▶</span>
           <span class="card-title" style="font-weight:700">${esc(academicYearShort(r.year))}</span>
           <span class="card-title">${esc(r.member)}</span>
           <span style="font-size:12px;color:var(--text2)">${esc(monthYearLabel(r.year,r.month))}</span>
@@ -1332,14 +1334,14 @@ function renderReviews() {
           ${statusPill}
         </div>
         <div style="font-size:11px;color:var(--text3)">Reviewer: ${esc(r.reviewer||'—')}</div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap" onclick="event.stopPropagation()">
           <span class="score-badge ${scoreClass(totalMem,totalMax)}">Member: ${totalMem}/${totalMax}</span>
           ${mgrDone ? `<span class="score-badge ${scoreClass(totalMgr,totalMax)}">Mgr: ${totalMgr}/${totalMax}</span>` : `<span class="score-badge" style="background:var(--surface2);color:var(--text3)">Mgr: pending</span>`}
           ${(canEditMemberScore(r)||canEditMgrScore(r))?`<button class="btn btn-secondary btn-sm" onclick="openReviewModal('${r.id}')">✏️ Edit</button>`:''}
           ${currentUser.role===ROLES.ADMIN||currentUser.role===ROLES.DEPT_HEAD?`<button class="btn btn-danger btn-sm" onclick="deleteReview('${r.id}')">Delete</button>`:''}
         </div>
       </div>
-      <div class="card-body">
+      <div class="card-body" style="display:none">
         ${r.remarks ? `<p style="font-size:12px;color:var(--text2);margin-bottom:12px;padding:8px 12px;background:var(--surface2);border-radius:var(--radius);border-left:3px solid var(--brand)">📝 ${esc(r.remarks)}</p>` : ''}
         ${summaryHtml}
         ${sectionsHtml}
@@ -1347,6 +1349,17 @@ function renderReviews() {
     </div>`;
   });
   document.getElementById('review-list').innerHTML = html;
+}
+
+// Reviews render collapsed (header line only); clicking the header expands the detail.
+function toggleReviewCard(hdEl) {
+  const card = hdEl.closest('.sg-review-card');
+  if (!card) return;
+  const body = card.querySelector('.card-body');
+  const chev = hdEl.querySelector('.sg-review-chevron');
+  const isOpen = card.classList.toggle('sg-open');
+  if (body) body.style.display = isOpen ? '' : 'none';
+  if (chev) chev.textContent = isOpen ? '▼' : '▶';
 }
 
 function openReviewModal(id) {
@@ -2009,6 +2022,19 @@ window.SmartGoals = {
   setUser: function (u) { if (u && u.email) { window.SMART_GOALS_USER = u; if (mounted) { resolveUser(); renderUserBadge(); renderPage(getCurrentPageId()); } } }
 };
 
+// ── In-app data refresh (no browser reload needed) ──
+// Pulls the latest server data and re-renders the current page in place.
+function sgRefresh() {
+  var btn = document.getElementById('sg-refresh-btn');
+  if (btn) { if (btn.classList.contains('loading')) return; btn.classList.add('loading'); }
+  sgShowLoader();
+  loadAll(true)
+    .then(afterLoadRender)
+    .then(function () { try { toast('Data refreshed'); } catch (e) {} })
+    .catch(function (e) { try { toast((e && e.message) || 'Refresh failed'); } catch (x) {} })
+    .then(function () { sgHideLoader(); if (btn) btn.classList.remove('loading'); });
+}
+
 // expose inline-handler functions used by the injected fragment
 try { window.addSetting = addSetting; } catch(e){}
 try { window.changeDept = changeDept; } catch(e){}
@@ -2049,6 +2075,8 @@ try { window.renderDashboard = renderDashboard; } catch(e){}
 try { window.renderPlan = renderPlan; } catch(e){}
 try { window.renderReviews = renderReviews; } catch(e){}
 try { window.renderSmartGoals = renderSmartGoals; } catch(e){}
+try { window.toggleReviewCard = toggleReviewCard; } catch(e){}
+try { window.sgRefresh = sgRefresh; } catch(e){}
 try { window.saveGoal = saveGoal; } catch(e){}
 try { window.saveInlineRow = saveInlineRow; } catch(e){}
 try { window.sgToggleDate = sgToggleDate; } catch(e){}
