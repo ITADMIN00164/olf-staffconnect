@@ -190,6 +190,7 @@
        bail out safely if the DOM is gone)
     ==================================================== */
     let user = { email: "", displayName: "", isValidator: false };
+    console.log("Gr.js loaded")
     let allRecords = [];                       // in-memory cache (server + optimistic)
     let recordsLoaded = false;                 // first successful fetch done?
     const pendingUploads = Object.create(null); // localId -> { file, meta } for retry
