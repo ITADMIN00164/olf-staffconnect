@@ -250,6 +250,17 @@ function showAppConfirm({ title = "Please confirm", message = "", type = "warnin
 }
 
 /* ====================================
+   EXPOSE SHARED HELPERS
+   Lets non-module scripts (calendar.js,
+   smartgoal.js, gr.js) reuse the in-app
+   toast / alert / confirm helpers.
+==================================== */
+
+window.notify        = notify;
+window.showAppAlert  = showAppAlert;
+window.showAppConfirm = showAppConfirm;
+
+/* ====================================
    AUTH STATE
 ==================================== */
 
@@ -362,6 +373,31 @@ async function isSmartGoalsAdmin(email) {
         return false;
     } catch (err) {
         console.error("Smart Goals admin check failed:", err);
+        return false;
+    }
+}
+
+/* ====================================
+   GR / CIRCULAR VALIDATOR CHECK (Firestore)
+   Emails in the "GR_Circular_Validator"
+   collection may validate / reject uploaded
+   GRs & Circulars. Everyone else can upload
+   and view, but not validate.
+   (Matches either the Email field or the doc id.)
+==================================== */
+
+async function isGrCircularValidator(email) {
+    try {
+        const snapshot = await getDocs(collection(db, "GR_Circular_Validator"));
+        for (const d of snapshot.docs) {
+            if (d.id && d.id.toLowerCase() === email) return true;
+            const data = d.data();
+            const val = data["Email"] || data["Email ID"] || data["email"];
+            if (val && String(val).toLowerCase() === email) return true;
+        }
+        return false;
+    } catch (err) {
+        console.error("GR/Circular validator check failed:", err);
         return false;
     }
 }
@@ -528,6 +564,21 @@ window.navigate = async function (page) {
         }
         if (window.SmartGoals && typeof window.SmartGoals.mount === "function") {
             window.SmartGoals.mount();
+        }
+    }
+
+    else if (page === "gr") {
+        const user = window.__olfUser;
+        if (user) {
+            const isValidator = await isGrCircularValidator(user.email.toLowerCase());
+            window.GR_CIRCULAR_USER = {
+                email: user.email,
+                displayName: user.displayName,
+                isValidator
+            };
+        }
+        if (window.GRCirculars && typeof window.GRCirculars.mount === "function") {
+            window.GRCirculars.mount();
         }
     }
 

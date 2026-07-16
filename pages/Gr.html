@@ -1,0 +1,533 @@
+<!-- ============================================================
+     pages/gr.html — GR's & Circulars
+     Injected into #pageContent by app.js -> navigate('gr').
+     Driven by gr.js (window.GRCirculars.mount()).
+     NOTE: no inline <script> here — scripts injected via
+     innerHTML never execute, so all wiring lives in gr.js.
+     ============================================================ -->
+<style>
+    #grPage { max-width: 1200px; }
+
+    #grPage .gr-badge {
+        display: inline-block; font-size: 11px; font-weight: 600;
+        padding: 2px 8px; border-radius: 20px; margin-left: 6px;
+    }
+    #grPage .gr-badge--val { background: #dcfce7; color: #15803d; }
+    #grPage .gr-whoami { font-size: 13px; color: #6b7280; margin-top: 2px; }
+
+    /* Top refresh */
+    #grPage .gr-refresh-top {
+        border: 1px solid #e5e7eb; background: #fff; border-radius: 8px;
+        padding: 9px 16px; font-size: 13px; font-weight: 600; color: #374151;
+        cursor: pointer; display: inline-flex; align-items: center; gap: 7px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05); white-space: nowrap;
+    }
+    #grPage .gr-refresh-top:hover { background: #f9fafb; }
+    #grPage .gr-refresh-top:disabled { opacity: .65; cursor: default; }
+    #grPage .gr-refresh-top .gr-ricon { display: inline-block; }
+    #grPage .gr-refresh-top.busy .gr-ricon { animation: grspin .8s linear infinite; }
+
+    /* Tabs */
+    #grPage .gr-tabs {
+        display: flex; gap: 6px; margin: 22px 0 20px;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    #grPage .gr-tab {
+        border: none; background: none; padding: 10px 16px;
+        font: inherit; font-size: 14px; font-weight: 600; color: #6b7280;
+        cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
+        transition: color .15s, border-color .15s;
+    }
+    #grPage .gr-tab:hover { color: #1a1d23; }
+    #grPage .gr-tab.active { color: #4f8ef7; border-bottom-color: #4f8ef7; }
+
+    #grPage .gr-panel { display: none; }
+    #grPage .gr-panel.active { display: block; }
+
+    /* Cards */
+    #grPage .gr-card {
+        background: #fff; border-radius: 12px; padding: 24px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.07); margin-bottom: 20px;
+    }
+    #grPage .gr-card-title { font-size: 16px; font-weight: 700; color: #1a1d23; margin-bottom: 4px; }
+    #grPage .gr-card-sub { font-size: 13px; color: #6b7280; margin-bottom: 18px; }
+
+    /* My uploads header (title + Add New button) */
+    #grPage .gr-myups-head {
+        display: flex; align-items: flex-start; justify-content: space-between;
+        gap: 14px; margin-bottom: 4px;
+    }
+    #grPage .gr-myups-head .gr-card-sub { margin-bottom: 12px; }
+
+    /* Form */
+    #grPage .gr-form-grid {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 16px 20px;
+    }
+    #grPage .gr-field { display: flex; flex-direction: column; gap: 6px; }
+    #grPage .gr-field.gr-span2 { grid-column: 1 / -1; }
+    #grPage .gr-field label { font-size: 12.5px; font-weight: 600; color: #374151; }
+    #grPage .gr-field label .req { color: #ef4444; }
+
+    #grPage .gr-field input[type="text"],
+    #grPage .gr-field input[type="date"],
+    #grPage .gr-field select,
+    #grPage .gr-field textarea {
+        width: 100%; padding: 9px 12px; border: 1px solid #e5e7eb;
+        border-radius: 8px; font-size: 13.5px; font-family: inherit; color: #1a1d23;
+        outline: none; background: #fff; transition: border-color .15s, box-shadow .15s;
+    }
+    #grPage .gr-field textarea { resize: vertical; min-height: 76px; }
+    #grPage .gr-field input:focus,
+    #grPage .gr-field select:focus,
+    #grPage .gr-field textarea:focus {
+        border-color: #4f8ef7; box-shadow: 0 0 0 3px rgba(79,142,247,0.12);
+    }
+    #grPage .gr-field select:disabled { background: #f3f4f6; color: #9ca3af; }
+
+    /* Type radio pills */
+    #grPage .gr-type-row { display: flex; gap: 10px; }
+    #grPage .gr-type-pill {
+        flex: 1; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 12px;
+        display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13.5px;
+        font-weight: 600; color: #374151; transition: border-color .15s, background .15s;
+    }
+    #grPage .gr-type-pill:hover { border-color: #cbd5e1; }
+    #grPage .gr-type-pill input { accent-color: #4f8ef7; }
+    #grPage .gr-type-pill:has(input:checked) { border-color: #4f8ef7; background: #eef3fe; color: #1e40af; }
+
+    /* File picker */
+    #grPage .gr-file-row { display: flex; align-items: center; gap: 12px; }
+    #grPage .gr-file-btn {
+        border: 1px solid #e5e7eb; background: #f9fafb; border-radius: 8px;
+        padding: 9px 14px; font-size: 13px; font-weight: 600; color: #374151; cursor: pointer;
+    }
+    #grPage .gr-file-btn:hover { background: #f3f4f6; }
+    #grPage .gr-file-name { font-size: 12.5px; color: #6b7280; word-break: break-all; }
+    #grPage #grUpFile { display: none; }
+
+    /* Buttons */
+    #grPage .gr-btn-primary {
+        background: #4f8ef7; color: #fff; border: none; border-radius: 8px;
+        padding: 11px 22px; font-size: 14px; font-weight: 600; cursor: pointer;
+        transition: background .15s; display: inline-flex; align-items: center; gap: 6px;
+    }
+    #grPage .gr-btn-primary:hover { background: #3a7de8; }
+    #grPage .gr-btn-secondary {
+        background: #fff; color: #374151; border: 1px solid #e5e7eb; border-radius: 8px;
+        padding: 11px 18px; font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    #grPage .gr-btn-secondary:hover { background: #f9fafb; }
+    #grPage .gr-form-footer { margin-top: 22px; display: flex; justify-content: flex-end; gap: 10px; }
+
+    /* Filters bar */
+    #grPage .gr-filters {
+        display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end;
+        background: #fff; border-radius: 12px; padding: 16px 20px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.07); margin-bottom: 18px;
+    }
+    #grPage .gr-filter { display: flex; flex-direction: column; gap: 5px; min-width: 190px; }
+    #grPage .gr-filter label { font-size: 11.5px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: .3px; }
+    #grPage .gr-filter select {
+        padding: 8px 11px; border: 1px solid #e5e7eb; border-radius: 8px;
+        font-size: 13.5px; font-family: inherit; outline: none; background: #fff;
+    }
+    #grPage .gr-filter select:focus { border-color: #4f8ef7; box-shadow: 0 0 0 3px rgba(79,142,247,0.12); }
+    #grPage .gr-filter-req label::after { content: " *"; color: #ef4444; }
+    #grPage .gr-meta { font-size: 12.5px; color: #6b7280; margin: 0 0 10px 2px; }
+
+    /* Table */
+    #grPage .gr-table-wrap {
+        background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+        overflow: auto; max-height: 62vh;
+    }
+    #grPage .gr-myups-wrap { max-height: 52vh; box-shadow: none; border: 1px solid #f1f5f9; }
+    #grPage table.gr-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 900px; }
+    #grPage table.gr-table--detailed { min-width: 1080px; }
+    #grPage .gr-table thead th {
+        position: sticky; top: 0; z-index: 2; background: #f8fafc; color: #475569;
+        text-align: left; font-weight: 700; font-size: 11.5px; text-transform: uppercase;
+        letter-spacing: .3px; padding: 11px 12px; border-bottom: 1px solid #e5e7eb; white-space: nowrap;
+    }
+    #grPage .gr-table tbody td { padding: 11px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; color: #1f2937; }
+    #grPage .gr-table tbody tr:hover { background: #fafbff; }
+    #grPage .gr-td-title { font-weight: 600; max-width: 220px; }
+    #grPage .gr-td-desc { max-width: 240px; color: #4b5563;
+        overflow: hidden; text-overflow: ellipsis; display: -webkit-box;
+        -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    #grPage .gr-ts { font-size: 11px; color: #9ca3af; }
+    #grPage .gr-uploaded { font-size: 12.5px; }
+    #grPage .gr-muted { color: #9ca3af; }
+    #grPage .gr-locked { font-size: 12px; font-weight: 600; color: #9ca3af; white-space: nowrap; }
+    #grPage .gr-file-link { color: #4f8ef7; font-weight: 600; text-decoration: none; }
+    #grPage .gr-file-link:hover { text-decoration: underline; }
+
+    #grPage .gr-type { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; white-space: nowrap; }
+    #grPage .gr-type--gr { background: #eef3fe; color: #1e40af; }
+    #grPage .gr-type--circ { background: #fef3c7; color: #92400e; }
+
+    #grPage .gr-chip { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; white-space: nowrap; }
+    #grPage .gr-chip--ok { background: #dcfce7; color: #15803d; }
+    #grPage .gr-chip--rej { background: #fee2e2; color: #b91c1c; }
+    #grPage .gr-chip--pend { background: #fef9c3; color: #a16207; }
+
+    /* Sync chips (optimistic states) */
+    #grPage .gr-sync { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; white-space: nowrap; }
+    #grPage .gr-sync--busy { background: #e0f2fe; color: #0369a1; }
+    #grPage .gr-sync--fail { background: #fee2e2; color: #b91c1c; }
+
+    #grPage .gr-row-actions { display: flex; gap: 6px; }
+    #grPage .gr-btn-ok, #grPage .gr-btn-rej {
+        border: none; border-radius: 6px; padding: 6px 11px; font-size: 12px;
+        font-weight: 700; cursor: pointer;
+    }
+    #grPage .gr-btn-ok { background: #16a34a; color: #fff; }
+    #grPage .gr-btn-ok:hover { background: #15803d; }
+    #grPage .gr-btn-rej { background: #ef4444; color: #fff; }
+    #grPage .gr-btn-rej:hover { background: #dc2626; }
+
+    #grPage .gr-btn-mini { border: none; border-radius: 6px; padding: 5px 10px; font-size: 11.5px; font-weight: 700; cursor: pointer; }
+    #grPage .gr-btn-retry { background: #4f8ef7; color: #fff; }
+    #grPage .gr-btn-retry:hover { background: #3a7de8; }
+    #grPage .gr-btn-discard { background: #f3f4f6; color: #6b7280; }
+    #grPage .gr-btn-discard:hover { background: #e5e7eb; }
+
+    /* Empty / loading state */
+    #grPage .gr-empty-cell { padding: 40px 12px !important; text-align: center; }
+    #grPage .gr-empty { color: #9ca3af; font-size: 13.5px; }
+    #grPage .gr-empty-icon { font-size: 30px; margin-bottom: 8px; }
+
+    /* Summary */
+    #grPage .gr-sum-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+    #grPage .gr-sum-card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+    #grPage .gr-sum-val { font-size: 30px; font-weight: 800; line-height: 1; }
+    #grPage .gr-sum-label { font-size: 12.5px; color: #6b7280; margin-top: 8px; }
+
+    #grPage .gr-chart-card { background: #fff; border-radius: 12px; padding: 22px 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+    #grPage .gr-chart-title { font-size: 14.5px; font-weight: 700; color: #1a1d23; margin-bottom: 20px; }
+    #grPage .gr-chart { display: flex; gap: 60px; align-items: flex-end; height: 200px; padding: 0 10px; }
+    #grPage .gr-bar-group { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    #grPage .gr-bars { display: flex; gap: 14px; align-items: flex-end; height: 170px; }
+    #grPage .gr-bar { width: 46px; border-radius: 6px 6px 0 0; position: relative; min-height: 3px; transition: height .3s; }
+    #grPage .gr-bar--up { background: #4f8ef7; }
+    #grPage .gr-bar--val { background: #16a34a; }
+    #grPage .gr-bar-num { position: absolute; top: -20px; left: 0; right: 0; text-align: center; font-size: 12px; font-weight: 700; color: #374151; }
+    #grPage .gr-bar-label { font-size: 12.5px; font-weight: 600; color: #6b7280; }
+    #grPage .gr-legend { display: flex; gap: 20px; margin-top: 18px; font-size: 12.5px; color: #6b7280; }
+    #grPage .gr-legend span { display: flex; align-items: center; gap: 6px; }
+    #grPage .gr-swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+    @keyframes grspin { to { transform: rotate(360deg); } }
+
+    /* ============ Clickable stat row (Upload + Dashboard) ============ */
+    #grPage .gr-mystat-row { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+    #grPage .gr-mystat {
+        flex: 1; min-width: 140px; display: flex; flex-direction: column; gap: 4px;
+        background: #fff; border: 1.5px solid #e5e7eb; border-radius: 10px;
+        padding: 14px 18px; cursor: pointer; text-align: left; font-family: inherit;
+        transition: border-color .15s, box-shadow .15s, transform .1s;
+    }
+    #grPage .gr-mystat:hover { border-color: #cbd5e1; transform: translateY(-1px); }
+    #grPage .gr-mystat.active { border-color: #4f8ef7; box-shadow: 0 0 0 3px rgba(79,142,247,0.12); }
+    #grPage .gr-mystat-val { font-size: 24px; font-weight: 800; line-height: 1; color: #1a1d23; }
+    #grPage .gr-mystat-label { font-size: 12px; font-weight: 600; color: #6b7280; }
+    #grPage .gr-mystat--val .gr-mystat-val { color: #16a34a; }
+    #grPage .gr-mystat--pend .gr-mystat-val { color: #d97706; }
+    #grPage .gr-mystat--rej .gr-mystat-val { color: #dc2626; }
+    #grPage .gr-mystat.active.gr-mystat--val { border-color: #16a34a; box-shadow: 0 0 0 3px rgba(22,163,74,0.12); }
+    #grPage .gr-mystat.active.gr-mystat--pend { border-color: #d97706; box-shadow: 0 0 0 3px rgba(217,119,6,0.12); }
+
+    /* ============ Per-column filter row ============ */
+    #grPage .gr-filter-row th { position: sticky; top: 36px; background: #fff; padding: 6px 8px; z-index: 2; }
+    #grPage .gr-col-filter, #grPage .gr-col-filter-text {
+        width: 100%; font: inherit; font-size: 12px; font-weight: 500; color: #374151;
+        border: 1px solid #e5e7eb; border-radius: 6px; padding: 5px 7px; outline: none; background: #fff;
+    }
+    #grPage .gr-col-filter:focus, #grPage .gr-col-filter-text:focus { border-color: #4f8ef7; box-shadow: 0 0 0 2px rgba(79,142,247,0.12); }
+    #grPage .gr-filters-clear {
+        border: none; background: none; color: #4f8ef7; font-size: 12px; font-weight: 700;
+        cursor: pointer; padding: 4px 0; margin: -6px 0 10px 2px;
+    }
+    #grPage .gr-filters-clear:hover { text-decoration: underline; }
+
+    /* ============ Upload modal (popup) ============ */
+    #grPage .gr-modal-overlay {
+        display: none; position: fixed; inset: 0; background: rgba(10,11,15,0.6);
+        z-index: 600; align-items: flex-start; justify-content: center;
+        padding: 40px 16px; overflow-y: auto; backdrop-filter: blur(1px);
+    }
+    #grPage .gr-modal-overlay.open { display: flex; }
+    #grPage .gr-modal-box {
+        background: #fff; border-radius: 16px; width: 680px; max-width: 100%;
+        box-shadow: 0 24px 70px rgba(0,0,0,0.25); overflow: hidden; margin: auto;
+        animation: grModalIn .18s ease-out;
+    }
+    @keyframes grModalIn { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+    #grPage .gr-modal-header {
+        display: flex; align-items: flex-start; justify-content: space-between;
+        padding: 22px 26px; border-bottom: 1px solid #f3f4f6;
+        background: linear-gradient(135deg, #eef3fe, #fff);
+    }
+    #grPage .gr-modal-header h2 { font-size: 17px; font-weight: 800; color: #1a1d23; margin-bottom: 3px; }
+    #grPage .gr-modal-header p { font-size: 12.5px; color: #6b7280; margin: 0; max-width: 460px; }
+    #grPage .gr-modal-close {
+        border: none; background: #fff; color: #6b7280; font-size: 15px; cursor: pointer;
+        width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    #grPage .gr-modal-close:hover { background: #f3f4f6; color: #374151; }
+    #grPage .gr-modal-body { padding: 24px 26px; max-height: 68vh; overflow-y: auto; }
+    #grPage .gr-modal-footer {
+        display: flex; justify-content: flex-end; gap: 10px; padding: 16px 26px;
+        border-top: 1px solid #f3f4f6; background: #fafafa;
+    }
+
+    @media (max-width: 720px) {
+        #grPage .gr-form-grid { grid-template-columns: 1fr; }
+        #grPage .gr-sum-cards { grid-template-columns: 1fr; }
+        #grPage .gr-chart { gap: 32px; }
+        #grPage .gr-myups-head { flex-direction: column; }
+        #grPage .gr-mystat-row { flex-direction: column; }
+    }
+</style>
+
+<div id="grPage">
+    <div class="page-header">
+        <div>
+            <div class="page-title">GR's &amp; <span>Circulars</span></div>
+            <div class="page-subtitle">Upload Government Resolutions &amp; Circulars, then track validation on the Vinoba app.</div>
+            <div class="gr-whoami" id="grWhoAmI"></div>
+        </div>
+        <button class="gr-refresh-top" id="grRefreshAll" title="Reload all page data from the server">
+            <span class="gr-ricon">↻</span> Refresh Data
+        </button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="gr-tabs">
+        <button class="gr-tab active" data-tab="upload">⬆ Upload</button>
+        <button class="gr-tab" data-tab="detailed">📋 Dashboard</button>
+        <button class="gr-tab" data-tab="summary">📊 Summary</button>
+    </div>
+
+    <!-- ============ UPLOAD PANEL ============ -->
+    <div class="gr-panel active" data-panel="upload">
+
+        <!-- Add / upload form: now a popup modal, hidden until "+ Add New" is clicked -->
+        <div class="gr-modal-overlay" id="grFormModalOverlay">
+            <div class="gr-modal-box" id="grFormCard" role="dialog" aria-modal="true">
+                <div class="gr-modal-header">
+                    <div>
+                        <h2>Upload a GR / Circular</h2>
+                        <p>The file is saved to Drive under <em>month → district</em> in the background — you can keep working while it uploads.</p>
+                    </div>
+                    <button class="gr-modal-close" id="grFormCloseX" type="button">✕</button>
+                </div>
+
+                <form id="grUploadForm" onsubmit="return false;">
+                    <div class="gr-modal-body">
+                        <div class="gr-form-grid">
+                            <div class="gr-field gr-span2">
+                                <label>Type <span class="req">*</span></label>
+                                <div class="gr-type-row">
+                                    <label class="gr-type-pill"><input type="radio" name="grType" value="GR"> Government Resolution (GR)</label>
+                                    <label class="gr-type-pill"><input type="radio" name="grType" value="Circular"> Circular</label>
+                                </div>
+                            </div>
+
+                            <div class="gr-field">
+                                <label>State <span class="req">*</span></label>
+                                <select id="grUpState"></select>
+                            </div>
+                            <div class="gr-field">
+                                <label>District <span class="req">*</span></label>
+                                <select id="grUpDistrict"></select>
+                            </div>
+
+                            <div class="gr-field gr-span2">
+                                <label>Title <span class="req">*</span></label>
+                                <input type="text" id="grUpTitle" placeholder="e.g. GR on scholarship disbursement 2026">
+                            </div>
+
+                            <div class="gr-field gr-span2">
+                                <label>Description</label>
+                                <textarea id="grUpDesc" placeholder="Brief description of the GR / Circular…"></textarea>
+                            </div>
+
+                            <div class="gr-field">
+                                <label>Date of GR / Circular <span class="req">*</span></label>
+                                <input type="date" id="grUpDate">
+                            </div>
+                            <div class="gr-field">
+                                <label>File <span class="req">*</span></label>
+                                <div class="gr-file-row">
+                                    <label class="gr-file-btn" for="grUpFile">Choose file</label>
+                                    <input type="file" id="grUpFile">
+                                    <span class="gr-file-name" id="grUpFileName">No file chosen</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="gr-modal-footer">
+                        <button class="gr-btn-secondary" id="grFormCancelBtn" type="button">Cancel</button>
+                        <button class="gr-btn-primary" id="grUploadBtn">⬆ Upload</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- My uploads -->
+        <div class="gr-card">
+            <div class="gr-myups-head">
+                <div>
+                    <div class="gr-card-title">My uploads</div>
+                    <div class="gr-card-sub">GRs &amp; Circulars uploaded by you.</div>
+                </div>
+                <button class="gr-btn-primary" id="grAddNewBtn">＋ Add New GR / Circular</button>
+            </div>
+
+            <!-- Clickable Total / Validated / Not-validated counters -->
+            <div class="gr-mystat-row" id="grMyStatRow">
+                <button class="gr-mystat active" data-filter="all" type="button">
+                    <span class="gr-mystat-val" id="grMyStatTotal">0</span>
+                    <span class="gr-mystat-label">Total</span>
+                </button>
+                <button class="gr-mystat gr-mystat--val" data-filter="validated" type="button">
+                    <span class="gr-mystat-val" id="grMyStatValidated">0</span>
+                    <span class="gr-mystat-label">Validated</span>
+                </button>
+                <button class="gr-mystat gr-mystat--pend" data-filter="not_validated" type="button">
+                    <span class="gr-mystat-val" id="grMyStatPending">0</span>
+                    <span class="gr-mystat-label">Not Validated</span>
+                </button>
+            </div>
+
+            <div class="gr-meta" id="grMyMeta"></div>
+
+            <div class="gr-table-wrap gr-myups-wrap">
+                <table class="gr-table">
+                    <thead>
+                        <tr>
+                            <th>Sr.</th>
+                            <th>Type</th>
+                            <th>Title</th>
+                            <th>Date</th>
+                            <th>District</th>
+                            <th>State</th>
+                            <th>File</th>
+                            <th>Status</th>
+                            <th>Uploaded on</th>
+                            <th></th>
+                        </tr>
+                        <tr class="gr-filter-row" id="grMyFilterRow">
+                            <th></th>
+                            <th><select class="gr-col-filter" data-col="type"></select></th>
+                            <th><input class="gr-col-filter-text" data-col="title" type="text" placeholder="Filter title…"></th>
+                            <th></th>
+                            <th><select class="gr-col-filter" data-col="district"></select></th>
+                            <th><select class="gr-col-filter" data-col="state"></select></th>
+                            <th></th>
+                            <th><select class="gr-col-filter" data-col="status"></select></th>
+                            <th></th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="grMyBody">
+                        <tr><td colspan="10" class="gr-empty-cell">
+                            <div class="gr-empty"><div class="gr-empty-icon">⏳</div>Loading your uploads…</div>
+                        </td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ DETAILED DASHBOARD PANEL ============ -->
+    <div class="gr-panel" data-panel="detailed">
+        <div class="gr-filters">
+            <div class="gr-filter">
+                <label>State</label>
+                <select id="grDashState"></select>
+            </div>
+            <div class="gr-filter">
+                <label>District</label>
+                <select id="grDashDistrict"></select>
+            </div>
+            <div class="gr-filter">
+                <label>Month</label>
+                <select id="grDashMonth"></select>
+            </div>
+        </div>
+
+        <div class="gr-mystat-row" id="grDashStatRow">
+            <button class="gr-mystat active" data-filter="all" type="button">
+                <span class="gr-mystat-val" id="grDashStatTotal">0</span>
+                <span class="gr-mystat-label">Total</span>
+            </button>
+            <button class="gr-mystat gr-mystat--val" data-filter="validated" type="button">
+                <span class="gr-mystat-val" id="grDashStatValidated">0</span>
+                <span class="gr-mystat-label">Validated</span>
+            </button>
+            <button class="gr-mystat gr-mystat--pend" data-filter="not_validated" type="button">
+                <span class="gr-mystat-val" id="grDashStatPending">0</span>
+                <span class="gr-mystat-label">Not Validated</span>
+            </button>
+        </div>
+
+        <div class="gr-meta" id="grDetailedMeta"></div>
+
+        <div class="gr-table-wrap">
+            <table class="gr-table gr-table--detailed">
+                <thead>
+                    <tr>
+                        <th>Sr.</th>
+                        <th>Type</th>
+                        <th>Title</th>
+                        <th>Description</th>
+                        <th>Date</th>
+                        <th>District</th>
+                        <th>State</th>
+                        <th>File</th>
+                        <th>Uploaded By</th>
+                        <th>Status</th>
+                        <th>Validated By</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="grDetailedBody">
+                    <tr><td colspan="12" class="gr-empty-cell">
+                        <div class="gr-empty"><div class="gr-empty-icon">⏳</div>Loading records…</div>
+                    </td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ============ SUMMARY DASHBOARD PANEL ============ -->
+    <div class="gr-panel" data-panel="summary">
+        <div class="gr-filters">
+            <div class="gr-filter">
+                <label>State</label>
+                <select id="grSumState"></select>
+            </div>
+            <div class="gr-filter">
+                <label>District</label>
+                <select id="grSumDistrict"></select>
+            </div>
+            <div class="gr-filter">
+                <label>Month</label>
+                <select id="grSumMonth"></select>
+            </div>
+            <!-- Only shown when there's more than one validator in the data -->
+            <div class="gr-filter" id="grSumValidatorWrap" style="display:none;">
+                <label>Validator</label>
+                <select id="grSumValidator"></select>
+            </div>
+        </div>
+
+        <div id="grSummaryWrap">
+            <div class="gr-empty" style="padding:40px;text-align:center;">
+                <div class="gr-empty-icon">⏳</div>Loading summary…
+            </div>
+        </div>
+    </div>
+</div>
