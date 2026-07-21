@@ -14,9 +14,36 @@ const MONTHS = ['January','February','March','April','May','June','July','August
 const WEEKS = ['Week 1','Week 2','Week 3','Week 4','Week 5'];
 
 function academicYearOptions() {
+  // Start at the CURRENT academic year and go forward (no past years shown).
+  const now = new Date();
+  const startY = now.getMonth() >= 5 ? now.getFullYear() : now.getFullYear() - 1;
   const years = [];
-  for (let y = 2023; y <= 2033; y++) years.push(`June ${y} - May ${y+1}`);
+  for (let y = startY; y <= startY + 10; y++) years.push(`June ${y} - May ${y+1}`);
   return years;
+}
+// Stored value stays the full "June 2026 - May 2027"; this is the SHORT label only.
+function ayLabel(full) {
+  const m = /June (\d{4}) - May (\d{4})/.exec(full || '');
+  if (!m) return full || '';
+  return `June ${m[1].slice(-2)} - May ${m[2].slice(-2)}`;
+}
+// Full current academic year string, e.g. "June 2026 - May 2027".
+function currentAcademicYear() {
+  const now = new Date();
+  return deriveAcademicYear(MONTHS[now.getMonth()], now.getFullYear());
+}
+// Year <select>: option VALUE is the full string (so saved data still matches),
+// LABEL is the short "June 26 - May 27". opts:{emptyLabel,includeEmpty,selectCurrent}
+function populateYearSelect(id, opts) {
+  opts = opts || {};
+  const el = document.getElementById(id); if (!el) return;
+  const cur = el.value;
+  let html = '';
+  if (opts.includeEmpty !== false) html += `<option value="">${opts.emptyLabel || 'All Academic Years'}</option>`;
+  html += academicYearOptions().map(y => `<option value="${esc(y)}">${esc(ayLabel(y))}</option>`).join('');
+  el.innerHTML = html;
+  if (cur) el.value = cur;
+  else if (opts.selectCurrent) el.value = currentAcademicYear();
 }
 // derive an academic year label from a calendar month name + calendar year
 function deriveAcademicYear(monthName, calYear) {
@@ -316,46 +343,94 @@ function populateAllSelects() {
   const {depts} = DB.settings, members = memberNames(), years = academicYearOptions();
   populateSelect('global-dept', depts, 'All Departments');
 
-  populateSelect('sg-year-filter', years, 'All Academic Years');
+  populateYearSelect('sg-year-filter', {emptyLabel:'All Academic Years', selectCurrent:true});
   populateSelect('sg-dept-filter', depts, 'Select Department…');
   setSgMemberOptions();
 
-  populateSelect('mp-year', years, 'Academic Year…');
+  populateYearSelect('mp-year', {emptyLabel:'Academic Year…', selectCurrent:true});
   populateSelect('mp-month', MONTHS, 'Month…');
-  populateSelect('mp-week', WEEKS, 'Week…');
+  populateSelect('mp-week', WEEKS, 'All Weeks');
   populateSelect('mp-dept', depts, 'Department…');
-  populateSelect('mp-member', members, 'All Members');
-  // mp-goal populated dynamically from DB.goals goal names
-  populateSelect('mp-goal', [...new Set(DB.goals.map(g=>g.goal))], 'All SMART Goals');
+  // mp-goal & mp-member are scoped to the selected department + role
+  refreshMpDeptScopedDropdowns();
 
-  populateSelect('rv-year', years, 'All Academic Years');
+  populateYearSelect('rv-year', {emptyLabel:'All Academic Years', selectCurrent:true});
   populateSelect('rv-month', MONTHS, 'All Months');
   populateSelect('rv-dept', depts, 'All Depts');
   populateSelect('rv-member', members, 'Select Member…');
 
-  populateSelect('tf-year', years, 'Select…');
+  populateYearSelect('tf-year', {emptyLabel:'Select…'});
   populateSelect('tf-month', MONTHS, 'Select…');
   populateSelect('tf-week', WEEKS, 'Select…');
   populateSelect('tf-dept', depts, 'Select Department…');
 
-  populateSelect('gf-year', years, 'Select…');
+  populateYearSelect('gf-year', {emptyLabel:'Select…'});
   populateSelect('gf-dept', depts, 'Select…');
 
-  populateSelect('rf-year', years, 'Select…');
+  populateYearSelect('rf-year', {emptyLabel:'Select…'});
   populateSelect('rf-month', MONTHS, 'Select…');
   populateSelect('rf-dept', depts, 'Select…');
 
-  populateSelect('dash-year-filter', years, 'All Academic Years');
-  document.getElementById('dash-year-filter').value = '';
+  populateYearSelect('dash-year-filter', {emptyLabel:'All Academic Years', selectCurrent:true});
   populateSelect('dash-month-filter', MONTHS, 'All Months');
   populateSelect('dash-dept-filter', depts, 'All Departments');
+}
+
+// Role-scoped member names for dept-scoped dropdowns:
+//   admin -> members in the given dept; dept_head -> own dept; member -> self only.
+function scopedMemberNames(dept) {
+  if (currentUser.role === ROLES.MEMBER) return currentUser.name ? [currentUser.name] : [];
+  if (currentUser.role === ROLES.DEPT_HEAD) return membersInDept(currentUser.dept).map(function(m){return m.name;});
+  return membersInDept(dept).map(function(m){return m.name;});
+}
+
+// Monthly Plan: SMART Goal + Member dropdowns follow the selected department.
+// The plan is view-open — EVERY role (members included) can pick any member of
+// the selected department and view their plan. A member viewing a teammate sees
+// read-only rows; viewing their own rows, they're editable. That edit gate is
+// enforced per-row by canEditTask() in planCellHtml, not by hiding names here.
+function refreshMpDeptScopedDropdowns() {
+  const deptEl = document.getElementById('mp-dept'); if (!deptEl) return;
+  const dept = deptEl.value || '';
+  const goalPool = DB.goals.filter(function(g){ return !dept || g.dept === dept; });
+  populateSelect('mp-goal', [...new Set(goalPool.map(function(g){return g.goal;}))], 'All SMART Goals');
+  populateSelect('mp-member', membersInDept(dept).map(function(m){return m.name;}), 'All Members');
+}
+function onMpDeptChange() { refreshMpDeptScopedDropdowns(); renderPlan(); }
+
+// Auto-populate the landing state of filters: current AY, current month, and
+// (for non-admins) the user's own department. Only fills EMPTY fields, so it
+// never overrides a selection the user already made.
+function applyFilterDefaults() {
+  const nowMonth = MONTHS[new Date().getMonth()];
+  const ay = currentAcademicYear();
+  const isAdmin = currentUser.role === ROLES.ADMIN;
+  const myDept = currentUser.dept || '';
+
+  ['sg-year-filter','mp-year','rv-year','dash-year-filter'].forEach(function(id){
+    const el = document.getElementById(id); if (el && !el.value) el.value = ay;
+  });
+  ['mp-month','rv-month','dash-month-filter'].forEach(function(id){
+    const el = document.getElementById(id); if (el && !el.value) el.value = nowMonth;
+  });
+  if (!isAdmin && myDept) {
+    if (!currentDept) currentDept = myDept;
+    ['global-dept','mp-dept','sg-dept-filter','rv-dept','dash-dept-filter'].forEach(function(id){
+      const el = document.getElementById(id); if (el && !el.value) el.value = myDept;
+    });
+  }
+  // Dependent, dept-scoped dropdowns
+  if (typeof setSgMemberOptions === 'function') setSgMemberOptions();
+  const rvDept = (document.getElementById('rv-dept') || {}).value || '';
+  if (document.getElementById('rv-member')) populateSelect('rv-member', scopedMemberNames(rvDept), 'Select Member…');
+  refreshMpDeptScopedDropdowns();
 }
 
 function populateTaskMemberDropdown() {
   const dept = document.getElementById('tf-dept').value;
   const el = document.getElementById('tf-member');
   const curVal = el.value;
-  const filtered = membersInDept(dept).map(m=>m.name);
+  const filtered = scopedMemberNames(dept);
   el.innerHTML = `<option value="">Select Member…</option>` + filtered.map(n => `<option value="${esc(n)}"${n===curVal?' selected':''}>${esc(n)}</option>`).join('');
 }
 
@@ -363,7 +438,7 @@ function populateGoalMemberDropdown() {
   const dept = document.getElementById('gf-dept').value;
   const el = document.getElementById('gf-member');
   const curVal = el.value;
-  const filtered = membersInDept(dept).map(m=>m.name);
+  const filtered = scopedMemberNames(dept);
   el.innerHTML = `<option value="">Select…</option>` + filtered.map(n => `<option value="${esc(n)}"${n===curVal?' selected':''}>${esc(n)}</option>`).join('');
 }
 
@@ -371,7 +446,7 @@ function populateReviewMemberDropdown() {
   const dept = document.getElementById('rf-dept').value;
   const el = document.getElementById('rf-member');
   const curVal = el.value;
-  const filtered = membersInDept(dept).map(m=>m.name);
+  const filtered = scopedMemberNames(dept);
   el.innerHTML = `<option value="">Select…</option>` + filtered.map(n => `<option value="${esc(n)}"${n===curVal?' selected':''}>${esc(n)}</option>`).join('');
 }
 
@@ -622,7 +697,7 @@ function setSgMemberOptions() {
   if (!dept) {
     el.innerHTML = '<option value="">Select Department first…</option>';
   } else {
-    populateSelect('sg-member-filter', membersInDept(dept).map(m=>m.name), 'Select Member…');
+    populateSelect('sg-member-filter', scopedMemberNames(dept), 'Select Member…');
   }
 }
 function onSgDeptChange() {
@@ -1022,10 +1097,10 @@ function renderPlan() {
   const dept=document.getElementById('mp-dept').value;
   const tbody=document.getElementById('plan-tbody');
 
-  // The first four filters are mandatory — nothing shows until all are chosen.
-  if (!year || !month || !week || !dept) {
+  // Academic Year, Month and Department are mandatory; Week is optional (All Weeks).
+  if (!year || !month || !dept) {
     document.getElementById('plan-thead').innerHTML='';
-    tbody.innerHTML=`<tr><td colspan="21"><div class="empty"><div class="empty-icon">🗓️</div><p>Select <b>Academic Year</b>, <b>Month</b>, <b>Week</b> and <b>Department</b> above to view the plan.</p></div></td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="21"><div class="empty"><div class="empty-icon">🗓️</div><p>Select <b>Academic Year</b>, <b>Month</b> and <b>Department</b> above to view the plan.</p></div></td></tr>`;
     return;
   }
 
@@ -1036,7 +1111,8 @@ function renderPlan() {
   const search=document.getElementById('mp-search').value.toLowerCase();
 
   // Everyone can view the plan; who can edit each row is enforced per-row.
-  let tasks=DB.tasks.filter(t=>t.year===year && t.month===month && t.week===week && t.dept===dept);
+  let tasks=DB.tasks.filter(t=>t.year===year && t.month===month && t.dept===dept);
+  if(week) tasks=tasks.filter(t=>t.week===week);
   if(goal) tasks=tasks.filter(t=>t.goal===goal);
   if(member) tasks=tasks.filter(t=>t.member===member);
   if(status) tasks=tasks.filter(t=>t.status===status);
@@ -1192,7 +1268,7 @@ function deleteTask(id) {
 // ── REVIEWS ──
 function onRvDeptChange() {
   const dept = document.getElementById('rv-dept').value;
-  populateSelect('rv-member', membersInDept(dept).map(m=>m.name), 'Select Member…');
+  populateSelect('rv-member', scopedMemberNames(dept), 'Select Member…');
   document.getElementById('rv-member').value = '';
   renderReviews();
 }
@@ -1542,21 +1618,19 @@ function renderSettings() {
       .filter(function (x) { return x.m.dept === currentDept; })
       .map(function (x) {
         var m = x.m, i = x.i;
-        var deptOpts = DB.settings.depts.map(function (d) { return '<option value="'+esc(d)+'"'+(d===m.dept?' selected':'')+'>'+esc(d)+'</option>'; }).join('');
-        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);flex-wrap:wrap">
-        <span style="font-size:13px;font-weight:600;min-width:40px">${esc(m.name)}</span>
-        <select onchange="updateMemberField(${i},'dept',this.value)"
-          style="border:1px solid var(--border2);border-radius:var(--radius);padding:3px 8px;font-size:12px;font-family:inherit;color:var(--text);background:var(--surface);flex:1;min-width:120px">
-          <option value="">— No Dept —</option>${deptOpts}
-        </select>
-        <select onchange="updateMemberField(${i},'role',this.value)"
-          style="border:1px solid var(--border2);border-radius:var(--radius);padding:3px 8px;font-size:12px;font-family:inherit;color:var(--text);background:var(--surface);min-width:110px">
-          <option value="member"${m.role==='member'?' selected':''}>Member</option>
-          <option value="dept_head"${m.role==='dept_head'?' selected':''}>Dept Head</option>
-        </select>
-        <input type="email" value="${esc(m.email||'')}" placeholder="Email ID…" onchange="updateMemberField(${i},'email',this.value.trim())"
-          style="border:1px solid var(--border2);border-radius:var(--radius);padding:3px 8px;font-size:12px;font-family:inherit;color:var(--text);background:var(--surface);flex:1;min-width:150px">
-        <button class="btn btn-danger btn-sm" onclick="removeMember(${i})">✕</button>
+        var roleLabel = m.role === 'dept_head' ? 'Dept Head' : 'Member';
+        return `<div style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--border)">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:13.5px;font-weight:700;color:var(--text)">${esc(m.name)}</span>
+            <span style="font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px;background:var(--brand-lt);color:var(--brand);border:1px solid var(--brand-border)">${roleLabel}</span>
+          </div>
+          <div style="font-size:11.5px;color:var(--text3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+            ${esc(m.dept || '— No Dept —')} · ${esc(m.email || 'no email')}
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-sm" title="Edit member" onclick="openEditMemberModal(${i})">✎ Edit</button>
+        <button class="btn btn-danger btn-sm" title="Delete member permanently" onclick="removeMember(${i})">🗑</button>
       </div>`;
       }).join('');
     membersEl.innerHTML = rowsHtml || '<p style="font-size:12px;color:var(--text3)">No team members in '+esc(currentDept)+' yet. Use “+ Add Member”.</p>';
@@ -1613,14 +1687,28 @@ function addSetting(key, label) {
   });
 }
 
-// ── ADD MEMBER MODAL ──
+// ── ADD / EDIT MEMBER MODAL ──
+var editingMemberId = null;
 function openAddMemberModal() {
+  editingMemberId = null;
   document.getElementById('am-modal-title').textContent = 'Add Team Member';
   document.getElementById('am-name').value = '';
   document.getElementById('am-role').value = 'member';
   document.getElementById('am-email').value = '';
   populateSelect('am-dept', DB.settings.depts, 'Select…');
   document.getElementById('am-dept').value = currentDept || '';
+  openModal('add-member-modal');
+}
+function openEditMemberModal(i) {
+  var m = DB.settings.members[i];
+  if (!m) return;
+  editingMemberId = m.id;
+  document.getElementById('am-modal-title').textContent = 'Edit Team Member';
+  populateSelect('am-dept', DB.settings.depts, 'Select…');
+  document.getElementById('am-dept').value = m.dept || '';
+  document.getElementById('am-name').value = m.name || '';
+  document.getElementById('am-role').value = m.role || 'member';
+  document.getElementById('am-email').value = m.email || '';
   openModal('add-member-modal');
 }
 
@@ -1631,6 +1719,18 @@ function saveNewMember() {
   const email = document.getElementById('am-email').value.trim();
   if (!dept) { toast('Department is required'); return; }
   if (!name) { toast('Member name is required'); return; }
+  if (editingMemberId) {
+    const idx = DB.settings.members.findIndex(function (x) { return x.id === editingMemberId; });
+    if (idx < 0) { editingMemberId = null; toast('Member not found'); return; }
+    const clash = DB.settings.members.some(function (x, j) { return j !== idx && x.name === name; });
+    if (clash) { toast('Another member already has that name'); return; }
+    DB.settings.members[idx] = { id: editingMemberId, name, dept, role, email };
+    editingMemberId = null;
+    save(); populateAllSelects(); renderSettings(); renderSidebar();
+    closeModal('add-member-modal');
+    toast(`${name} updated`);
+    return;
+  }
   if (memberNames().includes(name)) { toast('Member already exists'); return; }
   DB.settings.members.push({id:uid(), name, dept, role, email});
   save(); populateAllSelects(); renderSettings(); renderSidebar();
@@ -1996,6 +2096,7 @@ function afterLoadRender() {
   resolveUser();
   populateAllSelects();
   renderUserBadge();
+  applyFilterDefaults();
   renderSidebar();
   renderPage(getCurrentPageId());
 }
@@ -2058,6 +2159,9 @@ try { window.onRvDeptChange = onRvDeptChange; } catch(e){}
 try { window.onSgDeptChange = onSgDeptChange; } catch(e){}
 try { window.openAddAdminModal = openAddAdminModal; } catch(e){}
 try { window.openAddMemberModal = openAddMemberModal; } catch(e){}
+try { window.openEditMemberModal = openEditMemberModal; } catch(e){}
+try { window.onMpDeptChange = onMpDeptChange; } catch(e){}
+try { window.refreshMpDeptScopedDropdowns = refreshMpDeptScopedDropdowns; } catch(e){}
 try { window.openAddTask = openAddTask; } catch(e){}
 try { window.openEditTask = openEditTask; } catch(e){}
 try { window.openGoalModal = openGoalModal; } catch(e){}
