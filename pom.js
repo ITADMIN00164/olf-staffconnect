@@ -1382,7 +1382,7 @@ window.switchPomTab = function (tab) {
     if (dash)   { dash.style.display = "flex"; dash.classList.add("active"); }
     if (tManage) tManage.classList.remove("active");
     if (tDash)   tDash.classList.add("active");
-    renderDashboard();
+    renderPomDashboard();
   } else {
     if (dash)   { dash.style.display = "none"; dash.classList.remove("active"); }
     if (manage) manage.style.display = "flex";
@@ -1665,7 +1665,7 @@ function startDashPrefetch() {
       dashLoaded = true;
       populateDashFilters(opts);            // builds filters → clears loading state
       finishDashProgress();                 // snap the counter to 100%
-      if (isDashVisible()) renderDashboard();
+      if (isDashVisible()) renderPomDashboard();
       setDashRefreshing(false);             // restore the Refresh Data button
       setTimeout(() => setDashTabLoading(false), 350);   // show 100% briefly, then enable the tab
     })
@@ -1912,7 +1912,7 @@ function applyDashFilter(kind) {
     updateDashAwardLabelFrom(dashAwardSel);
   }
   closeDashDropdowns();
-  renderDashboard();
+  renderPomDashboard();
 }
 
 // Live preview of the (un-applied) draft selection in the trigger label.
@@ -1966,7 +1966,7 @@ function pct(num, den) {
   return Math.round((num / den) * 100) + "%";
 }
 
-function renderDashboard() {
+function renderPomDashboard() {
   // Data not ready yet → show the loading state in the filters + table and make
   // sure the background load is running.
   if (!dashLoaded) {
