@@ -402,6 +402,9 @@
         <button class="nav-item pcal-admin-only" data-pcal-tab="settings">
           <span class="nav-icon">⚙️</span> Settings
         </button>
+        <button class="nav-item pcal-admin-only" data-pcal-tab="past">
+          <span class="nav-icon">🗂</span> Past Events
+        </button>
       </nav>
 
       <div id="pcal-sidebar-cal-controls">
@@ -435,6 +438,8 @@
           </svg>
           Add Event
         </button>
+        <button class="sidebar-add-btn pcal-admin-only" id="pcal-past-btn"
+          style="background:#475569;margin-top:8px">🗂 View Past Events</button>
 
         <div class="sidebar-legend" id="pcal-sidebar-legend"></div>
       </div>
@@ -458,26 +463,12 @@
         <div class="settings-grid">
           <div class="settings-card">
             <div class="settings-card-header">
-              <h3>🏛️ Districts</h3>
-              <p>Add or remove districts</p>
+              <h3>🎯 Event Types</h3>
+              <p>Add or remove event types (shown in the Add Event dropdown)</p>
             </div>
             <div class="settings-card-body">
               <div class="add-item-row">
-                <input type="text" id="pcal-new-district" placeholder="District name…">
-                <button class="btn-primary small" id="pcal-add-district-btn">Add</button>
-              </div>
-              <div class="item-list" id="pcal-district-list"></div>
-            </div>
-          </div>
-
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <h3>🎯 Program Types</h3>
-              <p>Add or remove program categories</p>
-            </div>
-            <div class="settings-card-body">
-              <div class="add-item-row">
-                <input type="text" id="pcal-new-program" placeholder="Program type…">
+                <input type="text" id="pcal-new-program" placeholder="Event type…">
                 <button class="btn-primary small" id="pcal-add-program-btn">Add</button>
               </div>
               <div class="item-list" id="pcal-program-list"></div>
@@ -486,58 +477,148 @@
         </div>
       </div>
 
+      <!-- PAST / ALL EVENTS TAB (full page) -->
+      <div id="pcal-tab-past" class="tab-panel">
+        <div class="section-heading">All Events</div>
+        <div style="font-size:12.5px;color:var(--text-light);margin-bottom:12px">Upcoming events can be edited (invites re-sent) or copied; past events are read-only.</div>
+        <div id="pcal-past-table"></div>
+      </div>
+
     </main>
   </div>
 
-  <!-- ══ ADD EVENT MODAL ══ -->
+  <!-- ══ ADD / EDIT EVENT MODAL ══ -->
+  <style>
+    #pcal-app .modal.pcal-modal-lg { max-width: 620px; width: 92vw; }
+    #pcal-app .pcal-add-body { max-height: 66vh; overflow-y: auto; }
+    #pcal-app .pcal-grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
+    #pcal-app .pcal-rem-row { display:grid; grid-template-columns:1fr 130px; gap:8px; margin-bottom:6px; }
+    #pcal-app .pcal-chk { display:flex; align-items:center; gap:8px; font-weight:600; }
+    #pcal-app .pcal-chk input { width:auto; margin:0; }
+    #pcal-app .pcal-past-tbl { width:100%; border-collapse:collapse; font-size:12.5px; }
+    #pcal-app .pcal-past-tbl th { text-align:left; padding:8px 10px; background:#f1f5f9; color:#475569;
+      font-size:11px; text-transform:uppercase; letter-spacing:.3px; position:sticky; top:0; }
+    #pcal-app .pcal-past-tbl td { padding:8px 10px; border-bottom:1px solid #eef2f7; vertical-align:top; }
+    #pcal-app .pcal-past-wrap { max-height:60vh; overflow:auto; border:1px solid #eef2f7; border-radius:8px; }
+    #pcal-app .pcal-badge-past { font-size:10px; font-weight:700; color:#64748b; background:#f1f5f9; padding:2px 7px; border-radius:20px; }
+    #pcal-app .pcal-badge-up { font-size:10px; font-weight:700; color:#166534; background:#dcfce7; padding:2px 7px; border-radius:20px; }
+    #pcal-app .pcal-mini { border:none; border-radius:6px; padding:5px 10px; font-size:11.5px; font-weight:700; cursor:pointer; }
+    #pcal-app .pcal-mini-edit { background:#2563eb; color:#fff; }
+    #pcal-app .pcal-mini-del { background:#ef4444; color:#fff; margin-left:5px; }
+    #pcal-app .pcal-att-link { color:#2563eb; text-decoration:none; }
+    #pcal-app .pcal-mini-copy { background:#0e7490; color:#fff; margin-left:5px; }
+    #pcal-app .pcal-dt-input { cursor:pointer; background:#fff; }
+    #pcal-app .pcal-dt-input:hover { border-color:#94a3b8; }
+    #pcal-app .pcal-rem-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px 16px; }
+    #pcal-app .pcal-rem-chk { display:flex; align-items:center; gap:8px; font-weight:500; font-size:13px; color:var(--text-dark); cursor:pointer; }
+    #pcal-app .pcal-rem-chk input { width:auto; margin:0; }
+    #pcal-app .pcal-rem-note { font-size:11px; color:var(--text-light); margin-top:9px; }
+    #pcal-app .btn-primary.small, #pcal-app .btn-secondary.small { padding:7px 15px; font-size:12.5px; border-radius:8px; }
+    /* custom date-time picker */
+    #pcal-app .pcal-dtp-overlay { position:fixed; inset:0; background:rgba(15,23,42,.45); display:none; align-items:center; justify-content:center; z-index:7000; }
+    #pcal-app .pcal-dtp-overlay.open { display:flex; }
+    #pcal-app .pcal-dtp { background:#fff; border-radius:14px; padding:16px; width:300px; box-shadow:0 20px 50px rgba(0,0,0,.28); }
+    #pcal-app .pcal-dtp-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+    #pcal-app .pcal-dtp-title { font-weight:700; color:var(--text-dark); font-size:14px; }
+    #pcal-app .pcal-dtp-nav { border:none; background:#f1f5f9; border-radius:8px; width:30px; height:30px; cursor:pointer; font-size:16px; color:#334155; line-height:1; }
+    #pcal-app .pcal-dtp-nav:hover { background:#e2e8f0; }
+    #pcal-app .pcal-dtp-dow { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; margin-bottom:4px; }
+    #pcal-app .pcal-dtp-dow span { text-align:center; font-size:10.5px; font-weight:700; color:#94a3b8; }
+    #pcal-app .pcal-dtp-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
+    #pcal-app .pcal-dtp-day { text-align:center; padding:7px 0; font-size:12.5px; border-radius:8px; cursor:pointer; color:#334155; }
+    #pcal-app .pcal-dtp-day:hover { background:#eff6ff; }
+    #pcal-app .pcal-dtp-day.sel { background:#2563eb; color:#fff; font-weight:700; }
+    #pcal-app .pcal-dtp-day.empty { cursor:default; }
+    #pcal-app .pcal-dtp-time { display:flex; align-items:center; gap:6px; justify-content:center; margin-top:12px; }
+    #pcal-app .pcal-dtp-time select { padding:6px 8px; border:1px solid #e2e8f0; border-radius:8px; font-size:13px; background:#fff; }
+    #pcal-app .pcal-dtp-clock { font-size:16px; margin-right:2px; }
+    #pcal-app .pcal-dtp-foot { display:flex; gap:8px; justify-content:flex-end; margin-top:14px; }
+  </style>
   <div class="modal-overlay" id="pcal-modal-add">
-    <div class="modal">
+    <div class="modal pcal-modal-lg">
       <div class="modal-header">
-        <h2>➕ Add New Event</h2>
+        <h2 id="pcal-add-title">➕ Add New Event</h2>
         <button class="modal-close" data-pcal-close="pcal-modal-add">×</button>
       </div>
-      <div class="modal-body">
-        <div class="form-row thirds" style="margin-bottom:14px">
-          <div class="form-group" id="pcal-fg-eyear" style="margin-bottom:0">
-            <label class="field-label">Year <span class="req">*</span></label>
-            <select id="pcal-evt-year"></select>
+      <div class="modal-body pcal-add-body">
+        <input type="hidden" id="pcal-evt-id">
+
+        <div class="pcal-grid2">
+          <div class="form-group" id="pcal-fg-state" style="margin-bottom:0">
+            <label class="field-label">State <span class="req">*</span></label>
+            <select id="pcal-evt-state"><option value="">Select state…</option></select>
             <div class="form-error">Required</div>
           </div>
-          <div class="form-group" id="pcal-fg-emonth" style="margin-bottom:0">
-            <label class="field-label">Month <span class="req">*</span></label>
-            <select id="pcal-evt-month">
-              <option value="">—</option>
-              <option value="0">Jan</option><option value="1">Feb</option>
-              <option value="2">Mar</option><option value="3">Apr</option>
-              <option value="4">May</option><option value="5">Jun</option>
-              <option value="6">Jul</option><option value="7">Aug</option>
-              <option value="8">Sep</option><option value="9">Oct</option>
-              <option value="10">Nov</option><option value="11">Dec</option>
-            </select>
-            <div class="form-error">Required</div>
-          </div>
-          <div class="form-group" id="pcal-fg-eday" style="margin-bottom:0">
-            <label class="field-label">Day <span class="req">*</span></label>
-            <select id="pcal-evt-day"><option value="">—</option></select>
+          <div class="form-group" id="pcal-fg-district" style="margin-bottom:0">
+            <label class="field-label">District <span class="req">*</span></label>
+            <select id="pcal-evt-district" disabled><option value="">Select state first…</option></select>
             <div class="form-error">Required</div>
           </div>
         </div>
 
-        <div class="form-group" id="pcal-fg-edistrict">
-          <label class="field-label">District <span class="req">*</span></label>
-          <select id="pcal-evt-district"><option value="">Select district…</option></select>
-          <div class="form-error">Required</div>
+        <div class="pcal-grid2">
+          <div class="form-group" id="pcal-fg-type" style="margin-bottom:0">
+            <label class="field-label">Event Type <span class="req">*</span></label>
+            <select id="pcal-evt-type"><option value="">Select type…</option></select>
+            <div class="form-error">Required</div>
+          </div>
+          <div class="form-group" id="pcal-fg-name" style="margin-bottom:0">
+            <label class="field-label">Event Name <span class="req">*</span></label>
+            <input type="text" id="pcal-evt-name" maxlength="200" placeholder="e.g. Shikshan Utsav — Pune">
+            <div class="form-error">Required</div>
+          </div>
         </div>
 
-        <div class="form-group" id="pcal-fg-etype">
-          <label class="field-label">Program Type <span class="req">*</span></label>
-          <select id="pcal-evt-type"><option value="">Select type…</option></select>
-          <div class="form-error">Required</div>
+        <div class="form-group">
+          <label class="field-label">Host Email</label>
+          <input type="email" id="pcal-evt-host" readonly style="background:#f1f5f9;cursor:not-allowed">
+          <div style="font-size:11px;color:var(--text-light);margin-top:3px">You are the host — added as a guest and shown as host on the invite.</div>
+        </div>
+
+        <div class="form-group">
+          <label class="field-label pcal-chk"><input type="checkbox" id="pcal-evt-allday"> All-day event</label>
+        </div>
+
+        <div class="pcal-grid2">
+          <div class="form-group" id="pcal-fg-start" style="margin-bottom:0">
+            <label class="field-label">Start <span class="req">*</span></label>
+            <input type="text" id="pcal-evt-start" class="pcal-dt-input" readonly placeholder="Select date & time">
+            <div class="form-error">Required</div>
+          </div>
+          <div class="form-group" id="pcal-fg-end" style="margin-bottom:0">
+            <label class="field-label">End <span class="req">*</span></label>
+            <input type="text" id="pcal-evt-end" class="pcal-dt-input" readonly placeholder="Select date & time">
+            <div class="form-error">Required</div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="field-label">Guest Emails <span style="color:var(--text-light);font-weight:400;text-transform:none;letter-spacing:0">(comma separated)</span></label>
+          <textarea id="pcal-evt-guests" placeholder="a@x.org, b@y.org"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="field-label pcal-chk"><input type="checkbox" id="pcal-evt-sendinvite" checked> Send email invites to guests</label>
+        </div>
+
+        <div class="form-group">
+          <label class="field-label pcal-chk"><input type="checkbox" id="pcal-evt-meet"> Add Google Meet video link</label>
+        </div>
+
+        <div class="form-group">
+          <label class="field-label">Reminders <span style="color:var(--text-light);font-weight:400;text-transform:none;letter-spacing:0">(up to 5)</span></label>
+          <div id="pcal-reminders"></div>
         </div>
 
         <div class="form-group">
           <label class="field-label">Description <span style="color:var(--text-light);font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
           <textarea id="pcal-evt-desc" maxlength="500" placeholder="Short note about this event…"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="field-label">Attachments <span style="color:var(--text-light);font-weight:400;text-transform:none;letter-spacing:0">(optional · multiple)</span></label>
+          <input type="file" id="pcal-evt-files" multiple>
+          <div id="pcal-existing-attach" style="font-size:11.5px;color:var(--text-light);margin-top:6px"></div>
         </div>
       </div>
       <div class="modal-footer">

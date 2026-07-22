@@ -104,6 +104,15 @@
                 'July', 'August', 'September', 'October', 'November', 'December'];
   var DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+  // State -> districts (shared with the GR module; used by the Add Event form).
+  var STATE_LABELS = { MH: 'Maharashtra', MP: 'Madhya Pradesh', CG: 'Chhattisgarh', BR: 'Bihar' };
+  var STATE_DISTRICTS = {
+    MH: ['Ahilyanagar','Akola','Amravati','Beed','Bhandara','Buldhana','Chandrapur','Chhatrapati Sambhajinagar','Dharashiv','Dhule','Gadchiroli','Gondia','Hingoli','Jalgaon','Jalna','Kolhapur','Latur','Mumbai City','Mumbai Suburban','Nagpur','Nanded','Nandurbar','Nashik','Palghar','Parbhani','Pune','Raigad','Ratnagiri','Sangli','Satara','Sindhudurg','Solapur','Thane','Wardha','Washim','Yavatmal'],
+    MP: ['Agar Malwa','Alirajpur','Anuppur','Ashoknagar','Balaghat','Barwani','Betul','Bhind','Bhopal','Burhanpur','Chhatarpur','Chhindwara','Damoh','Datia','Dewas','Dhar','Dindori','Guna','Gwalior','Harda','Indore','Jabalpur','Jhabua','Katni','Khandwa','Khargone','Maihar','Mandla','Mandsaur','Mauganj','Morena','Narmadapuram','Narsinghpur','Neemuch','Niwari','Pandhurna','Panna','Raisen','Rajgarh','Ratlam','Rewa','Sagar','Satna','Sehore','Seoni','Shahdol','Shajapur','Sheopur','Shivpuri','Sidhi','Singrauli','Tikamgarh','Ujjain','Umaria','Vidisha'],
+    CG: ['Balod','Baloda Bazar','Balrampur-Ramanujganj','Bastar','Bemetara','Bijapur','Bilaspur','Dantewada','Dhamtari','Durg','Gariaband','Gaurela-Pendra-Marwahi','Janjgir-Champa','Jashpur','Kabirdham','Kanker','Khairagarh-Chhuikhadan-Gandai','Kondagaon','Korba','Koriya','Mahasamund','Manendragarh-Chirmiri-Bharatpur','Mohla-Manpur-Ambagarh Chowki','Mungeli','Narayanpur','Raigarh','Raipur','Rajnandgaon','Sakti','Sarangarh-Bilaigarh','Sukma','Surajpur','Surguja'],
+    BR: ['Araria','Arwal','Aurangabad','Banka','Begusarai','Bhagalpur','Bhojpur','Buxar','Darbhanga','East Champaran','Gaya','Gopalganj','Jamui','Jehanabad','Kaimur','Katihar','Khagaria','Kishanganj','Lakhisarai','Madhepura','Madhubani','Munger','Muzaffarpur','Nalanda','Nawada','Patna','Purnia','Rohtas','Saharsa','Samastipur','Saran','Sheikhpura','Sheohar','Sitamarhi','Siwan','Supaul','Vaishali','West Champaran']
+  };
+
   // ── STATE ─────────────────────────────────────────────────────────
   var events = [], districts = [], programs = [];
   var now = new Date();
@@ -175,6 +184,41 @@
       return res.data;
     });
   }
+
+  // POST transport for large payloads (attachments). JSONP is GET-only and
+  // URL-length limited; saves/edits with files go over fetch. text/plain keeps
+  // it a "simple" request (no CORS preflight), same approach as the GR module.
+  function apiPost(action, payload) {
+    var body = { action: action };
+    for (var k in (payload || {})) if (payload[k] !== undefined) body[k] = payload[k];
+    return fetch(CONFIG.GAS_WEB_APP_URL, { method: 'POST', body: JSON.stringify(body), redirect: 'follow' })
+      .then(function (r) { return r.text(); })
+      .then(function (t) {
+        var res; try { res = JSON.parse(t); } catch (e) { throw new Error('Unexpected server response.'); }
+        if (!res || res.ok === false) throw new Error((res && res.error) || 'Server error');
+        return res.data;
+      });
+  }
+
+  function fileToBase64(file) {
+    return new Promise(function (resolve, reject) {
+      var r = new FileReader();
+      r.onload = function () { resolve(String(r.result).split(',')[1] || ''); };
+      r.onerror = function () { reject(new Error('Could not read ' + file.name)); };
+      r.readAsDataURL(file);
+    });
+  }
+  function readFiles(input) {
+    var files = (input && input.files) ? Array.prototype.slice.call(input.files) : [];
+    var big = files.filter(function (f) { return f.size > 25 * 1024 * 1024; });
+    if (big.length) return Promise.reject(new Error('Each file must be under 25 MB.'));
+    return Promise.all(files.map(function (f) {
+      return fileToBase64(f).then(function (b) {
+        return { name: f.name, mimeType: f.type || 'application/octet-stream', dataBase64: b };
+      });
+    }));
+  }
+  function lc(x) { return String(x == null ? '' : x).trim().toLowerCase(); }
 
   // ── USER / ADMIN RESOLUTION ───────────────────────────────────────
   function resolveUser() {
@@ -309,6 +353,8 @@
     renderEventDots();
     renderEventList();
     renderSidebarLegend();
+    var pastModal = $('pcal-modal-past');
+    if (pastModal && pastModal.classList.contains('open')) renderPastTable();
   }
 
   function renderEventDots() {
@@ -385,6 +431,7 @@
     var controls = $('pcal-sidebar-cal-controls');
     if (controls) controls.style.display = (name === 'calendar') ? '' : 'none';
     if (name === 'settings') renderSettings();
+    if (name === 'past') renderPastTable();
   }
 
   function navigateMonth(dir) {
@@ -394,85 +441,353 @@
     renderCalendar();
   }
 
-  // ── ADD EVENT MODAL ───────────────────────────────────────────────
-  function openAddEvent() {
+  // ── ADD / EDIT EVENT MODAL ────────────────────────────────────────
+  var REMINDER_CHOICES = [
+    { label: '4 Weeks before', minutes: 40320 },
+    { label: '2 Weeks before', minutes: 20160 },
+    { label: '1 Week before',  minutes: 10080 },
+    { label: '2 Days before',  minutes: 2880 },
+    { label: '1 Day before',   minutes: 1440 },
+    { label: '12 Hours before',minutes: 720 },
+    { label: '2 Hours before', minutes: 120 },
+    { label: '1 Hour before',  minutes: 60 },
+    { label: '30 Min before',  minutes: 30 }
+  ];
+  var DEFAULT_REMINDERS = [ { minutes: 2880, method: 'email' }, { minutes: 120, method: 'email' } ];
+
+  function fillStateSelect() {
+    var sel = $('pcal-evt-state'); if (!sel) return;
+    sel.innerHTML = '<option value="">Select state…</option>' +
+      Object.keys(STATE_LABELS).map(function (c) {
+        return '<option value="' + c + '">' + esc(STATE_LABELS[c]) + '</option>';
+      }).join('');
+  }
+  function fillDistrictSelect(stateCode, selected) {
+    var sel = $('pcal-evt-district'); if (!sel) return;
+    if (!stateCode) { sel.innerHTML = '<option value="">Select state first…</option>'; sel.disabled = true; return; }
+    var list = STATE_DISTRICTS[stateCode] || [];
+    sel.innerHTML = '<option value="">Select district…</option>' +
+      list.map(function (d) { return '<option value="' + esc(d) + '"' + (d === selected ? ' selected' : '') + '>' + esc(d) + '</option>'; }).join('');
+    sel.disabled = false;
+  }
+  function onStateChange() { fillDistrictSelect($('pcal-evt-state').value, ''); }
+  function onAllDayToggle() {
+    var allday = $('pcal-evt-allday').checked;
+    ['pcal-evt-start', 'pcal-evt-end'].forEach(function (id) {
+      var el = $(id); if (!el) return;
+      el.dataset.allday = allday ? '1' : '';
+      if (el.dataset.iso) setDtField(id, el.dataset.iso, allday);
+    });
+  }
+
+  function buildReminderRows(existing) {
+    var box = $('pcal-reminders'); if (!box) return;
+    var chosen = {};
+    ((existing && existing.length) ? existing : DEFAULT_REMINDERS)
+      .forEach(function (r) { chosen[Number(r.minutes)] = true; });
+    box.innerHTML = '<div class="pcal-rem-grid">' + REMINDER_CHOICES.map(function (c) {
+      return '<label class="pcal-rem-chk"><input type="checkbox" class="pcal-rem-when" value="' + c.minutes + '"' +
+        (chosen[c.minutes] ? ' checked' : '') + '> ' + c.label + '</label>';
+    }).join('') + '</div>' +
+    '<div class="pcal-rem-note">Reminders are emailed to guests \u00b7 choose up to 5.</div>';
+  }
+  function gatherReminders() {
+    var out = [];
+    qsa('.pcal-rem-when').forEach(function (cb) {
+      if (cb.checked && out.length < 5) out.push({ minutes: parseInt(cb.value, 10), method: 'email' });
+    });
+    return out;
+  }
+  function fillEventTypeSelect(selected) {
+    var sel = $('pcal-evt-type'); if (!sel) return;
+    sel.innerHTML = '<option value="">Select type\u2026</option>' +
+      programs.map(function (p) {
+        return '<option value="' + esc(p) + '"' + (p === selected ? ' selected' : '') + '>' + esc(p) + '</option>';
+      }).join('');
+  }
+
+  function toLocalInput(iso, dateOnly) {
+    if (!iso) return '';
+    var d = new Date(iso); if (isNaN(d)) return '';
+    var p = function (n) { return ('0' + n).slice(-2); };
+    var base = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+    return dateOnly ? base : base + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+  function fromLocalInput(val, dateOnly) {
+    if (!val) return null;
+    var d = dateOnly ? new Date(val + 'T00:00:00') : new Date(val);
+    return isNaN(d) ? null : d;
+  }
+  function getDtISO(id) { var el = $(id); return el ? (el.dataset.iso || '') : ''; }
+  function fmtDtDisplay(iso, allDay) {
+    var d = new Date(iso); if (isNaN(d)) return '';
+    var opt = allDay ? { day: '2-digit', month: 'short', year: 'numeric' }
+                     : { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' };
+    return d.toLocaleString('en-IN', opt);
+  }
+  function setDtField(id, iso, allDay) {
+    var el = $(id); if (!el || !iso) return;
+    el.dataset.iso = new Date(iso).toISOString();
+    el.dataset.allday = allDay ? '1' : '';
+    el.value = fmtDtDisplay(iso, allDay);
+  }
+  var DTP_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var dtpState = { id: null, allDay: false, y: 0, mo: 0, d: 1, h: 9, mi: 0 };
+  function ensureDtpDom() {
+    if ($('pcal-dtp-overlay')) return;
+    var ov = document.createElement('div');
+    ov.id = 'pcal-dtp-overlay'; ov.className = 'pcal-dtp-overlay';
+    ov.innerHTML = '<div class="pcal-dtp" id="pcal-dtp"></div>';
+    root().appendChild(ov);
+    ov.addEventListener('click', function (e) { if (e.target === ov) ov.classList.remove('open'); });
+  }
+  function openDtPicker(id) {
+    ensureDtpDom();
+    var el = $(id);
+    var allDay = !!(el && el.dataset.allday === '1');
+    var base = (el && el.dataset.iso) ? new Date(el.dataset.iso) : new Date();
+    if (isNaN(base)) base = new Date();
+    dtpState = { id: id, allDay: allDay, y: base.getFullYear(), mo: base.getMonth(),
+                 d: base.getDate(), h: base.getHours(), mi: base.getMinutes() };
+    renderDtp();
+    $('pcal-dtp-overlay').classList.add('open');
+  }
+  function renderDtp() {
+    var box = $('pcal-dtp'); if (!box) return;
+    var s = dtpState;
+    var first = new Date(s.y, s.mo, 1).getDay();
+    var days = new Date(s.y, s.mo + 1, 0).getDate();
+    var cells = '';
+    for (var i = 0; i < first; i++) cells += '<span class="pcal-dtp-day empty"></span>';
+    for (var dd = 1; dd <= days; dd++)
+      cells += '<span class="pcal-dtp-day' + (dd === s.d ? ' sel' : '') + '" data-dtp-day="' + dd + '">' + dd + '</span>';
+    var timeHtml = '';
+    if (!s.allDay) {
+      var h12 = ((s.h % 12) || 12), ap = s.h < 12 ? 'AM' : 'PM';
+      var hourOpts = ''; for (var hh = 1; hh <= 12; hh++) hourOpts += '<option value="' + hh + '"' + (hh === h12 ? ' selected' : '') + '>' + ('0' + hh).slice(-2) + '</option>';
+      var minOpts = ''; for (var mm = 0; mm < 60; mm++) minOpts += '<option value="' + mm + '"' + (mm === s.mi ? ' selected' : '') + '>' + ('0' + mm).slice(-2) + '</option>';
+      timeHtml = '<div class="pcal-dtp-time"><span class="pcal-dtp-clock">\uD83D\uDD52</span>' +
+        '<select id="pcal-dtp-h">' + hourOpts + '</select><span>:</span>' +
+        '<select id="pcal-dtp-mi">' + minOpts + '</select>' +
+        '<select id="pcal-dtp-ap"><option' + (ap === 'AM' ? ' selected' : '') + '>AM</option><option' + (ap === 'PM' ? ' selected' : '') + '>PM</option></select></div>';
+    }
+    box.innerHTML =
+      '<div class="pcal-dtp-head"><button class="pcal-dtp-nav" data-dtp-nav="-1">\u2039</button>' +
+      '<div class="pcal-dtp-title">' + DTP_MONTHS[s.mo] + ' ' + s.y + '</div>' +
+      '<button class="pcal-dtp-nav" data-dtp-nav="1">\u203A</button></div>' +
+      '<div class="pcal-dtp-dow"><span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span></div>' +
+      '<div class="pcal-dtp-grid">' + cells + '</div>' + timeHtml +
+      '<div class="pcal-dtp-foot"><button class="btn-secondary small" id="pcal-dtp-cancel">Cancel</button>' +
+      '<button class="btn-primary small" id="pcal-dtp-done">Done</button></div>';
+    box.querySelectorAll('[data-dtp-nav]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        s.mo += parseInt(b.getAttribute('data-dtp-nav'), 10);
+        if (s.mo > 11) { s.mo = 0; s.y++; } if (s.mo < 0) { s.mo = 11; s.y--; }
+        var maxd = new Date(s.y, s.mo + 1, 0).getDate(); if (s.d > maxd) s.d = maxd;
+        renderDtp();
+      });
+    });
+    box.querySelectorAll('[data-dtp-day]').forEach(function (c) {
+      if (c.getAttribute('data-dtp-day')) c.addEventListener('click', function () { s.d = parseInt(c.getAttribute('data-dtp-day'), 10); renderDtp(); });
+    });
+    var cancel = $('pcal-dtp-cancel'); if (cancel) cancel.addEventListener('click', function () { $('pcal-dtp-overlay').classList.remove('open'); });
+    var done = $('pcal-dtp-done'); if (done) done.addEventListener('click', function () {
+      if (!s.allDay) {
+        var h = parseInt($('pcal-dtp-h').value, 10) % 12;
+        if ($('pcal-dtp-ap').value === 'PM') h += 12;
+        s.h = h; s.mi = parseInt($('pcal-dtp-mi').value, 10);
+      } else { s.h = 0; s.mi = 0; }
+      var dt = new Date(s.y, s.mo, s.d, s.h, s.mi, 0);
+      setDtField(s.id, dt.toISOString(), s.allDay);
+      $('pcal-dtp-overlay').classList.remove('open');
+    });
+  }
+
+  function findEvent(id) {
+    for (var i = 0; i < events.length; i++) if (String(events[i].id) === String(id)) return events[i];
+    return null;
+  }
+
+  function openAddEvent() { openEventModal(null); }
+  function editEvent(id) {
+    var evt = findEvent(id); if (!evt) return;
+    if (new Date(evt.start).getTime() < Date.now()) { showToast('Past events are read-only.', true); return; }
+    openEventModal(evt);
+  }
+
+  function openEventModal(evt) {
     if (!isAdmin) return;
-    populateYearSelect('pcal-evt-year', viewYear);
-    $('pcal-evt-month').value = viewMonth;
-    updateEventDays();
-    $('pcal-evt-day').value = '';
-    $('pcal-evt-district').innerHTML = '<option value="">Select district…</option>' +
-      districts.map(function (d) { return '<option value="' + esc(d) + '">' + esc(d) + '</option>'; }).join('');
-    $('pcal-evt-type').innerHTML = '<option value="">Select type…</option>' +
-      programs.map(function (t) { return '<option value="' + esc(t) + '">' + esc(t) + '</option>'; }).join('');
-    $('pcal-evt-desc').value = '';
+    var isEdit = !!evt;
+    $('pcal-add-title').textContent = isEdit ? '\u270F\uFE0F Edit Event' : '\u2795 Add New Event';
+    $('pcal-evt-id').value = isEdit ? evt.id : '';
+    $('pcal-evt-host').value = currentEmail || '';
+
+    fillStateSelect();
+    $('pcal-evt-state').value = isEdit ? (evt.state || '') : '';
+    fillDistrictSelect(isEdit ? (evt.state || '') : '', isEdit ? (evt.district || '') : '');
+
+    $('pcal-evt-name').value = isEdit ? (evt.eventName || evt.type || '') : '';
+    $('pcal-evt-desc').value = isEdit ? (evt.desc || '') : '';
+    $('pcal-evt-guests').value = isEdit
+      ? (evt.guests || []).filter(function (g) { return lc(g) !== lc(currentEmail); }).join(', ') : '';
+    $('pcal-evt-sendinvite').checked = isEdit ? (evt.sendInvite !== false) : true;
+
+    fillEventTypeSelect(isEdit ? (evt.eventType || '') : '');
+    $('pcal-evt-meet').checked = isEdit ? (!!evt.meetLink || !!evt.meet) : false;
+
+    var allday = isEdit ? !!evt.allDay : false;
+    $('pcal-evt-allday').checked = allday;
+    ['pcal-evt-start', 'pcal-evt-end'].forEach(function (id) {
+      var el = $(id); if (el) { el.dataset.allday = allday ? '1' : ''; el.dataset.iso = ''; el.value = ''; }
+    });
+    if (isEdit) { setDtField('pcal-evt-start', evt.start, allday); setDtField('pcal-evt-end', evt.end, allday); }
+
+    buildReminderRows(isEdit ? evt.reminders : null);
+
+    $('pcal-evt-files').value = '';
+    var existBox = $('pcal-existing-attach');
+    if (existBox) {
+      var atts = (isEdit && evt.attachments) ? evt.attachments : [];
+      existBox.innerHTML = atts.length
+        ? 'Existing: ' + atts.map(function (a) { return '<a class="pcal-att-link" href="' + esc(a.url) + '" target="_blank" rel="noopener">' + esc(a.name) + '</a>'; }).join(', ')
+        : '';
+    }
+
     clearFormErrors();
     $('pcal-modal-add').classList.add('open');
   }
 
-  function updateEventDays() {
-    var y = +$('pcal-evt-year').value;
-    var m = $('pcal-evt-month').value;
-    var daysSel = $('pcal-evt-day');
-    var prev = daysSel.value;
-    daysSel.innerHTML = '<option value="">—</option>';
-    if (m === '') return;
-    var dim = new Date(y, +m + 1, 0).getDate();
-    for (var d = 1; d <= dim; d++) {
-      var o = document.createElement('option');
-      o.value = d; o.textContent = d;
-      if (+prev === d) o.selected = true;
-      daysSel.appendChild(o);
-    }
-  }
-
   function clearFormErrors() {
-    ['pcal-fg-eyear', 'pcal-fg-emonth', 'pcal-fg-eday', 'pcal-fg-edistrict', 'pcal-fg-etype']
+['pcal-fg-state', 'pcal-fg-district', 'pcal-fg-type', 'pcal-fg-name', 'pcal-fg-start', 'pcal-fg-end']
       .forEach(function (id) { var el = $(id); if (el) el.classList.remove('has-error'); });
   }
 
   function saveEvent() {
     if (!isAdmin || busy) return;
     clearFormErrors();
-    var valid = true;
-    var year = +$('pcal-evt-year').value;
-    var month = $('pcal-evt-month').value;
-    var day = $('pcal-evt-day').value;
+    var id = $('pcal-evt-id').value;
+    var isEdit = !!id;
+    var state = $('pcal-evt-state').value;
     var district = $('pcal-evt-district').value;
-    var type = $('pcal-evt-type').value;
+    var name = $('pcal-evt-name').value.trim();
+    var eventType = $('pcal-evt-type').value;
+    var meet = $('pcal-evt-meet').checked;
+    var allday = $('pcal-evt-allday').checked;
+    var sISO = getDtISO('pcal-evt-start'), eISO = getDtISO('pcal-evt-end');
+    var startD = sISO ? new Date(sISO) : null;
+    var endD = eISO ? new Date(eISO) : null;
     var desc = $('pcal-evt-desc').value.trim();
+    var guests = $('pcal-evt-guests').value;
+    var sendInvite = $('pcal-evt-sendinvite').checked;
+    var reminders = gatherReminders();
+    var host = currentEmail || '';
 
-    if (!month) { $('pcal-fg-emonth').classList.add('has-error'); valid = false; }
-    if (!day) { $('pcal-fg-eday').classList.add('has-error'); valid = false; }
-    if (!district) { $('pcal-fg-edistrict').classList.add('has-error'); valid = false; }
-    if (!type) { $('pcal-fg-etype').classList.add('has-error'); valid = false; }
+    var valid = true;
+    if (!state)    { $('pcal-fg-state').classList.add('has-error'); valid = false; }
+    if (!district) { $('pcal-fg-district').classList.add('has-error'); valid = false; }
+    if (!eventType){ $('pcal-fg-type').classList.add('has-error'); valid = false; }
+    if (!name)     { $('pcal-fg-name').classList.add('has-error'); valid = false; }
+    if (!startD)   { $('pcal-fg-start').classList.add('has-error'); valid = false; }
+    if (!endD)     { $('pcal-fg-end').classList.add('has-error'); valid = false; }
+    if (valid && endD.getTime() < startD.getTime()) { $('pcal-fg-end').classList.add('has-error'); showToast('End must be after start.', true); valid = false; }
+    if (!host) { showToast('Could not determine your email (host).', true); valid = false; }
     if (!valid) return;
 
     var btn = $('pcal-save-event');
-    setBusy(btn, true);          // disable to prevent double-submit (label unchanged)
-    showLoader();                // blur backdrop + spinner
-    api('addEvent', {
-      year: year, month: +month, day: +day,
-      district: district, type: type, desc: desc,
-      createdBy: currentEmail || ''
-    })
-      .then(function (res) {
-        // Single round trip: the server returns the created event; if an older
-        // backend only returns {id}, reconstruct it locally from the form.
-        var evt = (res && res.event) ? res.event : {
-          id: (res && res.id) || ('tmp_' + Date.now()),
-          year: year, month: +month, day: +day,
-          district: district, type: type, desc: desc,
-          createdBy: currentEmail || ''
-        };
-        evt.year = Number(evt.year); evt.month = Number(evt.month); evt.day = Number(evt.day);
-        events.push(evt);
-        closeModal('pcal-modal-add');
-        renderCalendar();
-        showToast('Event added successfully!');
-      })
-      .catch(function (e) { showToast(e.message || 'Could not add event', true); })
-      .then(function () { setBusy(btn, false); hideLoader(); });
+    setBusy(btn, true);
+    var uname = (window.PROGRAM_CALENDAR_USER && window.PROGRAM_CALENDAR_USER.displayName) ||
+                (window.__olfUser && window.__olfUser.displayName) || '';
+
+    readFiles($('pcal-evt-files')).then(function (attachments) {
+      var startISO = startD.toISOString(), endISO = endD.toISOString();
+      var guestArr = guests.split(',').map(function (g) { return g.trim(); }).filter(Boolean);
+      if (guestArr.map(lc).indexOf(lc(host)) === -1) guestArr.push(host);
+
+      var priorAtt = [];
+      if (isEdit) { var ex = findEvent(id); if (ex && ex.attachments) priorAtt = ex.attachments; }
+      var tempId = isEdit ? id : ('tmp_' + Date.now());
+      var optimistic = {
+        id: tempId, googleEventId: isEdit ? ((findEvent(id) || {}).googleEventId || '') : '',
+        state: state, district: district, eventName: name, eventType: eventType, type: eventType || name, desc: desc,
+        start: startISO, end: endISO, allDay: allday,
+        year: startD.getFullYear(), month: startD.getMonth(), day: startD.getDate(),
+        host: host, guests: guestArr, reminders: reminders, sendInvite: sendInvite, meet: meet,
+        meetLink: (isEdit ? ((findEvent(id) || {}).meetLink || '') : ''),
+        attachments: priorAtt, savedByName: uname, savedByEmail: host, status: 'active', _saving: true
+      };
+      var prevEvents = events.slice();
+      if (isEdit) events = events.map(function (e) { return String(e.id) === String(id) ? optimistic : e; });
+      else events.push(optimistic);
+      closeModal('pcal-modal-add');
+      renderCalendar();
+      showToast(isEdit ? 'Saving changes\u2026' : 'Saving event\u2026');
+
+      var payload = {
+        id: isEdit ? id : undefined,
+        state: state, district: district, eventName: name, eventType: eventType, desc: desc,
+        start: startISO, end: endISO, allDay: allday, meet: meet,
+        host: host, guests: guestArr, reminders: reminders, sendInvite: sendInvite,
+        attachments: attachments, savedByName: uname, savedByEmail: host
+      };
+      return apiPost(isEdit ? 'updateEvent' : 'saveEvent', payload)
+        .then(function (res) {
+          var saved = res && res.event;
+          if (saved) events = events.map(function (e) { return String(e.id) === String(tempId) ? saved : e; });
+          else { var keep = findEvent(tempId); if (keep) keep._saving = false; }
+          renderCalendar();
+          showToast(isEdit ? 'Event updated \u00B7 invites sent' : 'Event saved \u00B7 invites sent');
+        })
+        .catch(function (e) { events = prevEvents; renderCalendar(); showToast(e.message || 'Could not save event', true); });
+    }).catch(function (e) {
+      showToast(e.message || 'Could not read attachments', true);
+    }).then(function () { setBusy(btn, false); });
+  }
+
+  // ── PAST / ALL EVENTS TABLE ───────────────────────────────────────
+  function openPastEvents() { if (!isAdmin) return; switchTab('past'); }
+  function fmtDateOnly(iso) { var d = new Date(iso); return isNaN(d) ? String(iso || '\u2014') : d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); }
+  function fmtDateTime(iso) { var d = new Date(iso); return isNaN(d) ? String(iso || '\u2014') : d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+  function sameDay(a, b) { return new Date(a).toDateString() === new Date(b).toDateString(); }
+  function renderPastTable() {
+    var box = $('pcal-past-table'); if (!box) return;
+    var sorted = events.slice().sort(function (a, b) { return new Date(a.start) - new Date(b.start); });
+    if (!sorted.length) { box.innerHTML = '<div class="empty-state" style="padding:20px">No events yet.</div>'; return; }
+    var nowT = Date.now();
+    var rows = sorted.map(function (e) {
+      var past = new Date(e.start).getTime() < nowT;
+      var when = e.allDay ? fmtDateOnly(e.start) : fmtDateTime(e.start);
+      var copyBtn = '<button class="pcal-mini pcal-mini-copy" data-pcal-copy="' + esc(e.id) + '">Copy</button>';
+      var actions = e._saving ? '<span class="pcal-badge-up">saving\u2026</span>'
+        : (past ? copyBtn + '<button class="pcal-mini pcal-mini-del" data-pcal-del="' + esc(e.id) + '">Delete</button>'
+                : '<button class="pcal-mini pcal-mini-edit" data-pcal-edit="' + esc(e.id) + '">Edit</button>' + copyBtn + '<button class="pcal-mini pcal-mini-del" data-pcal-del="' + esc(e.id) + '">Delete</button>');
+      return '<tr>' +
+        '<td>' + esc(e.eventName || '\u2014') + '</td>' +
+        '<td>' + esc(e.eventType || e.type || '\u2014') + '</td>' +
+        '<td>' + esc(e.district) + '</td>' +
+        '<td>' + esc(when) + '</td>' +
+        '<td>' + esc(e.host || '\u2014') + '</td>' +
+        '<td>' + ((e.guests && e.guests.length) ? e.guests.length : 0) + '</td>' +
+        '<td>' + (past ? '<span class="pcal-badge-past">Past</span>' : '<span class="pcal-badge-up">Upcoming</span>') + '</td>' +
+        '<td style="white-space:nowrap">' + actions + '</td></tr>';
+    }).join('');
+    box.innerHTML = '<div class="pcal-past-wrap"><table class="pcal-past-tbl"><thead><tr>' +
+      '<th>Event</th><th>Type</th><th>District</th><th>Start</th><th>Host</th><th>Guests</th><th>Status</th><th>Action</th>' +
+      '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }
+
+  function copyEvent(id) {
+    if (!isAdmin) return;
+    var e = findEvent(id); if (!e) return;
+    var clone = {
+      state: e.state, district: e.district, eventName: e.eventName, eventType: e.eventType || e.type,
+      desc: e.desc, allDay: e.allDay, start: e.start, end: e.end,
+      guests: (e.guests || []).slice(), reminders: (e.reminders || []).slice(),
+      sendInvite: e.sendInvite, meetLink: e.meetLink, meet: !!e.meetLink, attachments: []
+    };
+    switchTab('calendar');
+    openEventModal(clone);            // no id -> saved as a brand-new event
+    $('pcal-evt-id').value = '';
+    $('pcal-add-title').textContent = '\u2795 Copy Event';
   }
 
   function deleteEvent(id) {
@@ -496,35 +811,31 @@
   }
 
   function openEventDetails(id) {
-    var evt = null;
-    for (var i = 0; i < events.length; i++) {
-      if (String(events[i].id) === String(id)) { evt = events[i]; break; }
-    }
+    var evt = findEvent(id);
     if (!evt) return;
     var body = $('pcal-details-body');
     if (!body) return;
     var color = getProgramColor(evt.type);
+    function row(label, val) { return '<div class="pcal-detail-row"><span class="pcal-detail-label">' + label + '</span><span class="pcal-detail-val">' + val + '</span></div>'; }
+    var when = evt.allDay
+      ? (fmtDateOnly(evt.start) + (sameDay(evt.start, evt.end) ? '' : ' \u2192 ' + fmtDateOnly(evt.end)) + ' (all day)')
+      : (fmtDateTime(evt.start) + ' \u2192 ' + fmtDateTime(evt.end));
+    var atts = (evt.attachments || []).map(function (a) { return '<a class="pcal-att-link" href="' + esc(a.url) + '" target="_blank" rel="noopener">' + esc(a.name) + '</a>'; }).join(', ');
     body.innerHTML =
-      '<div class="pcal-detail-row"><span class="pcal-detail-label">Date</span>' +
-        '<span class="pcal-detail-val">' + MONTHS[evt.month] + ' ' + evt.day + ', ' + evt.year + '</span></div>' +
-      '<div class="pcal-detail-row"><span class="pcal-detail-label">District</span>' +
-        '<span class="pcal-detail-val">📍 ' + esc(evt.district) + '</span></div>' +
-      '<div class="pcal-detail-row"><span class="pcal-detail-label">Program Type</span>' +
-        '<span class="pcal-detail-val"><span class="pcal-detail-dot" style="background:' + color + '"></span>' +
-        esc(evt.type) + '</span></div>' +
-      (evt.desc
-        ? '<div class="pcal-detail-row col"><span class="pcal-detail-label">Description</span>' +
-          '<div class="pcal-detail-desc">' + esc(evt.desc) + '</div></div>'
-        : '') +
-      (evt.createdBy
-        ? '<div class="pcal-detail-row"><span class="pcal-detail-label">Added by</span>' +
-          '<span class="pcal-detail-val pcal-detail-muted">' + esc(evt.createdBy) + '</span></div>'
-        : '');
+      row('Event', '<span class="pcal-detail-dot" style="background:' + color + '"></span>' + esc(evt.eventName || evt.type)) +
+      row('When', esc(when)) +
+      row('State', esc(STATE_LABELS[evt.state] || evt.state || '\u2014')) +
+      row('District', '\uD83D\uDCCD ' + esc(evt.district)) +
+      row('Host', esc(evt.host || '\u2014')) +
+      ((evt.guests && evt.guests.length) ? row('Guests', esc(evt.guests.join(', '))) : '') +
+      (evt.desc ? '<div class="pcal-detail-row col"><span class="pcal-detail-label">Description</span><div class="pcal-detail-desc">' + esc(evt.desc) + '</div></div>' : '') +
+      (atts ? row('Attachments', atts) : '') +
+      (evt.savedByEmail ? row('Added by', '<span class="pcal-detail-muted">' + esc(evt.savedByName ? (evt.savedByName + ' \u00B7 ') : '') + esc(evt.savedByEmail) + '</span>') : '');
     $('pcal-modal-details').classList.add('open');
   }
 
   // ── SETTINGS ──────────────────────────────────────────────────────
-  function renderSettings() { renderDistrictList(); renderProgramList(); }
+  function renderSettings() { renderProgramList(); }
 
   function trashBtn(attr) {
     return '<button class="btn-trash" ' + attr + ' title="Delete">' + $('pcal-icon-trash').innerHTML + '</button>';
@@ -686,8 +997,8 @@
   function applyRole() {
     qsa('.pcal-admin-only').forEach(function (el) { el.style.display = isAdmin ? '' : 'none'; });
     if (!isAdmin) {
-      var settings = $('pcal-tab-settings');
-      if (settings && settings.classList.contains('active')) switchTab('calendar');
+      var st = $('pcal-tab-settings'), pt = $('pcal-tab-past');
+      if ((st && st.classList.contains('active')) || (pt && pt.classList.contains('active'))) switchTab('calendar');
     }
   }
 
@@ -707,9 +1018,12 @@
     on('pcal-sel-month', 'change', function () { viewMonth = +this.value; renderCalendar(); });
     on('pcal-add-btn', 'click', openAddEvent);
 
-    on('pcal-evt-year', 'change', updateEventDays);
-    on('pcal-evt-month', 'change', updateEventDays);
+    on('pcal-evt-state', 'change', onStateChange);
+    on('pcal-evt-allday', 'change', onAllDayToggle);
+    on('pcal-evt-start', 'click', function () { openDtPicker('pcal-evt-start'); });
+    on('pcal-evt-end', 'click', function () { openDtPicker('pcal-evt-end'); });
     on('pcal-save-event', 'click', saveEvent);
+    on('pcal-past-btn', 'click', openPastEvents);
 
     r.querySelectorAll('[data-pcal-close]').forEach(function (btn) {
       btn.addEventListener('click', function () { closeModal(btn.getAttribute('data-pcal-close')); });
@@ -718,6 +1032,11 @@
     if (overlay) overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.classList.remove('open'); });
     var dOverlay = $('pcal-modal-details');
     if (dOverlay) dOverlay.addEventListener('click', function (e) { if (e.target === dOverlay) dOverlay.classList.remove('open'); });
+    var pOverlay = $('pcal-modal-past');
+    if (pOverlay) pOverlay.addEventListener('click', function (e) { if (e.target === pOverlay) pOverlay.classList.remove('open'); });
+    delegate('pcal-past-table', '[data-pcal-edit]', function (btn) { editEvent(btn.getAttribute('data-pcal-edit')); });
+    delegate('pcal-past-table', '[data-pcal-copy]', function (btn) { copyEvent(btn.getAttribute('data-pcal-copy')); });
+    delegate('pcal-past-table', '[data-pcal-del]', function (btn) { deleteEvent(btn.getAttribute('data-pcal-del')); });
 
     // Click an event card to view full details (ignore clicks on its delete button)
     var listEl = $('pcal-events-list');
@@ -727,17 +1046,12 @@
       if (card) openEventDetails(card.getAttribute('data-pcal-view-event'));
     });
 
-    on('pcal-add-district-btn', 'click', addDistrict);
-    on('pcal-new-district', 'keydown', function (e) { if (e.key === 'Enter') addDistrict(); });
     on('pcal-add-program-btn', 'click', addProgram);
     on('pcal-new-program', 'keydown', function (e) { if (e.key === 'Enter') addProgram(); });
 
     // Delegation for dynamically-rendered delete buttons
     delegate('pcal-events-list', '[data-pcal-del-event]', function (btn) {
       deleteEvent(btn.getAttribute('data-pcal-del-event'));
-    });
-    delegate('pcal-district-list', '[data-pcal-del-district]', function (btn) {
-      removeDistrict(btn.getAttribute('data-pcal-del-district'));
     });
     delegate('pcal-program-list', '[data-pcal-del-program]', function (btn) {
       removeProgram(btn.getAttribute('data-pcal-del-program'));
