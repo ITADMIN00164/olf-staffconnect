@@ -285,7 +285,7 @@ function switchRole(idx) {
   toast(`Viewing as: ${r.label}`);
 }
 
-function save() { try { localStorage.setItem('sg_uiPrefs', JSON.stringify(DB.uiPrefs||{})); } catch(e){} if (syncEnabled) syncDiff(); }
+function save() { try { localStorage.setItem('sg_uiPrefs', JSON.stringify(DB.uiPrefs||{})); } catch(e){} saveSnapshot(); if (syncEnabled) syncDiff(); }
 
 // ── HELPERS ──
 function uid() { return 'id_' + Math.random().toString(36).slice(2,10); }
@@ -2012,6 +2012,28 @@ function loadUiPrefs() {
   try { var v = JSON.parse(localStorage.getItem('sg_uiPrefs') || 'null'); if (v && v.hiddenPlanCols) return v; } catch (e) {}
   return { hiddenPlanCols: [] };
 }
+// ── Client snapshot: instant first paint across full page reloads ──
+// Stores the last-seen data in localStorage so the page renders immediately on
+// load (no spinner), then refreshes from the server in the background. This is
+// CLIENT-SIDE ONLY — it never writes to or affects the Google Sheets. Keyed per
+// user so different accounts on the same browser never mix.
+function _snapKey() {
+  var u = (window.SMART_GOALS_USER && window.SMART_GOALS_USER.email) || 'anon';
+  return 'sg_snapshot_' + u;
+}
+function saveSnapshot() {
+  try {
+    localStorage.setItem(_snapKey(), JSON.stringify({
+      settings: DB.settings, goals: DB.goals, tasks: DB.tasks, reviews: DB.reviews
+    }));
+  } catch (e) { /* quota / serialize issue — ignore; we just lose the fast-paint boost */ }
+}
+function loadSnapshot() {
+  try { var v = JSON.parse(localStorage.getItem(_snapKey()) || 'null'); if (v && v.settings) return v; }
+  catch (e) {}
+  return null;
+}
+
 function loadAll(fresh) {
   return api('getAll', fresh ? { fresh: 1 } : null).then(function (data) {
     data = data || {};
@@ -2032,6 +2054,7 @@ function loadAll(fresh) {
     _shadow = deepCopy(DB);
     syncEnabled = true;
     loadedOnce = true;
+    saveSnapshot();
   });
 }
 
@@ -2110,6 +2133,30 @@ function mount() {
     afterLoadRender();
     return loadAll(true).then(afterLoadRender).catch(function (e) { console.warn('[SmartGoals] background refresh failed:', e); });
   }
+  // Instant paint from the last local snapshot (survives full page reloads),
+  // then refresh from the server in the background — no long spinner.
+  var snap = loadSnapshot();
+  if (snap) {
+    DB = {
+      settings: {
+        depts:      (snap.settings && snap.settings.depts)      || [],
+        members:    (snap.settings && snap.settings.members)    || [],
+        admins:     (snap.settings && snap.settings.admins)     || [],
+        goalNames:  (snap.settings && snap.settings.goalNames)  || [],
+        categories: (snap.settings && snap.settings.categories) || []
+      },
+      goals:   snap.goals   || [],
+      tasks:   snap.tasks   || [],
+      reviews: snap.reviews || [],
+      uiPrefs: loadUiPrefs()
+    };
+    _shadow = deepCopy(DB);     // baseline so any edit during refresh diffs correctly
+    syncEnabled = true;         // edits made before the refresh still sync — no lost writes
+    afterLoadRender();          // paint instantly, no spinner
+    return loadAll(true).then(afterLoadRender)
+      .catch(function (e) { console.warn('[SmartGoals] background refresh failed:', e); });
+  }
+
   sgShowLoader();
   return loadAll()
     .then(afterLoadRender)
