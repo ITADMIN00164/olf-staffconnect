@@ -240,6 +240,34 @@
 #sg-app .remark-icon-btn { border: 1px solid var(--border2); background: #fff; border-radius: 6px; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px; line-height: 1; padding: 0; transition: all .12s; }
 #sg-app .remark-icon-btn:hover { background: var(--brand-lt); border-color: var(--brand); }
 #sg-app .remark-icon-btn.has-remark { border-color: var(--brand); background: var(--brand-lt); }
+
+/* ── Grouped review detail table: flat background (no zebra) + column-group colour bands ──
+   Columns 1–2 (Category, Particulars): default. Columns 3–7 (Target…Member Score): band A.
+   Column 8 (Manager Score): band B. Rules sit after the generic .tbl rules so they win. */
+#sg-app .tbl.tbl-grouped tbody tr td { background: transparent; }
+#sg-app .tbl.tbl-grouped tbody td:nth-child(3),
+#sg-app .tbl.tbl-grouped tbody td:nth-child(4),
+#sg-app .tbl.tbl-grouped tbody td:nth-child(5),
+#sg-app .tbl.tbl-grouped tbody td:nth-child(6),
+#sg-app .tbl.tbl-grouped tbody td:nth-child(7) { background: #EDF3F7; }
+#sg-app .tbl.tbl-grouped tbody td:nth-child(8) { background: #E7F4F0; }
+/* Total row: one uniform colour across every cell (overrides the per-column bands) */
+#sg-app .tbl.tbl-grouped tbody tr.sg-total-row td { background: var(--surface2); }
+/* Keep single-word detail headers on one line; two-word score headers still wrap to 2 rows.
+   Tighter horizontal cell padding lets them fit even though the nested table is narrower. */
+#sg-app .tbl-grouped th.sg-th-nowrap { white-space: nowrap; }
+#sg-app .tbl-grouped th, #sg-app .tbl-grouped td { padding-left: 8px; padding-right: 8px; }
+
+/* Inline-expanding detail nested under each Summary row (smooth open/close).
+   The expanded area is a tinted zone (matching the open goal row) holding an inset, framed table,
+   so it clearly reads as belonging to that goal and is visually smaller than the summary table. */
+#sg-app .sg-detail-wrap { overflow: hidden; max-height: 0; transition: max-height .32s ease; }
+#sg-app .sg-detail-inner { padding: 12px 22px 18px; background: var(--brand-lt); }
+#sg-app .sg-detail-panel { border: 1px solid var(--border); border-left: 3px solid var(--brand); border-radius: var(--radius); overflow: hidden; background: var(--surface); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+
+/* Summary-table expandable rows */
+#sg-app .sg-sum-caret { display: inline-block; width: 14px; color: var(--brand); font-size: 10px; }
+#sg-app .tbl .sg-sum-row.open td { background: var(--brand-lt); }
 #sg-app .gp-road { background: var(--amber-lt); color: var(--amber); }
 #sg-app .gp-team { background: var(--violet-lt); color: var(--violet); }
 #sg-app .gp-def { background: var(--slate-lt); color: var(--slate); }
@@ -649,7 +677,7 @@
 </div>
 
 <div class="modal-backdrop" id="review-modal">
-  <div class="modal" style="max-width:960px">
+  <div class="modal" style="max-width:1120px">
     <div class="modal-head">
       <span class="modal-title">Monthly Review</span>
       <button class="modal-close" onclick="closeModal('review-modal')">×</button>
@@ -665,6 +693,9 @@
       <div class="form-grid" style="margin-bottom:16px" id="rf-reviewer-row">
         <div class="field"><label>Reviewer (Manager)</label><input id="rf-reviewer" placeholder="Manager name"></div>
         <div class="field form-full"><label>Overall Remarks</label><input id="rf-remarks" placeholder="Overall comment…"></div>
+      </div>
+      <div class="form-grid" style="margin-bottom:16px">
+        <div class="field form-full"><label>Sheet B Link</label><input id="rf-sheetb" type="url" placeholder="https://docs.google.com/…"></div>
       </div>
       <div class="section-label">Score each SMART Goal / Category</div>
       <p style="font-size:12px;color:var(--text3);margin-bottom:12px">

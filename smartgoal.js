@@ -186,7 +186,7 @@ let DB = JSON.parse(JSON.stringify(DEFAULT));
       };
     });
     if (!r.year || !r.month) changed = true;
-    return {id:r.id||uid(), year, month, dept:r.dept||'', member:r.member||'', reviewer:r.reviewer||'', date:r.date||'', remarks:r.remarks||'', items};
+    return {id:r.id||uid(), year, month, dept:r.dept||'', member:r.member||'', reviewer:r.reviewer||'', date:r.date||'', remarks:r.remarks||'', sheetBLink:r.sheetBLink||'', items};
   });
   // one-time cleanup: remove IT OPs sample/legacy data from any previously saved browser data.
   // Data for other departments (e.g. Content/Communications) is left untouched.
@@ -1326,35 +1326,83 @@ function renderReviews() {
 
     const groups = groupByGoal(items);
 
-    // ── Summary of Review table: SMART Goal | Description | Weightage | Performance ──
-    let summaryRows = '';
+    // ── Summary of Review table with each SMART Goal's detail table nested directly beneath its row ──
+    const canEditRemark = canEditMemberScore(r) || canEditMgrScore(r);
+    let bodyRows = '';
     let totalWeightage = 0, totalPerformance = 0;
-    groups.forEach((grp,i) => {
-      const tMax = grp.rows.reduce((a,x)=>a+(parseFloat(x.maxScore)||0),0);
-      const tMgr = grp.rows.reduce((a,x)=>a+(parseFloat(x.mgrScore)||0),0);
+    groups.forEach((grp,gi) => {
+      const gMax = grp.rows.reduce((a,x)=>a+(parseFloat(x.maxScore)||0),0);
+      const gMgr = grp.rows.reduce((a,x)=>a+(parseFloat(x.mgrScore)||0),0);
+      const gMem = grp.rows.reduce((a,x)=>a+(parseFloat(x.memberScore)||0),0);
       const weightage = parseFloat(grp.weightage)||0;
-      const ratio = tMax>0 ? (tMgr/tMax) : 0;
+      const ratio = gMax>0 ? (gMgr/gMax) : 0;
       const performance = Math.round(ratio * weightage);
       totalWeightage += weightage;
       totalPerformance += performance;
       const desc = grp.rows[0].description || '';
-      summaryRows += `<tr>
-        <td style="text-align:center;color:var(--text3)">${i+1}</td>
-        <td style="font-weight:600">${esc(grp.goal)}</td>
-        <td style="font-size:11px;color:var(--text2)">${esc(desc||'—')}</td>
-        <td style="text-align:center;font-weight:600">${weightage}%</td>
-        <td style="text-align:center;font-weight:700;background:${pctColor(performance)}22;color:${pctColor(performance)}">${performance}%</td>
-      </tr>`;
+
+      const detailBody = grp.rows.map(i=>{
+        const hasRemark = !!(i.remark && String(i.remark).trim());
+        const itemIndex = items.indexOf(i);
+        return `<tr>
+          <td>${esc(i.cat)}</td>
+          <td>${esc(i.particulars||'—')}</td>
+          <td style="text-align:center">${esc(i.target||'—')}</td>
+          <td style="text-align:center">${esc(i.actual||'—')}</td>
+          <td style="text-align:center"><button type="button" class="remark-icon-btn ${hasRemark?'has-remark':''}" title="${hasRemark?'View / edit remark':(canEditRemark?'Add remark':'No remark')}" onclick="sgOpenItemRemarkModal('${r.id}',${itemIndex})">${hasRemark?'📝':'✏️'}</button></td>
+          <td style="text-align:center;font-weight:700">${i.maxScore}</td>
+          <td style="text-align:center"><span class="score-badge ${scoreClass(i.memberScore,i.maxScore)}">${i.memberScore||'—'}</span></td>
+          <td style="text-align:center">${parseFloat(i.mgrScore)>0?`<span class="score-badge ${scoreClass(i.mgrScore,i.maxScore)}">${i.mgrScore}</span>`:'<span style="font-size:11px;color:var(--text3)">—</span>'}</td>
+        </tr>`;
+      }).join('');
+
+      const detailTable = `<table class="tbl tbl-fixed tbl-grouped">
+        <colgroup>
+          <col style="width:13%"><col style="width:42.5%"><col style="width:7.5%"><col style="width:7.5%">
+          <col style="width:7%"><col style="width:5.5%"><col style="width:8.5%"><col style="width:8.5%">
+        </colgroup>
+        <thead><tr>
+          <th>Category</th><th>Particulars</th>
+          <th class="sg-th-nowrap" style="text-align:center">Target</th>
+          <th class="sg-th-nowrap" style="text-align:center">Actual</th>
+          <th class="sg-th-nowrap" style="text-align:center">Remark</th>
+          <th class="sg-th-nowrap" style="text-align:center">Max</th>
+          <th style="text-align:center">Member Score</th><th style="text-align:center">Manager Score</th>
+        </tr></thead>
+        <tbody>
+          ${detailBody}
+          <tr class="sg-total-row" style="font-weight:700">
+            <td colspan="5">Total</td>
+            <td style="text-align:center">${gMax}</td>
+            <td style="text-align:center"><span class="score-badge ${scoreClass(gMem,gMax)}">${gMem}</span></td>
+            <td style="text-align:center">${gMgr>0?`<span class="score-badge ${scoreClass(gMgr,gMax)}">${gMgr}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
+          </tr>
+        </tbody>
+      </table>`;
+
+      bodyRows += `<tr class="sg-sum-row" id="sgsum-${r.id}-${gi}" onclick="sgToggleGoalDetail('${r.id}',${gi})" style="cursor:pointer">
+          <td style="text-align:center;color:var(--text3)">${gi+1}</td>
+          <td style="font-weight:600"><span class="sg-sum-caret">▸</span>${esc(grp.goal)}</td>
+          <td style="color:var(--text2)">${esc(desc||'—')}</td>
+          <td style="text-align:center;font-weight:600">${weightage}%</td>
+          <td style="text-align:center;font-weight:700;background:${pctColor(performance)}22;color:${pctColor(performance)}">${performance}%</td>
+        </tr>
+        <tr class="sg-detail-row">
+          <td colspan="5" style="padding:0;border:none;background:transparent">
+            <div class="sg-detail-wrap" id="sgd-${r.id}-${gi}"><div class="sg-detail-inner"><div class="sg-detail-panel">${detailTable}</div></div></div>
+          </td>
+        </tr>`;
     });
+
     const summaryHtml = `<div style="margin-bottom:18px">
-      <div class="review-section-hd">Summary of Review — ${monthYearLabel(r.year,r.month)}</div>
+      <div class="review-section-hd">Summary of Review — ${monthYearLabel(r.year,r.month)} <span style="font-weight:400;font-size:11px;color:var(--text3);text-transform:none;letter-spacing:0">— click a SMART Goal to view its details</span></div>
       <div class="tbl-wrap"><table class="tbl">
         <thead><tr>
           <th style="text-align:center">#</th><th>SMART Goal</th><th>Description</th>
           <th style="text-align:center">Weightage</th><th style="text-align:center">Performance</th>
         </tr></thead>
         <tbody>
-          ${summaryRows}
+          ${bodyRows}
           <tr style="background:var(--surface2);font-weight:700">
             <td colspan="3" style="text-align:right">Total</td>
             <td style="text-align:center">${totalWeightage}%</td>
@@ -1363,47 +1411,6 @@ function renderReviews() {
         </tbody>
       </table></div>
     </div>`;
-
-    const canEditRemark = canEditMemberScore(r) || canEditMgrScore(r);
-    let sectionsHtml = groups.map(grp => {
-      const tMax = grp.rows.reduce((a,i)=>a+(parseFloat(i.maxScore)||0),0);
-      const tMem = grp.rows.reduce((a,i)=>a+(parseFloat(i.memberScore)||0),0);
-      const tMgr = grp.rows.reduce((a,i)=>a+(parseFloat(i.mgrScore)||0),0);
-      return `<div class="review-section">
-        <div class="review-section-hd">${esc(grp.goal)} <b>(${grp.weightage}%)</b></div>
-        <div class="tbl-wrap"><table class="tbl tbl-fixed">
-          <colgroup>
-            <col style="width:14%"><col style="width:29%"><col style="width:9%"><col style="width:9%">
-            <col style="width:7%"><col style="width:8%"><col style="width:12%"><col style="width:12%">
-          </colgroup>
-          <thead><tr>
-            <th>Category</th><th>Particulars</th><th>Target</th><th>Actual</th><th style="text-align:center">Remark</th>
-            <th style="text-align:center">Max</th><th style="text-align:center">Member Score</th><th style="text-align:center">Manager Score</th>
-          </tr></thead>
-          <tbody>
-            ${grp.rows.map(i=>{
-              const hasRemark = !!(i.remark && String(i.remark).trim());
-              return `<tr>
-              <td>${esc(i.cat)}</td>
-              <td>${esc(i.particulars||'—')}</td>
-              <td>${esc(i.target||'—')}</td>
-              <td>${esc(i.actual||'—')}</td>
-              <td style="text-align:center"><button class="remark-icon-btn ${hasRemark?'has-remark':''}" title="${hasRemark?'View / edit remark':(canEditRemark?'Add remark':'No remark')}" onclick="sgOpenItemRemarkModal('${r.id}','${i.goalItemId}')">${hasRemark?'📝':'✏️'}</button></td>
-              <td style="text-align:center;font-weight:700">${i.maxScore}</td>
-              <td style="text-align:center"><span class="score-badge ${scoreClass(i.memberScore,i.maxScore)}">${i.memberScore||'—'}</span></td>
-              <td style="text-align:center">${parseFloat(i.mgrScore)>0?`<span class="score-badge ${scoreClass(i.mgrScore,i.maxScore)}">${i.mgrScore}</span>`:'<span style="font-size:11px;color:var(--text3)">—</span>'}</td>
-            </tr>`;
-            }).join('')}
-            <tr style="background:var(--surface2);font-weight:700">
-              <td colspan="5">Total</td>
-              <td style="text-align:center">${tMax}</td>
-              <td style="text-align:center"><span class="score-badge ${scoreClass(tMem,tMax)}">${tMem}</span></td>
-              <td style="text-align:center">${tMgr>0?`<span class="score-badge ${scoreClass(tMgr,tMax)}">${tMgr}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
-            </tr>
-          </tbody>
-        </table></div>
-      </div>`;
-    }).join('');
 
     // Collapsed by default: only this header line shows. Click the row to expand details.
     html += `<div class="card sg-review-card" style="margin-bottom:16px">
@@ -1426,9 +1433,11 @@ function renderReviews() {
         </div>
       </div>
       <div class="card-body" style="display:none">
-        ${r.remarks ? `<p style="font-size:12px;color:var(--text2);margin-bottom:12px;padding:8px 12px;background:var(--surface2);border-radius:var(--radius);border-left:3px solid var(--brand)">📝 ${esc(r.remarks)}</p>` : ''}
         ${summaryHtml}
-        ${sectionsHtml}
+        ${(r.remarks || (r.sheetBLink && String(r.sheetBLink).trim())) ? `<div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
+          ${r.remarks ? `<p style="font-size:12px;color:var(--text2);margin:0;padding:8px 12px;background:var(--surface2);border-radius:var(--radius);border-left:3px solid var(--brand)">📝 ${esc(r.remarks)}</p>` : ''}
+          ${(r.sheetBLink && String(r.sheetBLink).trim()) ? `<p style="font-size:12px;color:var(--text2);margin:0;padding:8px 12px;background:var(--surface2);border-radius:var(--radius);border-left:3px solid var(--blue)">🔗 ${/^https?:\/\//i.test(r.sheetBLink.trim()) ? `<a href="${esc(r.sheetBLink.trim())}" target="_blank" rel="noopener" style="color:var(--blue);font-weight:600">Sheet B</a>` : `<span>${esc(r.sheetBLink.trim())}</span>`}</p>` : ''}
+        </div>` : ''}
       </div>
     </div>`;
   });
@@ -1448,7 +1457,7 @@ function toggleReviewCard(hdEl) {
 
 function openReviewModal(id) {
   editingReviewId = id || null;
-  ['rf-reviewer','rf-remarks'].forEach(fid => document.getElementById(fid).value = '');
+  ['rf-reviewer','rf-remarks','rf-sheetb'].forEach(fid => document.getElementById(fid).value = '');
   document.getElementById('rf-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('review-score-table').innerHTML = '';
 
@@ -1465,6 +1474,7 @@ function openReviewModal(id) {
       document.getElementById('rf-reviewer').value = r.reviewer||'';
       document.getElementById('rf-date').value = r.date||'';
       document.getElementById('rf-remarks').value = r.remarks||'';
+      document.getElementById('rf-sheetb').value = r.sheetBLink||'';
     }
   } else if (currentUser.role === ROLES.MEMBER) {
     yearEl.value = currentAcademicYearGuess();
@@ -1515,10 +1525,14 @@ function loadGoalsForReview() {
   groups.forEach(grp => {
     html += `<div class="review-section">
       <div class="review-section-hd">${esc(grp.goal)} <b>(${grp.weightage}%)</b></div>
-      <div class="tbl-wrap"><table class="tbl" style="min-width:900px">
+      <div class="tbl-wrap"><table class="tbl tbl-fixed">
+        <colgroup>
+          <col style="width:13%"><col style="width:27%"><col style="width:8%"><col style="width:8%">
+          <col style="width:16%"><col style="width:8%"><col style="width:10%"><col style="width:10%">
+        </colgroup>
         <thead><tr>
           <th>Category</th><th>Particulars</th>
-          <th>Target</th><th>Actual</th><th>Remark</th>
+          <th style="text-align:center">Target</th><th style="text-align:center">Actual</th><th style="text-align:center">Remark</th>
           <th style="text-align:center">Max Score</th>
           <th style="text-align:center">Member Score</th>
           <th style="text-align:center">Manager Score</th>
@@ -1530,12 +1544,12 @@ function loadGoalsForReview() {
       html += `<tr class="review-score-row" data-goal-id="${g.id}" data-goal-name="${esc(g.goal)}" data-weightage="${g.weightage}" data-default-max="${g.maxScore}">
         <td>${esc(g.cat)}</td>
         <td>${esc(g.particulars||'—')}</td>
-        <td><input type="text" class="item-target" value="${esc(ex?.target||'')}" style="width:70px;border:1px solid var(--border2);border-radius:4px;padding:3px 6px;font-size:12px;font-family:inherit"></td>
-        <td><input type="text" class="item-actual" value="${esc(ex?.actual||'')}" style="width:70px;border:1px solid var(--border2);border-radius:4px;padding:3px 6px;font-size:12px;font-family:inherit"></td>
-        <td><input type="text" placeholder="Remark…" class="item-remark" value="${esc(ex?.remark||'')}" style="width:100%;min-width:120px;border:1px solid var(--border2);border-radius:4px;padding:3px 7px;font-size:12px;font-family:inherit"></td>
-        <td style="text-align:center"><input class="score-input-sm item-maxscore" type="number" min="0" value="${maxVal}" title="Max Score is fetched from SMART Goals, but can be adjusted here"></td>
-        <td style="text-align:center"><input class="score-input-sm item-memberscore" type="number" min="0" value="${ex?.memberScore||0}" ${memberDisabled}></td>
-        <td style="text-align:center"><input class="score-input-sm item-mgrscore" type="number" min="0" value="${ex?.mgrScore||0}" ${mgrDisabled}></td>
+        <td style="text-align:center"><input type="text" class="item-target" value="${esc(ex?.target||'')}" style="width:100%;border:1px solid var(--border2);border-radius:4px;padding:3px 6px;font-size:12px;font-family:inherit;text-align:center"></td>
+        <td style="text-align:center"><input type="text" class="item-actual" value="${esc(ex?.actual||'')}" style="width:100%;border:1px solid var(--border2);border-radius:4px;padding:3px 6px;font-size:12px;font-family:inherit;text-align:center"></td>
+        <td style="text-align:center"><input type="text" placeholder="Remark…" class="item-remark" value="${esc(ex?.remark||'')}" style="width:100%;border:1px solid var(--border2);border-radius:4px;padding:3px 7px;font-size:12px;font-family:inherit"></td>
+        <td style="text-align:center"><input class="score-input-sm item-maxscore" type="number" min="0" value="${maxVal}" title="Max Score is fetched from SMART Goals, but can be adjusted here" style="width:100%;max-width:64px"></td>
+        <td style="text-align:center"><input class="score-input-sm item-memberscore" type="number" min="0" value="${ex?.memberScore||0}" ${memberDisabled} style="width:100%;max-width:64px"></td>
+        <td style="text-align:center"><input class="score-input-sm item-mgrscore" type="number" min="0" value="${ex?.mgrScore||0}" ${mgrDisabled} style="width:100%;max-width:64px"></td>
       </tr>`;
     });
     html += `<tr style="background:var(--surface2);font-weight:700">
@@ -1584,6 +1598,7 @@ function saveReview() {
     reviewer: document.getElementById('rf-reviewer').value,
     date: document.getElementById('rf-date').value,
     remarks: document.getElementById('rf-remarks').value,
+    sheetBLink: (document.getElementById('rf-sheetb').value||'').trim(),
     items
   };
   if (existingId) { const i=DB.reviews.findIndex(x=>x.id===existingId); if(i>-1) DB.reviews[i]=rec; }
@@ -1591,15 +1606,54 @@ function saveReview() {
   save(); closeModal('review-modal'); renderReviews(); toast('Review saved');
 }
 
+// ── Progressive disclosure of a review's per-SMART-Goal detail tables ──
+// Each detail table renders collapsed (max-height:0) directly beneath its Summary row. Clicking the row
+// toggles it with a smooth max-height transition. Rows are located by id so any review id is safe.
+function sgToggleGoalDetail(reviewId, groupIndex) {
+  const wrap = document.getElementById('sgd-' + reviewId + '-' + groupIndex);
+  if (!wrap) return;
+  const row = document.getElementById('sgsum-' + reviewId + '-' + groupIndex);
+  const caret = row ? row.querySelector('.sg-sum-caret') : null;
+  const willOpen = !wrap.classList.contains('open');
+
+  // clear any pending post-open handler from a previous rapid toggle
+  if (wrap._sgEnd) { wrap.removeEventListener('transitionend', wrap._sgEnd); wrap._sgEnd = null; }
+
+  if (willOpen) {
+    wrap.classList.add('open');
+    if (row) row.classList.add('open');
+    if (caret) caret.textContent = '▾';
+    wrap.style.maxHeight = wrap.scrollHeight + 'px';   // animate 0 → content height
+    const onEnd = function (e) {
+      if (e.propertyName !== 'max-height') return;
+      if (wrap.classList.contains('open')) wrap.style.maxHeight = 'none'; // allow natural growth after open
+      wrap.removeEventListener('transitionend', onEnd);
+      wrap._sgEnd = null;
+    };
+    wrap._sgEnd = onEnd;
+    wrap.addEventListener('transitionend', onEnd);
+  } else {
+    wrap.style.maxHeight = wrap.scrollHeight + 'px';   // pin concrete height (in case it was 'none')
+    void wrap.offsetHeight;                            // force reflow so the next change animates
+    wrap.classList.remove('open');
+    if (row) row.classList.remove('open');
+    if (caret) caret.textContent = '▸';
+    wrap.style.maxHeight = '0px';                      // animate content height → 0
+  }
+}
+
 // ── Per-item Remark popup (view/add/edit a single row's remark without opening the full Edit modal) ──
+// Items are located by their absolute index in the review's items array. This is robust even if the
+// backend round-trip does not preserve a per-item id, and the index maps to the same in-memory object
+// regardless of how rows are grouped for display.
 let sgRemarkTarget = null;
-function sgOpenItemRemarkModal(reviewId, goalItemId) {
+function sgOpenItemRemarkModal(reviewId, itemIndex) {
   const r = DB.reviews.find(x => x.id === reviewId);
   if (!r) return;
-  const item = (r.items || []).find(i => i.goalItemId === goalItemId);
+  const item = (r.items || [])[itemIndex];
   if (!item) return;
   const editable = canEditMemberScore(r) || canEditMgrScore(r);
-  sgRemarkTarget = { reviewId, goalItemId, editable };
+  sgRemarkTarget = { reviewId, itemIndex, editable };
 
   document.getElementById('ir-context').textContent = [item.cat, item.particulars].filter(Boolean).join(' — ');
   const ta = document.getElementById('ir-remark-text');
@@ -1611,12 +1665,12 @@ function sgOpenItemRemarkModal(reviewId, goalItemId) {
 }
 function sgSaveItemRemark() {
   if (!sgRemarkTarget || !sgRemarkTarget.editable) return;
-  const { reviewId, goalItemId } = sgRemarkTarget;
+  const { reviewId, itemIndex } = sgRemarkTarget;
   const rIdx = DB.reviews.findIndex(x => x.id === reviewId);
   if (rIdx === -1) return;
-  const iIdx = (DB.reviews[rIdx].items || []).findIndex(i => i.goalItemId === goalItemId);
-  if (iIdx === -1) return;
-  DB.reviews[rIdx].items[iIdx].remark = document.getElementById('ir-remark-text').value;
+  const item = (DB.reviews[rIdx].items || [])[itemIndex];
+  if (!item) return;
+  item.remark = document.getElementById('ir-remark-text').value;
   save();
   closeModal('item-remark-modal');
   renderReviews();
@@ -2268,6 +2322,9 @@ try { window.deleteGoalGroup = deleteGoalGroup; } catch(e){}
 try { window.sgConfirmOk = sgConfirmOk; } catch(e){}
 try { window.sgConfirmCancel = sgConfirmCancel; } catch(e){}
 try { window.deleteReview = deleteReview; } catch(e){}
+try { window.sgOpenItemRemarkModal = sgOpenItemRemarkModal; } catch(e){}
+try { window.sgSaveItemRemark = sgSaveItemRemark; } catch(e){}
+try { window.sgToggleGoalDetail = sgToggleGoalDetail; } catch(e){}
 try { window.deleteTask = deleteTask; } catch(e){}
 try { window.esc = esc; } catch(e){}
 try { window.escJs = escJs; } catch(e){}
