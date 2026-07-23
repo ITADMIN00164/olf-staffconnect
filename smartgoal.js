@@ -1364,28 +1364,36 @@ function renderReviews() {
       </table></div>
     </div>`;
 
+    const canEditRemark = canEditMemberScore(r) || canEditMgrScore(r);
     let sectionsHtml = groups.map(grp => {
       const tMax = grp.rows.reduce((a,i)=>a+(parseFloat(i.maxScore)||0),0);
       const tMem = grp.rows.reduce((a,i)=>a+(parseFloat(i.memberScore)||0),0);
       const tMgr = grp.rows.reduce((a,i)=>a+(parseFloat(i.mgrScore)||0),0);
       return `<div class="review-section">
         <div class="review-section-hd">${esc(grp.goal)} <b>(${grp.weightage}%)</b></div>
-        <div class="tbl-wrap"><table class="tbl">
+        <div class="tbl-wrap"><table class="tbl tbl-fixed">
+          <colgroup>
+            <col style="width:14%"><col style="width:29%"><col style="width:9%"><col style="width:9%">
+            <col style="width:7%"><col style="width:8%"><col style="width:12%"><col style="width:12%">
+          </colgroup>
           <thead><tr>
-            <th>Category</th><th>Particulars</th><th>Target</th><th>Actual</th><th>Remark</th>
+            <th>Category</th><th>Particulars</th><th>Target</th><th>Actual</th><th style="text-align:center">Remark</th>
             <th style="text-align:center">Max</th><th style="text-align:center">Member Score</th><th style="text-align:center">Manager Score</th>
           </tr></thead>
           <tbody>
-            ${grp.rows.map(i=>`<tr>
+            ${grp.rows.map(i=>{
+              const hasRemark = !!(i.remark && String(i.remark).trim());
+              return `<tr>
               <td>${esc(i.cat)}</td>
               <td>${esc(i.particulars||'—')}</td>
               <td>${esc(i.target||'—')}</td>
               <td>${esc(i.actual||'—')}</td>
-              <td style="font-size:11px;color:var(--text2)">${esc(i.remark||'—')}</td>
+              <td style="text-align:center"><button class="remark-icon-btn ${hasRemark?'has-remark':''}" title="${hasRemark?'View / edit remark':(canEditRemark?'Add remark':'No remark')}" onclick="sgOpenItemRemarkModal('${r.id}','${i.goalItemId}')">${hasRemark?'📝':'✏️'}</button></td>
               <td style="text-align:center;font-weight:700">${i.maxScore}</td>
               <td style="text-align:center"><span class="score-badge ${scoreClass(i.memberScore,i.maxScore)}">${i.memberScore||'—'}</span></td>
               <td style="text-align:center">${parseFloat(i.mgrScore)>0?`<span class="score-badge ${scoreClass(i.mgrScore,i.maxScore)}">${i.mgrScore}</span>`:'<span style="font-size:11px;color:var(--text3)">—</span>'}</td>
-            </tr>`).join('')}
+            </tr>`;
+            }).join('')}
             <tr style="background:var(--surface2);font-weight:700">
               <td colspan="5">Total</td>
               <td style="text-align:center">${tMax}</td>
@@ -1581,6 +1589,38 @@ function saveReview() {
   if (existingId) { const i=DB.reviews.findIndex(x=>x.id===existingId); if(i>-1) DB.reviews[i]=rec; }
   else DB.reviews.push(rec);
   save(); closeModal('review-modal'); renderReviews(); toast('Review saved');
+}
+
+// ── Per-item Remark popup (view/add/edit a single row's remark without opening the full Edit modal) ──
+let sgRemarkTarget = null;
+function sgOpenItemRemarkModal(reviewId, goalItemId) {
+  const r = DB.reviews.find(x => x.id === reviewId);
+  if (!r) return;
+  const item = (r.items || []).find(i => i.goalItemId === goalItemId);
+  if (!item) return;
+  const editable = canEditMemberScore(r) || canEditMgrScore(r);
+  sgRemarkTarget = { reviewId, goalItemId, editable };
+
+  document.getElementById('ir-context').textContent = [item.cat, item.particulars].filter(Boolean).join(' — ');
+  const ta = document.getElementById('ir-remark-text');
+  ta.value = item.remark || '';
+  ta.disabled = !editable;
+  document.getElementById('ir-save-btn').style.display = editable ? '' : 'none';
+  document.getElementById('item-remark-modal-title').textContent = editable ? (item.remark ? 'Edit Remark' : 'Add Remark') : 'View Remark';
+  openModal('item-remark-modal');
+}
+function sgSaveItemRemark() {
+  if (!sgRemarkTarget || !sgRemarkTarget.editable) return;
+  const { reviewId, goalItemId } = sgRemarkTarget;
+  const rIdx = DB.reviews.findIndex(x => x.id === reviewId);
+  if (rIdx === -1) return;
+  const iIdx = (DB.reviews[rIdx].items || []).findIndex(i => i.goalItemId === goalItemId);
+  if (iIdx === -1) return;
+  DB.reviews[rIdx].items[iIdx].remark = document.getElementById('ir-remark-text').value;
+  save();
+  closeModal('item-remark-modal');
+  renderReviews();
+  toast('Remark saved');
 }
 
 function deleteReview(id) {
@@ -2059,10 +2099,42 @@ function loadAll(fresh) {
 }
 
 // ── DIFF-BASED SYNC (one small write per changed record; JSONP-safe) ──
+// Small, NON-BLOCKING save indicator so the page stays fully interactive while a
+// background write finishes. state: 'saving' | 'saved' | 'hide'. Purely visual —
+// pointer-events:none means it never intercepts clicks. Shared by ALL write
+// points (add/edit goal, add/edit task, add/edit review, settings, deletes).
+function sgSavePill(state) {
+  var id = 'sg-save-pill';
+  var el = document.getElementById(id);
+  if (state === 'hide') { if (el) el.style.opacity = '0'; return; }
+  if (!el) {
+    el = document.createElement('div');
+    el.id = id;
+    el.style.cssText = 'position:fixed;bottom:18px;left:18px;z-index:9999;padding:7px 14px;'
+      + 'border-radius:20px;font-size:12px;font-weight:600;font-family:inherit;pointer-events:none;'
+      + 'transition:opacity .2s;box-shadow:0 4px 14px rgba(0,0,0,.15);opacity:0;';
+    (document.getElementById('sg-app') || document.body).appendChild(el);
+  }
+  if (state === 'saving') {
+    el.textContent = 'Saving\u2026';
+    el.style.background = '#fff7ed'; el.style.color = '#9a3412'; el.style.border = '1px solid #fed7aa';
+  } else {
+    el.textContent = 'Saved';
+    el.style.background = '#f0fdf4'; el.style.color = '#166534'; el.style.border = '1px solid #bbf7d0';
+  }
+  el.style.opacity = '1';
+}
+
+// Background write: the UI has already updated optimistically, so we DON'T block
+// the page with the full-screen loader. A small corner pill shows progress; a
+// failure still surfaces via toast. Sync/persistence logic is unchanged.
 function queuePush(action, payload) {
-  _inflight++; sgShowLoader();
+  _inflight++; sgSavePill('saving');
   api(action, payload).catch(function (e) { try { toast((e && e.message) || 'Save failed'); } catch (x) {} })
-    .then(function () { _inflight--; if (_inflight <= 0) { _inflight = 0; sgHideLoader(); } });
+    .then(function () {
+      _inflight--;
+      if (_inflight <= 0) { _inflight = 0; sgSavePill('saved'); setTimeout(function () { sgSavePill('hide'); }, 1200); }
+    });
 }
 function diffById(saveAction, delAction, cur, prev) {
   cur = cur || []; prev = prev || [];
