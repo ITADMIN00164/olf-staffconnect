@@ -36,6 +36,8 @@
     ==================================================== */
     const STATE_LABELS = {
         MH: "Maharashtra",
+        MH_ATC: "Maharashtra - ATC",
+        MH_MC: "Maharashtra - MC",
         MP: "Madhya Pradesh",
         CG: "Chhattisgarh",
         BR: "Bihar"
@@ -50,6 +52,13 @@
             "Nandurbar", "Nashik", "Palghar", "Parbhani", "Pune", "Raigad",
             "Ratnagiri", "Sangli", "Satara", "Sindhudurg", "Solapur", "Thane",
             "Wardha", "Washim", "Yavatmal"
+        ],
+        MH_ATC: [
+            "Nagpur - ATC"
+        ],
+        MH_MC: [
+            "Amravati - MC", "Pune MC", "PCMC",
+            "Sangli - MC", "Nagpur - MC", "Nashik - MC"
         ],
         MP: [
             "Agar Malwa", "Alirajpur", "Anuppur", "Ashoknagar", "Balaghat",
