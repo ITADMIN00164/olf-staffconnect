@@ -308,6 +308,26 @@ function roleBadge(role) {
 }
 function pctColor(p) { return p>=80?'#3F6B2A':p>=50?'#C07C0A':'#C0392B'; }
 function scoreClass(sc,mx) { const r=mx>0?sc/mx:0; return r>=.8?'score-hi':r>=.5?'score-mid':'score-lo'; }
+// Render the Sheet B link callout as "🔗 Sheet B Link - Click Here". "Click Here" is the link when the
+// value is a URL — a value without a scheme (e.g. "docs.google.com/…") is treated as https; a non-http
+// scheme (javascript:, data:, …) is not linked and the raw value is shown instead so it can't inject.
+function sgSheetBLinkHtml(raw) {
+  const v = (raw==null?'':String(raw)).trim();
+  if (!v) return '';
+  const hasScheme = /^[a-z][a-z0-9+.\-]*:/i.test(v);
+  const clickable = !hasScheme || /^https?:\/\//i.test(v);
+  const href = hasScheme ? v : ('https://' + v);
+  const linkPart = clickable
+    ? `<a href="${esc(href)}" target="_blank" rel="noopener" style="color:var(--blue);font-weight:600">Click Here</a>`
+    : `<span style="word-break:break-all">${esc(v)}</span>`;
+  return `<p style="font-size:12px;color:var(--text2);margin:0;padding:8px 12px;background:var(--surface2);border-radius:var(--radius);border-left:3px solid var(--blue)">🔗 <span style="font-weight:600;color:var(--text)">Sheet B Link</span> - ${linkPart}</p>`;
+}
+// Render the overall-remark callout as "📝 Overall Performance - <what the user entered>".
+function sgOverallHtml(remarks) {
+  const v = (remarks==null?'':String(remarks)).trim();
+  if (!v) return '';
+  return `<p style="font-size:12px;color:var(--text2);margin:0;padding:8px 12px;background:var(--surface2);border-radius:var(--radius);border-left:3px solid var(--brand)">📝 <span style="font-weight:600;color:var(--text)">Overall Performance</span> - ${esc(v)}</p>`;
+}
 function formatDate(d) { if(!d) return '—'; const dt=new Date(d); if(isNaN(dt)) return d; const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return `${String(dt.getDate()).padStart(2,'0')}-${mo[dt.getMonth()]}-${String(dt.getFullYear()).slice(-2)}`; }
 function esc(s) { return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 // safe to embed inside a single-quoted JS string literal that itself sits inside an HTML onclick="..." attribute
@@ -1394,8 +1414,11 @@ function renderReviews() {
         </tr>`;
     });
 
+    const overallHtml = sgOverallHtml(r.remarks);
+    const sheetBHtml = sgSheetBLinkHtml(r.sheetBLink);
     const summaryHtml = `<div style="margin-bottom:18px">
       <div class="review-section-hd">Summary of Review — ${monthYearLabel(r.year,r.month)} <span style="font-weight:400;font-size:11px;color:var(--text3);text-transform:none;letter-spacing:0">— click a SMART Goal to view its details</span></div>
+      ${(overallHtml || sheetBHtml) ? `<div style="margin:10px 0 12px;display:flex;flex-direction:column;gap:8px">${overallHtml}${sheetBHtml}</div>` : ''}
       <div class="tbl-wrap"><table class="tbl">
         <thead><tr>
           <th style="text-align:center">#</th><th>SMART Goal</th><th>Description</th>
@@ -1434,10 +1457,6 @@ function renderReviews() {
       </div>
       <div class="card-body" style="display:none">
         ${summaryHtml}
-        ${(r.remarks || (r.sheetBLink && String(r.sheetBLink).trim())) ? `<div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
-          ${r.remarks ? `<p style="font-size:12px;color:var(--text2);margin:0;padding:8px 12px;background:var(--surface2);border-radius:var(--radius);border-left:3px solid var(--brand)">📝 ${esc(r.remarks)}</p>` : ''}
-          ${(r.sheetBLink && String(r.sheetBLink).trim()) ? `<p style="font-size:12px;color:var(--text2);margin:0;padding:8px 12px;background:var(--surface2);border-radius:var(--radius);border-left:3px solid var(--blue)">🔗 ${/^https?:\/\//i.test(r.sheetBLink.trim()) ? `<a href="${esc(r.sheetBLink.trim())}" target="_blank" rel="noopener" style="color:var(--blue);font-weight:600">Sheet B</a>` : `<span>${esc(r.sheetBLink.trim())}</span>`}</p>` : ''}
-        </div>` : ''}
       </div>
     </div>`;
   });
