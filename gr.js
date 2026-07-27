@@ -42,6 +42,10 @@
         CG: "Chhattisgarh",
         BR: "Bihar"
     };
+    // Compact labels for the State column (saves horizontal space). Full name shows on hover.
+    const STATE_SHORT = { MH: "MH", MH_ATC: "MH-ATC", MH_MC: "MH-MC", MP: "MP", CG: "CG", BR: "BR" };
+    function stateShort(code) { return STATE_SHORT[code] || code || "—"; }
+    function stateCell(code) { return `<span title="${escHtml(STATE_LABELS[code] || code || "")}">${escHtml(stateShort(code))}</span>`; }
 
     const STATE_DISTRICTS = {
         MH: [
@@ -378,6 +382,12 @@
 
         const submitBtn = document.getElementById("grUploadBtn");
         if (submitBtn) submitBtn.addEventListener("click", (e) => { e.preventDefault(); submitUpload(); });
+
+        // Description popup: close on Escape (the modal itself is created lazily in JS by openDescModal).
+        document.addEventListener("keydown", (e) => {
+            const o = document.getElementById("grDescModalOverlay");
+            if (e.key === "Escape" && o && o.classList.contains("open")) closeDescModal();
+        });
     }
 
     /* ====================================================
@@ -763,7 +773,7 @@
         } else if (r._sync === "failed") {
             fileCell = `<span class="gr-sync gr-sync--fail" title="${escHtml(r._syncError)}">⚠ Failed</span>`;
         } else if (r.fileUrl) {
-            fileCell = `<a href="${escHtml(r.fileUrl)}" target="_blank" rel="noopener" class="gr-file-link">📄 Open</a>`;
+            fileCell = `<a href="${escHtml(r.fileUrl)}" target="_blank" rel="noopener" class="gr-file-link gr-file-icon" title="Open file">📄</a>`;
         } else {
             fileCell = "—";
         }
@@ -786,7 +796,7 @@
             <td class="gr-td-title">${escHtml(r.title)}</td>
             <td>${fmtDate(r.docDate)}</td>
             <td>${escHtml(r.district)}</td>
-            <td>${escHtml(STATE_LABELS[r.state] || r.state)}</td>
+            <td>${stateCell(r.state)}</td>
             <td>${fileCell}</td>
             <td>${statusChip(r.status)}</td>
             <td><div class="gr-ts">${fmtDateTime(r.uploadTimestamp)}</div></td>
@@ -909,9 +919,9 @@
 
     function statusChip(status) {
         const s = (status || "Pending").toLowerCase();
-        if (s === "validated") return `<span class="gr-chip gr-chip--ok">✔ Validated</span>`;
-        if (s === "rejected") return `<span class="gr-chip gr-chip--rej">✕ Rejected</span>`;
-        return `<span class="gr-chip gr-chip--pend">● Pending</span>`;
+        if (s === "validated") return `<span class="gr-chip gr-chip--ok gr-chip--icon" title="Validated">✔</span>`;
+        if (s === "rejected") return `<span class="gr-chip gr-chip--rej gr-chip--icon" title="Rejected">✕</span>`;
+        return `<span class="gr-chip gr-chip--pend gr-chip--icon" title="Pending">●</span>`;
     }
 
     function detailedRowHtml(r, sr) {
@@ -925,18 +935,18 @@
             actionCell = `<span class="gr-muted">View only</span>`;
         } else if (s === "validated") {
             // Locked forever — no buttons at all.
-            actionCell = `<span class="gr-locked">🔒 Locked</span>`;
+            actionCell = `<span class="gr-locked gr-locked--icon" title="Locked">🔒</span>`;
         } else if (s === "rejected") {
             // A rejected record can still be validated later.
             actionCell = `
                 <div class="gr-row-actions">
-                    <button class="gr-btn-ok" data-act="validate" data-id="${escHtml(r.recordId)}">Validate</button>
+                    <button class="gr-btn-ok gr-btn-icon" data-act="validate" data-id="${escHtml(r.recordId)}" title="Validate">✔</button>
                 </div>`;
         } else {
             actionCell = `
                 <div class="gr-row-actions">
-                    <button class="gr-btn-ok" data-act="validate" data-id="${escHtml(r.recordId)}">Validate</button>
-                    <button class="gr-btn-rej" data-act="reject" data-id="${escHtml(r.recordId)}">Reject</button>
+                    <button class="gr-btn-ok gr-btn-icon" data-act="validate" data-id="${escHtml(r.recordId)}" title="Validate">✔</button>
+                    <button class="gr-btn-rej gr-btn-icon" data-act="reject" data-id="${escHtml(r.recordId)}" title="Reject">✕</button>
                 </div>`;
         }
 
@@ -944,7 +954,7 @@
         if (r._sync === "uploading") fileCell = `<span class="gr-sync gr-sync--busy">⏳</span>`;
         else if (r._sync === "failed") fileCell = `<span class="gr-sync gr-sync--fail">⚠</span>`;
         else fileCell = r.fileUrl
-            ? `<a href="${escHtml(r.fileUrl)}" target="_blank" rel="noopener" class="gr-file-link">📄 Open</a>`
+            ? `<a href="${escHtml(r.fileUrl)}" target="_blank" rel="noopener" class="gr-file-link gr-file-icon" title="Open file">📄</a>`
             : "—";
 
         return `
@@ -952,10 +962,10 @@
             <td>${sr}</td>
             <td><span class="gr-type gr-type--${(r.type || "").toLowerCase() === "gr" ? "gr" : "circ"}">${escHtml(r.type || "")}</span></td>
             <td class="gr-td-title">${escHtml(r.title)}</td>
-            <td class="gr-td-desc" title="${escHtml(r.description)}">${escHtml(r.description || "—")}</td>
+            <td class="gr-td-icon">${r.description ? `<button type="button" class="gr-desc-btn" data-act="desc" data-desc="${escHtml(r.description)}" title="View description">📄</button>` : `<span class="gr-muted">—</span>`}</td>
             <td>${fmtDate(r.docDate)}</td>
             <td>${escHtml(r.district)}</td>
-            <td>${escHtml(STATE_LABELS[r.state] || r.state)}</td>
+            <td>${stateCell(r.state)}</td>
             <td>${fileCell}</td>
             <td>
                 <div class="gr-uploaded">${escHtml(r.uploadedBy || "—")}</div>
@@ -972,8 +982,46 @@
 
     function wireRowActions() {
         document.querySelectorAll("#grDetailedBody button[data-act]").forEach(btn => {
-            btn.addEventListener("click", () => handleValidation(btn.dataset.act, btn.dataset.id));
+            btn.addEventListener("click", () => {
+                if (btn.dataset.act === "desc") {
+                    openDescModal(btn.dataset.desc || "");
+                } else {
+                    handleValidation(btn.dataset.act, btn.dataset.id);
+                }
+            });
         });
+    }
+
+    // Description popup. The modal is created in JS the first time it's needed, so it works even if
+    // the page HTML wasn't refreshed — it only relies on the pre-existing .gr-modal-* styles.
+    function ensureDescModal() {
+        let overlay = document.getElementById("grDescModalOverlay");
+        if (overlay) return overlay;
+        overlay = document.createElement("div");
+        overlay.className = "gr-modal-overlay";
+        overlay.id = "grDescModalOverlay";
+        // Static markup only (no user data) — the description text is injected later via textContent.
+        overlay.innerHTML =
+            '<div class="gr-modal-box" role="dialog" aria-modal="true" style="width:560px">' +
+            '<div class="gr-modal-header"><div><h2>Description</h2></div>' +
+            '<button class="gr-modal-close" id="grDescCloseX" type="button">\u2715</button></div>' +
+            '<div class="gr-modal-body"><p id="grDescText" style="font-size:14px;line-height:1.6;color:#1f2937;white-space:pre-wrap;word-break:break-word;margin:0;"></p></div>' +
+            '</div>';
+        (document.getElementById("grPage") || document.body).appendChild(overlay);
+        overlay.querySelector("#grDescCloseX").addEventListener("click", closeDescModal);
+        overlay.addEventListener("click", (e) => { if (e.target === overlay) closeDescModal(); });
+        return overlay;
+    }
+    // content set via textContent (never innerHTML) so it's safe for any text.
+    function openDescModal(text) {
+        const overlay = ensureDescModal();
+        const body = overlay.querySelector("#grDescText");
+        if (body) body.textContent = (text == null || text === "") ? "—" : text;
+        overlay.classList.add("open");
+    }
+    function closeDescModal() {
+        const overlay = document.getElementById("grDescModalOverlay");
+        if (overlay) overlay.classList.remove("open");
     }
 
     /* ====================================================
@@ -1087,22 +1135,27 @@
             GR: { up: 0, val: 0 },
             Circular: { up: 0, val: 0 }
         };
-        let validatorValCount = 0;
+        let totalValidatedAll = 0;   // validated by anyone — drives Pending / rejected
+        let validatorValCount = 0;   // validated by the selected validator only
         rows.forEach(r => {
             const key = (r.type || "").toLowerCase() === "gr" ? "GR" : "Circular";
             stat[key].up += 1;
             if ((r.status || "").toLowerCase() === "validated") {
-                stat[key].val += 1;
-                if (validator && String(r.validatedBy || "").toLowerCase() === validator) validatorValCount += 1;
+                totalValidatedAll += 1;
+                const matchesValidator = String(r.validatedBy || "").toLowerCase() === validator;
+                // The green "Validated" bars follow the validator filter: with a validator
+                // selected they show only that person's validations; with none, all of them.
+                if (!validator || matchesValidator) stat[key].val += 1;
+                if (validator && matchesValidator) validatorValCount += 1;
             }
         });
 
         const totalUp = stat.GR.up + stat.Circular.up;
-        const totalVal = stat.GR.val + stat.Circular.val;
+        const totalVal = stat.GR.val + stat.Circular.val; // = validatorValCount when a validator is picked
         // Total uploaded & Pending/rejected depend only on State / District /
-        // Month — never on which validator is selected. Only the "Validated"
-        // number changes when a specific validator is picked.
-        const pendingOrRejected = totalUp - totalVal;
+        // Month — never on which validator is selected. Pending / rejected is
+        // simply what nobody has validated yet, so it uses the all-validator total.
+        const pendingOrRejected = totalUp - totalValidatedAll;
 
         // Cards: when a specific validator is chosen, swap "Total validated"
         // for that validator's own count. Pending/rejected stays the same
@@ -1126,7 +1179,7 @@
                 ${barChartHtml(stat)}
                 <div class="gr-legend">
                     <span><i class="gr-swatch" style="background:#4f8ef7"></i>Uploaded</span>
-                    <span><i class="gr-swatch" style="background:#16a34a"></i>Validated</span>
+                    <span><i class="gr-swatch" style="background:#16a34a"></i>Validated${validator ? ` by ${escHtml(validator)}` : ""}</span>
                 </div>
             </div>`;
     }
