@@ -239,7 +239,45 @@ function canEditMemberScore(r) {
   return currentUser.role === ROLES.ADMIN || (currentUser.role === ROLES.MEMBER && r.member === currentUser.name);
 }
 function canEditMgrScore(r) {
-  return currentUser.role === ROLES.ADMIN || (currentUser.role === ROLES.DEPT_HEAD && r.dept === currentUser.dept);
+  if (currentUser.role === ROLES.ADMIN) return true;
+  if (currentUser.role === ROLES.DEPT_HEAD && r && r.dept === currentUser.dept) return true;
+  if (r && isManagerOf(r.member, r.dept)) return true; // assigned reporting manager
+  return false;
+}
+
+// ── Manager relationship (assigned per-member, not a role) ──────────
+// The logged-in user's email lives in the module var currentEmail (set by
+// resolveUser at login). A person is the 'manager' of a member iff that
+// member's managerEmail matches currentEmail. This is a RELATIONSHIP layered
+// on top of whatever Role the person holds; it never replaces Role.
+function _lc(x) { return String(x == null ? '' : x).trim().toLowerCase(); }
+function _myEmail() { return _lc(currentEmail); }
+function memberRecordByName(name, dept) {
+  var ms = (DB.settings && DB.settings.members) || [];
+  var i;
+  for (i = 0; i < ms.length; i++) { if (ms[i].name === name && (!dept || ms[i].dept === dept)) return ms[i]; }
+  for (i = 0; i < ms.length; i++) { if (ms[i].name === name) return ms[i]; }
+  return null;
+}
+function isManagerOf(memberName, dept) {
+  var me = _myEmail(); if (!me || !memberName) return false;
+  var m = memberRecordByName(memberName, dept);
+  return !!(m && _lc(m.managerEmail) === me);
+}
+function myReportees() {
+  var me = _myEmail(); if (!me) return [];
+  return ((DB.settings && DB.settings.members) || []).filter(function (m) { return _lc(m.managerEmail) === me; });
+}
+function amIManager() { return myReportees().length > 0; }
+// A review is visible if: admin (all) · dept head (own dept) · it's your own ·
+// or you are the member's assigned reporting manager (works across departments).
+function canViewReview(r) {
+  if (!r) return false;
+  if (currentUser.role === ROLES.ADMIN) return true;
+  if (currentUser.role === ROLES.DEPT_HEAD && r.dept === currentUser.dept) return true;
+  if (r.member === currentUser.name && currentUser.name) return true;
+  if (isManagerOf(r.member, r.dept)) return true;
+  return false;
 }
 
 function renderUserBadge() {
@@ -276,6 +314,8 @@ function renderRoleSwitcher() {
 }
 function switchRole(idx) {
   const r = window._roleSwitcherRows[idx];
+  var _mrec = memberRecordByName(r.name, r.dept);
+  currentEmail = (_mrec && _mrec.email) ? _mrec.email : '';
   currentUser = {name:r.name, dept:r.dept, role:r.role};
   currentDept = r.role === 'dept_head' ? r.dept : '';
   closeModal('role-switcher-modal');
@@ -404,6 +444,20 @@ function scopedMemberNames(dept) {
   return membersInDept(dept).map(function(m){return m.name;});
 }
 
+// Reviews-only member scope: like scopedMemberNames, but ALSO includes the
+// user themselves and everyone who reports to them (their reportees), even
+// across departments. Used only by the Reviews tab so a Manager can pick a
+// reportee to view/score. Does NOT widen Monthly Plan / SMART Goals scope.
+function reviewScopedMemberNames(dept) {
+  if (currentUser.role === ROLES.ADMIN) return membersInDept(dept).map(function(m){return m.name;});
+  var set = {}, order = [];
+  function add(n){ if (n && !set[n]) { set[n] = 1; order.push(n); } }
+  if (currentUser.role === ROLES.DEPT_HEAD) membersInDept(currentUser.dept).forEach(function(m){ add(m.name); });
+  add(currentUser.name);
+  myReportees().forEach(function(m){ add(m.name); });
+  return order;
+}
+
 // Monthly Plan: SMART Goal + Member dropdowns follow the selected department.
 // The plan is view-open — EVERY role (members included) can pick any member of
 // the selected department and view their plan. A member viewing a teammate sees
@@ -435,14 +489,16 @@ function applyFilterDefaults() {
   });
   if (!isAdmin && myDept) {
     if (!currentDept) currentDept = myDept;
+    var _isMgr = amIManager();
     ['global-dept','mp-dept','sg-dept-filter','rv-dept','dash-dept-filter'].forEach(function(id){
+      if (id === 'rv-dept' && _isMgr) return; // manager: keep review dept open for cross-dept reportees
       const el = document.getElementById(id); if (el && !el.value) el.value = myDept;
     });
   }
   // Dependent, dept-scoped dropdowns
   if (typeof setSgMemberOptions === 'function') setSgMemberOptions();
   const rvDept = (document.getElementById('rv-dept') || {}).value || '';
-  if (document.getElementById('rv-member')) populateSelect('rv-member', scopedMemberNames(rvDept), 'Select Member…');
+  if (document.getElementById('rv-member')) populateSelect('rv-member', reviewScopedMemberNames(rvDept), 'Select Member…');
   refreshMpDeptScopedDropdowns();
 }
 
@@ -463,10 +519,11 @@ function populateGoalMemberDropdown() {
 }
 
 function populateReviewMemberDropdown() {
+  // reviews-scoped so a Manager editing a reportee's review sees a valid option
   const dept = document.getElementById('rf-dept').value;
   const el = document.getElementById('rf-member');
   const curVal = el.value;
-  const filtered = scopedMemberNames(dept);
+  const filtered = reviewScopedMemberNames(dept);
   el.innerHTML = `<option value="">Select…</option>` + filtered.map(n => `<option value="${esc(n)}"${n===curVal?' selected':''}>${esc(n)}</option>`).join('');
 }
 
@@ -1288,45 +1345,47 @@ function deleteTask(id) {
 // ── REVIEWS ──
 function onRvDeptChange() {
   const dept = document.getElementById('rv-dept').value;
-  populateSelect('rv-member', scopedMemberNames(dept), 'Select Member…');
+  populateSelect('rv-member', reviewScopedMemberNames(dept), 'Select Member…');
   document.getElementById('rv-member').value = '';
   renderReviews();
 }
 
 function renderReviews() {
   const addBtn = document.getElementById('rv-add-btn');
-  if (currentUser.role === ROLES.MEMBER) {
-    addBtn.textContent = '+ Submit Self Review';
-    document.getElementById('rv-dept').style.display = 'none';
-    document.getElementById('rv-member').style.display = 'none';
-  } else {
-    addBtn.textContent = '+ New Review';
-    document.getElementById('rv-dept').style.display = '';
-    document.getElementById('rv-member').style.display = '';
-  }
+  // Plain Member (no reportees): self-review, filters hidden. Anyone who can
+  // view others' reviews (Admin, Dept Head, or a Manager with reportees) gets
+  // the Department/Member filters to choose whose review to open.
+  const viewOthers = (currentUser.role === ROLES.ADMIN || currentUser.role === ROLES.DEPT_HEAD || amIManager());
+  addBtn.textContent = (currentUser.role === ROLES.MEMBER) ? '+ Submit Self Review' : '+ New Review';
+  document.getElementById('rv-dept').style.display = viewOthers ? '' : 'none';
+  document.getElementById('rv-member').style.display = viewOthers ? '' : 'none';
 
   const yearF = document.getElementById('rv-year').value;
   const monthF = document.getElementById('rv-month').value;
-  const deptF = document.getElementById('rv-dept').value || currentDept;
+  // A Manager who is a plain Member has no home-dept lock — folding currentDept
+  // in would hide a reportee who sits in another department.
+  // Any manager (a plain member OR a dept head who also manages someone in
+  // another department) must not have the review list locked to a home dept.
+  const mgrView = amIManager();
+  const deptF = document.getElementById('rv-dept').value || (mgrView ? '' : currentDept);
   const memberF = document.getElementById('rv-member').value;
 
   // Default view is blank — Dept Head / Admin must pick a Member (via filters) before anything shows.
   // Members viewing their own reviews (dept/member filters hidden) see their data immediately.
-  if (currentUser.role !== ROLES.MEMBER && !memberF) {
+  if (viewOthers && !memberF) {
     document.getElementById('review-list').innerHTML = `<div class="empty"><div class="empty-icon">🔎</div><p>Select a Member from the filters above to view their review.</p></div>`;
     return;
   }
 
-  let reviews = DB.reviews;
-  if (currentUser.role === ROLES.MEMBER) reviews = reviews.filter(r => r.member === currentUser.name);
-  else if (currentUser.role === ROLES.DEPT_HEAD) reviews = reviews.filter(r => r.dept === currentUser.dept);
+  // Visibility = own + dept-head's own dept + reportees (any dept) + admin(all).
+  let reviews = DB.reviews.filter(canViewReview);
   if (yearF) reviews = reviews.filter(r => r.year === yearF);
   if (monthF) reviews = reviews.filter(r => r.month === monthF);
   if (deptF) reviews = reviews.filter(r => r.dept === deptF);
   if (memberF) reviews = reviews.filter(r => r.member === memberF);
 
   if (!reviews.length) {
-    document.getElementById('review-list').innerHTML = `<div class="empty"><div class="empty-icon">📊</div><p>${currentUser.role===ROLES.MEMBER ? 'You have no reviews yet. Click "+ Submit Self Review" to submit yours.' : 'No reviews found for this selection.'}</p></div>`;
+    document.getElementById('review-list').innerHTML = `<div class="empty"><div class="empty-icon">📊</div><p>${!viewOthers ? 'You have no reviews yet. Click "+ Submit Self Review" to submit yours.' : 'No reviews found for this selection.'}</p></div>`;
     return;
   }
 
@@ -1535,8 +1594,12 @@ function loadGoalsForReview() {
   // pull existing saved values, if editing
   const existing = editingReviewId ? DB.reviews.find(x=>x.id===editingReviewId) : null;
   const isMember = currentUser.role === ROLES.MEMBER;
-  const memberDisabled = !(currentUser.role===ROLES.ADMIN || (isMember)) ? 'disabled' : '';
-  const mgrDisabled = !(currentUser.role===ROLES.ADMIN || currentUser.role===ROLES.DEPT_HEAD) ? 'disabled' : '';
+  // Enable each score column by actual permission on THIS review's member:
+  //  Member score  -> the member themselves, or Admin.
+  //  Manager score -> Admin, that dept's Dept Head, or the assigned Manager.
+  const _scopeRef = { member: member, dept: dept };
+  const memberDisabled = canEditMemberScore(_scopeRef) ? '' : 'disabled';
+  const mgrDisabled   = canEditMgrScore(_scopeRef)   ? '' : 'disabled';
 
   // group exactly like the SMART Goals tab: one mini-section per SMART Goal (header = goal + weightage bold)
   const groups = groupByGoal(goalRows);
@@ -1741,6 +1804,7 @@ function renderSettings() {
           <div style="font-size:11.5px;color:var(--text3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
             ${esc(m.dept || '— No Dept —')} · ${esc(m.email || 'no email')}
           </div>
+          <div style="font-size:11px;color:var(--text3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${m.managerName ? ('Mgr: ' + esc(m.managerName)) : 'Mgr: —'}</div>
         </div>
         <button class="btn btn-secondary btn-sm" title="Edit member" onclick="openEditMemberModal(${i})">✎ Edit</button>
         <button class="btn btn-danger btn-sm" title="Delete member permanently" onclick="removeMember(${i})">🗑</button>
@@ -1802,6 +1866,34 @@ function addSetting(key, label) {
 
 // ── ADD / EDIT MEMBER MODAL ──
 var editingMemberId = null;
+// Manager picker: choose the reporting manager from existing members + admins
+// so the stored email is always a real, loginable account (a typo'd email
+// would silently break that manager's review access).
+function populateManagerDropdown(selectedEmail, selectedName, excludeName) {
+  var el = document.getElementById('am-mgr'); if (!el) return;
+  selectedEmail = selectedEmail || ''; selectedName = selectedName || '';
+  var lcSel = selectedEmail.toLowerCase();
+  var people = [];
+  ((DB.settings && DB.settings.members) || []).forEach(function (m) { if (m.email && m.name !== excludeName) people.push({ name: m.name, email: m.email }); });
+  ((DB.settings && DB.settings.admins) || []).forEach(function (a) { if (a.email) people.push({ name: a.name || a.email, email: a.email }); });
+  var seen = {}, opts = '<option value="">\u2014 None \u2014</option>', matched = false;
+  people.forEach(function (p) {
+    var key = (p.email || '').toLowerCase(); if (!key || seen[key]) return; seen[key] = 1;
+    var sel = (key === lcSel) ? ' selected' : ''; if (sel) matched = true;
+    opts += '<option value="' + esc(p.email) + '" data-name="' + esc(p.name) + '"' + sel + '>' + esc(p.name) + ' \u2014 ' + esc(p.email) + '</option>';
+  });
+  if (selectedEmail && !matched) {
+    opts += '<option value="' + esc(selectedEmail) + '" data-name="' + esc(selectedName) + '" selected>' + esc(selectedName || selectedEmail) + ' \u2014 ' + esc(selectedEmail) + ' (not in list)</option>';
+  }
+  el.innerHTML = opts;
+  syncMgrEmail();
+}
+function syncMgrEmail() {
+  var el = document.getElementById('am-mgr');
+  var box = document.getElementById('am-mgr-email');
+  if (el && box) box.value = el.value || '';
+}
+
 function openAddMemberModal() {
   editingMemberId = null;
   document.getElementById('am-modal-title').textContent = 'Add Team Member';
@@ -1810,6 +1902,8 @@ function openAddMemberModal() {
   document.getElementById('am-email').value = '';
   populateSelect('am-dept', DB.settings.depts, 'Select…');
   document.getElementById('am-dept').value = currentDept || '';
+  populateManagerDropdown('', '', '');
+  document.getElementById('am-mgr-email').value = '';
   openModal('add-member-modal');
 }
 function openEditMemberModal(i) {
@@ -1822,6 +1916,8 @@ function openEditMemberModal(i) {
   document.getElementById('am-name').value = m.name || '';
   document.getElementById('am-role').value = m.role || 'member';
   document.getElementById('am-email').value = m.email || '';
+  populateManagerDropdown(m.managerEmail || '', m.managerName || '', m.name || '');
+  document.getElementById('am-mgr-email').value = m.managerEmail || '';
   openModal('add-member-modal');
 }
 
@@ -1830,6 +1926,11 @@ function saveNewMember() {
   const name = document.getElementById('am-name').value.trim();
   const role = document.getElementById('am-role').value;
   const email = document.getElementById('am-email').value.trim();
+  const mgrSel = document.getElementById('am-mgr');
+  const mgrEmail = mgrSel ? (mgrSel.value || '') : '';
+  const mgrOpt = mgrSel && mgrSel.selectedOptions && mgrSel.selectedOptions[0];
+  const managerName = mgrOpt ? (mgrOpt.getAttribute('data-name') || '') : '';
+  if (mgrEmail && email && mgrEmail.toLowerCase() === email.toLowerCase()) { toast('A member cannot be their own manager'); return; }
   if (!dept) { toast('Department is required'); return; }
   if (!name) { toast('Member name is required'); return; }
   if (editingMemberId) {
@@ -1837,7 +1938,7 @@ function saveNewMember() {
     if (idx < 0) { editingMemberId = null; toast('Member not found'); return; }
     const clash = DB.settings.members.some(function (x, j) { return j !== idx && x.name === name; });
     if (clash) { toast('Another member already has that name'); return; }
-    DB.settings.members[idx] = { id: editingMemberId, name, dept, role, email };
+    DB.settings.members[idx] = { id: editingMemberId, name, dept, role, email, managerName, managerEmail: mgrEmail };
     editingMemberId = null;
     save(); populateAllSelects(); renderSettings(); renderSidebar();
     closeModal('add-member-modal');
@@ -1845,7 +1946,7 @@ function saveNewMember() {
     return;
   }
   if (memberNames().includes(name)) { toast('Member already exists'); return; }
-  DB.settings.members.push({id:uid(), name, dept, role, email});
+  DB.settings.members.push({id:uid(), name, dept, role, email, managerName, managerEmail: mgrEmail});
   save(); populateAllSelects(); renderSettings(); renderSidebar();
   closeModal('add-member-modal');
   toast(`${name} added`);
@@ -2073,6 +2174,9 @@ var syncEnabled = false;
 var mounted = false;
 var _shadow = null;
 var _inflight = 0;
+var _flushing = false;   // an outbox flush pass is currently running
+var _flushTimer = null;  // pending scheduled retry
+var _outbox = null;      // in-memory mirror of the durable localStorage outbox
 
 function sgShowLoader() { var o = document.getElementById('sg-loader'); if (o) o.classList.add('open'); }
 function sgHideLoader() { var o = document.getElementById('sg-loader'); if (o) o.classList.remove('open'); }
@@ -2148,10 +2252,14 @@ function loadSnapshot() {
 }
 
 function loadAll(fresh) {
-  return api('getAll', fresh ? { fresh: 1 } : null).then(function (data) {
+  // Deliver anything still queued (from this or a previous session) BEFORE
+  // pulling server truth, so a refresh can't race past an unsaved change.
+  return flushOutbox().then(function () {
+    return api('getAll', fresh ? { fresh: 1 } : null);
+  }).then(function (data) {
     data = data || {};
     var s = data.settings || {};
-    DB = {
+    var next = {
       settings: {
         depts:      s.depts || [],
         members:    s.members || [],
@@ -2164,10 +2272,25 @@ function loadAll(fresh) {
       reviews: data.reviews || [],
       uiPrefs: loadUiPrefs()
     };
+    // SAFETY: an empty server read while we already hold data locally is
+    // treated as a transient glitch — keep the local data rather than wipe it.
+    var serverEmpty = !next.settings.members.length && !next.settings.depts.length &&
+                      !next.goals.length && !next.tasks.length && !next.reviews.length;
+    var haveLocal = DB && ((DB.settings && DB.settings.members && DB.settings.members.length) ||
+                    (DB.goals && DB.goals.length) || (DB.tasks && DB.tasks.length) || (DB.reviews && DB.reviews.length));
+    if (serverEmpty && haveLocal) {
+      console.warn('[SmartGoals] empty server read ignored to protect local data');
+      syncEnabled = true; loadedOnce = true; updateUnsavedBanner();
+      return;
+    }
+    // Overlay still-pending writes so a refresh never hides an unsaved edit.
+    applyOutboxTo(next);
+    DB = next;
     _shadow = deepCopy(DB);
     syncEnabled = true;
     loadedOnce = true;
     saveSnapshot();
+    updateUnsavedBanner();
   });
 }
 
@@ -2201,6 +2324,114 @@ function sgSavePill(state) {
 // Background write: the UI has already updated optimistically, so we DON'T block
 // the page with the full-screen loader. A small corner pill shows progress; a
 // failure still surfaces via toast. Sync/persistence logic is unchanged.
+// ════════════════════════════════════════════════════════════════════
+// DURABLE OUTBOX  —  guarantees no saved change is ever silently dropped.
+//
+// Every change becomes an entry in a per-user localStorage queue, keyed by
+// the record it targets (so the newest edit to a record supersedes older
+// queued ones). Entries are retried until the server confirms them, survive
+// page reloads, and are re-applied on top of any server refresh so a reload
+// never hides an unsaved edit. This is what fixes 'network error -> progress
+// not saved': the write simply stays queued and keeps retrying, with a
+// visible banner, until it lands.
+// ════════════════════════════════════════════════════════════════════
+function _outboxKey() { var u = (window.SMART_GOALS_USER && window.SMART_GOALS_USER.email) || 'anon'; return 'sg_outbox_' + u; }
+function _outboxLoad() { try { var v = JSON.parse(localStorage.getItem(_outboxKey()) || 'null'); return (v && typeof v === 'object') ? v : {}; } catch (e) { return {}; } }
+function _outboxSave(m) { try { localStorage.setItem(_outboxKey(), JSON.stringify(m)); } catch (e) { /* quota — keep in-memory copy */ } }
+function outbox() { if (!_outbox) _outbox = _outboxLoad(); return _outbox; }
+function outboxCount() { return Object.keys(outbox()).length; }
+function outboxAdd(key, action, payload) { var m = outbox(); m[key] = { action: action, payload: payload, ts: Date.now(), tries: 0 }; _outboxSave(m); }
+
+// Persistent, tappable 'not yet saved' indicator so a failed write is never
+// mistaken for a successful one. Hidden automatically once the queue drains.
+function updateUnsavedBanner() {
+  var n = outboxCount();
+  var id = 'sg-unsaved-banner';
+  var el = document.getElementById(id);
+  if (n === 0) { if (el) el.style.display = 'none'; return; }
+  if (!el) {
+    el = document.createElement('div'); el.id = id;
+    el.style.cssText = 'position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:10000;'
+      + 'padding:8px 16px;border-radius:20px;font-size:12px;font-weight:600;font-family:inherit;'
+      + 'background:#fff7ed;color:#9a3412;border:1px solid #fed7aa;box-shadow:0 4px 14px rgba(0,0,0,.15);cursor:pointer;';
+    el.title = 'Click to retry now';
+    el.onclick = function () { flushOutbox(); };
+    (document.getElementById('sg-app') || document.body).appendChild(el);
+  }
+  el.textContent = '\u26A0 ' + n + ' change' + (n > 1 ? 's' : '') + ' not yet saved \u2014 retrying\u2026 (tap to retry)';
+  el.style.display = '';
+}
+
+// Attempt every queued write once per pass (sequentially, to stay gentle on
+// the Apps Script backend). Successes are removed; failures stay and trigger
+// a backed-off retry. A single failing entry never blocks the others.
+function flushOutbox() {
+  if (_flushing) return Promise.resolve();
+  var m = outbox(); var keys = Object.keys(m);
+  if (!keys.length) { updateUnsavedBanner(); return Promise.resolve(); }
+  _flushing = true; sgSavePill('saving'); updateUnsavedBanner();
+  var idx = 0, anyFail = false;
+  return new Promise(function (resolve) {
+    function done() {
+      _flushing = false;
+      if (outboxCount() === 0) { sgSavePill('saved'); setTimeout(function () { sgSavePill('hide'); }, 1200); }
+      updateUnsavedBanner();
+      if (anyFail || outboxCount() > 0) scheduleFlush(anyFail ? 4000 : 800);
+      resolve();
+    }
+    function step() {
+      if (idx >= keys.length) { done(); return; }
+      var key = keys[idx++];
+      var cur = outbox(); var entry = cur[key];
+      if (!entry) { step(); return; }
+      api(entry.action, entry.payload).then(function () {
+        var mm = outbox(); delete mm[key]; _outboxSave(mm); step();
+      }).catch(function () {
+        anyFail = true; var mm = outbox(); if (mm[key]) { mm[key].tries = (mm[key].tries || 0) + 1; _outboxSave(mm); } step();
+      });
+    }
+    step();
+  });
+}
+function scheduleFlush(delay) {
+  if (_flushTimer) return;
+  _flushTimer = setTimeout(function () { _flushTimer = null; flushOutbox(); }, delay || 3000);
+}
+
+// Re-apply still-pending writes on top of a fresh server snapshot, so a
+// background refresh can never blank out an edit that hasn't been saved yet.
+function _listKeyFor(type) { return type === 'dept' ? 'depts' : (type === 'goalName' ? 'goalNames' : (type === 'category' ? 'categories' : null)); }
+function _upsertInto(arr, obj) { if (!obj || obj.id == null) return; for (var i = 0; i < arr.length; i++) { if (arr[i].id === obj.id) { arr[i] = obj; return; } } arr.push(obj); }
+function _removeFrom(arr, id) { for (var i = arr.length - 1; i >= 0; i--) { if (arr[i].id === id) arr.splice(i, 1); } }
+function _addToList(settings, type, value) { var k = _listKeyFor(type); if (!k) return; settings[k] = settings[k] || []; if (settings[k].indexOf(value) === -1) settings[k].push(value); }
+function _removeFromList(settings, type, value) { var k = _listKeyFor(type); if (!k || !settings[k]) return; settings[k] = settings[k].filter(function (v) { return v !== value; }); }
+function applyOutboxTo(db) {
+  var m = outbox();
+  Object.keys(m).forEach(function (key) {
+    var e = m[key]; if (!e) return; var a = e.action, p = e.payload || {};
+    try {
+      if (a === 'saveGoal') _upsertInto(db.goals, p);
+      else if (a === 'deleteGoal') _removeFrom(db.goals, p.id);
+      else if (a === 'saveTask') _upsertInto(db.tasks, p);
+      else if (a === 'deleteTask') _removeFrom(db.tasks, p.id);
+      else if (a === 'saveReview') _upsertInto(db.reviews, p);
+      else if (a === 'deleteReview') _removeFrom(db.reviews, p.id);
+      else if (a === 'saveMember') _upsertInto(db.settings.members, p);
+      else if (a === 'removeMember') _removeFrom(db.settings.members, p.id);
+      else if (a === 'saveAdmin') _upsertInto(db.settings.admins, p);
+      else if (a === 'removeAdmin') _removeFrom(db.settings.admins, p.id);
+      else if (a === 'addListItem') _addToList(db.settings, p.type, p.value);
+      else if (a === 'removeListItem') _removeFromList(db.settings, p.type, p.value);
+    } catch (err) { /* ignore a single bad entry */ }
+  });
+}
+
+// Retry leftover writes when the network returns and periodically as a safety net.
+try {
+  window.addEventListener('online', function () { flushOutbox(); });
+  setInterval(function () { if (outboxCount()) flushOutbox(); }, 20000);
+} catch (e) {}
+
 function queuePush(action, payload) {
   _inflight++; sgSavePill('saving');
   api(action, payload).catch(function (e) { try { toast((e && e.message) || 'Save failed'); } catch (x) {} })
@@ -2209,35 +2440,48 @@ function queuePush(action, payload) {
       if (_inflight <= 0) { _inflight = 0; sgSavePill('saved'); setTimeout(function () { sgSavePill('hide'); }, 1200); }
     });
 }
-function diffById(saveAction, delAction, cur, prev) {
+function diffById(saveAction, delAction, kind, cur, prev) {
   cur = cur || []; prev = prev || [];
   var byId = {}; prev.forEach(function (x) { byId[x.id] = x; });
   var seen = {};
   cur.forEach(function (x) {
     seen[x.id] = 1;
     var was = byId[x.id];
-    if (!was || JSON.stringify(was) !== JSON.stringify(x)) queuePush(saveAction, x);
+    if (!was || JSON.stringify(was) !== JSON.stringify(x)) outboxAdd(kind + ':' + x.id, saveAction, x);
   });
-  prev.forEach(function (x) { if (!seen[x.id]) queuePush(delAction, { id: x.id }); });
+  var dels = prev.filter(function (x) { return !seen[x.id]; });
+  // SAFETY GUARD: real deletions happen one row at a time via the UI. A pass
+  // that would delete many rows at once (or wipe a whole collection) is almost
+  // certainly a bad refresh or bug, so we refuse it — no saved data is lost.
+  if (dels.length >= 5 || (cur.length === 0 && prev.length >= 3)) {
+    console.warn('[SmartGoals] safety: skipped bulk delete of ' + dels.length + ' ' + kind + ' record(s)');
+    try { toast('Safety guard: skipped an unexpected bulk delete (' + dels.length + ' ' + kind + '). Your data is intact.'); } catch (e) {}
+    return;
+  }
+  dels.forEach(function (x) { outboxAdd(kind + ':' + x.id, delAction, { id: x.id }); });
 }
 function diffList(type, cur, prev) {
   cur = cur || []; prev = prev || [];
-  cur.forEach(function (v) { if (prev.indexOf(v) === -1) queuePush('addListItem', { type: type, value: v }); });
-  prev.forEach(function (v) { if (cur.indexOf(v) === -1) queuePush('removeListItem', { type: type, value: v }); });
+  cur.forEach(function (v) { if (prev.indexOf(v) === -1) outboxAdd('list:' + type + ':' + v, 'addListItem', { type: type, value: v }); });
+  prev.forEach(function (v) { if (cur.indexOf(v) === -1) outboxAdd('list:' + type + ':' + v, 'removeListItem', { type: type, value: v }); });
 }
 function syncDiff() {
   if (!_shadow) { _shadow = deepCopy(DB); return; }
   try {
-    diffById('saveGoal', 'deleteGoal', DB.goals, _shadow.goals);
-    diffById('saveTask', 'deleteTask', DB.tasks, _shadow.tasks);
-    diffById('saveReview', 'deleteReview', DB.reviews, _shadow.reviews);
-    diffById('saveMember', 'removeMember', DB.settings.members, _shadow.settings.members);
-    diffById('saveAdmin', 'removeAdmin', DB.settings.admins, _shadow.settings.admins);
+    diffById('saveGoal', 'deleteGoal', 'goal', DB.goals, _shadow.goals);
+    diffById('saveTask', 'deleteTask', 'task', DB.tasks, _shadow.tasks);
+    diffById('saveReview', 'deleteReview', 'review', DB.reviews, _shadow.reviews);
+    diffById('saveMember', 'removeMember', 'member', DB.settings.members, _shadow.settings.members);
+    diffById('saveAdmin', 'removeAdmin', 'admin', DB.settings.admins, _shadow.settings.admins);
     diffList('dept',     DB.settings.depts,      _shadow.settings.depts);
     diffList('goalName', DB.settings.goalNames,  _shadow.settings.goalNames);
     diffList('category', DB.settings.categories, _shadow.settings.categories);
   } catch (e) { console.warn('[SmartGoals] sync error', e); }
+  // Shadow can advance now: the change is durably queued in the outbox, which
+  // keeps retrying until the server confirms it — so nothing is lost even if
+  // the write below fails.
   _shadow = deepCopy(DB);
+  flushOutbox();
 }
 
 // ── read-only user badge (no role switcher in production) ──
@@ -2365,6 +2609,8 @@ try { window.openRoleSwitcher = openRoleSwitcher; } catch(e){}
 try { window.populateCatDropdown = populateCatDropdown; } catch(e){}
 try { window.populateGoalMemberDropdown = populateGoalMemberDropdown; } catch(e){}
 try { window.populateReviewMemberDropdown = populateReviewMemberDropdown; } catch(e){}
+try { window.syncMgrEmail = syncMgrEmail; } catch(e){}
+try { window.populateManagerDropdown = populateManagerDropdown; } catch(e){}
 try { window.populateTaskGoalDropdown = populateTaskGoalDropdown; } catch(e){}
 try { window.populateTaskMemberDropdown = populateTaskMemberDropdown; } catch(e){}
 try { window.removeAdmin = removeAdmin; } catch(e){}

@@ -503,7 +503,7 @@
   <div class="page-header">
     <div>
       <h1 style="font-size:20px;font-weight:800;letter-spacing:-.02em">Monthly Reviews</h1>
-      <p style="font-size:12px;color:var(--text3);margin-top:3px" id="rv-dept-label">Self-review by member · Manager score by Dept Head / Admin</p>
+      <p style="font-size:12px;color:var(--text3);margin-top:3px" id="rv-dept-label">Self-review by member · Manager score by Dept Head, Admin, or the assigned reporting manager</p>
     </div>
     <button class="btn btn-primary" id="rv-add-btn" onclick="openReviewModal()">+ New Review</button>
   </div>
@@ -739,6 +739,15 @@
         <div class="field">
           <label>Email ID</label>
           <input id="am-email" type="email" placeholder="e.g. name@olf.org" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Reporting Manager</label>
+          <select id="am-mgr" onchange="syncMgrEmail()"><option value="">— None —</option></select>
+          <div style="font-size:11px;color:var(--text3);margin-top:3px">This person gets review rights for this member. Pick from existing members/admins so the email is always valid.</div>
+        </div>
+        <div class="field">
+          <label>Reporting Manager Email</label>
+          <input id="am-mgr-email" type="email" placeholder="auto-filled from manager" autocomplete="off" readonly style="background:#f1f5f9;color:#64748b">
         </div>
       </div>
     </div>
