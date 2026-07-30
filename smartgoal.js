@@ -236,12 +236,21 @@ function canEditTask(task) {
   return false;
 }
 function canEditMemberScore(r) {
-  return currentUser.role === ROLES.ADMIN || (currentUser.role === ROLES.MEMBER && r.member === currentUser.name);
+  // The MEMBER column is the person's own self-assessment. Admin can edit any;
+  // otherwise only the member themselves, on their OWN review, regardless of
+  // role -- so a Dept Head fills in their own member score too. It is never
+  // editable by that person's dept head or reporting manager.
+  if (currentUser.role === ROLES.ADMIN) return true;
+  return !!(r && currentUser.name && r.member === currentUser.name);
 }
 function canEditMgrScore(r) {
+  if (!r) return false;
   if (currentUser.role === ROLES.ADMIN) return true;
-  if (currentUser.role === ROLES.DEPT_HEAD && r && r.dept === currentUser.dept) return true;
-  if (r && isManagerOf(r.member, r.dept)) return true; // assigned reporting manager
+  // A Dept Head scores the Manager column for the OTHER members of their dept,
+  // but NOT their own review: a Dept Head's own manager score belongs to that
+  // Dept Head's reporting manager, never to themselves.
+  if (currentUser.role === ROLES.DEPT_HEAD && r.dept === currentUser.dept && r.member !== currentUser.name) return true;
+  if (isManagerOf(r.member, r.dept)) return true; // assigned reporting manager
   return false;
 }
 
@@ -2177,6 +2186,7 @@ var _inflight = 0;
 var _flushing = false;   // an outbox flush pass is currently running
 var _flushTimer = null;  // pending scheduled retry
 var _outbox = null;      // in-memory mirror of the durable localStorage outbox
+var _noBatch = false;    // set true if the deployed backend predates saveBatch
 
 function sgShowLoader() { var o = document.getElementById('sg-loader'); if (o) o.classList.add('open'); }
 function sgHideLoader() { var o = document.getElementById('sg-loader'); if (o) o.classList.remove('open'); }
@@ -2306,7 +2316,7 @@ function sgSavePill(state) {
   if (!el) {
     el = document.createElement('div');
     el.id = id;
-    el.style.cssText = 'position:fixed;bottom:18px;left:18px;z-index:9999;padding:7px 14px;'
+    el.style.cssText = 'position:fixed;bottom:18px;right:18px;z-index:9999;padding:7px 14px;'
       + 'border-radius:20px;font-size:12px;font-weight:600;font-family:inherit;pointer-events:none;'
       + 'transition:opacity .2s;box-shadow:0 4px 14px rgba(0,0,0,.15);opacity:0;';
     (document.getElementById('sg-app') || document.body).appendChild(el);
@@ -2345,52 +2355,72 @@ function outboxAdd(key, action, payload) { var m = outbox(); m[key] = { action: 
 // Persistent, tappable 'not yet saved' indicator so a failed write is never
 // mistaken for a successful one. Hidden automatically once the queue drains.
 function updateUnsavedBanner() {
-  var n = outboxCount();
-  var id = 'sg-unsaved-banner';
-  var el = document.getElementById(id);
-  if (n === 0) { if (el) el.style.display = 'none'; return; }
-  if (!el) {
-    el = document.createElement('div'); el.id = id;
-    el.style.cssText = 'position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:10000;'
-      + 'padding:8px 16px;border-radius:20px;font-size:12px;font-weight:600;font-family:inherit;'
-      + 'background:#fff7ed;color:#9a3412;border:1px solid #fed7aa;box-shadow:0 4px 14px rgba(0,0,0,.15);cursor:pointer;';
-    el.title = 'Click to retry now';
-    el.onclick = function () { flushOutbox(); };
-    (document.getElementById('sg-app') || document.body).appendChild(el);
-  }
-  el.textContent = '\u26A0 ' + n + ' change' + (n > 1 ? 's' : '') + ' not yet saved \u2014 retrying\u2026 (tap to retry)';
-  el.style.display = '';
+  // Single, quiet save indicator (bottom-right corner). No separate centre
+  // banner, no count, no 'tap to retry' -- retries run automatically. While any
+  // change is still queued we just keep showing the 'Saving' pill; once the
+  // queue drains the flush shows 'Saved' briefly and hides. Any leftover centre
+  // banner from a previous build is removed on sight.
+  var legacy = document.getElementById('sg-unsaved-banner');
+  if (legacy && legacy.parentNode) legacy.parentNode.removeChild(legacy);
+  if (outboxCount() > 0) sgSavePill('saving');
 }
 
-// Attempt every queued write once per pass (sequentially, to stay gentle on
-// the Apps Script backend). Successes are removed; failures stay and trigger
-// a backed-off retry. A single failing entry never blocks the others.
+// Flush the whole queue in ONE request via the backend 'saveBatch' action, so a
+// save is a single round-trip no matter how many records changed (the old code
+// sent them one-by-one). The batch is size-bounded because JSONP is a GET and
+// the encoded payload must stay within URL limits: small writes collapse into
+// one request; a large queue drains across a few quick passes (at least one
+// entry always goes, so a single big review still sends fine). A queued edit is
+// cleared only when the server confirms it AND it wasn't superseded by a newer
+// edit while in flight (matched on its timestamp) -- so no change is ever
+// silently dropped. If the deployed backend predates saveBatch we permanently
+// fall back to per-entry sends (still nothing is lost).
+function _flushSettle(delay) {
+  _flushing = false;
+  if (outboxCount() === 0) { sgSavePill('saved'); setTimeout(function () { sgSavePill('hide'); }, 1200); }
+  else scheduleFlush(typeof delay === 'number' ? delay : 2500);
+  updateUnsavedBanner();
+}
+function _flushSequential(sending) {
+  return sending.reduce(function (chain, s) {
+    return chain.then(function () {
+      return api(s.action, s.payload).then(function () {
+        var mm = outbox(); if (mm[s.key] && mm[s.key].ts === s.ts) { delete mm[s.key]; _outboxSave(mm); }
+      }).catch(function () {
+        var mm = outbox(); if (mm[s.key] && mm[s.key].ts === s.ts) { mm[s.key].tries = (mm[s.key].tries || 0) + 1; _outboxSave(mm); }
+      });
+    });
+  }, Promise.resolve());
+}
 function flushOutbox() {
   if (_flushing) return Promise.resolve();
   var m = outbox(); var keys = Object.keys(m);
   if (!keys.length) { updateUnsavedBanner(); return Promise.resolve(); }
-  _flushing = true; sgSavePill('saving'); updateUnsavedBanner();
-  var idx = 0, anyFail = false;
-  return new Promise(function (resolve) {
-    function done() {
-      _flushing = false;
-      if (outboxCount() === 0) { sgSavePill('saved'); setTimeout(function () { sgSavePill('hide'); }, 1200); }
-      updateUnsavedBanner();
-      if (anyFail || outboxCount() > 0) scheduleFlush(anyFail ? 4000 : 800);
-      resolve();
-    }
-    function step() {
-      if (idx >= keys.length) { done(); return; }
-      var key = keys[idx++];
-      var cur = outbox(); var entry = cur[key];
-      if (!entry) { step(); return; }
-      api(entry.action, entry.payload).then(function () {
-        var mm = outbox(); delete mm[key]; _outboxSave(mm); step();
-      }).catch(function () {
-        anyFail = true; var mm = outbox(); if (mm[key]) { mm[key].tries = (mm[key].tries || 0) + 1; _outboxSave(mm); } step();
-      });
-    }
-    step();
+  _flushing = true; sgSavePill('saving');
+  // Build a size-bounded batch (keep the encoded GET URL within limits).
+  var sending = [], approx = 0, LIMIT = 4000;
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i], e = m[k];
+    var sz = JSON.stringify(e.payload || {}).length + String(e.action || '').length + 8;
+    if (sending.length && approx + sz > LIMIT) break;
+    sending.push({ key: k, ts: e.ts, action: e.action, payload: e.payload });
+    approx += sz;
+  }
+  if (_noBatch) return _flushSequential(sending).then(function () { _flushSettle(300); }, function () { _flushSettle(4000); });
+  var ops = sending.map(function (s) { return { action: s.action, payload: s.payload }; });
+  return api('saveBatch', { ops: ops }).then(function (res) {
+    var results = (res && res.results) || [];
+    var mm = outbox();
+    sending.forEach(function (s, i) {
+      var r = results[i]; var ok = r ? (r.ok !== false) : false; var cur = mm[s.key];
+      if (ok) { if (cur && cur.ts === s.ts) delete mm[s.key]; }
+      else if (cur && cur.ts === s.ts) cur.tries = (cur.tries || 0) + 1;
+    });
+    _outboxSave(mm);
+    _flushSettle(300); // more may remain (size-bounded) -> drain quickly
+  }).catch(function (err) {
+    if (err && /unknown action/i.test(err.message || '')) { _noBatch = true; return _flushSequential(sending).then(function () { _flushSettle(300); }, function () { _flushSettle(4000); }); }
+    _flushSettle(4000); // transient network/timeout -> keep queued, back off
   });
 }
 function scheduleFlush(delay) {

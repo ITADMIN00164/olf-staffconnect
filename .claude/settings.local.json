@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -o /dev/null -w \"server:%{http_code}\\\\n\" http://localhost:8843/shell-test.html)",
+      "Bash(curl -s -o /dev/null -w \"sg:%{http_code}\\\\n\" http://localhost:8843/pages/smart-goals.html)",
+      "Bash(taskkill //F //IM python.exe)",
+      "Bash(node --check \"C:\\\\Users\\\\Admin\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-Admin-OneDrive-Desktop-Staff-Connect-Main-code-OLF-Staff-Connect-V3\\\\26ee91f6-5431-4303-a28a-d179c54dcb93\\\\scratchpad\\\\Code_check.js\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8843/shell-test.html)",
+      "Bash(rm -f shell-test.html)"
+    ]
+  }
+}
