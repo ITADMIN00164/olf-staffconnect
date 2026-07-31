@@ -849,7 +849,10 @@ function renderSmartGoals() {
     });
     const summaryHtml = `<div style="margin-bottom:14px">
       <div class="review-section-hd">Summary of SMART Goals${yearSuffix}</div>
-      <div class="tbl-wrap"><table class="tbl">
+      <div class="tbl-wrap"><table class="tbl tbl-fixed">
+        <colgroup>
+          <col style="width:5%"><col style="width:25%"><col style="width:55%"><col style="width:15%">
+        </colgroup>
         <thead><tr>
           <th style="text-align:center">#</th><th>SMART Goal</th><th>Description</th>
           <th style="text-align:center">Weightage</th>
@@ -1487,7 +1490,10 @@ function renderReviews() {
     const summaryHtml = `<div style="margin-bottom:18px">
       <div class="review-section-hd">Summary of Review — ${monthYearLabel(r.year,r.month)} <span style="font-weight:400;font-size:11px;color:var(--text3);text-transform:none;letter-spacing:0">— click a SMART Goal to view its details</span></div>
       ${(overallHtml || sheetBHtml) ? `<div style="margin:10px 0 12px;display:flex;flex-direction:column;gap:8px">${overallHtml}${sheetBHtml}</div>` : ''}
-      <div class="tbl-wrap"><table class="tbl">
+      <div class="tbl-wrap"><table class="tbl tbl-fixed">
+        <colgroup>
+          <col style="width:5%"><col style="width:22%"><col style="width:47%"><col style="width:13%"><col style="width:13%">
+        </colgroup>
         <thead><tr>
           <th style="text-align:center">#</th><th>SMART Goal</th><th>Description</th>
           <th style="text-align:center">Weightage</th><th style="text-align:center">Performance</th>
