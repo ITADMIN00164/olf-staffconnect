@@ -1700,7 +1700,7 @@ function saveReview() {
   };
   if (existingId) { const i=DB.reviews.findIndex(x=>x.id===existingId); if(i>-1) DB.reviews[i]=rec; }
   else DB.reviews.push(rec);
-  save(); closeModal('review-modal'); renderReviews(); toast('Review saved');
+  save(); closeModal('review-modal'); renderReviews();
 }
 
 // ── Progressive disclosure of a review's per-SMART-Goal detail tables ──
@@ -2217,10 +2217,52 @@ function jsonp(params) {
     document.head.appendChild(script);
   });
 }
+// A review item's goal / weightage / description / cat / particulars are all
+// derivable from its goalItemId, so we DON'T send them over the wire — the backend
+// backfills them from the Goals sheet. JSONP is GET-only, so the whole payload
+// rides in the URL; a large review carrying those repeated fields blows past the
+// URL-length limit and the save silently fails. Local data keeps the FULL items
+// (rendering needs them); only this network copy is slimmed.
+function _slimReviewItems(rev) {
+  if (!rev || !rev.items) return rev;
+  var out = {}; for (var k in rev) { if (rev.hasOwnProperty(k)) out[k] = rev[k]; }
+  out.items = rev.items.map(function (it) {
+    return { goalItemId: it.goalItemId, maxScore: it.maxScore, target: it.target,
+             actual: it.actual, remark: it.remark, memberScore: it.memberScore, mgrScore: it.mgrScore };
+  });
+  return out;
+}
+function _wirePayload(action, payload) {
+  if (action === 'saveReview') return _slimReviewItems(payload);
+  if (action === 'saveBatch' && payload && payload.ops) {
+    return { ops: payload.ops.map(function (op) { return { action: op.action, payload: _wirePayload(op.action, op.payload) }; }) };
+  }
+  return payload;
+}
+// Fallback transport for a request too big for a GET URL: POST the payload in the
+// body (no URL-length limit). text/plain keeps it a 'simple' request (no CORS
+// preflight); Apps Script redirects to a googleusercontent URL that allows the
+// cross-origin read, so we can read the JSON back. Only used for oversize writes,
+// so the common JSONP path is untouched.
+function _postApi(action, wire) {
+  return fetch(CONFIG.GAS_WEB_APP_URL + '?action=' + encodeURIComponent(action), {
+    method: 'POST', redirect: 'follow',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(wire == null ? {} : wire)
+  }).then(function (r) { return r.json(); });
+}
 function api(action, payload) {
+  var wire = _wirePayload(action, payload);
   var params = { action: action };
-  if (payload) params.payload = JSON.stringify(payload);
-  return jsonp(params).then(function (res) {
+  if (wire) params.payload = JSON.stringify(wire);
+  // Estimate the GET URL length (params + &callback=..&_t=..). If it would be too
+  // long for a URL, POST instead; otherwise use the proven JSONP path.
+  var getUrlLen = CONFIG.GAS_WEB_APP_URL.length + 1 + 60 +
+    Object.keys(params).reduce(function (a, k) {
+      return a + k.length + 1 + encodeURIComponent(params[k] == null ? '' : params[k]).length + 1;
+    }, 0);
+  var call = (getUrlLen > 8000) ? _postApi(action, wire) : jsonp(params);
+  return call.then(function (res) {
     if (!res || res.ok === false) throw new Error((res && res.error) || 'Server error');
     return res.data;
   });
@@ -2315,7 +2357,73 @@ function loadAll(fresh) {
 // background write finishes. state: 'saving' | 'saved' | 'hide'. Purely visual —
 // pointer-events:none means it never intercepts clicks. Shared by ALL write
 // points (add/edit goal, add/edit task, add/edit review, settings, deletes).
-function sgSavePill(state) {
+// ── Stacked save toasts (bottom-right): one per save action, "Saving…" -> "Saved". ──
+// Each toast is bound to the outbox keys that save touched and flips to "Saved" only
+// once the SERVER confirms them (honest feedback, not just the optimistic local
+// update). Rapid saves stack so the user can see how many are still in flight.
+var _saveToasts = [];
+var _saveDeliveredTs = {};   // outbox key -> highest ts the server has confirmed
+function _saveStack() {
+  var c = document.getElementById('sg-save-stack');
+  if (c) return c;
+  if (!document.getElementById('sg-save-stack-css')) {
+    var st = document.createElement('style'); st.id = 'sg-save-stack-css';
+    st.textContent = '@keyframes sgSpin{to{transform:rotate(360deg)}}'
+      + '#sg-save-stack{position:fixed;right:18px;bottom:18px;z-index:9999;display:flex;flex-direction:column;gap:8px;align-items:flex-end;pointer-events:none}'
+      + '.sg-stoast{display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:22px;font-family:inherit;font-size:12px;font-weight:600;line-height:1;box-shadow:0 4px 14px rgba(0,0,0,.15);opacity:0;transform:translateY(6px);transition:opacity .18s ease,transform .18s ease}'
+      + '.sg-stoast.show{opacity:1;transform:translateY(0)}'
+      + '.sg-stoast.saving{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}'
+      + '.sg-stoast.saved{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}'
+      + '.sg-stoast .sg-sp{width:12px;height:12px;border-radius:50%;border:2px solid currentColor;border-top-color:transparent;animation:sgSpin .7s linear infinite}'
+      + '.sg-stoast .sg-ck{font-size:13px;font-weight:800}';
+    document.head.appendChild(st);
+  }
+  c = document.createElement('div'); c.id = 'sg-save-stack';
+  (document.getElementById('sg-app') || document.body).appendChild(c);
+  return c;
+}
+function sgSaveToast(bound) {
+  bound = (bound || []).filter(function (b) { return b && b.key; });
+  var el = document.createElement('div');
+  el.className = 'sg-stoast saving';
+  el.innerHTML = '<span class="sg-sp"></span><span>Saving…</span>';
+  _saveStack().appendChild(el);
+  requestAnimationFrame(function () { el.classList.add('show'); });
+  var t = { el: el, keys: bound, done: false };
+  _saveToasts.push(t);
+  _saveToastCheck(t);   // maybe there was nothing to send / already delivered
+  return t;
+}
+function _saveToastCheck(t) {
+  if (t.done) return;
+  var ob = outbox();
+  var allIn = !t.keys.length || t.keys.every(function (b) {
+    if ((_saveDeliveredTs[b.key] || 0) >= b.ts) return true;   // server confirmed this or newer data
+    if (!ob[b.key]) return true;                               // no longer queued -> delivered
+    return false;
+  });
+  if (!allIn) return;
+  t.done = true;
+  t.el.className = 'sg-stoast saved show';
+  t.el.innerHTML = '<span class="sg-ck">✓</span><span>Saved</span>';
+  setTimeout(function () {
+    t.el.classList.remove('show');
+    setTimeout(function () {
+      if (t.el.parentNode) t.el.parentNode.removeChild(t.el);
+      var i = _saveToasts.indexOf(t); if (i > -1) _saveToasts.splice(i, 1);
+    }, 220);
+  }, 1400);
+}
+// Called from the flush paths whenever the server confirms an outbox key at a ts.
+function _saveDelivered(key, ts) {
+  if (!key) return;
+  if ((_saveDeliveredTs[key] || 0) < ts) _saveDeliveredTs[key] = ts;
+  for (var i = _saveToasts.length - 1; i >= 0; i--) _saveToastCheck(_saveToasts[i]);
+}
+// The single corner pill is superseded by the stacked per-save toasts above; kept
+// as a no-op so existing call sites remain harmless.
+function sgSavePill(state) { return; }
+function _sgSavePill_legacy(state) {
   var id = 'sg-save-pill';
   var el = document.getElementById(id);
   if (state === 'hide') { if (el) el.style.opacity = '0'; return; }
@@ -2392,6 +2500,7 @@ function _flushSequential(sending) {
     return chain.then(function () {
       return api(s.action, s.payload).then(function () {
         var mm = outbox(); if (mm[s.key] && mm[s.key].ts === s.ts) { delete mm[s.key]; _outboxSave(mm); }
+        if (typeof _saveDelivered === 'function') _saveDelivered(s.key, s.ts);
       }).catch(function () {
         var mm = outbox(); if (mm[s.key] && mm[s.key].ts === s.ts) { mm[s.key].tries = (mm[s.key].tries || 0) + 1; _outboxSave(mm); }
       });
@@ -2419,7 +2528,7 @@ function flushOutbox() {
     var mm = outbox();
     sending.forEach(function (s, i) {
       var r = results[i]; var ok = r ? (r.ok !== false) : false; var cur = mm[s.key];
-      if (ok) { if (cur && cur.ts === s.ts) delete mm[s.key]; }
+      if (ok) { if (cur && cur.ts === s.ts) delete mm[s.key]; if (typeof _saveDelivered === 'function') _saveDelivered(s.key, s.ts); }
       else if (cur && cur.ts === s.ts) cur.tries = (cur.tries || 0) + 1;
     });
     _outboxSave(mm);
@@ -2503,6 +2612,7 @@ function diffList(type, cur, prev) {
 }
 function syncDiff() {
   if (!_shadow) { _shadow = deepCopy(DB); return; }
+  var _obBefore = {}; try { var _oB = outbox(); Object.keys(_oB).forEach(function (k) { _obBefore[k] = _oB[k].ts; }); } catch (e) {}
   try {
     diffById('saveGoal', 'deleteGoal', 'goal', DB.goals, _shadow.goals);
     diffById('saveTask', 'deleteTask', 'task', DB.tasks, _shadow.tasks);
@@ -2516,6 +2626,11 @@ function syncDiff() {
   // Shadow can advance now: the change is durably queued in the outbox, which
   // keeps retrying until the server confirms it — so nothing is lost even if
   // the write below fails.
+  try {
+    var _touched = [], _oA = outbox();
+    Object.keys(_oA).forEach(function (k) { if (_obBefore[k] !== _oA[k].ts) _touched.push({ key: k, ts: _oA[k].ts }); });
+    if (_touched.length && typeof sgSaveToast === 'function') sgSaveToast(_touched);
+  } catch (e) {}
   _shadow = deepCopy(DB);
   flushOutbox();
 }
