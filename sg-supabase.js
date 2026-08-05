@@ -44,23 +44,46 @@
   var LIST_TABLE = { dept: 'depts', goalName: 'goal_names', category: 'categories' };
 
   // ================= READ: getAll =================
+  // Supabase caps a single select at 1000 rows (PostgREST max-rows). Fetch every
+  // table in fixed-size pages via .range() and stitch them together, ordered by a
+  // stable key so pages never overlap or skip a row. A page shorter than PAGE_SIZE
+  // means we've reached the end. This is transport-only: getAll still returns the
+  // exact same complete object, so smartgoal.js and the UI are unchanged.
+  var PAGE_SIZE = 1000;
+  function sgSelectAll(table, orderCol) {
+    var all = [];
+    function fetchPage(from) {
+      return sb.from(table).select('*').order(orderCol, { ascending: true })
+        .range(from, from + PAGE_SIZE - 1)
+        .then(function (r) {
+          sgThrow(r.error);
+          var rows = r.data || [];
+          all = all.concat(rows);
+          // full page => there may be more; short page => done.
+          if (rows.length === PAGE_SIZE) return fetchPage(from + PAGE_SIZE);
+          return all;
+        });
+    }
+    return fetchPage(0);
+  }
+
   function sgGetAll() {
+    // Tables run in parallel; each large one pages internally by its stable key.
     return Promise.all([
-      sb.from('depts').select('name'),
-      sb.from('goal_names').select('name'),
-      sb.from('categories').select('name'),
-      sb.from('members').select('*'),
-      sb.from('admins').select('*'),
-      sb.from('goals').select('*'),
-      sb.from('tasks').select('*'),
-      sb.from('reviews').select('*'),
-      sb.from('review_items').select('*')
+      sgSelectAll('depts', 'name'),
+      sgSelectAll('goal_names', 'name'),
+      sgSelectAll('categories', 'name'),
+      sgSelectAll('members', 'id'),
+      sgSelectAll('admins', 'id'),
+      sgSelectAll('goals', 'id'),
+      sgSelectAll('tasks', 'id'),
+      sgSelectAll('reviews', 'id'),
+      sgSelectAll('review_items', 'pk')
     ]).then(function (res) {
-      res.forEach(function (r) { sgThrow(r.error); });
-      var depts = res[0].data || [], goalNames = res[1].data || [], cats = res[2].data || [];
-      var members = res[3].data || [], admins = res[4].data || [];
-      var goals = res[5].data || [], tasks = res[6].data || [];
-      var reviews = res[7].data || [], items = res[8].data || [];
+      var depts = res[0] || [], goalNames = res[1] || [], cats = res[2] || [];
+      var members = res[3] || [], admins = res[4] || [];
+      var goals = res[5] || [], tasks = res[6] || [];
+      var reviews = res[7] || [], items = res[8] || [];
 
       var itemsByReview = {};
       items.forEach(function (it) {
