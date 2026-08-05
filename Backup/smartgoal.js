@@ -2252,13 +2252,6 @@ function _postApi(action, wire) {
   }).then(function (r) { return r.json(); });
 }
 function api(action, payload) {
-  // TRANSPORT SWAP: use the Supabase data store when the adapter is present.
-  // Resolves to the same `data` shape and throws on error, so the outbox,
-  // snapshot and retry logic below are unchanged. Falls back to the original
-  // GAS/JSONP path automatically if sg-supabase.js failed to load.
-  if (window.SG_SUPA && typeof window.SG_SUPA.call === 'function') {
-    return window.SG_SUPA.call(action, payload || {});
-  }
   var wire = _wirePayload(action, payload);
   var params = { action: action };
   if (wire) params.payload = JSON.stringify(wire);
