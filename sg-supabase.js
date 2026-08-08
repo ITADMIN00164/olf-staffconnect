@@ -122,12 +122,13 @@
                    plannedItems: sgNumOrEmpty(t.planned_items), est: sgNum0(t.est),
                    tgtDate: t.tgt_date || '', compDate: t.comp_date || '', actualHrs: sgNum0(t.actual_hrs),
                    actualItems: sgNumOrEmpty(t.actual_items), status: t.status || '', deviation: t.deviation || '',
-                   helpNeeded: t.help_needed || '', revisedTgtDate: t.revised_tgt_date || '' };
+                   helpNeeded: t.help_needed || '', revisedTgtDate: t.revised_tgt_date || '',
+                   managerComment: t.manager_comment || '', managerGrade: t.manager_grade || '' };
         }),
         reviews: reviews.map(function (r) {
           return { id: String(r.id || ''), year: r.year || '', month: r.month || '', dept: r.dept || '',
                    member: r.member || '', reviewer: r.reviewer || '', date: r.date || '',
-                   remarks: r.remarks || '', sheetBLink: r.sheet_b_link || '',
+                   remarks: r.remarks || '', sheetBLink: r.sheet_b_link || '', helpNeeded: r.help_needed || '', areasOfImprovement: r.areas_of_improvement || '',
                    items: itemsByReview[String(r.id)] || [] };
         })
       };
@@ -197,7 +198,8 @@
                 actual_hrs: (t.actualHrs === '' || t.actualHrs == null) ? 0 : Number(t.actualHrs),
                 actual_items: (t.actualItems === '' || t.actualItems == null) ? null : Number(t.actualItems),
                 status: t.status || '', deviation: t.deviation || '',
-                help_needed: t.helpNeeded || '', revised_tgt_date: t.revisedTgtDate || '' };
+                help_needed: t.helpNeeded || '', revised_tgt_date: t.revisedTgtDate || '',
+                manager_comment: t.managerComment || '', manager_grade: t.managerGrade || '' };
     return (t.cat ? ensureListValue('categories', t.cat) : Promise.resolve())
       .then(function () { return sb.from('tasks').upsert(row, { onConflict: 'id' }); })
       .then(function (r) { sgThrow(r.error); return { task: t }; });
@@ -210,7 +212,7 @@
     if (!r.id) r.id = sgUid();
     var header = { id: r.id, year: r.year || '', month: r.month || '', dept: r.dept || '',
                    member: r.member || '', reviewer: r.reviewer || '', date: r.date || '',
-                   remarks: r.remarks || '', sheet_b_link: r.sheetBLink || '' };
+                   remarks: r.remarks || '', sheet_b_link: r.sheetBLink || '', help_needed: r.helpNeeded || '', areas_of_improvement: r.areasOfImprovement || '' };
     return sb.from('reviews').upsert(header, { onConflict: 'id' }).then(function (res) {
       sgThrow(res.error);
       // DATA-SAFETY: only touch items when the caller actually sent an items array.

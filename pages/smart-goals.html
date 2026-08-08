@@ -676,6 +676,25 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="mgr-comment-modal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-head">
+      <span class="modal-title" id="mc-title">Manager Comment</span>
+      <button class="modal-close" onclick="closeModal('mgr-comment-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <p id="mc-sub" style="font-size:12px;color:var(--text3);margin-bottom:10px"></p>
+      <div class="field form-full"><label>Comment</label>
+        <textarea id="mc-text" rows="5" placeholder="Manager comment…" style="width:100%;resize:vertical;font-family:inherit;font-size:13px;padding:8px;border:1px solid var(--border2);border-radius:6px;color:var(--text);background:rgba(255,255,255,.85)"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('mgr-comment-modal')">Close</button>
+      <button class="btn btn-primary" id="mc-save" onclick="saveMgrComment()">Save Comment</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="review-modal">
   <div class="modal" style="max-width:1120px">
     <div class="modal-head">
@@ -696,6 +715,10 @@
       </div>
       <div class="form-grid" style="margin-bottom:16px">
         <div class="field form-full"><label>Sheet B Link</label><input id="rf-sheetb" type="url" placeholder="https://docs.google.com/…"></div>
+      </div>
+      <div class="form-grid" style="margin-bottom:16px">
+        <div class="field form-full"><label>Help Needed</label><input id="rf-helpneeded" placeholder="What help is needed…"></div>
+        <div class="field form-full"><label>Areas of Improvement</label><input id="rf-areas" placeholder="Areas to improve…"></div>
       </div>
       <div class="section-label">Score each SMART Goal / Category</div>
       <p style="font-size:12px;color:var(--text3);margin-bottom:12px">

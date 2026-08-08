@@ -158,7 +158,8 @@ let DB = JSON.parse(JSON.stringify(DEFAULT));
       planned: t.planned||'Yes', plannedItems: t.plannedItems ?? '',
       est: t.est||0, tgtDate: t.tgtDate||'',
       compDate: t.compDate||'', actualHrs: t.actualHrs||0, actualItems: t.actualItems ?? '',
-      status: t.status||'Planned', deviation: t.deviation||'', helpNeeded: t.helpNeeded||'', revisedTgtDate: t.revisedTgtDate||''
+      status: t.status||'Planned', deviation: t.deviation||'', helpNeeded: t.helpNeeded||'', revisedTgtDate: t.revisedTgtDate||'',
+      managerGrade: t.managerGrade||'', managerComment: t.managerComment||''
     };
   });
   // reviews: old schema items keyed by goalId with selfScore/mgrScore, no target/actual/remark/weightage
@@ -186,7 +187,7 @@ let DB = JSON.parse(JSON.stringify(DEFAULT));
       };
     });
     if (!r.year || !r.month) changed = true;
-    return {id:r.id||uid(), year, month, dept:r.dept||'', member:r.member||'', reviewer:r.reviewer||'', date:r.date||'', remarks:r.remarks||'', sheetBLink:r.sheetBLink||'', items};
+    return {id:r.id||uid(), year, month, dept:r.dept||'', member:r.member||'', reviewer:r.reviewer||'', date:r.date||'', remarks:r.remarks||'', sheetBLink:r.sheetBLink||'', helpNeeded:r.helpNeeded||'', areasOfImprovement:r.areasOfImprovement||'', items};
   });
   // one-time cleanup: remove IT OPs sample/legacy data from any previously saved browser data.
   // Data for other departments (e.g. Content/Communications) is left untouched.
@@ -1057,6 +1058,36 @@ function deleteGoalGroup(year, dept, member, goal) {
   });
 }
 
+// ── Manager Grade / Comment + review helpers ──
+const GRADE_DESC = {
+  A: 'No Fatal, No Critical errors, No presentation issues, well reported',
+  B: '\u2264 2 fatal or critical errors, presentation issues',
+  C: '>2 errors, poor quality'
+};
+function gradeTitle(g) { return (g && GRADE_DESC[g]) ? (g + ' — ' + GRADE_DESC[g]) : 'Set grade'; }
+// Who may set a task's Manager Grade / Manager Comment: admin, the dept head of
+// that dept (not their own row), or the member's assigned reporting manager.
+// Mirrors canEditMgrScore so manager fields follow the same rule as manager scores.
+function canEditMgrTaskFields(t) {
+  if (!t) return false;
+  if (currentUser.role === ROLES.ADMIN) return true;
+  if (currentUser.role === ROLES.DEPT_HEAD && t.dept === currentUser.dept && t.member !== currentUser.name) return true;
+  if (isManagerOf(t.member, t.dept)) return true;
+  return false;
+}
+// Academic-year-aware month position (June=0 … May=11) for sorting reviews latest-first.
+function sgAyMonthPos(month) { var i = MONTHS.indexOf(month); return i < 0 ? -1 : (i - 5 + 12) % 12; }
+function sgReviewSortKey(a, b) {
+  var ya = String(a.year || ''), yb = String(b.year || '');
+  if (ya !== yb) return yb.localeCompare(ya);            // newer academic year first
+  return sgAyMonthPos(b.month) - sgAyMonthPos(a.month);  // later month in the year first
+}
+// Generic review-summary callout (blank value renders nothing).
+function sgReviewNoteHtml(icon, label, val) {
+  if (!val || !String(val).trim()) return '';
+  return `<p style="font-size:12px;color:var(--text2);margin:0;padding:8px 12px;background:var(--surface2);border-radius:var(--radius);border-left:3px solid var(--brand)">${icon} <span style="font-weight:600;color:var(--text)">${esc(label)}</span> - ${esc(val)}</p>`;
+}
+
 // ── MONTHLY PLAN ──
 const COL_DEFS = [
   {key:'year',      grp:'plan',   label:'Academic Year'},
@@ -1078,6 +1109,8 @@ const COL_DEFS = [
   {key:'status',    grp:'status', label:'Status'},
   {key:'deviation', grp:'status', label:'Deviation'},
   {key:'helpNeeded',grp:'status', label:'Help Needed'},
+  {key:'managerGrade',   grp:'status', label:'Mgr Grade'},
+  {key:'managerComment', grp:'status', label:'Mgr Comment'},
   {key:'revisedTgtDate', grp:'status', label:'Revised Date'},
   {key:'actions',   grp:'act',    label:'Actions'}
 ];
@@ -1166,6 +1199,20 @@ function planCellHtml(t, key) {
     case 'helpNeeded': return ed
       ? `<td class="c-status"><input class="tbl-input" type="text" value="${esc(t.helpNeeded||'')}" placeholder="Help needed…" data-id="${t.id}" data-field="helpNeeded" style="min-width:130px"></td>`
       : `<td class="c-status" style="font-size:11px;color:var(--text2)">${esc(t.helpNeeded||'—')}</td>`;
+    case 'managerGrade': {
+      const _gt = gradeTitle(t.managerGrade);
+      if (canEditMgrTaskFields(t)) {
+        return `<td class="c-status" style="text-align:center" title="${esc(_gt)}"><select class="tbl-select" onchange="sgSetGrade('${t.id}',this.value)" style="min-width:64px">${['','A','B','C'].map(x=>`<option value="${x}"${t.managerGrade===x?' selected':''}>${x||'—'}</option>`).join('')}</select></td>`;
+      }
+      return `<td class="c-status" style="text-align:center">${t.managerGrade?`<span title="${esc(_gt)}" style="display:inline-block;min-width:22px;padding:2px 8px;border-radius:20px;font-weight:700;font-size:11px;background:var(--surface2);border:1px solid var(--border2)">${esc(t.managerGrade)}</span>`:`<span style="color:var(--text3)" title="No grade">—</span>`}</td>`;
+    }
+    case 'managerComment': {
+      const _has = !!(t.managerComment && String(t.managerComment).trim());
+      const _ed = canEditMgrTaskFields(t);
+      const _icon = _ed ? '✏️' : '👁';
+      const _ttl = _ed ? 'View / edit manager comment' : 'View manager comment';
+      return `<td class="c-status" style="text-align:center"><button type="button" class="btn btn-secondary btn-sm" onclick="openMgrComment('${t.id}')" title="${_ttl}" style="padding:2px 9px">${_icon}${_has?' •':''}</button></td>`;
+    }
     case 'revisedTgtDate': return ed ? dateCellEditable(t.id,'revisedTgtDate',t.revisedTgtDate)
       : `<td class="c-status" style="white-space:nowrap">${dateChip(t.revisedTgtDate)}</td>`;
     case 'actions': return ed ? `<td class="c-act">
@@ -1189,7 +1236,7 @@ function renderPlan() {
   // Academic Year, Month and Department are mandatory; Week is optional (All Weeks).
   if (!year || !month || !dept) {
     document.getElementById('plan-thead').innerHTML='';
-    tbody.innerHTML=`<tr><td colspan="21"><div class="empty"><div class="empty-icon">🗓️</div><p>Select <b>Academic Year</b>, <b>Month</b> and <b>Department</b> above to view the plan.</p></div></td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="23"><div class="empty"><div class="empty-icon">🗓️</div><p>Select <b>Academic Year</b>, <b>Month</b> and <b>Department</b> above to view the plan.</p></div></td></tr>`;
     return;
   }
 
@@ -1244,6 +1291,34 @@ function saveInlineRow(id) {
   toast('Row saved ✓');
   row.style.outline='2px solid #1A8577';
   setTimeout(()=>row.style.outline='',1200);
+}
+
+// ── Manager Comment popup (Monthly Plan) ──
+let _mgrCommentTaskId = null;
+function openMgrComment(id) {
+  const t = DB.tasks.find(x=>x.id===id); if (!t) { toast('Task not found'); return; }
+  const editable = canEditMgrTaskFields(t);
+  _mgrCommentTaskId = id;
+  document.getElementById('mc-title').textContent = editable ? 'Manager Comment' : 'Manager Comment (view only)';
+  document.getElementById('mc-sub').textContent = (t.member||'') + (t.action ? (' — ' + t.action) : (t.goal ? (' — ' + t.goal) : ''));
+  const ta = document.getElementById('mc-text');
+  ta.value = t.managerComment || '';
+  ta.readOnly = !editable;
+  document.getElementById('mc-save').style.display = editable ? '' : 'none';
+  openModal('mgr-comment-modal');
+}
+function saveMgrComment() {
+  const t = DB.tasks.find(x=>x.id===_mgrCommentTaskId); if (!t) return;
+  if (!canEditMgrTaskFields(t)) { toast('Not allowed'); return; }
+  t.managerComment = document.getElementById('mc-text').value;
+  save(); closeModal('mgr-comment-modal'); renderPlan(); toast('Comment saved ✓');
+}
+// Manager Grade auto-saves on change (a reporting manager may not have the row's save button).
+function sgSetGrade(id, val) {
+  const t = DB.tasks.find(x=>x.id===id); if (!t) return;
+  if (!canEditMgrTaskFields(t)) { toast('Not allowed'); renderPlan(); return; }
+  t.managerGrade = val || '';
+  save(); renderPlan(); toast('Grade saved ✓');
 }
 
 // Compact date field: chip shows the value; clicking expands the picker in-cell.
@@ -1401,6 +1476,7 @@ function renderReviews() {
     return;
   }
 
+  reviews.sort(sgReviewSortKey);
   let html = '';
   reviews.forEach(r => {
     const items = r.items || [];
@@ -1442,15 +1518,13 @@ function renderReviews() {
           <td style="text-align:center">${esc(i.actual||'—')}</td>
           <td style="text-align:center"><button type="button" class="remark-icon-btn ${hasRemark?'has-remark':''}" title="${hasRemark?'View / edit remark':(canEditRemark?'Add remark':'No remark')}" onclick="sgOpenItemRemarkModal('${r.id}',${itemIndex})">${hasRemark?'📝':'✏️'}</button></td>
           <td style="text-align:center;font-weight:700">${i.maxScore}</td>
-          <td style="text-align:center"><span class="score-badge ${scoreClass(i.memberScore,i.maxScore)}">${i.memberScore||'—'}</span></td>
-          <td style="text-align:center">${parseFloat(i.mgrScore)>0?`<span class="score-badge ${scoreClass(i.mgrScore,i.maxScore)}">${i.mgrScore}</span>`:'<span style="font-size:11px;color:var(--text3)">—</span>'}</td>
         </tr>`;
       }).join('');
 
       const detailTable = `<table class="tbl tbl-fixed tbl-grouped">
         <colgroup>
-          <col style="width:13%"><col style="width:42.5%"><col style="width:7.5%"><col style="width:7.5%">
-          <col style="width:7%"><col style="width:5.5%"><col style="width:8.5%"><col style="width:8.5%">
+          <col style="width:16%"><col style="width:44%"><col style="width:10%"><col style="width:10%">
+          <col style="width:12%"><col style="width:8%">
         </colgroup>
         <thead><tr>
           <th>Category</th><th>Particulars</th>
@@ -1458,15 +1532,12 @@ function renderReviews() {
           <th class="sg-th-nowrap" style="text-align:center">Actual</th>
           <th class="sg-th-nowrap" style="text-align:center">Remark</th>
           <th class="sg-th-nowrap" style="text-align:center">Max</th>
-          <th style="text-align:center">Member Score</th><th style="text-align:center">Manager Score</th>
         </tr></thead>
         <tbody>
           ${detailBody}
           <tr class="sg-total-row" style="font-weight:700">
             <td colspan="5">Total</td>
             <td style="text-align:center">${gMax}</td>
-            <td style="text-align:center"><span class="score-badge ${scoreClass(gMem,gMax)}">${gMem}</span></td>
-            <td style="text-align:center">${gMgr>0?`<span class="score-badge ${scoreClass(gMgr,gMax)}">${gMgr}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
           </tr>
         </tbody>
       </table>`;
@@ -1487,9 +1558,11 @@ function renderReviews() {
 
     const overallHtml = sgOverallHtml(r.remarks);
     const sheetBHtml = sgSheetBLinkHtml(r.sheetBLink);
+    const helpHtml = sgReviewNoteHtml('🆘', 'Help Needed', r.helpNeeded);
+    const areasHtml = sgReviewNoteHtml('📈', 'Areas of Improvement', r.areasOfImprovement);
     const summaryHtml = `<div style="margin-bottom:18px">
       <div class="review-section-hd">Summary of Review — ${monthYearLabel(r.year,r.month)} <span style="font-weight:400;font-size:11px;color:var(--text3);text-transform:none;letter-spacing:0">— click a SMART Goal to view its details</span></div>
-      ${(overallHtml || sheetBHtml) ? `<div style="margin:10px 0 12px;display:flex;flex-direction:column;gap:8px">${overallHtml}${sheetBHtml}</div>` : ''}
+      ${(overallHtml || sheetBHtml || helpHtml || areasHtml) ? `<div style="margin:10px 0 12px;display:flex;flex-direction:column;gap:8px">${overallHtml}${sheetBHtml}${helpHtml}${areasHtml}</div>` : ''}
       <div class="tbl-wrap"><table class="tbl tbl-fixed">
         <colgroup>
           <col style="width:5%"><col style="width:22%"><col style="width:47%"><col style="width:13%"><col style="width:13%">
@@ -1523,8 +1596,7 @@ function renderReviews() {
         </div>
         <div style="font-size:11px;color:var(--text3)">Reviewer: ${esc(r.reviewer||'—')}</div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap" onclick="event.stopPropagation()">
-          <span class="score-badge ${scoreClass(totalMem,totalMax)}">Member: ${totalMem}/${totalMax}</span>
-          ${mgrDone ? `<span class="score-badge ${scoreClass(totalMgr,totalMax)}">Mgr: ${totalMgr}/${totalMax}</span>` : `<span class="score-badge" style="background:var(--surface2);color:var(--text3)">Mgr: pending</span>`}
+          <span class="score-badge" style="background:${pctColor(totalPerformance)}22;color:${pctColor(totalPerformance)};border:1px solid ${pctColor(totalPerformance)}55">Performance: ${totalPerformance}%</span>
           ${(canEditMemberScore(r)||canEditMgrScore(r))?`<button class="btn btn-secondary btn-sm" onclick="openReviewModal('${r.id}')">✏️ Edit</button>`:''}
           ${currentUser.role===ROLES.ADMIN||currentUser.role===ROLES.DEPT_HEAD?`<button class="btn btn-danger btn-sm" onclick="deleteReview('${r.id}')">Delete</button>`:''}
         </div>
@@ -1553,6 +1625,8 @@ function openReviewModal(id) {
   ['rf-reviewer','rf-remarks','rf-sheetb'].forEach(fid => document.getElementById(fid).value = '');
   document.getElementById('rf-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('review-score-table').innerHTML = '';
+  document.getElementById('rf-helpneeded').value = '';
+  document.getElementById('rf-areas').value = '';
 
   const yearEl = document.getElementById('rf-year');
   const monthEl = document.getElementById('rf-month');
@@ -1568,6 +1642,8 @@ function openReviewModal(id) {
       document.getElementById('rf-date').value = r.date||'';
       document.getElementById('rf-remarks').value = r.remarks||'';
       document.getElementById('rf-sheetb').value = r.sheetBLink||'';
+      document.getElementById('rf-helpneeded').value = r.helpNeeded||'';
+      document.getElementById('rf-areas').value = r.areasOfImprovement||'';
     }
   } else if (currentUser.role === ROLES.MEMBER) {
     yearEl.value = currentAcademicYearGuess();
@@ -1696,6 +1772,8 @@ function saveReview() {
     date: document.getElementById('rf-date').value,
     remarks: document.getElementById('rf-remarks').value,
     sheetBLink: (document.getElementById('rf-sheetb').value||'').trim(),
+    helpNeeded: (document.getElementById('rf-helpneeded').value||'').trim(),
+    areasOfImprovement: (document.getElementById('rf-areas').value||'').trim(),
     items
   };
   if (existingId) { const i=DB.reviews.findIndex(x=>x.id===existingId); if(i>-1) DB.reviews[i]=rec; }
@@ -2776,6 +2854,9 @@ try { window.removeDept = removeDept; } catch(e){}
 try { window.removeMember = removeMember; } catch(e){}
 try { window.renderDashboard = renderDashboard; } catch(e){}
 try { window.renderPlan = renderPlan; } catch(e){}
+try { window.openMgrComment = openMgrComment; } catch(e){}
+try { window.saveMgrComment = saveMgrComment; } catch(e){}
+try { window.sgSetGrade = sgSetGrade; } catch(e){}
 try { window.renderReviews = renderReviews; } catch(e){}
 try { window.renderSmartGoals = renderSmartGoals; } catch(e){}
 try { window.toggleReviewCard = toggleReviewCard; } catch(e){}
