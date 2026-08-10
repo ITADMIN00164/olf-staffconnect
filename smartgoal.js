@@ -376,7 +376,7 @@ function sgSheetBLinkHtml(raw) {
 function sgOverallHtml(remarks) {
   const v = (remarks==null?'':String(remarks)).trim();
   if (!v) return '';
-  return `<p style="font-size:12px;color:var(--text2);margin:0;padding:8px 12px;background:var(--surface2);border-radius:var(--radius);border-left:3px solid var(--brand)">📝 <span style="font-weight:600;color:var(--text)">Overall Performance</span> - ${esc(v)}</p>`;
+  return `<p style="font-size:12px;color:var(--text2);margin:0;padding:8px 12px;background:var(--surface2);border-radius:var(--radius);border-left:3px solid var(--brand);overflow-wrap:anywhere;word-break:break-word">📝 <span style="font-weight:600;color:var(--text)">Overall Performance</span> - ${esc(v)}</p>`;
 }
 function formatDate(d) { if(!d) return '—'; const dt=new Date(d); if(isNaN(dt)) return d; const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return `${String(dt.getDate()).padStart(2,'0')}-${mo[dt.getMonth()]}-${String(dt.getFullYear()).slice(-2)}`; }
 function esc(s) { return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -1085,37 +1085,37 @@ function sgReviewSortKey(a, b) {
 // Generic review-summary callout (blank value renders nothing).
 function sgReviewNoteHtml(icon, label, val) {
   if (!val || !String(val).trim()) return '';
-  return `<p style="font-size:12px;color:var(--text2);margin:0;padding:8px 12px;background:var(--surface2);border-radius:var(--radius);border-left:3px solid var(--brand)">${icon} <span style="font-weight:600;color:var(--text)">${esc(label)}</span> - ${esc(val)}</p>`;
+  return `<p style="font-size:12px;color:var(--text2);margin:0;padding:8px 12px;background:var(--surface2);border-radius:var(--radius);border-left:3px solid var(--brand);overflow-wrap:anywhere;word-break:break-word">${icon} <span style="font-weight:600;color:var(--text)">${esc(label)}</span> - ${esc(val)}</p>`;
 }
 
 // ── MONTHLY PLAN ──
 const COL_DEFS = [
-  {key:'year',      grp:'plan',   label:'Academic Year'},
-  {key:'month',     grp:'plan',   label:'Month'},
-  {key:'week',      grp:'plan',   label:'Week'},
-  {key:'dept',      grp:'plan',   label:'Dept'},
-  {key:'member',    grp:'plan',   label:'Member'},
-  {key:'goal',      grp:'plan',   label:'SMART Goal'},
-  {key:'cat',       grp:'plan',   label:'Category'},
-  {key:'subcat',    grp:'plan',   label:'Sub-category'},
-  {key:'action',    grp:'plan',   label:'Action Point'},
-  {key:'planned',   grp:'plan',   label:'Planned'},
-  {key:'plannedItems', grp:'plan',label:'Planned Items'},
-  {key:'est',       grp:'plan',   label:'Est Hrs'},
-  {key:'tgtDate',   grp:'plan',   label:'Target Date'},
-  {key:'compDate',  grp:'status', label:'Comp Date'},
-  {key:'actualHrs', grp:'status', label:'Actual Hrs'},
-  {key:'actualItems',grp:'status',label:'Actual Items'},
-  {key:'status',    grp:'status', label:'Status'},
-  {key:'deviation', grp:'status', label:'Deviation'},
-  {key:'helpNeeded',grp:'status', label:'Help Needed'},
-  {key:'managerGrade',   grp:'status', label:'Mgr Grade'},
-  {key:'managerComment', grp:'status', label:'Mgr Comment'},
-  {key:'revisedTgtDate', grp:'status', label:'Revised Date'},
-  {key:'actions',   grp:'act',    label:'Actions'}
+  {key:'year',      grp:'plan',   label:'Academic Year', w:125},
+  {key:'month',     grp:'plan',   label:'Month', w:75},
+  {key:'week',      grp:'plan',   label:'Week', w:65},
+  {key:'dept',      grp:'plan',   label:'Dept', w:90},
+  {key:'member',    grp:'plan',   label:'Member', w:130},
+  {key:'goal',      grp:'plan',   label:'SMART Goal', w:140},
+  {key:'cat',       grp:'plan',   label:'Category', w:120},
+  {key:'subcat',    grp:'plan',   label:'Sub-category', w:120},
+  {key:'action',    grp:'plan',   label:'Action Point', w:230},
+  {key:'planned',   grp:'plan',   label:'Planned', w:70},
+  {key:'plannedItems', grp:'plan',label:'Planned Items', w:80},
+  {key:'est',       grp:'plan',   label:'Est Hrs', w:70},
+  {key:'tgtDate',   grp:'plan',   label:'Target Date', w:110},
+  {key:'compDate',  grp:'status', label:'Comp Date', w:115},
+  {key:'actualHrs', grp:'status', label:'Actual Hrs', w:75},
+  {key:'actualItems',grp:'status',label:'Actual Items', w:80},
+  {key:'status',    grp:'status', label:'Status', w:120},
+  {key:'deviation', grp:'status', label:'Deviation', w:140},
+  {key:'helpNeeded',grp:'status', label:'Help Needed', w:140},
+  {key:'revisedTgtDate', grp:'status', label:'Revised Date', w:110},
+  {key:'managerGrade',   grp:'mgr', label:'Mgr Grade', w:95},
+  {key:'managerComment', grp:'mgr', label:'Mgr Comment', w:110},
+  {key:'actions',   grp:'act',    label:'Actions', w:130}
 ];
-const GRP_LABEL = {plan:'Plan', status:'Status Update', act:'Actions'};
-const GRP_CLASS = {plan:'plan', status:'status', act:'act'};
+const GRP_LABEL = {plan:'Plan', status:'Status Update', mgr:'Manager', act:'Actions'};
+const GRP_CLASS = {plan:'plan', status:'status', mgr:'mgr', act:'act'};
 
 function isColHidden(key) { return (DB.uiPrefs.hiddenPlanCols||[]).includes(key); }
 function toggleColumn(key, show) {
@@ -1144,16 +1144,36 @@ function renderColsPanel() {
   document.getElementById('cols-panel').innerHTML = html;
 }
 
-function visibleCols() { return COL_DEFS.filter(c => c.grp==='act' || !isColHidden(c.key)); }
+// Manager Grade/Comment columns are visible ONLY to admins, dept heads, and
+// anyone who is a reporting manager (has reportees). Plain members never see them.
+function canSeeMgrCols() {
+  return currentUser.role === ROLES.ADMIN || currentUser.role === ROLES.DEPT_HEAD || amIManager();
+}
+function visibleCols() {
+  return COL_DEFS.filter(c => {
+    if (c.grp === 'mgr') return true;   // Manager columns visible to all; members see them view-only
+    return c.grp === 'act' || !isColHidden(c.key);
+  });
+}
 
 function renderPlanHead() {
   const cols = visibleCols();
   const grpCounts = {};
   cols.forEach(c => grpCounts[c.grp] = (grpCounts[c.grp]||0)+1);
   let grpRow = '<tr class="grp-hd">';
-  ['plan','status','act'].forEach(g => { if (grpCounts[g]) grpRow += `<th class="g-${g==='act'?'act':g}" colspan="${grpCounts[g]}">${GRP_LABEL[g]}</th>`; });
+  ['plan','status','mgr','act'].forEach(g => { if (grpCounts[g]) grpRow += `<th class="g-${g}" colspan="${grpCounts[g]}">${GRP_LABEL[g]}</th>`; });
   grpRow += '</tr>';
   let colRow = '<tr class="col-hd">' + cols.map(c => `<th class="h-${c.grp==='act'?'act':c.grp}" data-col="${c.key}">${esc(c.label)}</th>`).join('') + '</tr>';
+  // Fixed column widths: colgroup + table-layout:fixed so columns never grow/shrink
+  // with content; long text wraps to the next line instead.
+  const tbl = document.getElementById('plan-thead').parentElement;
+  if (tbl) {
+    let cg = tbl.querySelector('colgroup.plan-cg');
+    if (!cg) { cg = document.createElement('colgroup'); cg.className = 'plan-cg'; tbl.insertBefore(cg, tbl.firstChild); }
+    cg.innerHTML = cols.map(c => `<col style="width:${c.w||100}px">`).join('');
+    tbl.style.tableLayout = 'fixed';
+    tbl.style.width = cols.reduce((a,c)=>a+(c.w||100),0) + 'px';
+  }
   document.getElementById('plan-thead').innerHTML = grpRow + colRow;
 }
 
@@ -1169,15 +1189,15 @@ function dateCellEditable(id, field, val) {
 function planCellHtml(t, key) {
   const ed = canEditTask(t);
   switch(key) {
-    case 'year': return `<td class="c-plan" style="white-space:nowrap;font-size:11px;color:var(--text3)">${esc(t.year)}</td>`;
+    case 'year': return `<td class="c-plan" style="font-size:11px;color:var(--text3)">${esc(t.year)}</td>`;
     case 'month': return `<td class="c-plan" style="white-space:nowrap;font-size:12px">${esc(t.month)}</td>`;
     case 'week': return `<td class="c-plan" style="white-space:nowrap;font-size:12px;font-weight:600">${esc(t.week)}</td>`;
     case 'dept': return `<td class="c-plan" style="font-size:11px;color:var(--text2)">${esc(t.dept)}</td>`;
-    case 'member': return `<td class="c-plan" style="white-space:nowrap;font-weight:500">${esc(t.member)}</td>`;
+    case 'member': return `<td class="c-plan" style="font-weight:500">${esc(t.member)}</td>`;
     case 'goal': return `<td class="c-plan"><span class="goal-pill ${goalColor(t.goal)}">${esc(t.goal)}</span></td>`;
     case 'cat': return `<td class="c-plan" style="font-size:11px;color:var(--text2)">${esc(t.cat||'—')}</td>`;
     case 'subcat': return `<td class="c-plan" style="font-size:11px">${esc(t.subcat||'—')}</td>`;
-    case 'action': return `<td class="c-plan" style="min-width:170px;font-size:12px">${esc(t.action)}</td>`;
+    case 'action': return `<td class="c-plan" style="font-size:12px">${esc(t.action)}</td>`;
     case 'planned': return `<td class="c-plan">${planBadge(t.planned)}</td>`;
     case 'plannedItems': return `<td class="c-plan" style="text-align:right">${t.plannedItems===''||t.plannedItems==null?'—':t.plannedItems}</td>`;
     case 'est': return `<td class="c-plan" style="text-align:right;font-weight:600">${t.est||0}</td>`;
@@ -1191,27 +1211,27 @@ function planCellHtml(t, key) {
       ? `<td class="c-status"><input class="tbl-input" type="number" min="0" value="${t.actualItems===''||t.actualItems==null?'':t.actualItems}" data-id="${t.id}" data-field="actualItems" style="width:80px"></td>`
       : `<td class="c-status" style="text-align:right">${t.actualItems===''||t.actualItems==null?'—':t.actualItems}</td>`;
     case 'status': return ed
-      ? `<td class="c-status"><select class="tbl-select" data-id="${t.id}" data-field="status" style="min-width:110px">${['Planned','Completed','In Process','Pending','On Hold','Cancelled'].map(s=>`<option value="${s}"${t.status===s?' selected':''}>${s}</option>`).join('')}</select></td>`
+      ? `<td class="c-status"><select class="tbl-select" data-id="${t.id}" data-field="status" style="width:100%">${['Planned','Completed','In Process','Pending','On Hold','Cancelled'].map(s=>`<option value="${s}"${t.status===s?' selected':''}>${s}</option>`).join('')}</select></td>`
       : `<td class="c-status">${statusBadge(t.status)}</td>`;
     case 'deviation': return ed
-      ? `<td class="c-status"><input class="tbl-input" type="text" value="${esc(t.deviation||'')}" placeholder="Deviation…" data-id="${t.id}" data-field="deviation" style="min-width:130px"></td>`
+      ? `<td class="c-status"><input class="tbl-input" type="text" value="${esc(t.deviation||'')}" placeholder="Deviation…" data-id="${t.id}" data-field="deviation" style="width:100%"></td>`
       : `<td class="c-status" style="font-size:11px;color:var(--text2)">${esc(t.deviation||'—')}</td>`;
     case 'helpNeeded': return ed
-      ? `<td class="c-status"><input class="tbl-input" type="text" value="${esc(t.helpNeeded||'')}" placeholder="Help needed…" data-id="${t.id}" data-field="helpNeeded" style="min-width:130px"></td>`
+      ? `<td class="c-status"><input class="tbl-input" type="text" value="${esc(t.helpNeeded||'')}" placeholder="Help needed…" data-id="${t.id}" data-field="helpNeeded" style="width:100%"></td>`
       : `<td class="c-status" style="font-size:11px;color:var(--text2)">${esc(t.helpNeeded||'—')}</td>`;
     case 'managerGrade': {
       const _gt = gradeTitle(t.managerGrade);
       if (canEditMgrTaskFields(t)) {
-        return `<td class="c-status" style="text-align:center" title="${esc(_gt)}"><select class="tbl-select" onchange="sgSetGrade('${t.id}',this.value)" style="min-width:64px">${['','A','B','C'].map(x=>`<option value="${x}"${t.managerGrade===x?' selected':''}>${x||'—'}</option>`).join('')}</select></td>`;
+        return `<td class="c-mgr" style="text-align:center" title="${esc(_gt)}"><select class="tbl-select" onchange="sgSetGrade('${t.id}',this.value)" style="width:100%">${['','A','B','C'].map(x=>`<option value="${x}"${t.managerGrade===x?' selected':''}>${x||'—'}</option>`).join('')}</select></td>`;
       }
-      return `<td class="c-status" style="text-align:center">${t.managerGrade?`<span title="${esc(_gt)}" style="display:inline-block;min-width:22px;padding:2px 8px;border-radius:20px;font-weight:700;font-size:11px;background:var(--surface2);border:1px solid var(--border2)">${esc(t.managerGrade)}</span>`:`<span style="color:var(--text3)" title="No grade">—</span>`}</td>`;
+      return `<td class="c-mgr" style="text-align:center">${t.managerGrade?`<span title="${esc(_gt)}" style="display:inline-block;min-width:22px;padding:2px 8px;border-radius:20px;font-weight:700;font-size:11px;background:var(--surface2);border:1px solid var(--border2)">${esc(t.managerGrade)}</span>`:`<span style="color:var(--text3)" title="No grade">—</span>`}</td>`;
     }
     case 'managerComment': {
       const _has = !!(t.managerComment && String(t.managerComment).trim());
       const _ed = canEditMgrTaskFields(t);
       const _icon = _ed ? '✏️' : '👁';
       const _ttl = _ed ? 'View / edit manager comment' : 'View manager comment';
-      return `<td class="c-status" style="text-align:center"><button type="button" class="btn btn-secondary btn-sm" onclick="openMgrComment('${t.id}')" title="${_ttl}" style="padding:2px 9px">${_icon}${_has?' •':''}</button></td>`;
+      return `<td class="c-mgr" style="text-align:center"><button type="button" class="btn btn-secondary btn-sm" onclick="openMgrComment('${t.id}')" title="${_ttl}" style="padding:2px 9px">${_icon}${_has?' •':''}</button></td>`;
     }
     case 'revisedTgtDate': return ed ? dateCellEditable(t.id,'revisedTgtDate',t.revisedTgtDate)
       : `<td class="c-status" style="white-space:nowrap">${dateChip(t.revisedTgtDate)}</td>`;
@@ -1253,6 +1273,15 @@ function renderPlan() {
   if(member) tasks=tasks.filter(t=>t.member===member);
   if(status) tasks=tasks.filter(t=>t.status===status);
   if(search) tasks=tasks.filter(t=>t.action.toLowerCase().includes(search)||(t.subcat||'').toLowerCase().includes(search)||(t.cat||'').toLowerCase().includes(search));
+
+  // Sort: Week 1 → 2 → 3 …, and within each week newest-added first.
+  tasks.sort((a,b)=>{
+    const wa=WEEKS.indexOf(a.week), wb=WEEKS.indexOf(b.week);
+    if (wa!==wb) return wa-wb;
+    const ca=a.createdAt||'', cb=b.createdAt||'';
+    if (ca!==cb) return ca<cb?1:-1;
+    return 0;
+  });
 
   const cols = visibleCols();
   if(!tasks.length){tbody.innerHTML=`<tr><td colspan="${cols.length}"><div class="empty"><div class="empty-icon">📋</div><p>No tasks for this selection.</p></div></td></tr>`;return;}
@@ -1344,7 +1373,7 @@ function openAddTask() {
   document.getElementById('task-modal-title').textContent='Add Task';
   document.getElementById('tf-year').value = currentAcademicYearGuess();
   document.getElementById('tf-month').value = MONTHS[new Date().getMonth()];
-  document.getElementById('tf-week').value='Week 1';
+  document.getElementById('tf-week').value = 'Week ' + Math.min(5, Math.ceil(new Date().getDate()/7));
   document.getElementById('tf-subcat').value='';
   document.getElementById('tf-action').value='';
   document.getElementById('tf-planneditems').value='';
@@ -1518,13 +1547,15 @@ function renderReviews() {
           <td style="text-align:center">${esc(i.actual||'—')}</td>
           <td style="text-align:center"><button type="button" class="remark-icon-btn ${hasRemark?'has-remark':''}" title="${hasRemark?'View / edit remark':(canEditRemark?'Add remark':'No remark')}" onclick="sgOpenItemRemarkModal('${r.id}',${itemIndex})">${hasRemark?'📝':'✏️'}</button></td>
           <td style="text-align:center;font-weight:700">${i.maxScore}</td>
+          <td style="text-align:center"><span class="score-badge ${scoreClass(i.memberScore,i.maxScore)}">${i.memberScore||'—'}</span></td>
+          <td style="text-align:center">${parseFloat(i.mgrScore)>0?`<span class="score-badge ${scoreClass(i.mgrScore,i.maxScore)}">${i.mgrScore}</span>`:'<span style="font-size:11px;color:var(--text3)">—</span>'}</td>
         </tr>`;
       }).join('');
 
       const detailTable = `<table class="tbl tbl-fixed tbl-grouped">
         <colgroup>
-          <col style="width:16%"><col style="width:44%"><col style="width:10%"><col style="width:10%">
-          <col style="width:12%"><col style="width:8%">
+          <col style="width:13%"><col style="width:33%"><col style="width:8%"><col style="width:8%">
+          <col style="width:8%"><col style="width:8%"><col style="width:11%"><col style="width:11%">
         </colgroup>
         <thead><tr>
           <th>Category</th><th>Particulars</th>
@@ -1532,12 +1563,16 @@ function renderReviews() {
           <th class="sg-th-nowrap" style="text-align:center">Actual</th>
           <th class="sg-th-nowrap" style="text-align:center">Remark</th>
           <th class="sg-th-nowrap" style="text-align:center">Max</th>
+          <th class="sg-th-nowrap" style="text-align:center">Member Score</th>
+          <th class="sg-th-nowrap" style="text-align:center">Manager Score</th>
         </tr></thead>
         <tbody>
           ${detailBody}
           <tr class="sg-total-row" style="font-weight:700">
             <td colspan="5">Total</td>
             <td style="text-align:center">${gMax}</td>
+            <td style="text-align:center"><span class="score-badge ${scoreClass(gMem,gMax)}">${gMem}</span></td>
+            <td style="text-align:center">${gMgr>0?`<span class="score-badge ${scoreClass(gMgr,gMax)}">${gMgr}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
           </tr>
         </tbody>
       </table>`;
@@ -1562,7 +1597,7 @@ function renderReviews() {
     const areasHtml = sgReviewNoteHtml('📈', 'Areas of Improvement', r.areasOfImprovement);
     const summaryHtml = `<div style="margin-bottom:18px">
       <div class="review-section-hd">Summary of Review — ${monthYearLabel(r.year,r.month)} <span style="font-weight:400;font-size:11px;color:var(--text3);text-transform:none;letter-spacing:0">— click a SMART Goal to view its details</span></div>
-      ${(overallHtml || sheetBHtml || helpHtml || areasHtml) ? `<div style="margin:10px 0 12px;display:flex;flex-direction:column;gap:8px">${overallHtml}${sheetBHtml}${helpHtml}${areasHtml}</div>` : ''}
+      ${(overallHtml || sheetBHtml) ? `<div style="margin:10px 0 8px;display:grid;grid-template-columns:minmax(0,1fr) 200px;gap:8px;align-items:start">${overallHtml||'<span></span>'}${sheetBHtml||'<span></span>'}</div>` : ''}
       <div class="tbl-wrap"><table class="tbl tbl-fixed">
         <colgroup>
           <col style="width:5%"><col style="width:22%"><col style="width:47%"><col style="width:13%"><col style="width:13%">
@@ -1580,6 +1615,7 @@ function renderReviews() {
           </tr>
         </tbody>
       </table></div>
+      ${(helpHtml || areasHtml) ? `<div style="margin:12px 0 0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:start">${helpHtml||'<span></span>'}${areasHtml||'<span></span>'}</div>` : ''}
     </div>`;
 
     // Collapsed by default: only this header line shows. Click the row to expand details.

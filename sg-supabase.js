@@ -123,7 +123,7 @@
                    tgtDate: t.tgt_date || '', compDate: t.comp_date || '', actualHrs: sgNum0(t.actual_hrs),
                    actualItems: sgNumOrEmpty(t.actual_items), status: t.status || '', deviation: t.deviation || '',
                    helpNeeded: t.help_needed || '', revisedTgtDate: t.revised_tgt_date || '',
-                   managerComment: t.manager_comment || '', managerGrade: t.manager_grade || '' };
+                   managerComment: t.manager_comment || '', managerGrade: t.manager_grade || '', createdAt: t.created_at || '' };
         }),
         reviews: reviews.map(function (r) {
           return { id: String(r.id || ''), year: r.year || '', month: r.month || '', dept: r.dept || '',
