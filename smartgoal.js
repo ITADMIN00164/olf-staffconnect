@@ -335,7 +335,7 @@ function switchRole(idx) {
   toast(`Viewing as: ${r.label}`);
 }
 
-function save() { try { localStorage.setItem('sg_uiPrefs', JSON.stringify(DB.uiPrefs||{})); } catch(e){} saveSnapshot(); if (syncEnabled) syncDiff(); }
+function save() { saveUiPrefs(); saveSnapshot(); if (syncEnabled) syncDiff(); }
 
 // ── HELPERS ──
 function uid() { return 'id_' + Math.random().toString(36).slice(2,10); }
@@ -1104,8 +1104,8 @@ const COL_DEFS = [
   {key:'est',       grp:'plan',   label:'Est Hrs', w:70},
   {key:'tgtDate',   grp:'plan',   label:'Target Date', w:110},
   {key:'compDate',  grp:'status', label:'Comp Date', w:115},
-  {key:'actualHrs', grp:'status', label:'Actual Hrs', w:75},
-  {key:'actualItems',grp:'status',label:'Actual Items', w:80},
+  {key:'actualHrs', grp:'status', label:'Actual Hrs', w:85},
+  {key:'actualItems',grp:'status',label:'Actual Items', w:90},
   {key:'status',    grp:'status', label:'Status', w:120},
   {key:'deviation', grp:'status', label:'Deviation', w:140},
   {key:'helpNeeded',grp:'status', label:'Help Needed', w:140},
@@ -1119,9 +1119,11 @@ const GRP_CLASS = {plan:'plan', status:'status', mgr:'mgr', act:'act'};
 
 function isColHidden(key) { return (DB.uiPrefs.hiddenPlanCols||[]).includes(key); }
 function toggleColumn(key, show) {
+  if (!DB.uiPrefs) DB.uiPrefs = { hiddenPlanCols: [] };
   const set = new Set(DB.uiPrefs.hiddenPlanCols||[]);
   if (show) set.delete(key); else set.add(key);
   DB.uiPrefs.hiddenPlanCols = [...set];
+  saveUiPrefs();   // persist the choice immediately (per-user), survives refresh
   save(); renderPlan();
 }
 function toggleColsPanel() {
@@ -1205,10 +1207,10 @@ function planCellHtml(t, key) {
     case 'compDate': return ed ? dateCellEditable(t.id,'compDate',t.compDate)
       : `<td class="c-status" style="white-space:nowrap">${dateChip(t.compDate)}</td>`;
     case 'actualHrs': return ed
-      ? `<td class="c-status"><input class="tbl-input" type="number" step="0.5" min="0" value="${t.actualHrs||0}" data-id="${t.id}" data-field="actualHrs" style="width:72px"></td>`
+      ? `<td class="c-status"><input class="tbl-input" type="number" step="0.5" min="0" value="${t.actualHrs||0}" data-id="${t.id}" data-field="actualHrs" style="width:100%"></td>`
       : `<td class="c-status" style="text-align:right">${t.actualHrs||0}</td>`;
     case 'actualItems': return ed
-      ? `<td class="c-status"><input class="tbl-input" type="number" min="0" value="${t.actualItems===''||t.actualItems==null?'':t.actualItems}" data-id="${t.id}" data-field="actualItems" style="width:80px"></td>`
+      ? `<td class="c-status"><input class="tbl-input" type="number" min="0" value="${t.actualItems===''||t.actualItems==null?'':t.actualItems}" data-id="${t.id}" data-field="actualItems" style="width:100%"></td>`
       : `<td class="c-status" style="text-align:right">${t.actualItems===''||t.actualItems==null?'—':t.actualItems}</td>`;
     case 'status': return ed
       ? `<td class="c-status"><select class="tbl-select" data-id="${t.id}" data-field="status" style="width:100%">${['Planned','Completed','In Process','Pending','On Hold','Cancelled'].map(s=>`<option value="${s}"${t.status===s?' selected':''}>${s}</option>`).join('')}</select></td>`
@@ -2404,9 +2406,23 @@ function resolveUser() {
 }
 
 // ── DATA LOAD ──
+function _uiPrefsKey() {
+  var u = (window.SMART_GOALS_USER && window.SMART_GOALS_USER.email) || 'anon';
+  return 'sg_uiPrefs_' + u;
+}
 function loadUiPrefs() {
-  try { var v = JSON.parse(localStorage.getItem('sg_uiPrefs') || 'null'); if (v && v.hiddenPlanCols) return v; } catch (e) {}
+  try {
+    var raw = localStorage.getItem(_uiPrefsKey());
+    if (raw == null) raw = localStorage.getItem('sg_uiPrefs'); // migrate old global key
+    var v = JSON.parse(raw || 'null');
+    if (v && Array.isArray(v.hiddenPlanCols)) return { hiddenPlanCols: v.hiddenPlanCols };
+  } catch (e) {}
   return { hiddenPlanCols: [] };
+}
+// Persist column show/hide choices under a per-user key so a background sync or a
+// second account on the same browser can never clobber them.
+function saveUiPrefs() {
+  try { localStorage.setItem(_uiPrefsKey(), JSON.stringify(DB.uiPrefs || { hiddenPlanCols: [] })); } catch (e) {}
 }
 // ── Client snapshot: instant first paint across full page reloads ──
 // Stores the last-seen data in localStorage so the page renders immediately on
