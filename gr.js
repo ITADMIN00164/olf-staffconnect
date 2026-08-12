@@ -47,6 +47,29 @@
     function stateShort(code) { return STATE_SHORT[code] || code || "—"; }
     function stateCell(code) { return `<span title="${escHtml(STATE_LABELS[code] || code || "")}">${escHtml(stateShort(code))}</span>`; }
 
+    // Type is rendered as a single initial (G / C) so the column stays narrow.
+    // The full name is still available on hover.
+    function isGrType(type) { return String(type || "").toLowerCase() === "gr"; }
+    function typeCell(type) {
+        if (!type) return `<span class="gr-muted">—</span>`;
+        const gr = isGrType(type);
+        return `<span class="gr-type gr-type--${gr ? "gr" : "circ"} gr-type--initial" title="${escHtml(gr ? "Government Resolution (GR)" : "Circular")}">${gr ? "G" : "C"}</span>`;
+    }
+
+    // Validator remark cell — an icon button that opens the shared popup,
+    // so the remark never eats table width. Validators get a writable cell
+    // on the Dashboard (including on locked, already-validated rows); the
+    // Upload tab is always read-only.
+    function remarkCell(r, editable) {
+        const has = !!r.validatorRemark;
+        if (editable) {
+            return `<button type="button" class="gr-desc-btn${has ? "" : " gr-desc-btn--empty"}" data-act="remark-edit" data-id="${escHtml(r.recordId)}" title="${has ? "View / edit validator remark" : "Add a validator remark"}">${has ? "💬" : "✎"}</button>`;
+        }
+        return has
+            ? `<button type="button" class="gr-desc-btn" data-act="remark" data-desc="${escHtml(r.validatorRemark)}" title="View validator remark">💬</button>`
+            : `<span class="gr-muted">—</span>`;
+    }
+
     const STATE_DISTRICTS = {
         MH: [
             "Ahilyanagar", "Akola", "Amravati", "Beed", "Bhandara", "Buldhana",
@@ -136,21 +159,41 @@
         return `${names[parseInt(m, 10)] || m} ${y}`;
     }
 
+    /* toLocaleDateString / toLocaleString build a fresh Intl formatter on
+       every call, which costs about a millisecond each. Across a table of
+       rows that alone was most of the render time, so the formatters are
+       built once and the results memoised - the same handful of dates
+       repeats across hundreds of rows. */
+    const DATE_FMT = new Intl.DateTimeFormat("en-IN", {
+        day: "2-digit", month: "short", year: "numeric"
+    });
+    const DATETIME_FMT = new Intl.DateTimeFormat("en-IN", {
+        day: "2-digit", month: "short", year: "numeric",
+        hour: "2-digit", minute: "2-digit"
+    });
+    const dateMemo = new Map();
+    const dateTimeMemo = new Map();
+
     function fmtDate(dateStr) {
         if (!dateStr) return "—";
-        const d = new Date(String(dateStr).length <= 10 ? `${dateStr}T00:00:00` : dateStr);
-        if (isNaN(d)) return escHtml(dateStr);
-        return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+        const key = String(dateStr);
+        const hit = dateMemo.get(key);
+        if (hit !== undefined) return hit;
+        const d = new Date(key.length <= 10 ? `${key}T00:00:00` : key);
+        const out = isNaN(d) ? escHtml(key) : DATE_FMT.format(d);
+        if (dateMemo.size < 4000) dateMemo.set(key, out);
+        return out;
     }
 
     function fmtDateTime(val) {
         if (!val) return "—";
-        const d = new Date(val);
-        if (isNaN(d)) return escHtml(val);
-        return d.toLocaleString("en-IN", {
-            day: "2-digit", month: "short", year: "numeric",
-            hour: "2-digit", minute: "2-digit"
-        });
+        const key = String(val);
+        const hit = dateTimeMemo.get(key);
+        if (hit !== undefined) return hit;
+        const d = new Date(key);
+        const out = isNaN(d) ? escHtml(key) : DATETIME_FMT.format(d);
+        if (dateTimeMemo.size < 4000) dateTimeMemo.set(key, out);
+        return out;
     }
 
     function fileToBase64(file) {
@@ -160,6 +203,15 @@
             r.onerror = () => reject(new Error("Could not read the selected file"));
             r.readAsDataURL(file);
         });
+    }
+
+    // Plain string comparison instead of localeCompare: these are ISO
+    // date / timestamp strings, so the result is identical and it runs
+    // an order of magnitude faster across a full year of records.
+    function cmpStr(a, b) {
+        const x = String(a == null ? "" : a);
+        const y = String(b == null ? "" : b);
+        return x < y ? -1 : (x > y ? 1 : 0);
     }
 
     function isLocal(record) {
@@ -216,6 +268,70 @@
     // Detailed dashboard — clickable stat filter (state/district/month come from the filter bar)
     let dashStatFilter = "all";                 // all | validated | not_validated
 
+    /* ----------------------------------------------------------
+       SPEED
+       1. The last known records live in localStorage, so the table
+          paints immediately on a cold load instead of waiting for
+          Apps Script.
+       2. A tiny "ver" call then tells us whether anything actually
+          changed; the full list is only downloaded when it did.
+       3. Rows render in windows, so a year of data (1000-1500 rows)
+          never builds 20k DOM nodes at once.
+    ---------------------------------------------------------- */
+    const LS_KEY = "olf_gr_cache_v1";
+    const LS_MAX_AGE = 7 * 24 * 60 * 60 * 1000;   // a week-old cache is still fine as a first paint
+    const VER_MIN_GAP = 45000;                    // don't re-check the version more often than this
+    const ROW_PAGE = 50;                          // rows added per window
+
+    let dataVersion = "";
+    let lastCheckAt = 0;
+    let persistTimer = null;
+
+    let dashRows = [], dashShown = 0;   // Dashboard windowing
+    let myRows = [], myShown = 0;       // My uploads windowing
+
+    // Paint from the previous session's data, if we still have it.
+    function loadFromLocal() {
+        try {
+            const raw = localStorage.getItem(LS_KEY);
+            if (!raw) return false;
+            const box = JSON.parse(raw);
+            if (!box || !Array.isArray(box.records) || !box.records.length) return false;
+            if (Date.now() - (box.savedAt || 0) > LS_MAX_AGE) return false;
+            allRecords = box.records;
+            dataVersion = box.version || "";
+            recordsLoaded = true;
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    // Throttled, and only ever stores server-confirmed records — an
+    // in-flight upload must not come back to life after a refresh.
+    function persistLocal() {
+        if (persistTimer) return;
+        persistTimer = setTimeout(() => {
+            persistTimer = null;
+            try {
+                const clean = allRecords
+                    .filter(r => !r._sync && !isLocal(r))
+                    .map(r => {
+                        const c = { ...r };
+                        delete c._sync;
+                        delete c._syncError;
+                        return c;
+                    });
+                localStorage.setItem(LS_KEY, JSON.stringify({
+                    version: dataVersion, savedAt: Date.now(), records: clean
+                }));
+            } catch (e) {
+                // Out of quota or private mode — drop the cache and carry on.
+                try { localStorage.removeItem(LS_KEY); } catch (e2) {}
+            }
+        }, 1200);
+    }
+
     /* ====================================================
        MOUNT — called by the router after gr.html is injected
     ==================================================== */
@@ -245,25 +361,36 @@
                     (user.isValidator ? ` <span class="gr-badge gr-badge--val">Validator</span>` : "");
             }
 
-            // Instant paint from the in-memory cache (repeat visits render
-            // with zero wait), then refresh silently in the background.
+            // Instant paint from memory, or from the stored copy on a cold
+            // load, then check the server quietly in the background.
+            if (!allRecords.length) loadFromLocal();
             refreshMonthOptions();
             renderMyUploads();
-            loadRecords();
+            syncRecords();
         }
     };
 
     /* ====================================================
        ROLE-BASED VISIBILITY
-       The Upload tab is for everyone. The Dashboard and
-       Summary tabs (validation views) are validator-only —
-       non-validators never see the tab buttons for them.
+       All three tabs are open to every member: Upload, Dashboard
+       and Summary are all readable by anyone. What is restricted
+       is the ability to ACT on a record — validating, rejecting and
+       writing a remark stay validator-only. That is enforced in
+       three places, so a non-validator has no route to a write:
+         • detailedRowHtml() renders "View only" instead of the
+           validate / reject buttons;
+         • remarkCell() renders a read-only remark icon rather
+           than the editable one;
+         • handleValidation() and editRemark() both refuse outright
+           if called anyway.
+       The Summary tab is read-only by nature — it has no actions.
     ==================================================== */
     function applyRoleVisibility() {
-        if (user.isValidator) return;
-        document.querySelectorAll("#grPage .gr-tab").forEach(tab => {
-            if (tab.dataset.tab !== "upload") tab.style.display = "none";
-        });
+        // Nothing to hide at the tab level any more. Kept as the single
+        // place to put page-level role rules if they are ever needed,
+        // and it tags the page so CSS can react to the role.
+        const root = document.getElementById("grPage");
+        if (root) root.classList.toggle("gr-role-validator", !!user.isValidator);
     }
     window.GRCirculars = GRCirculars;
 
@@ -294,7 +421,7 @@
     ==================================================== */
     function wireTopRefresh() {
         const btn = document.getElementById("grRefreshAll");
-        if (btn) btn.addEventListener("click", () => loadRecords({ nocache: true }));
+        if (btn) btn.addEventListener("click", () => syncRecords({ force: true }));
     }
 
     function setRefreshBusy(busy) {
@@ -559,6 +686,7 @@
                 mimeType: p.file.type || "application/octet-stream"
             });
 
+            if (data.version) dataVersion = String(data.version);
             const idx = allRecords.findIndex(r => String(r.recordId) === localId);
             if (data.record) {
                 sessionMyIds.add(String(data.record.recordId));
@@ -569,6 +697,7 @@
             }
             delete pendingUploads[localId];
             sessionMyIds.delete(localId);
+            persistLocal();
             notify("Uploaded to Drive ✓", "success");
         } catch (err) {
             console.error(err);
@@ -605,24 +734,51 @@
        results simply re-render when they arrive. Optimistic
        and in-flight records are preserved across merges.
     ==================================================== */
+    /**
+     * The cheap path: ask only whether the data changed. A "ver" reply is
+     * a few bytes against a payload that reaches ~1.5 MB at a full year of
+     * records, so an unchanged dataset costs one tiny round trip and the
+     * screen never blanks. Falls back to a full load on any doubt.
+     */
+    async function syncRecords({ force = false } = {}) {
+        if (force) {
+            lastCheckAt = Date.now();
+            return loadRecords({ nocache: true });
+        }
+        if (!allRecords.length || !dataVersion) return loadRecords();
+        if (Date.now() - lastCheckAt < VER_MIN_GAP) return;   // just checked
+
+        lastCheckAt = Date.now();
+        try {
+            const data = await api({ action: "ver" });
+            if (data.version && String(data.version) === String(dataVersion)) return;
+        } catch (err) {
+            // Older backend without the "ver" action, or a blip: just reload.
+            console.warn("Version check failed, falling back to a full load.", err);
+        }
+        return loadRecords();
+    }
+
     async function loadRecords({ nocache = false } = {}) {
         const firstLoad = !recordsLoaded;
         if (firstLoad) {
-            setLoadingBody("grMyBody", 10, "Loading your uploads…");
-            setLoadingBody("grDetailedBody", 12, "Loading records…");
+            setLoadingBody("grMyBody", 11, "Loading your uploads…");
+            setLoadingBody("grDetailedBody", 13, "Loading records…");
         }
         setRefreshBusy(true);
         try {
             const data = await api({ action: "list", nocache: !!nocache });
             mergeServerRecords(Array.isArray(data.records) ? data.records : []);
             recordsLoaded = true;
+            if (data.version) dataVersion = String(data.version);
+            persistLocal();
             refreshMonthOptions();
             rerenderAll();
         } catch (err) {
             console.error(err);
             if (firstLoad) {
-                setEmptyBody("grMyBody", 10, "⚠️", err.message);
-                setEmptyBody("grDetailedBody", 12, "⚠️", err.message);
+                setEmptyBody("grMyBody", 11, "⚠️", err.message);
+                setEmptyBody("grDetailedBody", 13, "⚠️", err.message);
             } else {
                 notify("Refresh failed: " + err.message, "error");
             }
@@ -718,7 +874,7 @@
             sessionMyIds.has(String(r.recordId)) ||
             (r.uploadedByEmail && String(r.uploadedByEmail).toLowerCase() === email) ||
             (!r.uploadedByEmail && String(r.uploadedBy || "").toLowerCase() === email)
-        ).sort((a, b) => String(b.uploadTimestamp).localeCompare(String(a.uploadTimestamp)));
+        ).sort((a, b) => cmpStr(b.uploadTimestamp, a.uploadTimestamp));
     }
 
     function renderMyUploads() {
@@ -748,21 +904,75 @@
         }
 
         if (!mine.length) {
-            setEmptyBody("grMyBody", 10, "📂", "You haven't uploaded any GRs / Circulars yet. Click “+ Add New GR / Circular” to get started.");
+            setEmptyBody("grMyBody", 11, "📂", "You haven't uploaded any GRs / Circulars yet. Click “+ Add New GR / Circular” to get started.");
             return;
         }
         if (!shown.length) {
-            setEmptyBody("grMyBody", 10, "📭", "No uploads match the current filters.");
+            setEmptyBody("grMyBody", 11, "📭", "No uploads match the current filters.");
             return;
         }
 
-        body.innerHTML = shown.map((r, i) => myRowHtml(r, i + 1)).join("");
+        const wrap = tableWrap("upload");
+        const prevTop = wrap ? wrap.scrollTop : 0;
+        const keep = Math.max(ROW_PAGE, myShown);   // keep what the user already scrolled through
 
-        body.querySelectorAll("button[data-act='retry']").forEach(btn => {
-            btn.addEventListener("click", () => performUpload(btn.dataset.id));
+        myRows = shown;
+        myShown = 0;
+        body.innerHTML = "";
+        wireMyRowActions();
+        wireLazyScroll("upload");
+        appendMyRows(keep);
+        restoreScroll(wrap, prevTop);
+    }
+
+    function appendMyRows(count) {
+        const body = document.getElementById("grMyBody");
+        if (!body) return;
+        const next = myRows.slice(myShown, myShown + (count || ROW_PAGE));
+        if (!next.length) return;
+        body.insertAdjacentHTML("beforeend",
+            next.map((r, i) => myRowHtml(r, myShown + i + 1)).join(""));
+        myShown += next.length;
+    }
+
+    // One delegated listener per table instead of one per button — rows
+    // are appended in windows, so per-row wiring would stack duplicates.
+    function wireMyRowActions() {
+        const body = document.getElementById("grMyBody");
+        if (!body || body.dataset.wired === "1") return;
+        body.dataset.wired = "1";
+        body.addEventListener("click", (e) => {
+            const btn = e.target.closest("button[data-act]");
+            if (!btn) return;
+            const act = btn.dataset.act;
+            if (act === "retry") performUpload(btn.dataset.id);
+            else if (act === "discard") discardFailedUpload(btn.dataset.id);
+            else if (act === "remark") openDescModal(btn.dataset.desc || "", "Validator remark");
         });
-        body.querySelectorAll("button[data-act='discard']").forEach(btn => {
-            btn.addEventListener("click", () => discardFailedUpload(btn.dataset.id));
+    }
+
+    /* Writing scrollTop straight after an insert forces a synchronous
+       layout and blocks the frame. When there is nothing to restore
+       (the common case - the list is at the top) skip it entirely,
+       otherwise let the browser lay out first and restore on the next
+       frame. */
+    function restoreScroll(wrap, top) {
+        if (!wrap || !top) return;
+        requestAnimationFrame(() => { wrap.scrollTop = top; });
+    }
+
+    function tableWrap(panel) {
+        return document.querySelector(`#grPage .gr-panel[data-panel="${panel}"] .gr-table-wrap`);
+    }
+
+    // Adds the next window of rows as the user nears the bottom.
+    function wireLazyScroll(panel) {
+        const wrap = tableWrap(panel);
+        if (!wrap || wrap.dataset.lazy === "1") return;
+        wrap.dataset.lazy = "1";
+        wrap.addEventListener("scroll", () => {
+            if (wrap.scrollTop + wrap.clientHeight < wrap.scrollHeight - 260) return;
+            if (panel === "detailed") appendDetailedRows(); else appendMyRows();
         });
     }
 
@@ -792,13 +1002,14 @@
         return `
         <tr>
             <td>${sr}</td>
-            <td><span class="gr-type gr-type--${(r.type || "").toLowerCase() === "gr" ? "gr" : "circ"}">${escHtml(r.type || "")}</span></td>
+            <td>${typeCell(r.type)}</td>
             <td class="gr-td-title">${escHtml(r.title)}</td>
-            <td>${fmtDate(r.docDate)}</td>
+            <td class="gr-td-date">${fmtDate(r.docDate)}</td>
             <td>${escHtml(r.district)}</td>
             <td>${stateCell(r.state)}</td>
             <td>${fileCell}</td>
             <td>${statusChip(r.status)}</td>
+            <td class="gr-td-icon">${remarkCell(r, false)}</td>
             <td><div class="gr-ts">${fmtDateTime(r.uploadTimestamp)}</div></td>
             <td>${actionCell}</td>
         </tr>`;
@@ -875,9 +1086,9 @@
         return [...rows].sort((a, b) => {
             const av = (a.status || "").toLowerCase() === "validated";
             const bv = (b.status || "").toLowerCase() === "validated";
-            if (av && bv) return String(b.validatedTimestamp).localeCompare(String(a.validatedTimestamp));
+            if (av && bv) return cmpStr(b.validatedTimestamp, a.validatedTimestamp);
             if (av !== bv) return av ? -1 : 1;
-            return String(b.docDate).localeCompare(String(a.docDate));
+            return cmpStr(b.docDate, a.docDate);
         });
     }
 
@@ -909,12 +1120,31 @@
         updateDetailedMeta(rows.length);
 
         if (!rows.length) {
-            setEmptyBody("grDetailedBody", 12, "📭", "No GRs / Circulars found for this selection.");
+            setEmptyBody("grDetailedBody", 13, "📭", "No GRs / Circulars found for this selection.");
             return;
         }
 
-        body.innerHTML = rows.map((r, i) => detailedRowHtml(r, i + 1)).join("");
+        const wrap = tableWrap("detailed");
+        const prevTop = wrap ? wrap.scrollTop : 0;
+        const keep = Math.max(ROW_PAGE, dashShown);
+
+        dashRows = rows;
+        dashShown = 0;
+        body.innerHTML = "";
         wireRowActions();
+        wireLazyScroll("detailed");
+        appendDetailedRows(keep);
+        restoreScroll(wrap, prevTop);
+    }
+
+    function appendDetailedRows(count) {
+        const body = document.getElementById("grDetailedBody");
+        if (!body) return;
+        const next = dashRows.slice(dashShown, dashShown + (count || ROW_PAGE));
+        if (!next.length) return;
+        body.insertAdjacentHTML("beforeend",
+            next.map((r, i) => detailedRowHtml(r, dashShown + i + 1)).join(""));
+        dashShown += next.length;
     }
 
     function statusChip(status) {
@@ -960,10 +1190,10 @@
         return `
         <tr>
             <td>${sr}</td>
-            <td><span class="gr-type gr-type--${(r.type || "").toLowerCase() === "gr" ? "gr" : "circ"}">${escHtml(r.type || "")}</span></td>
+            <td>${typeCell(r.type)}</td>
             <td class="gr-td-title">${escHtml(r.title)}</td>
             <td class="gr-td-icon">${r.description ? `<button type="button" class="gr-desc-btn" data-act="desc" data-desc="${escHtml(r.description)}" title="View description">📄</button>` : `<span class="gr-muted">—</span>`}</td>
-            <td>${fmtDate(r.docDate)}</td>
+            <td class="gr-td-date">${fmtDate(r.docDate)}</td>
             <td>${escHtml(r.district)}</td>
             <td>${stateCell(r.state)}</td>
             <td>${fileCell}</td>
@@ -976,19 +1206,28 @@
                 ${r.validatedBy ? `<div class="gr-uploaded">${escHtml(r.validatedByName || r.validatedBy)}</div>
                 <div class="gr-ts">${fmtDateTime(r.validatedTimestamp)}</div>` : `<span class="gr-muted">—</span>`}
             </td>
+            <td class="gr-td-icon">${remarkCell(r, user.isValidator && !syncing)}</td>
             <td>${actionCell}</td>
         </tr>`;
     }
 
     function wireRowActions() {
-        document.querySelectorAll("#grDetailedBody button[data-act]").forEach(btn => {
-            btn.addEventListener("click", () => {
-                if (btn.dataset.act === "desc") {
-                    openDescModal(btn.dataset.desc || "");
-                } else {
-                    handleValidation(btn.dataset.act, btn.dataset.id);
-                }
-            });
+        const body = document.getElementById("grDetailedBody");
+        if (!body || body.dataset.wired === "1") return;
+        body.dataset.wired = "1";
+        body.addEventListener("click", (e) => {
+            const btn = e.target.closest("button[data-act]");
+            if (!btn) return;
+            const act = btn.dataset.act;
+            if (act === "desc") {
+                openDescModal(btn.dataset.desc || "", "Description");
+            } else if (act === "remark") {
+                openDescModal(btn.dataset.desc || "", "Validator remark");
+            } else if (act === "remark-edit") {
+                editRemark(btn.dataset.id);
+            } else {
+                handleValidation(act, btn.dataset.id);
+            }
         });
     }
 
@@ -1003,7 +1242,7 @@
         // Static markup only (no user data) — the description text is injected later via textContent.
         overlay.innerHTML =
             '<div class="gr-modal-box" role="dialog" aria-modal="true" style="width:560px">' +
-            '<div class="gr-modal-header"><div><h2>Description</h2></div>' +
+            '<div class="gr-modal-header"><div><h2 id="grDescHeading">Description</h2></div>' +
             '<button class="gr-modal-close" id="grDescCloseX" type="button">\u2715</button></div>' +
             '<div class="gr-modal-body"><p id="grDescText" style="font-size:14px;line-height:1.6;color:#1f2937;white-space:pre-wrap;word-break:break-word;margin:0;"></p></div>' +
             '</div>';
@@ -1013,8 +1252,10 @@
         return overlay;
     }
     // content set via textContent (never innerHTML) so it's safe for any text.
-    function openDescModal(text) {
+    function openDescModal(text, heading) {
         const overlay = ensureDescModal();
+        const head = overlay.querySelector("#grDescHeading");
+        if (head) head.textContent = heading || "Description";
         const body = overlay.querySelector("#grDescText");
         if (body) body.textContent = (text == null || text === "") ? "—" : text;
         overlay.classList.add("open");
@@ -1022,6 +1263,125 @@
     function closeDescModal() {
         const overlay = document.getElementById("grDescModalOverlay");
         if (overlay) overlay.classList.remove("open");
+    }
+
+    /* ====================================================
+       REMARK PROMPT
+       There is no prompt-with-input helper in app.js, so this is a
+       small confirm dialog with a textarea. Resolves to the remark
+       string (possibly "") on confirm, or null when cancelled.
+    ==================================================== */
+    function ensureRemarkModal() {
+        let overlay = document.getElementById("grRemarkOverlay");
+        if (overlay) return overlay;
+        overlay = document.createElement("div");
+        overlay.className = "gr-modal-overlay";
+        overlay.id = "grRemarkOverlay";
+        // Static markup only — all text is set later via textContent.
+        overlay.innerHTML =
+            '<div class="gr-modal-box gr-modal-box--sm" role="dialog" aria-modal="true">' +
+            '<div class="gr-modal-header"><div><h2 id="grRemarkTitle"></h2>' +
+            '<p id="grRemarkMsg"></p></div>' +
+            '<button class="gr-modal-close" id="grRemarkCloseX" type="button">✕</button></div>' +
+            '<div class="gr-modal-body"><div class="gr-field">' +
+            '<label for="grRemarkText">Remark <span class="gr-muted">(optional)</span></label>' +
+            '<textarea id="grRemarkText" placeholder="Add a note for the person who uploaded this…"></textarea>' +
+            '</div></div>' +
+            '<div class="gr-modal-footer">' +
+            '<button class="gr-btn-secondary" id="grRemarkCancel" type="button">Cancel</button>' +
+            '<button class="gr-btn-primary" id="grRemarkOk" type="button"></button>' +
+            '</div></div>';
+        (document.getElementById("grPage") || document.body).appendChild(overlay);
+        return overlay;
+    }
+
+    function askRemark(opts) {
+        return new Promise(resolve => {
+            const overlay = ensureRemarkModal();
+            overlay.querySelector("#grRemarkTitle").textContent = opts.title || "Please confirm";
+            overlay.querySelector("#grRemarkMsg").textContent = opts.message || "";
+            const ta = overlay.querySelector("#grRemarkText");
+            ta.value = opts.value || "";
+            const okBtn = overlay.querySelector("#grRemarkOk");
+            okBtn.textContent = opts.confirmText || "Confirm";
+            okBtn.classList.toggle("gr-btn-danger", !!opts.danger);
+            overlay.classList.add("open");
+            setTimeout(() => ta.focus(), 60);
+
+            let done = false;
+            const finish = (val) => {
+                if (done) return;
+                done = true;
+                overlay.classList.remove("open");
+                document.removeEventListener("keydown", onKey);
+                resolve(val);
+            };
+            const onKey = (e) => { if (e.key === "Escape") finish(null); };
+            // Assigned (not added) so repeat opens never stack listeners.
+            okBtn.onclick = () => finish(ta.value.trim());
+            overlay.querySelector("#grRemarkCancel").onclick = () => finish(null);
+            overlay.querySelector("#grRemarkCloseX").onclick = () => finish(null);
+            overlay.onclick = (e) => { if (e.target === overlay) finish(null); };
+            document.addEventListener("keydown", onKey);
+        });
+    }
+
+    /* ====================================================
+       EDIT A REMARK ON ITS OWN
+       Separate from validate / reject so a validator can add or
+       correct a remark at any time — including on a validated row,
+       which stays locked for status changes.
+    ==================================================== */
+    async function editRemark(recordId) {
+        if (!user.isValidator) {
+            appAlert({ title: "Not allowed", type: "error", message: "Only validators can add remarks." });
+            return;
+        }
+        const idx = allRecords.findIndex(r => String(r.recordId) === String(recordId));
+        if (idx < 0) return;
+        const rec = allRecords[idx];
+        if (isLocal(rec) || rec._sync === "uploading" || rec._sync === "failed") {
+            appAlert({
+                title: "Not synced yet",
+                type: "warning",
+                message: "This record hasn't reached the server yet. Add the remark once the upload finishes."
+            });
+            return;
+        }
+
+        const next = await askRemark({
+            title: "Validator remark",
+            message: "Visible to the person who uploaded this GR / Circular.",
+            confirmText: "Save remark",
+            value: rec.validatorRemark || ""
+        });
+        if (next === null) return;                                  // cancelled
+        if (next === String(rec.validatorRemark || "")) return;     // unchanged
+
+        const prev = { ...rec };
+        allRecords[idx] = { ...rec, validatorRemark: next, _sync: "saving" };
+        rerenderAll();
+
+        try {
+            const data = await api({
+                action: "remark",
+                recordId,
+                remark: next,
+                validatedBy: user.email,
+                validatedByName: user.displayName
+            });
+            if (data.version) dataVersion = String(data.version);
+            const i2 = allRecords.findIndex(r => String(r.recordId) === String(recordId));
+            if (i2 >= 0) allRecords[i2] = data.record ? data.record : { ...allRecords[i2], _sync: "" };
+            persistLocal();
+            notify("Remark saved ✓", "success");
+        } catch (err) {
+            console.error(err);
+            const i2 = allRecords.findIndex(r => String(r.recordId) === String(recordId));
+            if (i2 >= 0) allRecords[i2] = prev;   // put the old remark back
+            notify(err.message, "error");
+        }
+        rerenderAll();
     }
 
     /* ====================================================
@@ -1041,16 +1401,15 @@
         if ((allRecords[idx].status || "").toLowerCase() === "validated") return; // locked
 
         const isReject = act === "reject";
-        const confirmed = await appConfirm({
+        const remark = await askRemark({
             title: isReject ? "Reject this record?" : "Mark as validated?",
-            type: isReject ? "error" : "info",
             message: isReject
-                ? "Reject this GR / Circular? This marks it as not validated on the Vinoba app."
+                ? "This marks the record as not validated on the Vinoba app. Add a remark so the person who uploaded it knows why."
                 : "Confirm this GR / Circular is validated and uploaded on the Vinoba app. Once validated, the record is locked and cannot be changed.",
             confirmText: isReject ? "Reject" : "Validate",
-            cancelText: "Cancel"
+            danger: isReject
         });
-        if (!confirmed) return;
+        if (remark === null) return;   // cancelled
 
         // --- Optimistic flip: instant on screen ---
         // validatedBy is kept as the EMAIL here (matching exactly what's
@@ -1065,6 +1424,7 @@
             validatedBy: user.email,
             validatedByName: user.displayName || user.email,
             validatedTimestamp: new Date().toISOString(),
+            validatorRemark: remark,
             _sync: "saving"
         };
         rerenderAll();
@@ -1074,12 +1434,15 @@
                 action: isReject ? "reject" : "validate",
                 recordId,
                 validatedBy: user.email,
-                validatedByName: user.displayName
+                validatedByName: user.displayName,
+                remark
             });
+            if (data.version) dataVersion = String(data.version);
             const i2 = allRecords.findIndex(r => String(r.recordId) === String(recordId));
             if (i2 >= 0) {
                 allRecords[i2] = data.record ? data.record : { ...allRecords[i2], _sync: "" };
             }
+            persistLocal();
         } catch (err) {
             console.error(err);
             // Revert to the previous state and tell the user why.
@@ -1098,68 +1461,268 @@
     /* ====================================================
        SUMMARY DASHBOARD (bar chart)
     ==================================================== */
+    // Most bar groups we can show side by side and still read them.
+    const SUM_MAX = 6;
+    let sumStates = [];      // [] = all communities, combined into one group
+    let sumDistricts = [];   // [] = every district of the chosen communities
+
     function wireSummaryFilters() {
-        const stateSel = document.getElementById("grSumState");
-        const distSel = document.getElementById("grSumDistrict");
-        const monthSel = document.getElementById("grSumMonth");
-        if (!stateSel || !distSel || !monthSel) return;
+        const stateWrap = document.getElementById("grSumStateMS");
+        const distWrap = document.getElementById("grSumDistrictMS");
+        if (!stateWrap || !distWrap) return;
 
-        fillStateSelect(stateSel, { includeAll: true });
-        fillDistrictSelect(distSel, "", { includeAll: true });
-
-        stateSel.addEventListener("change", () => {
-            fillDistrictSelect(distSel, stateSel.value, { includeAll: true });
-            renderSummary();
+        buildMultiSelect(stateWrap, {
+            allLabel: "All Communities",
+            options: () => Object.keys(STATE_LABELS).map(c => ({ value: c, label: STATE_LABELS[c] })),
+            selected: () => sumStates,
+            onApply: (vals) => {
+                sumStates = vals;
+                // Districts only make sense inside a single community: with
+                // none or several picked the bars are grouped by community,
+                // so the district filter switches off and resets.
+                if (sumStates.length === 1) {
+                    const allowed = new Set(districtsForStates(sumStates));
+                    sumDistricts = sumDistricts.filter(d => allowed.has(d));
+                } else {
+                    sumDistricts = [];
+                }
+                renderMultiSelect(distWrap);
+                renderSummary();
+            }
         });
-        distSel.addEventListener("change", renderSummary);
-        monthSel.addEventListener("change", renderSummary);
 
+        buildMultiSelect(distWrap, {
+            allLabel: "All Districts",
+            options: () => districtsForStates(sumStates).map(d => ({ value: d, label: d })),
+            selected: () => sumDistricts,
+            disabled: () => sumStates.length !== 1,
+            disabledLabel: () => sumStates.length > 1
+                ? "Grouped by community"
+                : "Select one community first",
+            onApply: (vals) => { sumDistricts = vals; renderSummary(); }
+        });
+
+        const monthSel = document.getElementById("grSumMonth");
+        if (monthSel) monthSel.addEventListener("change", renderSummary);
         const validatorSel = document.getElementById("grSumValidator");
         if (validatorSel) validatorSel.addEventListener("change", renderSummary);
+        const clearBtn = document.getElementById("grSumClear");
+        if (clearBtn) clearBtn.addEventListener("click", clearSummaryFilters);
+    }
+
+    // Reset every Summary filter back to its default.
+    function clearSummaryFilters() {
+        sumStates = [];
+        sumDistricts = [];
+        const monthSel = document.getElementById("grSumMonth");
+        if (monthSel) { monthSel.value = ""; monthSel.dataset.touched = ""; }
+        const validatorSel = document.getElementById("grSumValidator");
+        if (validatorSel) validatorSel.value = "";
+        closeAllMultiSelects();
+        renderMultiSelect(document.getElementById("grSumStateMS"));
+        renderMultiSelect(document.getElementById("grSumDistrictMS"));
+        renderSummary();
+    }
+
+    // Districts available for the current community selection (all of them
+    // when nothing is selected), de-duplicated and sorted.
+    function districtsForStates(states) {
+        const codes = states.length ? states : Object.keys(STATE_DISTRICTS);
+        const out = [];
+        codes.forEach(c => (STATE_DISTRICTS[c] || []).forEach(d => {
+            if (out.indexOf(d) < 0) out.push(d);
+        }));
+        return out.sort();
+    }
+
+    /* ====================================================
+       CHECKBOX MULTI-SELECT (button + dropdown + Apply)
+       Nothing checked means "all", combined into one group.
+    ==================================================== */
+    const msConfig = new WeakMap();
+
+    function buildMultiSelect(wrap, cfg) {
+        msConfig.set(wrap, cfg);
+        wrap.innerHTML =
+            '<button type="button" class="gr-ms-btn"><span class="gr-ms-label"></span>' +
+            '<span class="gr-ms-caret">\u25be</span></button>' +
+            '<div class="gr-ms-panel"><div class="gr-ms-list"></div>' +
+            '<div class="gr-ms-foot"><span class="gr-ms-hint"></span>' +
+            '<span class="gr-ms-foot-btns">' +
+            '<button type="button" class="gr-ms-clear">Clear</button>' +
+            '<button type="button" class="gr-ms-apply">Apply</button>' +
+            '</span></div></div>';
+
+        wrap.querySelector(".gr-ms-btn").addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (wrap.classList.contains("gr-ms--off")) return;
+            const wasOpen = wrap.classList.contains("open");
+            closeAllMultiSelects();
+            if (!wasOpen) {
+                renderMultiSelect(wrap);   // repaint from live state before showing
+                wrap.classList.add("open");
+            }
+        });
+        // Clicks inside the panel must not bubble to the document closer.
+        wrap.querySelector(".gr-ms-panel").addEventListener("click", (e) => e.stopPropagation());
+        wrap.querySelector(".gr-ms-apply").addEventListener("click", () => {
+            // "Select All" ticked means everything, combined into one group,
+            // which is exactly what an empty selection already represents.
+            const all = wrap.querySelector(".gr-ms-allbox");
+            const vals = (all && all.checked)
+                ? []
+                : Array.from(wrap.querySelectorAll(".gr-ms-opt:not(.gr-ms-all) input:checked")).map(i => i.value);
+            wrap.classList.remove("open");
+            const c = msConfig.get(wrap);
+            if (c) c.onApply(vals);
+            renderMultiSelect(wrap);
+        });
+        // Clear = back to "everything, combined", applied straight away.
+        wrap.querySelector(".gr-ms-clear").addEventListener("click", () => {
+            wrap.classList.remove("open");
+            const c = msConfig.get(wrap);
+            if (c) c.onApply([]);
+            renderMultiSelect(wrap);
+        });
+
+        if (!document.body.dataset.grMsWired) {
+            document.body.dataset.grMsWired = "1";
+            document.addEventListener("click", closeAllMultiSelects);
+        }
+        renderMultiSelect(wrap);
+    }
+
+    function closeAllMultiSelects() {
+        document.querySelectorAll("#grPage .gr-ms.open").forEach(w => w.classList.remove("open"));
+    }
+
+    function renderMultiSelect(wrap) {
+        const cfg = msConfig.get(wrap);
+        if (!cfg) return;
+        const opts = cfg.options();
+        const sel = cfg.selected();
+        const off = typeof cfg.disabled === "function" && cfg.disabled();
+
+        const btn = wrap.querySelector(".gr-ms-btn");
+        wrap.classList.toggle("gr-ms--off", !!off);
+        if (off) wrap.classList.remove("open");
+        if (btn) btn.disabled = !!off;
+
+        const labelEl = wrap.querySelector(".gr-ms-label");
+        if (labelEl) {
+            const first = opts.filter(o => o.value === sel[0])[0];
+            labelEl.textContent = off
+                ? (typeof cfg.disabledLabel === "function" ? cfg.disabledLabel() : cfg.allLabel)
+                : (!sel.length
+                    ? cfg.allLabel
+                    : (sel.length === 1 ? (first ? first.label : sel[0]) : sel.length + " selected"));
+        }
+        if (off) return;   // nothing to paint inside a closed, disabled control
+
+        const list = wrap.querySelector(".gr-ms-list");
+        if (!list) return;
+        const allTicked = !sel.length;
+        list.innerHTML = opts.length
+            ? ('<label class="gr-ms-opt gr-ms-all"><input type="checkbox" class="gr-ms-allbox"' +
+               (allTicked ? " checked" : "") + '><span>Select All</span></label><div class="gr-ms-sep"></div>' +
+               opts.map(o =>
+                   '<label class="gr-ms-opt"><input type="checkbox" value="' + escHtml(o.value) + '"' +
+                   (allTicked || sel.indexOf(o.value) >= 0 ? " checked" : "") + '><span>' + escHtml(o.label) + '</span></label>'
+               ).join(""))
+            : '<div class="gr-ms-none">No options</div>';
+
+        const hint = wrap.querySelector(".gr-ms-hint");
+        const allBox = list.querySelector(".gr-ms-allbox");
+        const boxes = Array.from(list.querySelectorAll(".gr-ms-opt:not(.gr-ms-all) input"));
+
+        // With "Select All" ticked the individual rows are shown ticked but
+        // locked. Otherwise they are free until SUM_MAX of them are ticked,
+        // so the chart never gets more groups than it can render legibly.
+        const sync = () => {
+            const all = !!(allBox && allBox.checked);
+            const n = boxes.filter(b => b.checked).length;
+            boxes.forEach(b => { b.disabled = all || (!b.checked && n >= SUM_MAX); });
+            if (hint) {
+                hint.textContent = all
+                    ? "All, combined into one group"
+                    : (n >= SUM_MAX ? "Maximum " + SUM_MAX + " at a time"
+                                    : (n ? n + " selected" : "Nothing ticked = all, combined"));
+            }
+        };
+        if (allBox) {
+            allBox.addEventListener("change", () => {
+                // Ticking "Select All" shows every row ticked; unticking it
+                // hands control back with a clean slate.
+                boxes.forEach(b => { b.checked = allBox.checked; });
+                sync();
+            });
+        }
+        boxes.forEach(b => b.addEventListener("change", () => {
+            if (allBox) allBox.checked = false;
+            sync();
+        }));
+        sync();
+    }
+
+
+    // What each bar group represents: the chosen districts if any, else the
+    // chosen communities, else everything rolled into a single group.
+    function summaryGroups() {
+        if (sumDistricts.length) {
+            return sumDistricts.slice(0, SUM_MAX).map(d => ({
+                label: d,
+                match: r => r.district === d && (!sumStates.length || sumStates.indexOf(r.state) >= 0)
+            }));
+        }
+        if (sumStates.length) {
+            return sumStates.slice(0, SUM_MAX).map(c => ({
+                label: STATE_LABELS[c] || c,
+                match: r => r.state === c
+            }));
+        }
+        return [{ label: "All communities", match: () => true }];
     }
 
     function renderSummary() {
         const wrap = document.getElementById("grSummaryWrap");
         if (!wrap) return;
 
-        const state = document.getElementById("grSumState").value;
-        const district = document.getElementById("grSumDistrict").value;
-        const month = document.getElementById("grSumMonth").value; // "" = All months (Select All)
+        const monthSel = document.getElementById("grSumMonth");
+        const month = monthSel ? monthSel.value : "";   // "" = all months
         const validatorSel = document.getElementById("grSumValidator");
         const validator = validatorSel ? validatorSel.value.toLowerCase() : "";
 
-        // month is no longer required — "All months" is the default view.
-        const rows = filterRecords({ state, district, month });
+        const pool = allRecords.filter(r => !month || monthKeyFromDate(r.docDate) === month);
+        const groups = summaryGroups();
 
-        const stat = {
-            GR: { up: 0, val: 0 },
-            Circular: { up: 0, val: 0 }
-        };
-        let totalValidatedAll = 0;   // validated by anyone — drives Pending / rejected
-        let validatorValCount = 0;   // validated by the selected validator only
-        rows.forEach(r => {
-            const key = (r.type || "").toLowerCase() === "gr" ? "GR" : "Circular";
-            stat[key].up += 1;
-            if ((r.status || "").toLowerCase() === "validated") {
-                totalValidatedAll += 1;
-                const matchesValidator = String(r.validatedBy || "").toLowerCase() === validator;
-                // The green "Validated" bars follow the validator filter: with a validator
-                // selected they show only that person's validations; with none, all of them.
-                if (!validator || matchesValidator) stat[key].val += 1;
-                if (validator && matchesValidator) validatorValCount += 1;
-            }
+        let totalUp = 0;          // rows in scope
+        let totalValidatedAll = 0; // validated by anyone — drives Pending / rejected
+        let validatorValCount = 0; // validated by the selected validator only
+
+        const data = groups.map(g => {
+            const rows = pool.filter(g.match);
+            const stat = { GR: { up: 0, val: 0 }, Circular: { up: 0, val: 0 } };
+            rows.forEach(r => {
+                const key = isGrType(r.type) ? "GR" : "Circular";
+                stat[key].up += 1;
+                if ((r.status || "").toLowerCase() === "validated") {
+                    totalValidatedAll += 1;
+                    const matchesValidator = String(r.validatedBy || "").toLowerCase() === validator;
+                    // The green segment follows the validator filter: with one
+                    // selected it shows only that person's validations.
+                    if (!validator || matchesValidator) stat[key].val += 1;
+                    if (validator && matchesValidator) validatorValCount += 1;
+                }
+            });
+            totalUp += rows.length;
+            return { label: g.label, stat };
         });
 
-        const totalUp = stat.GR.up + stat.Circular.up;
-        const totalVal = stat.GR.val + stat.Circular.val; // = validatorValCount when a validator is picked
-        // Total uploaded & Pending/rejected depend only on State / District /
-        // Month — never on which validator is selected. Pending / rejected is
-        // simply what nobody has validated yet, so it uses the all-validator total.
+        const totalVal = data.reduce((s, d) => s + d.stat.GR.val + d.stat.Circular.val, 0);
+        // Total uploaded and Pending / rejected never depend on which
+        // validator is picked — pending is simply what nobody validated yet.
         const pendingOrRejected = totalUp - totalValidatedAll;
 
-        // Cards: when a specific validator is chosen, swap "Total validated"
-        // for that validator's own count. Pending/rejected stays the same
-        // for everyone — it's simply what nobody has validated yet.
         const cardsHtml = validator
             ? `${sumCard("Total uploaded", totalUp, "#4f8ef7")}
                ${sumCard(`Validated by ${validator}`, validatorValCount, "#16a34a")}
@@ -1175,14 +1738,15 @@
                 ${cardsHtml}
             </div>
             <div class="gr-chart-card">
-                <div class="gr-chart-title">Uploaded vs Validated — ${escHtml(periodLabel)}</div>
-                ${barChartHtml(stat)}
+                <div class="gr-chart-title">Uploaded vs validated — ${escHtml(periodLabel)}</div>
+                ${stackedChartHtml(data)}
                 <div class="gr-legend">
-                    <span><i class="gr-swatch" style="background:#4f8ef7"></i>Uploaded</span>
                     <span><i class="gr-swatch" style="background:#16a34a"></i>Validated${validator ? ` by ${escHtml(validator)}` : ""}</span>
+                    <span><i class="gr-swatch" style="background:#c7dcfb"></i>Not validated</span>
                 </div>
             </div>`;
     }
+
 
     function sumCard(label, value, color) {
         return `
@@ -1192,30 +1756,38 @@
             </div>`;
     }
 
-    function barChartHtml(stat) {
-        const max = Math.max(1, stat.GR.up, stat.GR.val, stat.Circular.up, stat.Circular.val);
-        const group = (name, d) => {
-            const upH = Math.round((d.up / max) * 160);
-            const valH = Math.round((d.val / max) * 160);
+    // One bar per type per group. The full bar is everything uploaded; the
+    // green block filling it from the bottom is the validated share. The
+    // total sits above the bar, the validated count inside the green block
+    // (dropped when the block is too short for the text to fit).
+    function stackedChartHtml(data) {
+        const H = 170;
+        let max = 1;
+        data.forEach(d => { max = Math.max(max, d.stat.GR.up, d.stat.Circular.up); });
+
+        const bar = (short, name, d) => {
+            const upH = Math.max(4, Math.round((d.up / max) * H));
+            const valH = d.up ? Math.round((d.val / d.up) * upH) : 0;
             return `
-                <div class="gr-bar-group">
-                    <div class="gr-bars">
-                        <div class="gr-bar gr-bar--up" style="height:${upH}px" title="Uploaded: ${d.up}">
-                            <span class="gr-bar-num">${d.up}</span>
-                        </div>
-                        <div class="gr-bar gr-bar--val" style="height:${valH}px" title="Validated: ${d.val}">
-                            <span class="gr-bar-num">${d.val}</span>
-                        </div>
+                <div class="gr-bar-col" title="${escHtml(name)} — uploaded ${d.up}, validated ${d.val}">
+                    <div class="gr-bar-num">${d.up}</div>
+                    <div class="gr-bar gr-bar--stack" style="height:${upH}px">
+                        <div class="gr-bar-val" style="height:${valH}px">${valH >= 18 && d.val ? `<span class="gr-bar-vnum">${d.val}</span>` : ""}</div>
                     </div>
-                    <div class="gr-bar-label">${escHtml(name)}</div>
+                    <div class="gr-bar-label">${escHtml(short)}</div>
                 </div>`;
         };
+
         return `
             <div class="gr-chart">
-                ${group("GRs", stat.GR)}
-                ${group("Circulars", stat.Circular)}
+                ${data.map(g => `
+                    <div class="gr-group">
+                        <div class="gr-bars">${bar("G", "GRs", g.stat.GR)}${bar("C", "Circulars", g.stat.Circular)}</div>
+                        <div class="gr-group-label" title="${escHtml(g.label)}">${escHtml(g.label)}</div>
+                    </div>`).join("")}
             </div>`;
     }
+
 
     /* ====================================================
        SHARED RENDER HELPERS
