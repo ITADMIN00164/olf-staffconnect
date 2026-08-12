@@ -9,10 +9,24 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
+        /* ── Global UI scale ───────────────────────────────────────
+           The app was designed a little large; this renders it at the
+           size it used to have at 75-80% browser zoom, everywhere at
+           once - including every page under pages/.
+           TO ADJUST: change this one number. 0.8 = slightly roomier,
+           0.75 = exactly the old 75% zoom view, 1 = original size.
+           Note: heights below use % rather than vh because viewport
+           units ignore zoom and would leave the shell short.        */
+        html {
+            zoom: 0.8;
+            height: 100%;
+        }
+
         body {
             font-family: 'Inter', Arial, sans-serif;
             background: #f0f2f5;
-            min-height: 100vh;
+            height: 100%;
+            min-height: 100%;
         }
 
         /* ── Page Router ── */
@@ -20,7 +34,7 @@
         .page.active { display: block; }
 
         /* ── App Shell (shown after login) ── */
-        #appShell { display: none; height: 100vh; flex-direction: column; overflow: hidden; }
+        #appShell { display: none; height: 100%; flex-direction: column; overflow: hidden; }
         #appShell.visible { display: flex; }
 
         /* ── Top Bar ── */
@@ -111,9 +125,27 @@
             height: 100%;        /* fill app-body height exactly */
             flex-shrink: 0;
             transition: width 0.2s ease, padding 0.2s ease;
-            overflow-x: hidden;
-            overflow-y: auto;    /* allow sidebar nav to scroll if many items, but user block stays at bottom via flex */
+            overflow: hidden;    /* the nav list scrolls, not the whole sidebar */
         }
+
+        /* Only this scrolls, so the user block below never moves. */
+        .sidebar-nav {
+            flex: 1;
+            min-height: 0;       /* lets the flex child actually shrink */
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255,255,255,0.18) transparent;
+        }
+        .sidebar-nav::-webkit-scrollbar { width: 6px; }
+        .sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+        .sidebar-nav::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.16); border-radius: 3px;
+        }
+        .sidebar-nav::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.28); }
 
         /* ── Collapsed sidebar state ── */
         .sidebar.collapsed { width: 68px; padding: 20px 10px; }
@@ -127,7 +159,14 @@
 
         .sidebar.collapsed .nav-item { justify-content: center; padding: 9px; }
         .sidebar.collapsed .sidebar-user-info { justify-content: center; }
-        .sidebar.collapsed .sidebar-signout { padding: 8px; }
+        .sidebar.collapsed .sidebar-user-block {
+            padding: 12px 4px 8px; gap: 9px; align-items: center;
+        }
+        .sidebar.collapsed .sidebar-signout {
+            width: 38px; height: 38px; padding: 0; margin: 0 auto;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 9px; font-size: 15px;
+        }
 
         /* ── Sidebar collapse/expand toggle ── */
         .sidebar-toggle-row {
@@ -221,7 +260,7 @@
 
         /* ── Sign-in page (embedded) ── */
         #signinPage {
-            min-height: 100vh;
+            min-height: 100%;
             background: linear-gradient(135deg, #0f1117 0%, #1a1d23 50%, #0d1526 100%);
             display: none;
             align-items: center;
@@ -311,6 +350,8 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
+            flex-shrink: 0;      /* never squeezed by a long nav list */
+            margin-top: 8px;
         }
 
         .sidebar-user-info {
@@ -355,7 +396,10 @@
             font-size: 12.5px;
             font-family: inherit;
             transition: all 0.2s;
-            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
             white-space: nowrap;
             overflow: hidden;
         }
@@ -1534,6 +1578,7 @@
                 </button>
             </div>
 
+            <div class="sidebar-nav">
             <div class="sidebar-section">Main</div>
             <button class="nav-item active" data-page="home" onclick="navigate('home')" title="Home">
                 <span class="icon">🏠</span><span class="label">Home</span>
@@ -1559,10 +1604,9 @@
             <button class="nav-item" data-page="gr" onclick="navigate('gr')" title="GR's & Circulars">
                 <span class="icon">📜</span><span class="label">GR's & Circulars</span>
             </button>
-            <!-- Spacer pushes user block to bottom -->
-            <div style="flex:1;"></div>
+            </div><!-- /.sidebar-nav -->
 
-            <!-- User block at bottom of sidebar -->
+            <!-- User block: outside the scroll area, so it stays put -->
             <div class="sidebar-user-block">
                 <div class="sidebar-user-info">
                     <div class="sidebar-avatar" id="topbarAvatar">?</div>
