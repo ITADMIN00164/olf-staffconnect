@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OLF Staff Connect</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -39,7 +39,7 @@
 
         /* ── Top Bar ── */
         .topbar {
-            height: 60px;
+            height: 48px;
             background: #1a1d23;
             display: flex;
             align-items: center;
@@ -1524,6 +1524,499 @@
         .app-msg-footer .btn-cancel,
         .app-msg-footer .btn-save { padding: 9px 24px; }
 
+
+        /* ==========================================================
+           PREMIUM UI LAYER  — added on top of the rules above.
+           ----------------------------------------------------------
+           Everything here is presentation only: colours, blur, depth,
+           radius, motion. No selector is renamed and no geometry that
+           JavaScript reads is altered, so the layer can be deleted
+           wholesale to return to the previous look.
+
+           Glass needs something behind it or it just reads grey, so
+           the canvas carries a very low-opacity teal/blue field. That
+           field is the one liberty taken here; everything else stays
+           deliberately quiet.
+        ========================================================== */
+        :root {
+            --ink:          #0B1220;   /* sidebar / topbar base   */
+            --ink-soft:     #131C2E;   /* raised navy             */
+            --canvas:       #E4EAF3;   /* page canvas             */
+            --brand:        #4F8EF7;   /* existing OLF blue       */
+            --teal:         #10B197;   /* OLF teal/green          */
+            --amber:        #F59E0B;
+            --danger:       #EF4444;
+
+            --text:         #0F172A;
+            --text-soft:    #5A6577;
+            --text-faint:   #8A94A6;
+
+            --glass:        rgba(255,255,255,0.72);
+            --glass-strong: rgba(255,255,255,0.88);
+            --hairline:     rgba(15,23,42,0.08);
+            --hairline-dk:  rgba(255,255,255,0.07);
+
+            --r-sm: 10px;
+            --r-md: 14px;
+            --r-lg: 18px;
+
+            --shadow-sm: 0 1px 2px rgba(15,23,42,0.04), 0 1px 3px rgba(15,23,42,0.06);
+            --shadow-md: 0 2px 4px rgba(15,23,42,0.04), 0 8px 24px rgba(15,23,42,0.07);
+            --shadow-lg: 0 12px 32px rgba(15,23,42,0.12), 0 2px 8px rgba(15,23,42,0.06);
+
+            --ease: cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* ── Canvas ───────────────────────────────────────────── */
+        body {
+            background:
+                radial-gradient(820px 560px at 8% -6%,   rgba(16,177,151,0.22), transparent 58%),
+                radial-gradient(980px 680px at 102% 4%,  rgba(79,142,247,0.26), transparent 60%),
+                radial-gradient(700px 700px at 70% 110%, rgba(123,94,167,0.14), transparent 60%),
+                linear-gradient(180deg, #EFF3F9 0%, var(--canvas) 100%);
+            background-attachment: fixed;
+            color: var(--text);
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
+        }
+
+        /* ── Top bar: translucent over the dark rail ──────────── */
+        .topbar {
+            background: linear-gradient(180deg, rgba(11,18,32,0.92), rgba(11,18,32,0.86));
+            -webkit-backdrop-filter: blur(16px) saturate(150%);
+            backdrop-filter: blur(16px) saturate(150%);
+            border-bottom: 1px solid var(--hairline-dk);
+            box-shadow: 0 1px 24px rgba(11,18,32,0.28);
+        }
+        .topbar-logo { letter-spacing: -0.4px; }
+        .topbar-logo span {
+            background: linear-gradient(92deg, var(--brand), var(--teal));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* ── Sidebar: dark glass panel ────────────────────────── */
+        .sidebar {
+            background: linear-gradient(180deg, rgba(11,18,32,0.96) 0%, rgba(19,28,46,0.92) 100%);
+            -webkit-backdrop-filter: blur(18px) saturate(140%);
+            backdrop-filter: blur(18px) saturate(140%);
+            border-right: 1px solid var(--hairline-dk);
+        }
+
+        .sidebar-section {
+            color: var(--text-faint);
+            font-size: 10.5px;
+            font-weight: 600;
+            letter-spacing: 0.9px;
+            text-transform: uppercase;
+            padding: 4px 12px 6px;
+        }
+
+        .nav-item {
+            position: relative;
+            border-radius: var(--r-sm);
+            color: #9AA6B8;
+            font-weight: 500;
+            transition: background 0.16s var(--ease), color 0.16s var(--ease),
+                        transform 0.16s var(--ease);
+        }
+        .nav-item:hover {
+            background: rgba(255,255,255,0.06);
+            color: #E6EAF2;
+            transform: translateX(2px);
+        }
+        .nav-item .icon {
+            opacity: 0.85;
+            transition: opacity 0.16s var(--ease);
+        }
+        .nav-item:hover .icon, .nav-item.active .icon { opacity: 1; }
+
+        /* Active page: a lit rail on the leading edge. This is the
+           one place in the chrome allowed to glow. */
+        .nav-item.active {
+            background: linear-gradient(90deg, rgba(79,142,247,0.20), rgba(16,177,151,0.08) 70%, transparent);
+            color: #FFFFFF;
+            font-weight: 600;
+        }
+        .nav-item.active::before {
+            content: "";
+            position: absolute;
+            left: 0; top: 50%;
+            width: 3px; height: 62%;
+            transform: translateY(-50%);
+            border-radius: 0 3px 3px 0;
+            background: linear-gradient(180deg, var(--teal), var(--brand));
+            box-shadow: 0 0 12px rgba(79,142,247,0.55);
+        }
+
+        .sidebar-toggle-btn {
+            border-radius: 9px;
+            transition: background 0.16s var(--ease), border-color 0.16s var(--ease);
+        }
+
+        /* ── Sidebar footer ───────────────────────────────────── */
+        .sidebar-user-block { border-top: 1px solid var(--hairline-dk); }
+        .sidebar-avatar {
+            background: linear-gradient(135deg, var(--brand), var(--teal));
+            box-shadow: 0 4px 12px rgba(79,142,247,0.30);
+        }
+        .sidebar-user-name { letter-spacing: -0.1px; }
+        .sidebar-user-role { color: var(--teal); }
+        .sidebar-signout {
+            border-radius: 9px;
+            border-color: rgba(255,255,255,0.10);
+            transition: background 0.16s var(--ease), color 0.16s var(--ease),
+                        border-color 0.16s var(--ease);
+        }
+        .sidebar-signout:hover { border-color: rgba(255,255,255,0.20); }
+
+        /* ── Page heading ─────────────────────────────────────── */
+        .page-title {
+            letter-spacing: -0.5px;
+            color: var(--text);
+        }
+        .page-title span {
+            background: linear-gradient(92deg, var(--brand), var(--teal));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .page-subtitle { color: var(--text-soft); }
+
+        /* ── KPI cards ────────────────────────────────────────── */
+        .stat-card {
+            background: var(--glass);
+            -webkit-backdrop-filter: blur(20px) saturate(160%);
+            backdrop-filter: blur(20px) saturate(160%);
+            border: 1px solid rgba(255,255,255,0.85);
+            border-radius: var(--r-lg);
+            box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255,255,255,0.9);
+            transition: transform 0.18s var(--ease), box-shadow 0.18s var(--ease);
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+        /* background stays with the markup: each card tints its own icon */
+        .stat-icon {
+            border-radius: var(--r-md);
+            box-shadow: inset 0 0 0 1px rgba(15,23,42,0.04);
+        }
+        .stat-value {
+            font-size: 29px;
+            font-weight: 800;
+            letter-spacing: -0.9px;
+            font-variant-numeric: tabular-nums;
+            color: var(--text);
+        }
+        .stat-label {
+            color: var(--text-soft);
+            font-size: 12px;
+            letter-spacing: 0.1px;
+        }
+
+        /* ── Announcements ────────────────────────────────────── */
+        .news-section-title { letter-spacing: -0.2px; color: var(--text); }
+        .news-card-badge {
+            background: rgba(16,177,151,0.12);
+            color: #0B7A67;
+            border: 1px solid rgba(16,177,151,0.22);
+            letter-spacing: 0.4px;
+        }
+        .news-card--expired .news-card-badge {
+            background: rgba(15,23,42,0.06);
+            color: var(--text-faint);
+            border-color: rgba(15,23,42,0.10);
+        }
+        .news-card-text { color: var(--text); }
+        .news-card-dates { color: var(--text-faint); font-variant-numeric: tabular-nums; }
+        .news-card {
+            background: var(--glass);
+            -webkit-backdrop-filter: blur(18px) saturate(150%);
+            backdrop-filter: blur(18px) saturate(150%);
+            border: 1px solid rgba(255,255,255,0.8);
+            border-radius: var(--r-md);
+            box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255,255,255,0.85);
+            transition: transform 0.18s var(--ease), box-shadow 0.18s var(--ease);
+        }
+        .news-card:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+        .news-empty-state {
+            background: rgba(255,255,255,0.45);
+            border: 1px dashed rgba(15,23,42,0.12);
+            border-radius: var(--r-lg);
+            color: var(--text-faint);
+        }
+        .btn-add-news-inline {
+            border-radius: 9px;
+            background: rgba(79,142,247,0.10);
+            border: 1px solid rgba(79,142,247,0.24);
+            color: #2C63C4;
+            transition: transform 0.16s var(--ease), box-shadow 0.16s var(--ease),
+                        background 0.16s var(--ease);
+        }
+        .btn-add-news-inline:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+
+        /* ── Overlays: modal + toasts get the strongest glass ─── */
+        .app-msg-box {
+            background: var(--glass-strong);
+            -webkit-backdrop-filter: blur(30px) saturate(170%);
+            backdrop-filter: blur(30px) saturate(170%);
+            border: 1px solid rgba(255,255,255,0.7);
+            border-radius: var(--r-lg);
+            box-shadow: var(--shadow-lg);
+        }
+        .app-toast {
+            background: var(--glass-strong);
+            -webkit-backdrop-filter: blur(22px) saturate(160%);
+            backdrop-filter: blur(22px) saturate(160%);
+            border: 1px solid rgba(255,255,255,0.6);
+            border-radius: 12px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        /* ── Sign-in ──────────────────────────────────────────── */
+        #signinPage {
+            background:
+                radial-gradient(800px 500px at 20% 10%,  rgba(16,177,151,0.20), transparent 60%),
+                radial-gradient(900px 600px at 85% 90%,  rgba(79,142,247,0.24), transparent 62%),
+                linear-gradient(135deg, #0A0E16 0%, #131C2E 55%, #0B1426 100%);
+        }
+        .signin-card {
+            background: rgba(24,32,48,0.72);
+            -webkit-backdrop-filter: blur(26px) saturate(150%);
+            backdrop-filter: blur(26px) saturate(150%);
+            border: 1px solid rgba(255,255,255,0.10);
+            border-radius: 22px;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.45);
+        }
+        /* #4b5563 on a dark card is unreadable; lift it to a usable contrast. */
+        .signin-title { letter-spacing: -0.4px; }
+        .signin-subtitle { color: #A8B2C4; }
+        .signin-footer { color: #7E8899; }
+        .signin-logo-mark {
+            background: linear-gradient(135deg, var(--brand), var(--teal));
+            box-shadow: 0 8px 24px rgba(79,142,247,0.35);
+        }
+        .btn-google {
+            border-radius: 11px;
+            transition: transform 0.16s var(--ease), box-shadow 0.16s var(--ease),
+                        background 0.16s var(--ease);
+        }
+
+        /* ── Loading ──────────────────────────────────────────── */
+        #loadingScreen {
+            background:
+                radial-gradient(700px 500px at 50% 40%, rgba(79,142,247,0.10), transparent 65%),
+                var(--canvas);
+        }
+        .loader-dot { background: var(--brand); }
+        .loader-dot:nth-child(2) { background: var(--teal); }
+
+        /* ── Focus: visible for keyboard users, quiet for mouse ─ */
+        .nav-item:focus-visible,
+        .sidebar-signout:focus-visible,
+        .sidebar-toggle-btn:focus-visible,
+        .btn-google:focus-visible,
+        .btn-add-news-inline:focus-visible {
+            outline: 2px solid var(--brand);
+            outline-offset: 2px;
+        }
+
+        /* ── Responsive ───────────────────────────────────────── */
+        @media (max-width: 768px) {
+            /* The sidebar used to disappear entirely below 768px,
+               which left no way to navigate. It now becomes an icon
+               rail instead — same markup, same click targets. */
+            .sidebar { display: flex; width: 62px; padding: 14px 7px; }
+            .sidebar .sidebar-section,
+            .sidebar .nav-item .label,
+            .sidebar .sidebar-user-text,
+            .sidebar .sidebar-signout .label { display: none; }
+            .sidebar .nav-item { justify-content: center; padding: 10px; }
+            .sidebar .sidebar-user-info { justify-content: center; }
+            .sidebar .sidebar-signout {
+                width: 38px; height: 38px; padding: 0; margin: 0 auto;
+                display: flex; align-items: center; justify-content: center;
+            }
+            .sidebar-toggle-row { display: none; }
+            .content-area { padding: 16px; }
+            .stats-row { grid-template-columns: 1fr; gap: 12px; }
+            .home-grid { grid-template-columns: 1fr; }
+            .topbar { padding: 0 16px; }
+            body { overflow-x: hidden; }
+        }
+
+        /* Bounded on both sides: an unbounded max-width rule placed after
+           the 768px block would override the single-column phone layout. */
+        @media (min-width: 769px) and (max-width: 1100px) {
+            .stats-row { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        /* ── Motion preferences ───────────────────────────────── */
+        @media (prefers-reduced-motion: reduce) {
+            * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+            .nav-item:hover, .stat-card:hover, .news-card:hover { transform: none; }
+        }
+
+        /* ==========================================================
+           TOP BAR PROFILE + ID CARD
+        ========================================================== */
+        .topbar { gap: 14px; padding: 0 18px; }
+
+        /* Own wrapper: .topbar-right carries a legacy display:none. */
+        .tp-group { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+
+        .topbar-profile {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            padding: 4px 10px 4px 4px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.09);
+            border-radius: 999px;
+            font-family: inherit;
+            cursor: pointer;
+            flex-shrink: 0;
+            max-width: 260px;
+            transition: background 0.16s var(--ease), border-color 0.16s var(--ease);
+        }
+        .topbar-profile:hover {
+            background: rgba(255,255,255,0.10);
+            border-color: rgba(255,255,255,0.18);
+        }
+        .topbar-profile:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+        .tp-avatar {
+            width: 28px; height: 28px; flex-shrink: 0;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--brand), var(--teal));
+            color: #fff;
+            font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 8px rgba(79,142,247,0.35);
+        }
+        .tp-text { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; line-height: 1.15; }
+        .tp-name {
+            font-size: 12.5px; font-weight: 600; color: #E8EAF0;
+            max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .tp-dept {
+            font-size: 10.5px; font-weight: 500; color: var(--teal);
+            max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .tp-caret { font-size: 9px; color: #8A94A6; flex-shrink: 0; }
+
+        /* ── ID card ───────────────────────────────────────────── */
+        .olf-id-backdrop {
+            position: fixed; inset: 0; z-index: 400;
+            background: rgba(8,12,20,0.35);
+            -webkit-backdrop-filter: blur(2px);
+            backdrop-filter: blur(2px);
+        }
+        .olf-id-card {
+            position: fixed; top: 56px; right: 18px; z-index: 401;
+            width: 306px;
+            background: var(--ink);
+            border: 1px solid rgba(255,255,255,0.10);
+            border-radius: var(--r-lg);
+            box-shadow: 0 26px 64px rgba(8,12,20,0.5);
+            overflow: hidden;
+            animation: olfIdIn 0.18s var(--ease);
+        }
+        @keyframes olfIdIn {
+            from { opacity: 0; transform: translateY(-6px) scale(0.99); }
+            to   { opacity: 1; transform: none; }
+        }
+        .olf-id-close {
+            position: absolute; top: 8px; right: 8px; z-index: 2;
+            width: 24px; height: 24px; padding: 0;
+            background: rgba(255,255,255,0.14);
+            border: none; border-radius: 50%;
+            color: #fff; font-size: 11px; cursor: pointer; line-height: 1;
+        }
+        .olf-id-close:hover { background: rgba(255,255,255,0.26); }
+
+        /* Photo band. No photos exist, so initials carry it. */
+        .olf-id-head {
+            padding: 22px 18px 18px;
+            text-align: center;
+            background: linear-gradient(160deg, var(--brand) 0%, #3A74D8 55%, #2E63C0 100%);
+        }
+        .olf-id-photo {
+            width: 84px; height: 84px; margin: 0 auto 12px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.16);
+            border: 3px solid rgba(255,255,255,0.55);
+            color: #fff;
+            font-size: 30px; font-weight: 700; letter-spacing: 1px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .olf-id-name {
+            font-size: 16.5px; font-weight: 700; color: #fff;
+            letter-spacing: -0.2px; margin-bottom: 3px;
+        }
+        .olf-id-role { font-size: 12px; color: rgba(255,255,255,0.86); }
+
+        .olf-id-body { padding: 14px 18px 6px; }
+        .olf-id-row {
+            display: flex; align-items: baseline; gap: 12px;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .olf-id-row:last-child { border-bottom: none; }
+        .olf-id-key {
+            flex: 0 0 108px;
+            font-size: 11px; color: #7E8899; font-weight: 500;
+        }
+        .olf-id-val {
+            flex: 1; min-width: 0;
+            font-size: 12px; color: #E4E8F0; font-weight: 500;
+            /* Wrap rather than truncate: a clipped email or manager name
+               is worse than a two-line row on an ID card. */
+            white-space: normal;
+            overflow-wrap: anywhere;
+            line-height: 1.45;
+        }
+        .olf-id-note {
+            margin-top: 10px; padding: 9px 11px;
+            background: rgba(245,158,11,0.10);
+            border: 1px solid rgba(245,158,11,0.22);
+            border-radius: 9px;
+            font-size: 11px; line-height: 1.5; color: #E0B679;
+        }
+        .olf-id-foot {
+            padding: 10px 18px 12px;
+            text-align: center;
+            font-size: 10px; letter-spacing: 0.4px; text-transform: uppercase;
+            color: #5D6675;
+        }
+        .olf-id-signout {
+            display: flex; align-items: center; justify-content: center; gap: 3px;
+            width: calc(100% - 36px); margin: 0 18px 18px;
+            padding: 9px 14px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 10px;
+            color: #B8BEC9; font-family: inherit; font-size: 12.5px; font-weight: 600;
+            cursor: pointer;
+            transition: background 0.16s var(--ease), color 0.16s var(--ease),
+                        border-color 0.16s var(--ease);
+        }
+        .olf-id-signout:hover {
+            background: rgba(239,68,68,0.12);
+            border-color: rgba(239,68,68,0.35);
+            color: #FCA5A5;
+        }
+        .olf-id-signout:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+        @media (max-width: 768px) {
+            /* Keep the chip tappable but let the wordmark have the room. */
+            .tp-text, .tp-caret { display: none; }
+            .topbar-profile { padding: 4px; max-width: none; }
+            .olf-id-card { left: 10px; right: 10px; width: auto; }
+            .topbar-logo { font-size: 15px; }
+        }
     </style>
 </head>
 <body>
@@ -1566,6 +2059,35 @@
     <!-- Top Bar -->
     <div class="topbar">
         <div class="topbar-logo">OLF <span>Staff Connect</span></div>
+        <div class="tp-group">
+            <button class="topbar-profile" id="olfProfileBtn" type="button"
+                    aria-haspopup="dialog" aria-expanded="false" title="View your ID card">
+                <span class="tp-avatar" id="topbarAvatar">?</span>
+                <span class="tp-text">
+                    <span class="tp-name" id="topbarName">—</span>
+                    <span class="tp-dept" id="topbarDept">—</span>
+                </span>
+                <span class="tp-caret" aria-hidden="true">▾</span>
+                <span id="topbarRole" hidden>—</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- ID card, generated from this person's row in the employee directory -->
+    <div class="olf-id-backdrop" id="olfIdBackdrop" hidden></div>
+    <div class="olf-id-card" id="olfIdCard" role="dialog" aria-modal="true"
+         aria-labelledby="olfIdName" hidden>
+        <button class="olf-id-close" id="olfIdClose" type="button" aria-label="Close">✕</button>
+        <div class="olf-id-head">
+            <div class="olf-id-photo" id="olfIdInitials">—</div>
+            <div class="olf-id-name" id="olfIdName">—</div>
+            <div class="olf-id-role" id="olfIdDesignation"></div>
+        </div>
+        <div class="olf-id-body" id="olfIdFields"></div>
+        <div class="olf-id-foot">Openlinks Foundation · Staff Connect</div>
+        <button class="olf-id-signout" id="logoutBtn" type="button" title="Sign out">
+            <span class="icon" style="width:auto;">⏻</span><span class="label"> Sign out</span>
+        </button>
     </div>
 
     <div class="app-body">
@@ -1606,19 +2128,6 @@
             </button>
             </div><!-- /.sidebar-nav -->
 
-            <!-- User block: outside the scroll area, so it stays put -->
-            <div class="sidebar-user-block">
-                <div class="sidebar-user-info">
-                    <div class="sidebar-avatar" id="topbarAvatar">?</div>
-                    <div class="sidebar-user-text">
-                        <div class="sidebar-user-name" id="topbarName">—</div>
-                        <div class="sidebar-user-role" id="topbarRole">—</div>
-                    </div>
-                </div>
-                <button class="sidebar-signout" id="logoutBtn" title="Sign out">
-                    <span class="icon" style="width:auto;">⏻</span><span class="label"> Sign out</span>
-                </button>
-            </div>
         </div>
 
         <!-- Page content will be loaded here -->
@@ -1681,6 +2190,7 @@
 </div>
 
 <script type="module" src="app.js"></script>
+<script src="profile.js"></script>
 <script src="pom.js"></script>
 <script src="calendar.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

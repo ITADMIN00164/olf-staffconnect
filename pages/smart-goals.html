@@ -388,6 +388,369 @@
 #sg-app .sg-review-hd:hover { background: var(--surface2); }
 #sg-app .sg-review-chevron { display: inline-block; font-size: 11px; color: var(--text3); transition: transform .15s; flex-shrink: 0; }
 
+
+/* ==========================================================
+   GLASS + GREEN LAYER
+   ----------------------------------------------------------
+   Appended after every rule above so it wins without any of
+   them being edited. Presentation only: colour, blur, depth,
+   radius, motion. No selector renamed, no element removed, no
+   handler touched — delete this block to get the old look back.
+
+   The brand green already in the tokens (--brand #0D6B5E) is
+   the anchor; the canvas carries a low-opacity green field so
+   the translucent surfaces have something to sit on.
+========================================================== */
+
+/* ── Chrome the nav no longer needs ────────────────────────
+   Hidden rather than deleted: smartgoal.js writes into
+   #user-badge and #nav-dept-label, and removing the nodes
+   would break that. #user-badge carries an inline
+   display:flex, hence !important.                          */
+#sg-app .nav-brand { display: none !important; }
+#sg-app #user-badge { display: none !important; }
+#sg-app #nav-dept-label { display: none !important; }
+
+/* ── Canvas ───────────────────────────────────────────── */
+#sg-app {
+  --sg-glass:        rgba(255,255,255,0.74);
+  --sg-glass-strong: rgba(255,255,255,0.88);
+  --sg-edge:         rgba(255,255,255,0.85);
+  --sg-hair:         rgba(13,107,94,0.12);
+  --sg-shadow-sm:    0 1px 2px rgba(8,77,68,0.05), 0 1px 3px rgba(8,77,68,0.06);
+  --sg-shadow-md:    0 2px 4px rgba(8,77,68,0.05), 0 8px 22px rgba(8,77,68,0.09);
+  --sg-shadow-lg:    0 12px 30px rgba(8,77,68,0.15), 0 2px 8px rgba(8,77,68,0.07);
+  --sg-ease:         cubic-bezier(0.4, 0, 0.2, 1);
+
+  background:
+    radial-gradient(760px 520px at 4% -6%,   rgba(13,107,94,0.34),  transparent 58%),
+    radial-gradient(900px 620px at 100% 2%,  rgba(26,133,119,0.30), transparent 60%),
+    radial-gradient(680px 640px at 74% 108%, rgba(63,107,42,0.20),  transparent 62%),
+    linear-gradient(180deg, #EAF4F1 0%, #D8E7E5 100%);
+}
+
+/* ── Top nav ──────────────────────────────────────────── */
+#sg-app .app-nav {
+  background: linear-gradient(180deg, rgba(255,255,255,0.88), rgba(255,255,255,0.72));
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  backdrop-filter: blur(18px) saturate(160%);
+  border-bottom: 1px solid var(--sg-hair);
+  box-shadow: 0 1px 16px rgba(8,77,68,0.08);
+}
+#sg-app .nav-tab { position: relative; border-bottom-color: transparent; }
+#sg-app .nav-tab:hover { background: rgba(13,107,94,0.06); color: var(--brand); }
+#sg-app .nav-tab.active { background: rgba(13,107,94,0.07); font-weight: 600; }
+/* The underline becomes a rounded, softly lit bar */
+#sg-app .nav-tab.active::after {
+  content: "";
+  position: absolute; left: 14px; right: 14px; bottom: 0;
+  height: 2.5px; border-radius: 3px 3px 0 0;
+  background: linear-gradient(90deg, var(--brand), var(--brand-border));
+  box-shadow: 0 0 10px rgba(13,107,94,0.45);
+}
+
+/* ── Left sidebar ─────────────────────────────────────── */
+#sg-app .sidebar {
+  background: rgba(255,255,255,0.66);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  backdrop-filter: blur(16px) saturate(150%);
+  border-right: 1px solid var(--sg-hair);
+}
+#sg-app .sidebar-toggle { border-bottom-color: var(--sg-hair); }
+#sg-app .sb-dept { transition: background .14s var(--sg-ease); }
+#sg-app .sb-dept-hd { transition: background .14s var(--sg-ease), transform .14s var(--sg-ease); }
+#sg-app .sb-dept-hd:hover { transform: translateX(2px); }
+#sg-app .sb-dept-icon {
+  background: linear-gradient(135deg, var(--brand), var(--brand-border));
+  box-shadow: 0 2px 8px rgba(13,107,94,0.30);
+  border-radius: 6px;
+}
+#sg-app .sb-dept-children { background: rgba(232,245,243,0.45); border-top-color: var(--sg-hair); }
+#sg-app .sb-member { transition: background .12s var(--sg-ease), transform .12s var(--sg-ease); }
+#sg-app .sb-member:hover { transform: translateX(2px); }
+#sg-app .sb-divider { background: var(--sg-hair); }
+#sg-app .sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(13,107,94,0.22); }
+
+/* ── Cards ────────────────────────────────────────────── */
+#sg-app .card {
+  background: var(--sg-glass);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid var(--sg-edge);
+  border-radius: 14px;
+  box-shadow: var(--sg-shadow-md), inset 0 1px 0 rgba(255,255,255,0.9);
+  transition: box-shadow .2s var(--sg-ease);
+}
+#sg-app .card:hover { box-shadow: var(--sg-shadow-lg), inset 0 1px 0 rgba(255,255,255,0.9); }
+#sg-app .card-header {
+  border-bottom: 1px solid var(--sg-hair);
+  background: linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0));
+}
+#sg-app .card-title { letter-spacing: -0.1px; }
+
+/* ── Metric cards ─────────────────────────────────────── */
+#sg-app .metric-card {
+  background: var(--sg-glass);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  backdrop-filter: blur(18px) saturate(160%);
+  border: 1px solid var(--sg-edge);
+  border-radius: 13px;
+  box-shadow: var(--sg-shadow-sm), inset 0 1px 0 rgba(255,255,255,0.85);
+  transition: transform .18s var(--sg-ease), box-shadow .18s var(--sg-ease);
+}
+#sg-app .metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--sg-shadow-md), inset 0 1px 0 rgba(255,255,255,0.85);
+}
+#sg-app .metric-val { font-variant-numeric: tabular-nums; letter-spacing: -0.6px; }
+#sg-app .bar { background: rgba(13,107,94,0.10); height: 5px; border-radius: 3px; }
+
+/* ── Filter bar: loose selects become one glass strip ─── */
+#sg-app .filter-bar {
+  background: var(--sg-glass);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  backdrop-filter: blur(16px) saturate(150%);
+  border: 1px solid var(--sg-edge);
+  border-radius: 12px;
+  box-shadow: var(--sg-shadow-sm);
+  padding: 10px 12px;
+}
+#sg-app .filter-bar select {
+  background: rgba(255,255,255,0.9);
+  border: 1px solid var(--sg-hair);
+  border-radius: 8px;
+  transition: border-color .14s var(--sg-ease), box-shadow .14s var(--sg-ease);
+}
+#sg-app .filter-bar select:hover { border-color: var(--brand-border); }
+#sg-app .filter-bar select:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(13,107,94,0.14);
+}
+
+/* ── Tables ───────────────────────────────────────────── */
+#sg-app .tbl-wrap {
+  border: 1px solid var(--sg-edge);
+  border-radius: 11px;
+  background: rgba(255,255,255,0.55);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+}
+#sg-app .tbl th {
+  background: linear-gradient(180deg, var(--brand) 0%, var(--brand-dark) 100%);
+  border-bottom: none;
+  box-shadow: inset 0 -1px 0 rgba(255,255,255,0.12);
+}
+#sg-app .tbl td { border-bottom: 1px solid rgba(13,107,94,0.08); }
+#sg-app .tbl tbody tr:nth-child(even) td { background: rgba(255,255,255,0.42); }
+#sg-app .tbl tbody tr { transition: background .12s var(--sg-ease); }
+#sg-app .tbl tr:hover td { background: rgba(13,107,94,0.07); }
+
+/* ── Buttons ──────────────────────────────────────────── */
+#sg-app .btn { transition: transform .14s var(--sg-ease), box-shadow .14s var(--sg-ease), background .14s var(--sg-ease), border-color .14s var(--sg-ease); }
+#sg-app .btn:hover { transform: translateY(-1px); }
+#sg-app .btn:active { transform: none; }
+#sg-app .btn-primary {
+  background: linear-gradient(180deg, var(--brand-border), var(--brand));
+  border-color: var(--brand);
+  box-shadow: 0 2px 8px rgba(13,107,94,0.28);
+}
+#sg-app .btn-primary:hover { box-shadow: 0 4px 14px rgba(13,107,94,0.34); }
+#sg-app .btn-secondary {
+  background: rgba(255,255,255,0.85);
+  border-color: var(--sg-hair);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+#sg-app .btn-secondary:hover { border-color: var(--brand-border); color: var(--brand); }
+
+/* ── Badges ───────────────────────────────────────────── */
+#sg-app .badge { box-shadow: inset 0 1px 0 rgba(255,255,255,0.55); }
+
+/* ── Inputs inside tables ─────────────────────────────── */
+#sg-app .tbl-input:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(13,107,94,0.14);
+}
+
+/* ── Page scrollbar ───────────────────────────────────── */
+#sg-app .page-content { scrollbar-width: thin; scrollbar-color: rgba(13,107,94,0.25) transparent; }
+#sg-app .page-content::-webkit-scrollbar { width: 8px; }
+#sg-app .page-content::-webkit-scrollbar-track { background: transparent; }
+#sg-app .page-content::-webkit-scrollbar-thumb { background: rgba(13,107,94,0.22); border-radius: 4px; }
+#sg-app .page-content::-webkit-scrollbar-thumb:hover { background: rgba(13,107,94,0.34); }
+
+/* ── Motion preferences ───────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  #sg-app * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+  #sg-app .metric-card:hover, #sg-app .btn:hover,
+  #sg-app .sb-dept-hd:hover, #sg-app .sb-member:hover { transform: none; }
+}
+
+
+/* ==========================================================
+   GLASS + GREEN LAYER — PART 2
+   Fixes on top of part 1: one underline on the active tab,
+   neutral + column-band tokens moved into the green family,
+   and every dropdown / panel brought onto the page theme.
+   Still presentation only — no markup, no handlers.
+========================================================== */
+
+/* ── 1. Active tab: one line, not two ─────────────────────
+   The original rule sets border-bottom-color on .nav-tab.active
+   (2 classes, so it outranked the reset in part 1) and part 1
+   added a lit bar as well. Kill the border and keep the bar. */
+#sg-app .nav-tab.active { border-bottom-color: transparent; background: transparent; }
+#sg-app .nav-tab.active::after { left: 12px; right: 12px; height: 2.5px; }
+#sg-app .nav-tab:hover { background: rgba(13,107,94,0.05); }
+
+/* ── 2. Neutrals into the green family ───────────────────
+   --border was a pale blue-grey that disappeared against the
+   green canvas, which is why the Overall Performance / Sheet B
+   Link / Help Needed / Areas of Improvement boxes looked like
+   they had no edges: those are built in JS from these tokens.
+   Raising the contrast here fixes all of them at once.       */
+#sg-app {
+  --border:   #BAD3CE;
+  --border2:  #96BAB3;
+  --surface2: #F1F8F6;
+  --bg:       #EAF4F1;
+}
+
+/* ── 3. Column bands: navy / violet -> one green scale ────
+   These tokens are read by smartgoal.js when it builds the
+   grouped table headers, so retinting them here retints every
+   band without touching the table code.                     */
+#sg-app {
+  --col-a-hd:  #12544D;  --col-a-hdt: #DDF0EC;  --col-a-bg: #EDF6F4;
+  --col-b-hd:  #0D6B5E;  --col-b-hdt: #E8F5F3;  --col-b-bg: #F1FAF8;
+  --col-c-hd:  #1A8577;  --col-c-hdt: #EAF7F5;  --col-c-bg: #F3FBF9;
+  --col-d-hd:  #4E7A2E;  --col-d-hdt: #F0F7E9;  --col-d-bg: #F5FAF1;
+  --col-e-hd:  #274B45;  --col-e-hdt: #EAF2F0;  --col-e-bg: #F4F8F7;
+}
+/* The grouped review table hard-codes two band tints; re-declare
+   them here so they join the same green scale. */
+#sg-app .tbl.tbl-grouped tbody td:nth-child(3),
+#sg-app .tbl.tbl-grouped tbody td:nth-child(4),
+#sg-app .tbl.tbl-grouped tbody td:nth-child(5),
+#sg-app .tbl.tbl-grouped tbody td:nth-child(6),
+#sg-app .tbl.tbl-grouped tbody td:nth-child(7) { background: #EDF6F4; }
+#sg-app .tbl.tbl-grouped tbody td:nth-child(8) { background: #E4F3EF; }
+
+/* ── 4. Dropdowns that belong to the page ────────────────
+   Native select chrome is what made these read as cheap boxes.
+   The control is rebuilt: no native appearance, a green chevron,
+   a translucent surface that only shows an edge on hover/focus,
+   so it sits inside the glass strip instead of on top of it.  */
+#sg-app select,
+#sg-app input[type="text"],
+#sg-app input[type="search"],
+#sg-app input[type="url"] {
+  accent-color: var(--brand);
+}
+#sg-app .filter-bar select,
+#sg-app .field select,
+#sg-app .tbl select,
+#sg-app select.tbl-input {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-color: rgba(255,255,255,0.62);
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%230D6B5E' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+  border: 1px solid rgba(13,107,94,0.14);
+  border-radius: 8px;
+  color: var(--text);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color .14s var(--sg-ease), border-color .14s var(--sg-ease),
+              box-shadow .14s var(--sg-ease);
+}
+#sg-app .filter-bar select:hover,
+#sg-app .field select:hover,
+#sg-app .tbl select:hover,
+#sg-app select.tbl-input:hover {
+  background-color: rgba(255,255,255,0.9);
+  border-color: var(--brand-border);
+}
+#sg-app .filter-bar select:focus,
+#sg-app .field select:focus,
+#sg-app .tbl select:focus,
+#sg-app select.tbl-input:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(13,107,94,0.15);
+}
+/* The open list is drawn by the OS; these are the parts a
+   browser will honour. */
+#sg-app select option { background: #FFFFFF; color: var(--text); }
+#sg-app select option:checked { background: var(--brand-lt); color: var(--brand); font-weight: 600; }
+
+/* The dept pill deliberately has no control chrome of its own. */
+#sg-app .dept-selector select {
+  background-image: none; padding-right: 0; border: none;
+  background-color: transparent; border-radius: 0;
+}
+
+/* Text inputs in the filter strip match the selects */
+#sg-app .filter-bar input {
+  background: rgba(255,255,255,0.62);
+  border: 1px solid rgba(13,107,94,0.14);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-family: inherit;
+  color: var(--text);
+  transition: background .14s var(--sg-ease), border-color .14s var(--sg-ease),
+              box-shadow .14s var(--sg-ease);
+}
+#sg-app .filter-bar input::placeholder { color: var(--text3); }
+#sg-app .filter-bar input:hover { background: rgba(255,255,255,0.9); border-color: var(--brand-border); }
+#sg-app .filter-bar input:focus {
+  outline: none; border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(13,107,94,0.15);
+  background: #fff;
+}
+
+/* ── 5. Columns panel ────────────────────────────────────── */
+#sg-app .cols-panel {
+  background: var(--sg-glass-strong);
+  -webkit-backdrop-filter: blur(24px) saturate(170%);
+  backdrop-filter: blur(24px) saturate(170%);
+  border: 1px solid var(--sg-edge);
+  border-radius: 12px;
+  box-shadow: var(--sg-shadow-lg);
+  padding: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(13,107,94,0.25) transparent;
+}
+#sg-app .cols-panel::-webkit-scrollbar { width: 7px; }
+#sg-app .cols-panel::-webkit-scrollbar-track { background: transparent; }
+#sg-app .cols-panel::-webkit-scrollbar-thumb { background: rgba(13,107,94,0.22); border-radius: 4px; }
+#sg-app .cols-panel-group {
+  color: var(--brand);
+  border-bottom: 1px solid rgba(13,107,94,0.12);
+  padding-bottom: 4px;
+}
+#sg-app .cols-panel label { border-radius: 7px; padding: 4px 6px; transition: background .12s var(--sg-ease); }
+#sg-app .cols-panel label:hover { background: rgba(13,107,94,0.07); color: var(--brand); }
+#sg-app .cols-panel input[type="checkbox"] { accent-color: var(--brand); }
+
+/* ── 5b. Legend dots ─────────────────────────────────────
+   These three dots carry hard-coded inline colours (blue /
+   teal / slate) that no longer match the retinted bands, so
+   they are re-pointed at the same tokens. !important is the
+   only way to beat an inline style. */
+#sg-app .col-legend-item:nth-child(1) .col-legend-dot { background: var(--col-a-hd) !important; }
+#sg-app .col-legend-item:nth-child(2) .col-legend-dot { background: var(--col-b-hd) !important; }
+#sg-app .col-legend-item:nth-child(3) .col-legend-dot { background: var(--col-e-hd) !important; }
+#sg-app .col-legend-dot { border-radius: 3px; box-shadow: 0 1px 2px rgba(8,77,68,0.2); }
+
+/* ── 6. Panels JS builds from the tokens above ───────────── */
+#sg-app .sg-detail-panel { border-color: rgba(13,107,94,0.18); }
+#sg-app .review-section-hd { color: var(--text); }
+#sg-app .sg-review-hd:hover { background: rgba(13,107,94,0.05); }
+
 </style>
 <nav class="app-nav">
   <div class="nav-brand">OLF <span>Tracker</span></div>

@@ -281,6 +281,7 @@ onAuthStateChanged(auth, async (user) => {
         currentRole = isAdmin ? "Admin" : "User";
         updateTopbar(user);
         showApp();
+        loadMyEmployeeRecord(email);   // fills the profile chip / ID card
 
         await navigate("home");
     } else {
@@ -500,13 +501,47 @@ function showApp() {
     appShell.classList.add("visible");
 }
 
+// "Omkar Sinare" -> "OS". Falls back to one letter for single-word names.
+function initialsFrom(name) {
+    const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return "U";
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+}
+
 function updateTopbar(user) {
-    const firstLetter = user.displayName?.charAt(0)?.toUpperCase() || "U";
     if (topbarName)   topbarName.textContent   = user.displayName || "Staff";
     if (topbarRole)   topbarRole.textContent   = currentRole;
-    if (topbarAvatar) topbarAvatar.textContent = firstLetter;
+    if (topbarAvatar) topbarAvatar.textContent = initialsFrom(user.displayName);
     // Expose user globally so pages can read email
-    window.__olfUser = { email: user.email, displayName: user.displayName };
+    window.__olfUser = { email: user.email, displayName: user.displayName, role: currentRole };
+}
+
+/* ====================================
+   CURRENT USER'S DIRECTORY RECORD
+   Powers the profile chip and the ID card in the top bar. Read-only:
+   it fetches the row this person already has in Employees and hands it
+   to the UI. Never blocks the app - the shell renders either way.
+==================================== */
+
+async function loadMyEmployeeRecord(email) {
+    try {
+        const q    = query(collection(db, "Employees"), where("Email", "==", email));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+            const d = snap.docs[0];
+            window.__olfEmployee = { id: d.id, ...d.data() };
+        } else {
+            window.__olfEmployee = null;   // e.g. an admin who isn't in the directory
+        }
+    } catch (err) {
+        console.error("Could not load your directory record:", err);
+        window.__olfEmployee = null;
+    }
+    window.__olfEmployeeLoaded = true;
+    document.dispatchEvent(new CustomEvent("olf:profile-ready", {
+        detail: window.__olfEmployee
+    }));
 }
 
 /* ====================================
