@@ -35,6 +35,20 @@
         </div>
     </div>
 
+    <!-- ── Upcoming events (from Program Calendar) ──
+         Hidden until app.js finds something in the today/tomorrow window. -->
+    <div class="upcoming-section" id="upcomingSection" style="display:none;">
+        <div class="news-section-header">
+            <div class="news-section-title">
+                <span class="ns-icon">🗓️</span> Happening next
+            </div>
+            <button class="btn-add-news-inline" id="upcomingViewAll" type="button">
+                Open calendar →
+            </button>
+        </div>
+        <div class="upcoming-grid" id="upcomingGrid"></div>
+    </div>
+
     <!-- ── News Section ── -->
     <div class="news-section">
         <div class="news-section-header">
@@ -116,8 +130,76 @@
 
 .stat-label { font-size: 12.5px; color: #6b7280; font-weight: 500; }
 
+/* ── Happening next ────────────────────────────────────────────
+   Uses the shared tokens from index.html so this strip matches the
+   glass card system rather than inventing a third look. */
+.upcoming-section { margin-bottom: 24px; }
+
+.upcoming-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+}
+
+.upcoming-card {
+    position: relative;
+    display: flex;
+    gap: 12px;
+    padding: 13px 15px 13px 17px;
+    background: var(--glass, rgba(255,255,255,0.74));
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    backdrop-filter: blur(18px) saturate(150%);
+    border: 1px solid rgba(255,255,255,0.8);
+    border-radius: var(--r-md, 14px);
+    box-shadow: var(--shadow-sm, 0 1px 3px rgba(15,23,42,0.06)),
+                inset 0 1px 0 rgba(255,255,255,0.85);
+    overflow: hidden;
+    transition: transform .18s ease, box-shadow .18s ease;
+}
+.upcoming-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md, 0 8px 24px rgba(15,23,42,0.09));
+}
+
+/* Programme colour rides the leading edge */
+.upcoming-accent { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+
+.upcoming-when {
+    flex: 0 0 46px;
+    text-align: center;
+    border-right: 1px solid rgba(15,23,42,0.07);
+    padding-right: 11px;
+}
+.upcoming-day {
+    font-size: 21px; font-weight: 800; line-height: 1;
+    color: #1a1d23; font-variant-numeric: tabular-nums;
+}
+.upcoming-mon {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .06em; color: #6b7280; margin-top: 3px;
+}
+.upcoming-body { min-width: 0; flex: 1; }
+.upcoming-title {
+    font-size: 13px; font-weight: 700; color: #1a1d23;
+    margin-bottom: 3px; line-height: 1.35;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.upcoming-meta {
+    font-size: 11.5px; color: #6b7280; line-height: 1.45;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.upcoming-chip {
+    display: inline-block; margin-top: 6px;
+    font-size: 10px; font-weight: 700; letter-spacing: .04em;
+    text-transform: uppercase; padding: 2px 8px; border-radius: 20px;
+}
+.upcoming-chip--today    { background: rgba(239,68,68,0.12);  color: #B42318; }
+.upcoming-chip--tomorrow { background: rgba(79,142,247,0.12); color: #2C63C4; }
+.upcoming-chip--later    { background: rgba(15,23,42,0.06);   color: #5A6577; }
+
 @media (max-width: 768px) {
     .stats-row { grid-template-columns: 1fr; }
     .news-cards-grid { grid-template-columns: 1fr; }
+    .upcoming-grid { grid-template-columns: 1fr; }
 }
 </style>

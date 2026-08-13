@@ -2026,6 +2026,236 @@
             .olf-id-card { left: 10px; right: 10px; width: auto; }
             .topbar-logo { font-size: 15px; }
         }
+
+        /* ==========================================================
+           DATE & TIME PICKER + ANNOUNCEMENT POPUP
+        ========================================================== */
+
+        /* ── The field that opens the picker ──
+           Not scoped to #appShell: #newsModal is a sibling of it, not a
+           child. Geometry deliberately mirrors .form-group input so the
+           trigger reads as a form field, not a button. */
+        .dt-field {
+            width: 100%;
+            display: flex; align-items: center; justify-content: space-between; gap: 10px;
+            padding: 9px 12px;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 7px;
+            font-family: inherit; font-size: 13.5px; font-weight: 500;
+            color: #1a1d23;
+            cursor: pointer; text-align: left;
+            transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+        }
+        .dt-field:hover {
+            border-color: #4f8ef7;
+            background: #fbfdff;
+        }
+        .dt-field:focus-visible {
+            outline: none;
+            border-color: #4f8ef7;
+            box-shadow: 0 0 0 3px rgba(79,142,247,0.1);
+        }
+        .dt-field.is-empty .dt-field-val { color: #9ca3af; font-weight: 400; }
+        .dt-field-val {
+            font-variant-numeric: tabular-nums;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        /* An inline SVG rather than an emoji: the emoji rendered as a boxed
+           glyph on Windows and didn't match the UI weight. */
+        .dt-field-ico {
+            flex-shrink: 0; display: flex; align-items: center;
+            color: #9ca3af; transition: color .18s ease;
+        }
+        .dt-field:hover .dt-field-ico { color: #4f8ef7; }
+        .dt-field-ico svg { display: block; }
+
+        /* ── Picker shell ── */
+        /* An author `display` rule beats the UA stylesheet's [hidden]
+           display:none, so without this the "hidden" overlay would still
+           cover the page and swallow every click. */
+        .dtp-overlay[hidden], .news-popup[hidden] { display: none !important; }
+
+        .dtp-overlay {
+            position: fixed; inset: 0; z-index: 520;
+            display: flex; align-items: center; justify-content: center; padding: 16px;
+            background: rgba(8,12,20,0.42);
+            -webkit-backdrop-filter: blur(3px);
+            backdrop-filter: blur(3px);
+            animation: dtpFade .14s ease;
+        }
+        @keyframes dtpFade { from { opacity: 0; } to { opacity: 1; } }
+
+        .dtp {
+            width: 316px;
+            background: var(--glass-strong, rgba(255,255,255,0.94));
+            -webkit-backdrop-filter: blur(28px) saturate(170%);
+            backdrop-filter: blur(28px) saturate(170%);
+            border: 1px solid rgba(255,255,255,0.7);
+            border-radius: 16px;
+            box-shadow: var(--shadow-lg, 0 18px 44px rgba(15,23,42,0.22));
+            overflow: hidden;
+            animation: dtpIn .18s var(--ease);
+        }
+        @keyframes dtpIn {
+            from { opacity: 0; transform: translateY(8px) scale(.985); }
+            to   { opacity: 1; transform: none; }
+        }
+
+        .dtp-head {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 12px 8px;
+        }
+        .dtp-title { font-size: 13.5px; font-weight: 700; color: var(--text, #0F172A); }
+        .dtp-nav {
+            width: 28px; height: 28px; border-radius: 8px;
+            border: 1px solid var(--hairline, rgba(15,23,42,0.08));
+            background: rgba(255,255,255,0.8);
+            color: var(--text-soft, #5A6577);
+            font-size: 15px; line-height: 1; cursor: pointer;
+            transition: background .14s var(--ease), border-color .14s var(--ease);
+        }
+        .dtp-nav:hover { background: rgba(79,142,247,0.10); border-color: var(--brand, #4F8EF7); color: var(--brand); }
+
+        .dtp-dow, .dtp-grid {
+            display: grid; grid-template-columns: repeat(7, 1fr);
+            gap: 2px; padding: 0 12px;
+        }
+        .dtp-dow span {
+            text-align: center; font-size: 10px; font-weight: 700;
+            letter-spacing: .05em; text-transform: uppercase;
+            color: var(--text-faint, #8A94A6); padding-bottom: 4px;
+        }
+        .dtp-day {
+            height: 34px; border: none; background: none; border-radius: 9px;
+            font: inherit; font-size: 12.5px; font-weight: 500;
+            color: var(--text, #0F172A); cursor: pointer;
+            font-variant-numeric: tabular-nums;
+            transition: background .12s var(--ease), color .12s var(--ease);
+        }
+        .dtp-day:hover { background: rgba(79,142,247,0.12); }
+        .dtp-day.muted { color: var(--text-faint, #8A94A6); opacity: .55; }
+        .dtp-day.today { box-shadow: inset 0 0 0 1.5px rgba(79,142,247,0.45); }
+        .dtp-day.sel {
+            background: linear-gradient(135deg, var(--brand, #4F8EF7), var(--teal, #10B197));
+            color: #fff; font-weight: 700;
+            box-shadow: 0 3px 10px rgba(79,142,247,0.35);
+        }
+
+        /* ── Time row ── */
+        .dtp-time {
+            display: flex; align-items: center; gap: 7px;
+            margin: 12px 12px 0; padding: 10px 12px;
+            background: rgba(79,142,247,0.06);
+            border: 1px solid rgba(79,142,247,0.14);
+            border-radius: 11px;
+        }
+        .dtp-clock { font-size: 14px; opacity: .8; }
+        .dtp-spin { display: flex; flex-direction: column; align-items: center; }
+        .dtp-step {
+            width: 24px; height: 15px; padding: 0; border: none; background: none;
+            color: var(--text-soft, #5A6577); font-size: 9px; line-height: 1;
+            cursor: pointer; border-radius: 4px;
+        }
+        .dtp-step:hover { background: rgba(79,142,247,0.16); color: var(--brand, #4F8EF7); }
+        .dtp-num {
+            font-size: 17px; font-weight: 800; color: var(--text, #0F172A);
+            font-variant-numeric: tabular-nums; min-width: 26px; text-align: center;
+        }
+        .dtp-colon { font-size: 16px; font-weight: 800; color: var(--text-faint, #8A94A6); }
+        .dtp-ampm {
+            margin-left: 2px; padding: 4px 9px; border-radius: 7px;
+            border: 1px solid rgba(79,142,247,0.28);
+            background: rgba(255,255,255,0.85);
+            font: inherit; font-size: 11px; font-weight: 700;
+            color: var(--brand, #4F8EF7); cursor: pointer;
+        }
+        .dtp-ampm:hover { background: rgba(79,142,247,0.12); }
+        .dtp-preview {
+            margin-left: auto; font-size: 10.5px; color: var(--text-faint, #8A94A6);
+            text-align: right; line-height: 1.3;
+        }
+
+        .dtp-foot {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 10px; padding: 12px;
+        }
+        .dtp-foot-btns { display: flex; gap: 8px; }
+        .dtp-today {
+            border: none; background: none; font: inherit; font-size: 12px;
+            font-weight: 700; color: var(--brand, #4F8EF7); cursor: pointer;
+            padding: 6px 8px; border-radius: 7px;
+        }
+        .dtp-today:hover { background: rgba(79,142,247,0.10); }
+
+        /* ── Announcement detail rows ── */
+        .nd-item {
+            padding: 13px 15px;
+            background: rgba(255,255,255,0.72);
+            border: 1px solid rgba(15,23,42,0.07);
+            border-left: 3px solid var(--brand, #4F8EF7);
+            border-radius: 11px;
+            margin-bottom: 10px;
+        }
+        .nd-item:last-child { margin-bottom: 0; }
+        .nd-text { font-size: 13.5px; line-height: 1.6; color: var(--text, #0F172A); white-space: pre-wrap; }
+        .nd-dates {
+            margin-top: 8px; font-size: 11px; color: var(--text-faint, #8A94A6);
+            font-variant-numeric: tabular-nums;
+        }
+        .nd-empty { padding: 26px; text-align: center; font-size: 13px; color: var(--text-faint, #8A94A6); }
+
+        /* ── Session popup ── */
+        .news-popup {
+            position: fixed; right: 20px; bottom: 20px; z-index: 480;
+            width: 320px; display: flex; gap: 11px;
+            padding: 14px 15px 14px 14px;
+            background: var(--glass-strong, rgba(255,255,255,0.92));
+            -webkit-backdrop-filter: blur(24px) saturate(170%);
+            backdrop-filter: blur(24px) saturate(170%);
+            border: 1px solid rgba(255,255,255,0.75);
+            border-left: 3px solid var(--brand, #4F8EF7);
+            border-radius: 14px;
+            box-shadow: var(--shadow-lg, 0 16px 40px rgba(15,23,42,0.2));
+            animation: newsPopIn .28s var(--ease);
+        }
+        @keyframes newsPopIn {
+            from { opacity: 0; transform: translateY(14px) scale(.98); }
+            to   { opacity: 1; transform: none; }
+        }
+        .news-popup--leaving { animation: newsPopOut .2s ease forwards; }
+        @keyframes newsPopOut {
+            to { opacity: 0; transform: translateY(10px) scale(.98); }
+        }
+        .news-popup-icon { font-size: 18px; line-height: 1.2; flex-shrink: 0; }
+        .news-popup-body { min-width: 0; flex: 1; }
+        .news-popup-label {
+            font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: .06em; color: var(--brand, #4F8EF7); margin-bottom: 4px;
+        }
+        .news-popup-text {
+            font-size: 12.5px; line-height: 1.5; color: var(--text, #0F172A);
+            display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .news-popup-cta {
+            margin-top: 9px; padding: 0; border: none; background: none;
+            font: inherit; font-size: 12px; font-weight: 700;
+            color: var(--brand, #4F8EF7); cursor: pointer;
+        }
+        .news-popup-cta:hover { text-decoration: underline; }
+        .news-popup-x {
+            position: absolute; top: 7px; right: 8px;
+            width: 20px; height: 20px; padding: 0; border: none; border-radius: 50%;
+            background: rgba(15,23,42,0.06); color: var(--text-soft, #5A6577);
+            font-size: 10px; line-height: 1; cursor: pointer;
+        }
+        .news-popup-x:hover { background: rgba(15,23,42,0.12); }
+
+        @media (max-width: 768px) {
+            .news-popup { right: 10px; left: 10px; bottom: 10px; width: auto; }
+            .dtp { width: 100%; max-width: 340px; }
+        }
     </style>
 </head>
 <body>
@@ -2079,6 +2309,69 @@
                 <span class="tp-caret" aria-hidden="true">▾</span>
                 <span id="topbarRole" hidden>—</span>
             </button>
+        </div>
+    </div>
+
+    <!-- ── Date & time picker (replaces the native datetime-local UI) ── -->
+    <div class="dtp-overlay" id="dtpOverlay" hidden>
+        <div class="dtp" role="dialog" aria-modal="true" aria-label="Choose date and time">
+            <div class="dtp-head">
+                <button class="dtp-nav" id="dtpPrev" type="button" aria-label="Previous month">‹</button>
+                <div class="dtp-title" id="dtpTitle">—</div>
+                <button class="dtp-nav" id="dtpNext" type="button" aria-label="Next month">›</button>
+            </div>
+            <div class="dtp-dow">
+                <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+            </div>
+            <div class="dtp-grid" id="dtpGrid"></div>
+            <div class="dtp-time">
+                <span class="dtp-clock">🕒</span>
+                <div class="dtp-spin">
+                    <button class="dtp-step" data-dt-step="h,1" type="button" aria-label="Hour up">▴</button>
+                    <span class="dtp-num" id="dtpHour">09</span>
+                    <button class="dtp-step" data-dt-step="h,-1" type="button" aria-label="Hour down">▾</button>
+                </div>
+                <span class="dtp-colon">:</span>
+                <div class="dtp-spin">
+                    <button class="dtp-step" data-dt-step="mi,5" type="button" aria-label="Minute up">▴</button>
+                    <span class="dtp-num" id="dtpMin">00</span>
+                    <button class="dtp-step" data-dt-step="mi,-5" type="button" aria-label="Minute down">▾</button>
+                </div>
+                <button class="dtp-ampm" id="dtpAmPm" type="button">AM</button>
+                <span class="dtp-preview" id="dtpPreview"></span>
+            </div>
+            <div class="dtp-foot">
+                <button class="dtp-today" id="dtpNow" type="button">Now</button>
+                <div class="dtp-foot-btns">
+                    <button class="btn-cancel" id="dtpCancel" type="button">Cancel</button>
+                    <button class="btn-save" id="dtpSave" type="button">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Announcement detail (opened from the popup or a card) ── -->
+    <div id="newsDetailModal" class="modal-overlay">
+        <div class="modal-box" style="width:560px;">
+            <div class="modal-header">
+                <h2>📢 Announcements</h2>
+                <button class="modal-close" id="closeNewsDetailBtn" type="button">✕</button>
+            </div>
+            <div class="modal-body" id="newsDetailBody"></div>
+            <div class="modal-footer">
+                <button class="btn-cancel" id="closeNewsDetailBtn2" type="button">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Session popup: shown once per session on any page ── -->
+    <div class="news-popup" id="newsPopup" hidden>
+        <button class="news-popup-x" id="newsPopupClose" type="button" aria-label="Dismiss">✕</button>
+        <div class="news-popup-icon">📢</div>
+        <div class="news-popup-body">
+            <div class="news-popup-label" id="newsPopupLabel">New announcement</div>
+            <div class="news-popup-text" id="newsPopupText"></div>
+            <button class="news-popup-cta" id="newsPopupCta" type="button">Click here for more info →</button>
         </div>
     </div>
 
@@ -2155,7 +2448,7 @@
         <div class="modal-body" style="gap:16px;">
             <div class="form-group">
                 <label>News / Announcement <span class="req">*</span></label>
-                <textarea id="" rows="4" placeholder="Enter the announcement text…"
+                <textarea id="newsText" rows="4" placeholder="Enter the announcement text…"
                     style="width:100%;padding:9px 12px;border:1px solid #e5e7eb;border-radius:7px;font-size:13.5px;font-family:inherit;outline:none;resize:vertical;transition:border 0.2s;"
                     onfocus="this.style.borderColor='#4f8ef7';this.style.boxShadow='0 0 0 3px rgba(79,142,247,0.1)'"
                     onblur="this.style.borderColor='#e5e7eb';this.style.boxShadow='none'"></textarea>
@@ -2163,11 +2456,19 @@
             <div class="form-row">
                 <div class="form-group">
                     <label>From <span class="req">*</span></label>
-                    <input type="datetime-local" id="newsStartDate">
+                    <button type="button" class="dt-field" data-dt-target="newsStartDate">
+                        <span class="dt-field-val">Pick date &amp; time</span>
+                        <span class="dt-field-ico" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="1.9" y="3.2" width="12.2" height="10.9" rx="2"/><path d="M1.9 6.6h12.2M5.4 1.9v2.6M10.6 1.9v2.6"/></svg></span>
+                    </button>
+                    <input type="hidden" id="newsStartDate">
                 </div>
                 <div class="form-group">
                     <label>To <span class="req">*</span></label>
-                    <input type="datetime-local" id="newsEndDate">
+                    <button type="button" class="dt-field" data-dt-target="newsEndDate">
+                        <span class="dt-field-val">Pick date &amp; time</span>
+                        <span class="dt-field-ico" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><rect x="1.9" y="3.2" width="12.2" height="10.9" rx="2"/><path d="M1.9 6.6h12.2M5.4 1.9v2.6M10.6 1.9v2.6"/></svg></span>
+                    </button>
+                    <input type="hidden" id="newsEndDate">
                 </div>
             </div>
             <p style="font-size:11.5px;color:#9ca3af;margin-top:-4px;">

@@ -127,6 +127,13 @@ closeNewsModalBtn.addEventListener("click",  () => newsModal.classList.remove("o
 closeNewsModalBtn2.addEventListener("click", () => newsModal.classList.remove("open"));
 saveNewsBtn.addEventListener("click", saveNews);
 
+// Custom date & time picker + announcement detail modal (both static in index.html)
+wireDateTimePicker();
+document.getElementById("closeNewsDetailBtn")?.addEventListener("click",
+    () => document.getElementById("newsDetailModal").classList.remove("open"));
+document.getElementById("closeNewsDetailBtn2")?.addEventListener("click",
+    () => document.getElementById("newsDetailModal").classList.remove("open"));
+
 // Sidebar collapse/expand
 const sidebarToggleBtn = document.getElementById("sidebarToggleBtn");
 const appSidebar       = document.getElementById("appSidebar");
@@ -283,6 +290,7 @@ onAuthStateChanged(auth, async (user) => {
         showApp();
         loadMyEmployeeRecord(email);   // fills the profile chip / ID card
         prefetchPages();               // warm page fragments while idle
+        maybeShowNewsPopup();          // once-per-session announcement nudge
 
         await navigate("home");
     } else {
@@ -545,6 +553,378 @@ async function loadMyEmployeeRecord(email) {
     }));
 }
 
+
+/* ====================================
+   DATE & TIME PICKER
+   Replaces the native datetime-local UI, which is unstyleable and
+   fiddly. The hidden inputs keep their original IDs and the same
+   "YYYY-MM-DDTHH:mm" value format, so saveNews() is untouched.
+   Nothing is written to the field until Save is pressed.
+==================================== */
+
+const DTP_MONTHS = ["January", "February", "March", "April", "May", "June",
+                    "July", "August", "September", "October", "November", "December"];
+
+// Working copy; only committed to the input on Save.
+let dtpState = { targetId: null, y: 0, mo: 0, d: 1, h: 9, mi: 0 };
+
+function pad2(n) { return String(n).padStart(2, "0"); }
+
+/** "YYYY-MM-DDTHH:mm" — exactly what datetime-local produced before. */
+function dtpToValue(s) {
+    return `${s.y}-${pad2(s.mo + 1)}-${pad2(s.d)}T${pad2(s.h)}:${pad2(s.mi)}`;
+}
+
+function dtpFromValue(value) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(String(value || ""));
+    if (!m) return null;
+    return { y: +m[1], mo: +m[2] - 1, d: +m[3], h: +m[4], mi: +m[5] };
+}
+
+function dtpPretty(value) {
+    const p = dtpFromValue(value);
+    if (!p) return "";
+    const h12 = p.h % 12 === 0 ? 12 : p.h % 12;
+    return `${pad2(p.d)} ${DTP_MONTHS[p.mo].slice(0, 3)} ${p.y}, ${pad2(h12)}:${pad2(p.mi)} ${p.h < 12 ? "AM" : "PM"}`;
+}
+
+/** Repaints the label on a dt-field from its hidden input. */
+function dtpSyncField(targetId) {
+    const btn = document.querySelector(`.dt-field[data-dt-target="${targetId}"]`);
+    const input = document.getElementById(targetId);
+    if (!btn || !input) return;
+    const label = btn.querySelector(".dt-field-val");
+    const pretty = dtpPretty(input.value);
+    label.textContent = pretty || "Pick date & time";
+    btn.classList.toggle("is-empty", !pretty);
+}
+
+function dtpOpen(targetId) {
+    const input = document.getElementById(targetId);
+    if (!input) return;
+
+    const existing = dtpFromValue(input.value);
+    if (existing) {
+        dtpState = { targetId, ...existing };
+    } else {
+        // Sensible default: now, minutes rounded up to the next 5.
+        const n = new Date();
+        n.setMinutes(Math.ceil(n.getMinutes() / 5) * 5, 0, 0);
+        dtpState = { targetId, y: n.getFullYear(), mo: n.getMonth(), d: n.getDate(),
+                     h: n.getHours(), mi: n.getMinutes() };
+    }
+    dtpRender();
+    const ov = document.getElementById("dtpOverlay");
+    if (ov) ov.hidden = false;
+}
+
+function dtpClose() {
+    const ov = document.getElementById("dtpOverlay");
+    if (ov) ov.hidden = true;
+    dtpState.targetId = null;
+}
+
+function dtpRender() {
+    const s = dtpState;
+    const title = document.getElementById("dtpTitle");
+    if (title) title.textContent = `${DTP_MONTHS[s.mo]} ${s.y}`;
+
+    const grid = document.getElementById("dtpGrid");
+    if (grid) {
+        const first = new Date(s.y, s.mo, 1).getDay();
+        const days  = new Date(s.y, s.mo + 1, 0).getDate();
+        const prev  = new Date(s.y, s.mo, 0).getDate();
+        const now   = new Date();
+        let html = "";
+
+        for (let i = first - 1; i >= 0; i--) {
+            html += `<button type="button" class="dtp-day muted" data-dtp-shift="-1" data-dtp-day="${prev - i}">${prev - i}</button>`;
+        }
+        for (let d = 1; d <= days; d++) {
+            const isToday = d === now.getDate() && s.mo === now.getMonth() && s.y === now.getFullYear();
+            const cls = ["dtp-day", d === s.d ? "sel" : "", isToday ? "today" : ""].filter(Boolean).join(" ");
+            html += `<button type="button" class="${cls}" data-dtp-day="${d}">${d}</button>`;
+        }
+        const tail = (7 - ((first + days) % 7)) % 7;
+        for (let d = 1; d <= tail; d++) {
+            html += `<button type="button" class="dtp-day muted" data-dtp-shift="1" data-dtp-day="${d}">${d}</button>`;
+        }
+        grid.innerHTML = html;
+    }
+
+    const h12 = s.h % 12 === 0 ? 12 : s.h % 12;
+    const hEl = document.getElementById("dtpHour");
+    const mEl = document.getElementById("dtpMin");
+    const aEl = document.getElementById("dtpAmPm");
+    const pEl = document.getElementById("dtpPreview");
+    if (hEl) hEl.textContent = pad2(h12);
+    if (mEl) mEl.textContent = pad2(s.mi);
+    if (aEl) aEl.textContent = s.h < 12 ? "AM" : "PM";
+    if (pEl) pEl.textContent = dtpPretty(dtpToValue(s));
+}
+
+function wireDateTimePicker() {
+    // The triggers and the picker are static in index.html, so this runs once.
+    document.querySelectorAll(".dt-field[data-dt-target]").forEach(btn => {
+        btn.addEventListener("click", () => dtpOpen(btn.dataset.dtTarget));
+    });
+
+    const grid = document.getElementById("dtpGrid");
+    if (grid) {
+        grid.addEventListener("click", (e) => {
+            const b = e.target.closest("button[data-dtp-day]");
+            if (!b) return;
+            const shift = Number(b.dataset.dtpShift || 0);
+            if (shift) {
+                // Tapping a greyed-out day walks into that month.
+                const nd = new Date(dtpState.y, dtpState.mo + shift, Number(b.dataset.dtpDay));
+                dtpState.y = nd.getFullYear();
+                dtpState.mo = nd.getMonth();
+            }
+            dtpState.d = Number(b.dataset.dtpDay);
+            dtpRender();
+        });
+    }
+
+    const step = (field, by) => {
+        if (field === "h") dtpState.h = (dtpState.h + by + 24) % 24;
+        else dtpState.mi = (dtpState.mi + by + 60) % 60;
+        dtpRender();
+    };
+    document.querySelectorAll("[data-dt-step]").forEach(b => {
+        const [field, by] = b.dataset.dtStep.split(",");
+        b.addEventListener("click", () => step(field, Number(by)));
+    });
+
+    const move = (by) => {
+        const nd = new Date(dtpState.y, dtpState.mo + by, 1);
+        dtpState.y = nd.getFullYear();
+        dtpState.mo = nd.getMonth();
+        // Clamp so 31 -> Feb doesn't roll into March.
+        dtpState.d = Math.min(dtpState.d, new Date(dtpState.y, dtpState.mo + 1, 0).getDate());
+        dtpRender();
+    };
+    document.getElementById("dtpPrev")?.addEventListener("click", () => move(-1));
+    document.getElementById("dtpNext")?.addEventListener("click", () => move(1));
+
+    document.getElementById("dtpAmPm")?.addEventListener("click", () => {
+        dtpState.h = (dtpState.h + 12) % 24;
+        dtpRender();
+    });
+
+    document.getElementById("dtpNow")?.addEventListener("click", () => {
+        const n = new Date();
+        n.setMinutes(Math.ceil(n.getMinutes() / 5) * 5, 0, 0);
+        Object.assign(dtpState, { y: n.getFullYear(), mo: n.getMonth(), d: n.getDate(),
+                                  h: n.getHours(), mi: n.getMinutes() });
+        dtpRender();
+    });
+
+    document.getElementById("dtpCancel")?.addEventListener("click", dtpClose);
+    document.getElementById("dtpOverlay")?.addEventListener("click", (e) => {
+        if (e.target.id === "dtpOverlay") dtpClose();
+    });
+    document.addEventListener("keydown", (e) => {
+        const ov = document.getElementById("dtpOverlay");
+        if (e.key === "Escape" && ov && !ov.hidden) dtpClose();
+    });
+
+    // Save is the only thing that writes to the field.
+    document.getElementById("dtpSave")?.addEventListener("click", () => {
+        const id = dtpState.targetId;
+        if (!id) return dtpClose();
+        const input = document.getElementById(id);
+        if (input) input.value = dtpToValue(dtpState);
+        dtpSyncField(id);
+        dtpClose();
+    });
+
+    dtpSyncField("newsStartDate");
+    dtpSyncField("newsEndDate");
+}
+
+/* ====================================
+   ACTIVE ANNOUNCEMENTS (shared)
+==================================== */
+
+async function getActiveNews() {
+    const now = Date.now();
+    const snapshot = await getDocs(collection(db, "news"));
+    const active = [];
+    snapshot.forEach(d => {
+        const n = { id: d.id, ...d.data() };
+        const { start, end } = getNewsRange(n);
+        if (!isNaN(start) && !isNaN(end) && now >= start && now <= end) active.push(n);
+    });
+    active.sort((a, b) => getNewsRange(a).end - getNewsRange(b).end);
+    return active;
+}
+
+function openNewsDetail(items) {
+    const body = document.getElementById("newsDetailBody");
+    const modal = document.getElementById("newsDetailModal");
+    if (!body || !modal) return;
+
+    body.innerHTML = (items && items.length)
+        ? items.map(n => {
+            const startVal = n.startDateTime || n.startDate;
+            const endVal   = n.endDateTime   || n.endDate;
+            return `<div class="nd-item">
+                        <div class="nd-text">${escHtml(n.text || "")}</div>
+                        <div class="nd-dates">\u{1F4C5} ${formatNewsDateTime(startVal, false)} \u2013 ${formatNewsDateTime(endVal, true)}</div>
+                    </div>`;
+        }).join("")
+        : `<div class="nd-empty">No active announcements right now.</div>`;
+
+    modal.classList.add("open");
+}
+
+/* Shown once per session, on whatever page the person happens to be on. */
+const NEWS_POPUP_FLAG = "olf_news_popup_seen";
+
+function hideNewsPopup() {
+    const p = document.getElementById("newsPopup");
+    if (!p || p.hidden) return;
+    p.classList.add("news-popup--leaving");
+    setTimeout(() => { p.hidden = true; p.classList.remove("news-popup--leaving"); }, 200);
+}
+
+async function maybeShowNewsPopup() {
+    try {
+        if (sessionStorage.getItem(NEWS_POPUP_FLAG) === "1") return;
+    } catch (e) { /* private mode: fall through and just show it */ }
+
+    let items = [];
+    try {
+        items = await getActiveNews();
+    } catch (err) {
+        console.error("Announcement popup check failed:", err);
+        return;
+    }
+    if (!items.length) return;   // nothing to shout about
+
+    const popup = document.getElementById("newsPopup");
+    const text  = document.getElementById("newsPopupText");
+    const label = document.getElementById("newsPopupLabel");
+    if (!popup || !text) return;
+
+    text.textContent = items[0].text || "";
+    if (label) {
+        label.textContent = items.length > 1
+            ? `${items.length} new announcements`
+            : "New announcement";
+    }
+    popup.hidden = false;
+
+    try { sessionStorage.setItem(NEWS_POPUP_FLAG, "1"); } catch (e) {}
+
+    document.getElementById("newsPopupCta").onclick = () => { hideNewsPopup(); openNewsDetail(items); };
+    document.getElementById("newsPopupClose").onclick = hideNewsPopup;
+}
+
+/* ====================================
+   HAPPENING NEXT
+   The next events from the Program Calendar, shown on Home: the two
+   soonest from today onwards, however far off they are. An event
+   drops off once its own day has passed. Reads the calendar's own
+   cache, so this costs no extra request.
+==================================== */
+
+const UPCOMING_MAX = 2;   // plus a third only when it shares a day with the 2nd
+
+function dayKey(y, m, d) { return `${y}-${pad2(m + 1)}-${pad2(d)}`; }
+
+/** Whole days from today; 0 = today, 1 = tomorrow, negative = past. */
+function daysFromToday(e) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const that  = new Date(e.year, e.month, e.day);
+    return Math.round((that - today) / 86400000);
+}
+
+function pickUpcoming(events) {
+    const now = new Date();
+    const todayKey = dayKey(now.getFullYear(), now.getMonth(), now.getDate());
+
+    // Everything from today onwards, soonest first. Past days drop off
+    // on their own once the date rolls over.
+    const upcoming = (events || [])
+        .filter(e => daysFromToday(e) >= 0)
+        .sort((a, b) => {
+            const ka = dayKey(a.year, a.month, a.day);
+            const kb = dayKey(b.year, b.month, b.day);
+            if (ka !== kb) return ka < kb ? -1 : 1;
+            // Same day: earlier start time first when we have one.
+            return new Date(a.start || 0) - new Date(b.start || 0);
+        });
+
+    const picked = upcoming.slice(0, UPCOMING_MAX);
+    // Don't cut a day in half: if the next one shares its day with the
+    // last one picked, show it too.
+    const third = upcoming[UPCOMING_MAX];
+    if (third && picked.length === UPCOMING_MAX) {
+        const last = picked[picked.length - 1];
+        if (dayKey(third.year, third.month, third.day) === dayKey(last.year, last.month, last.day)) {
+            picked.push(third);
+        }
+    }
+    return { picked, todayKey };
+}
+
+async function renderUpcomingEvents() {
+    const section = document.getElementById("upcomingSection");
+    const grid    = document.getElementById("upcomingGrid");
+    if (!section || !grid) return;
+
+    let events = [];
+    try {
+        if (window.ProgramCalendar && typeof window.ProgramCalendar.ensureEvents === "function") {
+            events = await window.ProgramCalendar.ensureEvents();
+        }
+    } catch (err) {
+        console.warn("Upcoming events unavailable:", err);
+        return;                       // leave the strip hidden; Home still works
+    }
+
+    const { picked, todayKey } = pickUpcoming(events);
+    if (!picked.length) {
+        // Clear as well as hide, so yesterday's cards can't linger in the DOM.
+        grid.innerHTML = "";
+        section.style.display = "none";
+        return;
+    }
+
+    const colorFor = (t) => {
+        try { return window.ProgramCalendar.colorFor(t) || "#4F8EF7"; }
+        catch (e) { return "#4F8EF7"; }
+    };
+
+    grid.innerHTML = picked.map(e => {
+        const away = daysFromToday(e);
+        const when = away === 0 ? "Today" : (away === 1 ? "Tomorrow" : `In ${away} days`);
+        const tone = away === 0 ? "today" : (away === 1 ? "tomorrow" : "later");
+        const time = (!e.allDay && e.start)
+            ? new Date(e.start).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
+            : "All day";
+        return `
+        <div class="upcoming-card">
+            <span class="upcoming-accent" style="background:${escHtml(colorFor(e.type))}"></span>
+            <div class="upcoming-when">
+                <div class="upcoming-day">${pad2(e.day)}</div>
+                <div class="upcoming-mon">${DTP_MONTHS[e.month].slice(0, 3)}</div>
+            </div>
+            <div class="upcoming-body">
+                <div class="upcoming-title" title="${escHtml(e.eventName || e.type || "Event")}">${escHtml(e.eventName || e.type || "Event")}</div>
+                <div class="upcoming-meta">\u{1F4CD} ${escHtml(e.district || "\u2014")} &nbsp;\u00B7&nbsp; \u{1F551} ${escHtml(time)}</div>
+                <span class="upcoming-chip upcoming-chip--${tone}">${escHtml(when)}</span>
+            </div>
+        </div>`;
+    }).join("");
+
+    section.style.display = "";
+    document.getElementById("upcomingViewAll")?.addEventListener("click", () => navigate("calendar"));
+}
+
 /* ====================================
    PAGE FRAGMENT CACHE
    navigate() used to fetch pages/<page>.html on every visit, so the
@@ -764,6 +1144,9 @@ async function initHomePage() {
 
     // Load news as cards
     await renderNewsCards();
+
+    // Next events from the Program Calendar (cache-backed, no extra request)
+    renderUpcomingEvents();
 
     // Auto-refresh so expired news disappears without a page reload
     if (newsRefreshInterval) clearInterval(newsRefreshInterval);
@@ -1448,6 +1831,8 @@ async function saveNews() {
         document.getElementById("newsText").value = "";
         document.getElementById("newsStartDate").value = "";
         document.getElementById("newsEndDate").value = "";
+        dtpSyncField("newsStartDate");
+        dtpSyncField("newsEndDate");
         newsModal.classList.remove("open");
 
         // Refresh banners if still on home page

@@ -1203,6 +1203,16 @@
   window.ProgramCalendar = {
     mount: mount,
     reload: function () { return loadAll({ force: true }).then(renderCalendar); },
+
+    // Lets other pages (the Home upcoming-events strip) read the calendar
+    // without duplicating the transport: memory first, then the stored
+    // copy, then the server - all with the existing retry and dedupe.
+    ensureEvents: function () {
+      if (events.length) return Promise.resolve(events.slice());
+      if (loadFromLocal()) return Promise.resolve(events.slice());
+      return loadAll({ force: true }).then(function () { return events.slice(); });
+    },
+    colorFor: function (type) { return getProgramColor(type); },
     setUser: function (u) {
       if (u && u.email) {
         currentEmail = u.email;
