@@ -185,6 +185,21 @@
     });
   }
 
+  // Apps Script occasionally answers with 500 or drops a request (its
+  // per-user concurrency limit is easy to trip). Those failures are
+  // transient, so a read is retried once after a short pause rather
+  // than being reported to the user. Writes are NOT retried - repeating
+  // a save could duplicate a row.
+  function apiRead(action, payload, attempt) {
+    attempt = attempt || 0;
+    return api(action, payload).catch(function (err) {
+      if (attempt >= 1) throw err;
+      console.warn('[ProgramCalendar] ' + action + ' failed, retrying once:', err && err.message);
+      return new Promise(function (r) { setTimeout(r, 700); })
+        .then(function () { return apiRead(action, payload, attempt + 1); });
+    });
+  }
+
   // POST transport for large payloads (attachments). JSONP is GET-only and
   // URL-length limited; saves/edits with files go over fetch. text/plain keeps
   // it a "simple" request (no CORS preflight), same approach as the GR module.
@@ -261,14 +276,73 @@
   }
 
   // ── DATA LOAD ─────────────────────────────────────────────────────
-  function loadAll() {
-    return api('getAll').then(function (data) {
+  // The Apps Script round trip is the single slowest thing on this page,
+  // so the last payload is kept in localStorage. A cold load paints from
+  // it at once and the server call happens in the background; only a
+  // genuinely first-ever visit has to wait.
+  var LS_KEY     = 'olf_pcal_cache_v1';
+  var LS_MAX_AGE = 7 * 24 * 60 * 60 * 1000;   // a week-old copy is still fine as a first paint
+
+  function loadFromLocal() {
+    try {
+      var raw = localStorage.getItem(LS_KEY);
+      if (!raw) return false;
+      var box = JSON.parse(raw);
+      if (!box || !box.events || !box.savedAt) return false;
+      if (Date.now() - box.savedAt > LS_MAX_AGE) return false;
+      events    = box.events    || [];
+      districts = box.districts || [];
+      programs  = box.programs  || [];
+      rebuildProgramColors();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function persistLocal() {
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify({
+        savedAt: Date.now(), events: events, districts: districts, programs: programs
+      }));
+    } catch (e) {
+      // Quota or private mode: drop the cache and carry on uncached.
+      try { localStorage.removeItem(LS_KEY); } catch (e2) {}
+    }
+  }
+
+  var inFlightLoad = null;      // shared promise, so parallel callers coalesce
+  var lastLoadAt   = 0;
+  var LOAD_MIN_GAP = 45000;     // ms; a repeat visit inside this reuses what we have
+
+  function loadAll(opts) {
+    var force = !!(opts && opts.force);
+
+    // Already asking: hand back the same promise instead of firing a
+    // second identical request alongside it.
+    if (inFlightLoad) return inFlightLoad;
+
+    // Asked very recently and we already have data: nothing to do.
+    if (!force && loadedOnce && (Date.now() - lastLoadAt) < LOAD_MIN_GAP) {
+      return Promise.resolve();
+    }
+
+    inFlightLoad = apiRead('getAll').then(function (data) {
       events    = (data && data.events)    || [];
       districts = (data && data.districts) || [];
       programs  = (data && data.programs)  || [];
       rebuildProgramColors();
       loadedOnce = true;
+      lastLoadAt = Date.now();
+      persistLocal();
+    }).then(function () {
+      inFlightLoad = null;
+    }, function (err) {
+      inFlightLoad = null;
+      throw err;
     });
+
+    return inFlightLoad;
   }
 
   // ── YEAR SELECT ───────────────────────────────────────────────────
@@ -734,6 +808,7 @@
           var saved = res && res.event;
           if (saved) events = events.map(function (e) { return String(e.id) === String(tempId) ? saved : e; });
           else { var keep = findEvent(tempId); if (keep) keep._saving = false; }
+          persistLocal();
           renderCalendar();
           showToast(isEdit ? 'Event updated \u00B7 invites sent' : 'Event saved \u00B7 invites sent');
         })
@@ -798,6 +873,7 @@
       .then(function () {
         // Single round trip: drop it locally instead of re-fetching everything.
         events = events.filter(function (e) { return String(e.id) !== String(id); });
+        persistLocal();
         renderCalendar();
         showToast('Event deleted.');
       })
@@ -1087,31 +1163,46 @@
     populateYearSelect('pcal-sel-year', viewYear);
     $('pcal-sel-month').value = viewMonth;
 
-    // Repeat visit: paint instantly from in-memory data, refresh silently.
-    if (loadedOnce) {
-      return resolveUser().then(function () {
-        applyRole();
+    // Nothing in memory (a fresh page load) but a stored copy exists:
+    // treat it as a repeat visit so the month appears with no wait.
+    var paintedFromCache = false;
+    if (!loadedOnce && loadFromLocal()) {
+      paintedFromCache = true;
+    }
+
+    // Repeat visit: paint instantly from what we already have, refresh silently.
+    if (loadedOnce || paintedFromCache) {
+      applyRole();
+      renderCalendar();
+      // resolveUser() and loadAll() are independent - the payload does not
+      // depend on the role - so they run together rather than one after
+      // the other.
+      return Promise.all([
+        resolveUser().then(applyRole),
+        loadAll()
+      ]).then(function () {
         renderCalendar();
-        return loadAll()
-          .then(renderCalendar)
-          .catch(function (e) { console.warn('[ProgramCalendar] background refresh failed:', e); });
+      }).catch(function (e) {
+        console.warn('[ProgramCalendar] background refresh failed:', e);
       });
     }
 
-    // First visit: draw the empty grid immediately, then blur + circle loader
-    // over it until the data arrives.
+    // Genuinely first visit: draw the empty grid, then blur + circle loader
+    // over it while the two requests run side by side.
     renderCalendar();
     showLoader();
-    return resolveUser()
-      .then(function () { applyRole(); return loadAll(); })
-      .then(function () { renderCalendar(); })
+    return Promise.all([
+      resolveUser(),
+      loadAll()
+    ])
+      .then(function () { applyRole(); renderCalendar(); })
       .catch(function (e) { showError(e.message || 'Could not load calendar data'); })
       .then(function () { hideLoader(); });
   }
 
   window.ProgramCalendar = {
     mount: mount,
-    reload: function () { return loadAll().then(renderCalendar); },
+    reload: function () { return loadAll({ force: true }).then(renderCalendar); },
     setUser: function (u) {
       if (u && u.email) {
         currentEmail = u.email;

@@ -282,6 +282,7 @@ onAuthStateChanged(auth, async (user) => {
         updateTopbar(user);
         showApp();
         loadMyEmployeeRecord(email);   // fills the profile chip / ID card
+        prefetchPages();               // warm page fragments while idle
 
         await navigate("home");
     } else {
@@ -545,6 +546,82 @@ async function loadMyEmployeeRecord(email) {
 }
 
 /* ====================================
+   PAGE FRAGMENT CACHE
+   navigate() used to fetch pages/<page>.html on every visit, so the
+   screen stayed on the previous page until that request came back.
+   Fragments are static, so each one is fetched at most once per page
+   load and reused after that - a repeat visit renders synchronously.
+
+   Held in memory only, deliberately: a deploy replaces the fragments,
+   and anything persisted would keep serving the old markup after it.
+==================================== */
+
+const pageFragments = new Map();
+
+async function getPageHtml(page) {
+    if (pageFragments.has(page)) return pageFragments.get(page);
+    const res  = await fetch(`pages/${page}.html`);
+    const html = await res.text();
+    pageFragments.set(page, html);
+    return html;
+}
+
+/**
+ * Warms the cache while the browser is idle, so even the FIRST click on
+ * a nav item renders instantly. Fetched one at a time and lowest
+ * priority, so this never competes with the data the current page needs.
+ */
+function prefetchPages() {
+    const pages = [...document.querySelectorAll("#appSidebar .nav-item")]
+        .map(el => el.dataset.page)
+        .filter(p => p && !pageFragments.has(p));
+
+    const next = () => {
+        const page = pages.shift();
+        if (!page) return;
+        getPageHtml(page)
+            .catch(() => {})          // a miss here must never surface
+            .then(() => schedule(next));
+    };
+    const schedule = (fn) => (window.requestIdleCallback
+        ? requestIdleCallback(fn, { timeout: 3000 })
+        : setTimeout(fn, 400));
+
+    schedule(next);
+}
+
+/* ====================================
+   REMEMBERED ROLE
+   A UI affordance only, so a page can render its admin controls
+   without waiting on Firestore first. It decides what is shown,
+   never what is allowed - the backend still authorises every write.
+==================================== */
+
+function roleCacheKey(scope, email) {
+    return "olf_role_" + scope + "_" + String(email || "").toLowerCase();
+}
+
+function readCachedRole(scope, email) {
+    try {
+        const raw = localStorage.getItem(roleCacheKey(scope, email));
+        if (!raw) return false;
+        const box = JSON.parse(raw);
+        // A day old is plenty; the live check corrects it moments later anyway.
+        if (!box || Date.now() - (box.at || 0) > 24 * 60 * 60 * 1000) return false;
+        return !!box.isAdmin;
+    } catch (e) {
+        return false;
+    }
+}
+
+function writeCachedRole(scope, email, isAdmin) {
+    try {
+        localStorage.setItem(roleCacheKey(scope, email),
+            JSON.stringify({ isAdmin: !!isAdmin, at: Date.now() }));
+    } catch (e) {}
+}
+
+/* ====================================
    ROUTER
    Nav IDs use data-page attribute to
    avoid issues with hyphens in IDs.
@@ -564,9 +641,7 @@ window.navigate = async function (page) {
         el.classList.toggle("active", el.dataset.page === page);
     });
 
-    const res  = await fetch(`pages/${page}.html`);
-    const html = await res.text();
-    pageContent.innerHTML = html;
+    pageContent.innerHTML = await getPageHtml(page);
 
     if (page === "home") {
         initHomePage();
@@ -583,11 +658,25 @@ window.navigate = async function (page) {
     else if (page === "calendar") {
         const user = window.__olfUser;
         if (user) {
-            const isCalAdmin = await isCalendarAdmin(user.email.toLowerCase());
-            window.PROGRAM_CALENDAR_USER = { email: user.email, isAdmin: isCalAdmin };
+            // Start with the remembered verdict so admin controls are right
+            // straight away; corrected below once Firestore answers.
+            window.PROGRAM_CALENDAR_USER = {
+                email: user.email,
+                isAdmin: readCachedRole("cal", user.email)
+            };
         }
         if (window.ProgramCalendar && typeof window.ProgramCalendar.mount === "function") {
-            window.ProgramCalendar.mount();
+            window.ProgramCalendar.mount();   // not awaited: data load starts now
+        }
+        if (user) {
+            // Off the critical path.
+            isCalendarAdmin(user.email.toLowerCase()).then(isCalAdmin => {
+                writeCachedRole("cal", user.email, isCalAdmin);
+                window.PROGRAM_CALENDAR_USER = { email: user.email, isAdmin: isCalAdmin };
+                if (window.ProgramCalendar && typeof window.ProgramCalendar.setUser === "function") {
+                    window.ProgramCalendar.setUser(window.PROGRAM_CALENDAR_USER);
+                }
+            }).catch(err => console.error("Calendar admin check failed:", err));
         }
     }
 
