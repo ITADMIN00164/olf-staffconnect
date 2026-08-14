@@ -1461,6 +1461,20 @@
     /* ====================================================
        SUMMARY DASHBOARD (bar chart)
     ==================================================== */
+    /* Status palette, used by both the cards and the bars so a colour
+       always means the same thing:
+         blue  = the whole pile          green = signed off
+         amber = still waiting           red   = sent back
+       Amber and red are the conventional warning/error pair already used
+       by the status chips elsewhere on this page. */
+    const GR_C = {
+        total:          "#4f8ef7",
+        validated:      "#16a34a",
+        validatedOther: "#8fce9f",
+        pending:        "#f59e0b",
+        rejected:       "#dc2626"
+    };
+
     // Most bar groups we can show side by side and still read them.
     const SUM_MAX = 6;
     let sumStates = [];      // [] = all communities, combined into one group
@@ -1695,41 +1709,47 @@
         const pool = allRecords.filter(r => !month || monthKeyFromDate(r.docDate) === month);
         const groups = summaryGroups();
 
-        let totalUp = 0;          // rows in scope
-        let totalValidatedAll = 0; // validated by anyone — drives Pending / rejected
-        let validatorValCount = 0; // validated by the selected validator only
+        let totalUp = 0, totalVal = 0, totalPend = 0, totalRej = 0;
+        let validatorValCount = 0;   // validated by the selected validator only
 
         const data = groups.map(g => {
             const rows = pool.filter(g.match);
-            const stat = { GR: { up: 0, val: 0 }, Circular: { up: 0, val: 0 } };
+            // val  = validated by the selected validator (or by anyone when
+            //        no validator is picked)
+            // vOth = validated by someone else, so the bar still adds up to
+            //        the total when a validator is selected
+            const blank = () => ({ up: 0, val: 0, vOth: 0, pend: 0, rej: 0 });
+            const stat = { GR: blank(), Circular: blank() };
             rows.forEach(r => {
                 const key = isGrType(r.type) ? "GR" : "Circular";
+                const status = String(r.status || "").toLowerCase();
                 stat[key].up += 1;
-                if ((r.status || "").toLowerCase() === "validated") {
-                    totalValidatedAll += 1;
-                    const matchesValidator = String(r.validatedBy || "").toLowerCase() === validator;
-                    // The green segment follows the validator filter: with one
-                    // selected it shows only that person's validations.
-                    if (!validator || matchesValidator) stat[key].val += 1;
-                    if (validator && matchesValidator) validatorValCount += 1;
+                if (status === "validated") {
+                    totalVal += 1;
+                    const mine = String(r.validatedBy || "").toLowerCase() === validator;
+                    if (!validator || mine) stat[key].val += 1;
+                    else stat[key].vOth += 1;
+                    if (validator && mine) validatorValCount += 1;
+                } else if (status === "rejected") {
+                    stat[key].rej += 1;
+                    totalRej += 1;
+                } else {
+                    stat[key].pend += 1;   // "Pending", blank, anything else
+                    totalPend += 1;
                 }
             });
             totalUp += rows.length;
             return { label: g.label, stat };
         });
 
-        const totalVal = data.reduce((s, d) => s + d.stat.GR.val + d.stat.Circular.val, 0);
-        // Total uploaded and Pending / rejected never depend on which
-        // validator is picked — pending is simply what nobody validated yet.
-        const pendingOrRejected = totalUp - totalValidatedAll;
-
-        const cardsHtml = validator
-            ? `${sumCard("Total uploaded", totalUp, "#4f8ef7")}
-               ${sumCard(`Validated by ${validator}`, validatorValCount, "#16a34a")}
-               ${sumCard("Pending / rejected", pendingOrRejected, "#f59e0b")}`
-            : `${sumCard("Total uploaded", totalUp, "#4f8ef7")}
-               ${sumCard("Total validated", totalVal, "#16a34a")}
-               ${sumCard("Pending / rejected", pendingOrRejected, "#f59e0b")}`;
+        // Pending and Rejected are now their own cards, and the four numbers
+        // always reconcile: validated + pending + rejected = total uploaded.
+        const cardsHtml = `
+            ${sumCard("Total uploaded", totalUp, GR_C.total)}
+            ${sumCard("Validated", totalVal, GR_C.validated,
+                      validator ? `${escHtml(validator)}: ${validatorValCount}` : "")}
+            ${sumCard("Pending", totalPend, GR_C.pending)}
+            ${sumCard("Rejected", totalRej, GR_C.rejected)}`;
 
         const periodLabel = month ? monthLabel(month) : "All months";
 
@@ -1738,21 +1758,24 @@
                 ${cardsHtml}
             </div>
             <div class="gr-chart-card">
-                <div class="gr-chart-title">Uploaded vs validated — ${escHtml(periodLabel)}</div>
-                ${stackedChartHtml(data)}
+                <div class="gr-chart-title">Status breakdown — ${escHtml(periodLabel)}</div>
+                ${stackedChartHtml(data, !!validator)}
                 <div class="gr-legend">
-                    <span><i class="gr-swatch" style="background:#16a34a"></i>Validated${validator ? ` by ${escHtml(validator)}` : ""}</span>
-                    <span><i class="gr-swatch" style="background:#c7dcfb"></i>Not validated</span>
+                    <span><i class="gr-swatch" style="background:${GR_C.validated}"></i>Validated${validator ? ` by ${escHtml(validator)}` : ""}</span>
+                    ${validator ? `<span><i class="gr-swatch" style="background:${GR_C.validatedOther}"></i>Validated by others</span>` : ""}
+                    <span><i class="gr-swatch" style="background:${GR_C.pending}"></i>Pending</span>
+                    <span><i class="gr-swatch" style="background:${GR_C.rejected}"></i>Rejected</span>
                 </div>
             </div>`;
     }
 
 
-    function sumCard(label, value, color) {
+    function sumCard(label, value, color, sub) {
         return `
             <div class="gr-sum-card">
                 <div class="gr-sum-val" style="color:${color}">${value}</div>
                 <div class="gr-sum-label">${escHtml(label)}</div>
+                ${sub ? `<div class="gr-sum-sub">${sub}</div>` : ""}
             </div>`;
     }
 
@@ -1760,19 +1783,67 @@
     // green block filling it from the bottom is the validated share. The
     // total sits above the bar, the validated count inside the green block
     // (dropped when the block is too short for the text to fit).
-    function stackedChartHtml(data) {
+    // Smallest segment that can hold a number legibly; anything shorter
+    // gets its number printed beside the bar instead of inside it.
+    const SEG_MIN_LABEL = 15;
+
+    function stackedChartHtml(data, hasValidator) {
         const H = 170;
         let max = 1;
         data.forEach(d => { max = Math.max(max, d.stat.GR.up, d.stat.Circular.up); });
 
         const bar = (short, name, d) => {
             const upH = Math.max(4, Math.round((d.up / max) * H));
-            const valH = d.up ? Math.round((d.val / d.up) * upH) : 0;
+
+            // Build the stack bottom-up. Heights are apportioned by running
+            // total so rounding can never make the segments overflow the bar.
+            const parts = [
+                { key: "val",  n: d.val,  color: GR_C.validated,      word: "validated" },
+                { key: "vOth", n: d.vOth, color: GR_C.validatedOther, word: "validated by others" },
+                { key: "pend", n: d.pend, color: GR_C.pending,        word: "pending" },
+                { key: "rej",  n: d.rej,  color: GR_C.rejected,       word: "rejected" }
+            ].filter(p => p.n > 0);
+
+            let acc = 0, used = 0;
+            const segs = parts.map(p => {
+                acc += p.n;
+                const edge = d.up ? Math.round((acc / d.up) * upH) : 0;
+                const h = Math.max(0, edge - used);
+                const seg = { ...p, h, bottom: used };   // bottom = offset from bar base
+                used = edge;
+                return seg;
+            });
+
+            const inside = segs.filter(s => s.h >= SEG_MIN_LABEL);
+            const outside = segs.filter(s => s.h < SEG_MIN_LABEL);
+
+            // Anchor each overflow number beside its own segment rather than
+            // in a pile at the base, then nudge them apart so two adjacent
+            // thin segments can't print on top of each other.
+            const OUT_GAP = 15;   // chip is ~12px tall, so this clears it
+            let lastY = -Infinity;
+            outside.forEach(s => {
+                let y = s.bottom + (s.h / 2) - 6;
+                if (y < lastY + OUT_GAP) y = lastY + OUT_GAP;
+                s.y = Math.max(0, Math.round(y));
+                lastY = s.y;
+            });
+
+            const tip = `${name} — ${d.up} uploaded` +
+                        segs.map(s => `, ${s.n} ${s.word}`).join("");
+
             return `
-                <div class="gr-bar-col" title="${escHtml(name)} — uploaded ${d.up}, validated ${d.val}">
+                <div class="gr-bar-col" title="${escHtml(tip)}">
                     <div class="gr-bar-num">${d.up}</div>
-                    <div class="gr-bar gr-bar--stack" style="height:${upH}px">
-                        <div class="gr-bar-val" style="height:${valH}px">${valH >= 18 && d.val ? `<span class="gr-bar-vnum">${d.val}</span>` : ""}</div>
+                    <div class="gr-bar-slot">
+                        <div class="gr-bar gr-bar--stack" style="height:${upH}px">
+                            ${segs.map(s => `
+                                <div class="gr-seg" style="height:${s.h}px;background:${s.color}">
+                                    ${inside.indexOf(s) >= 0 ? `<span class="gr-seg-num">${s.n}</span>` : ""}
+                                </div>`).join("")}
+                        </div>
+                        ${outside.map(s => `
+                            <span class="gr-out-num" style="bottom:${s.y}px;color:${s.color}">${s.n}</span>`).join("")}
                     </div>
                     <div class="gr-bar-label">${escHtml(short)}</div>
                 </div>`;

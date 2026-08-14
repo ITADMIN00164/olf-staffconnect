@@ -217,7 +217,9 @@
     #grPage .gr-empty-icon { font-size: 30px; margin-bottom: 8px; }
 
     /* Summary */
-    #grPage .gr-sum-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px; margin-bottom: 16px; }
+    #grPage .gr-sum-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 13px; margin-bottom: 16px; }
+    #grPage .gr-sum-sub { font-size: 10.5px; color: #9ca3af; margin-top: 3px; font-variant-numeric: tabular-nums; }
+    @media (max-width: 1150px) { #grPage .gr-sum-cards { grid-template-columns: repeat(2, 1fr); } }
     #grPage .gr-sum-card { background: #fff; border-radius: 12px; padding: 15px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
     #grPage .gr-sum-val { font-size: 24px; font-weight: 800; line-height: 1; }
     #grPage .gr-sum-label { font-size: 11.5px; color: #6b7280; margin-top: 6px; }
@@ -227,16 +229,42 @@
     /* One cluster per group (community or district), two stacked bars each */
     #grPage .gr-chart { display: flex; gap: 30px; align-items: flex-end; padding: 6px 8px 0; overflow-x: auto; }
     #grPage .gr-group { display: flex; flex-direction: column; align-items: center; gap: 10px; flex: 0 0 auto; }
-    #grPage .gr-bars { display: flex; gap: 12px; align-items: flex-end; min-height: 176px; }
+    #grPage .gr-bars { display: flex; gap: 22px; align-items: flex-end; min-height: 176px; }
     #grPage .gr-bar-col { display: flex; flex-direction: column; align-items: center; gap: 7px; }
     #grPage .gr-bar { width: 42px; border-radius: 6px 6px 0 0; min-height: 4px; transition: height .3s; }
     /* Whole bar = uploaded; the green fill from the base = validated */
-    #grPage .gr-bar--stack { background: #c7dcfb; position: relative; overflow: hidden; }
-    #grPage .gr-bar-val {
-        position: absolute; left: 0; right: 0; bottom: 0; background: #16a34a;
-        display: flex; align-items: center; justify-content: center; transition: height .3s;
+    /* The bar is now built entirely from stacked status segments, so the
+       old single-colour track is gone. Segments run bottom-up:
+       validated, validated-by-others, pending, rejected. */
+    #grPage .gr-bar--stack {
+        background: #eef2f7;
+        overflow: hidden;
+        display: flex; flex-direction: column-reverse;
     }
-    #grPage .gr-bar-vnum { font-size: 12px; font-weight: 800; color: #fff; }
+    #grPage .gr-seg {
+        width: 100%; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+        transition: height .3s;
+    }
+    #grPage .gr-seg-num {
+        font-size: 11.5px; font-weight: 800; color: #fff;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.18);
+        font-variant-numeric: tabular-nums; line-height: 1;
+    }
+
+    /* Slot keeps the bar centred in its column while letting the overflow
+       numbers sit outside it without shifting the layout. */
+    #grPage .gr-bar-slot { position: relative; width: 42px; display: flex; }
+    /* Each overflow number is placed at its own segment's height, on a
+       small white chip so it stays legible over the page background. */
+    #grPage .gr-out-num {
+        position: absolute; left: 100%; margin-left: 4px;
+        padding: 0 3px; border-radius: 4px;
+        background: rgba(255,255,255,0.9);
+        font-size: 10.5px; font-weight: 800; line-height: 1.15;
+        font-variant-numeric: tabular-nums; white-space: nowrap;
+        pointer-events: none;
+    }
     #grPage .gr-bar-num { font-size: 12px; font-weight: 700; color: #374151; }
     #grPage .gr-bar-label { font-size: 11.5px; font-weight: 700; color: #6b7280; }
     #grPage .gr-group-label {
