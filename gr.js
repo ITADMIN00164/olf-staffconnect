@@ -224,19 +224,32 @@
        skips the CORS preflight; Apps Script returns JSON.
     ==================================================== */
 
-    async function api(payload) {
+    async function api(payload, opts = {}) {
         if (!WEB_APP_URL || WEB_APP_URL.indexOf("PASTE_YOUR") === 0) {
             throw new Error("Backend not configured yet. Set WEB_APP_URL at the top of gr.js to your Apps Script /exec URL.");
         }
-        let res;
+        // Optional timeout: without one a slow/hung Apps Script request never
+        // settles and the row stays stuck on "uploading" forever. With it, the
+        // upload flips to a visible "failed" state the user can act on.
+        let res, _timer = null, _ctrl = null;
+        if (opts.timeoutMs && typeof AbortController !== "undefined") {
+            _ctrl = new AbortController();
+            _timer = setTimeout(() => _ctrl.abort(), opts.timeoutMs);
+        }
         try {
             res = await fetch(WEB_APP_URL, {
                 method: "POST",
                 body: JSON.stringify(payload),
-                redirect: "follow"
+                redirect: "follow",
+                signal: _ctrl ? _ctrl.signal : undefined
             });
         } catch (e) {
+            if (e && e.name === "AbortError") {
+                throw new Error("The upload took too long and was stopped. It may not have saved — tap Refresh Data to check before retrying.");
+            }
             throw new Error("Network error reaching the backend. Check the Web App URL and that it is deployed for 'Anyone'.");
+        } finally {
+            if (_timer) clearTimeout(_timer);
         }
         const text = await res.text();
         let data;
@@ -366,6 +379,27 @@
             if (!allRecords.length) loadFromLocal();
             refreshMonthOptions();
             renderMyUploads();
+            renderSyncBanner();
+
+            // Warn before closing the tab while any upload is still unsynced,
+            // so an in-flight or failed upload isn't silently lost.
+            if (!window.__grUnloadGuard) {
+                window.__grUnloadGuard = true;
+                window.addEventListener("beforeunload", (e) => {
+                    if (unsyncedRecords().length) { e.preventDefault(); e.returnValue = ""; }
+                });
+            }
+            const _banner = document.getElementById("grSyncBanner");
+            if (_banner && !_banner.dataset.wired) {
+                _banner.dataset.wired = "1";
+                _banner.addEventListener("click", (e) => {
+                    if (e.target.closest('[data-act="gotoUpload"]')) {
+                        const t = document.querySelector('#grPage .gr-tab[data-tab="upload"]');
+                        if (t) t.click();
+                    }
+                });
+            }
+
             syncRecords();
         }
     };
@@ -649,6 +683,9 @@
             file,
             meta: {
                 action: "upload",
+                // Stable across retries so the backend can dedup and never
+                // create a duplicate file/row for the same upload attempt.
+                clientUploadId: localId,
                 type,
                 state,
                 stateLabel: STATE_LABELS[state] || state,
@@ -684,7 +721,7 @@
                 fileBase64,
                 fileName: p.file.name,
                 mimeType: p.file.type || "application/octet-stream"
-            });
+            }, { timeoutMs: 120000 });
 
             if (data.version) dataVersion = String(data.version);
             const idx = allRecords.findIndex(r => String(r.recordId) === localId);
@@ -855,8 +892,43 @@
         sel.innerHTML = html;
     }
 
+    /* ====================================================
+       UNSYNCED-UPLOAD VISIBILITY
+       A record is "unsynced" until the backend confirms it: it is still
+       uploading, it failed, or it is a local-only optimistic row. These
+       exist only in this browser — nobody else can see them and they are
+       not in the sheet yet. Surface that plainly so an upload can't look
+       saved when it isn't.
+    ==================================================== */
+    function unsyncedRecords() {
+        return allRecords.filter(r => r._sync === "uploading" || r._sync === "failed" || isLocal(r));
+    }
+
+    function renderSyncBanner() {
+        const el = document.getElementById("grSyncBanner");
+        if (!el) return;
+        const list = unsyncedRecords();
+        if (!list.length) { el.style.display = "none"; el.innerHTML = ""; return; }
+        const failed = list.filter(r => r._sync === "failed").length;
+        const busy = list.length - failed;
+        let msg;
+        if (failed && busy) msg = failed + " upload" + (failed > 1 ? "s" : "") + " failed to save and " + busy + " still saving to the backend";
+        else if (failed)    msg = failed + " upload" + (failed > 1 ? "s" : "") + " did NOT save to the backend";
+        else                msg = busy + " upload" + (busy > 1 ? "s" : "") + " still saving to the backend";
+        const tail = failed
+            ? " — open the Upload tab to Retry, or they will be lost if you leave."
+            : " — keep this tab open until it finishes.";
+        el.className = "gr-banner " + (failed ? "gr-banner--fail" : "gr-banner--busy");
+        el.innerHTML =
+            '<span class="gr-banner-ic">⚠</span>' +
+            '<span class="gr-banner-msg">' + escHtml(msg + tail) + '</span>' +
+            '<button type="button" class="gr-banner-btn" data-act="gotoUpload">View</button>';
+        el.style.display = "flex";
+    }
+
     // Re-render everything that's currently on screen.
     function rerenderAll() {
+        renderSyncBanner();
         renderMyUploads();
         const active = document.querySelector("#grPage .gr-tab.active");
         if (!active) return;
