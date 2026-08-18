@@ -340,6 +340,67 @@ function save() { saveUiPrefs(); saveSnapshot(); if (syncEnabled) syncDiff(); }
 // ── HELPERS ──
 function uid() { return 'id_' + Math.random().toString(36).slice(2,10); }
 function memberNames() { return DB.settings.members.map(m => m.name); }
+
+/* ── MEMBER RENAME CASCADE ──────────────────────────────────────────
+   goals, tasks and reviews all store the member as a NAME STRING, not
+   as a member id. Renaming somebody in Settings therefore used to
+   orphan every one of their existing rows: the member row got the new
+   name while the linked rows kept pointing at the old one.
+
+   This rewrites the name in every place it is stored:
+     goals.member, tasks.member,
+     reviews.member, reviews.reviewer,
+     members.manager_name   (the renamed person may manage others)
+
+   It only touches the in-memory DB. syncDiff() then sees those rows as
+   changed and queues each one through the normal outbox, so the writes
+   are batched, retried, and reported by the usual save toast.
+
+   Returns the number of rows changed. */
+function cascadeMemberRename(oldName, newName) {
+    if (!oldName || !newName || oldName === newName) return 0;
+    var touched = 0;
+
+    (DB.goals || []).forEach(function (g) {
+        if (g.member === oldName) { g.member = newName; touched++; }
+    });
+    (DB.tasks || []).forEach(function (t) {
+        if (t.member === oldName) { t.member = newName; touched++; }
+    });
+    (DB.reviews || []).forEach(function (r) {
+        var hit = false;
+        if (r.member === oldName) { r.member = newName; hit = true; }
+        // The renamed person may also be the reviewer on someone else's review.
+        if (r.reviewer === oldName) { r.reviewer = newName; hit = true; }
+        if (hit) touched++;
+    });
+    ((DB.settings && DB.settings.members) || []).forEach(function (m) {
+        if (m.managerName === oldName) { m.managerName = newName; touched++; }
+    });
+
+    return touched;
+}
+
+/* One-off repair for renames made before the cascade existed (including
+   ones made directly in the Supabase table editor, which the app never
+   sees). Run from the browser console on the HO Plan & Review page:
+
+     sgRenameMemberEverywhere('mahadevirathod.olf@gmail.com', 'Mahadevi Rathod')
+
+   It rewrites the linked rows only - the members row itself is assumed
+   to already carry the new name. */
+window.sgRenameMemberEverywhere = function (oldName, newName) {
+    var n = cascadeMemberRename(oldName, newName);
+    if (!n) {
+        try { toast('No linked records found for "' + oldName + '"'); } catch (e) {}
+        return 0;
+    }
+    save();
+    populateAllSelects(); renderSettings(); renderSidebar();
+    try { renderDashboard(); renderSmartGoals(); renderPlan(); renderReviews(); } catch (e) {}
+    try { toast('Renamed ' + n + ' linked record(s) to "' + newName + '"'); } catch (e) {}
+    return n;
+};
 function membersInDept(dept) { return DB.settings.members.filter(m => !dept || m.dept === dept); }
 
 function statusBadge(s) {
@@ -1308,6 +1369,121 @@ function planTotalRowHtml(tasks, cols) {
   return `<tr class="plan-total-row">${cells}</tr>`;
 }
 
+// ── Monthly Plan → Excel export ──
+// Downloads exactly what is on screen: the SAME filter pipeline as renderPlan()
+// and the SAME visible columns (Actions column excluded), plus the Total row.
+// SheetJS is lazy-loaded from CDN only on first export, so it never slows boot.
+function planCellValue(t, key) {
+  switch (key) {
+    case 'year':         return t.year || '';
+    case 'month':        return t.month || '';
+    case 'week':         return t.week || '';
+    case 'dept':         return t.dept || '';
+    case 'member':       return t.member || '';
+    case 'goal':         return t.goal || '';
+    case 'cat':          return t.cat || '';
+    case 'subcat':       return t.subcat || '';
+    case 'action':       return t.action || '';
+    case 'planned':      return t.planned || '';
+    case 'plannedItems': return (t.plannedItems === '' || t.plannedItems == null) ? '' : Number(t.plannedItems);
+    case 'est':          return Number(t.est || 0);
+    case 'tgtDate':      return t.tgtDate ? formatDate(t.tgtDate) : '';
+    case 'compDate':     return t.compDate ? formatDate(t.compDate) : '';
+    case 'actualHrs':    return Number(t.actualHrs || 0);
+    case 'actualItems':  return (t.actualItems === '' || t.actualItems == null) ? '' : Number(t.actualItems);
+    case 'status':       return t.status || '';
+    case 'deviation':    return t.deviation || '';
+    case 'helpNeeded':   return t.helpNeeded || '';
+    case 'revisedTgtDate': return t.revisedTgtDate ? formatDate(t.revisedTgtDate) : '';
+    case 'managerGrade': return t.managerGrade || '';
+    case 'managerComment': return t.managerComment || '';
+    default: return '';
+  }
+}
+
+// Read-only mirror of renderPlan()'s filtering/sorting. Returns the task array
+// without touching the DOM, so export and on-screen table always match.
+function currentPlanTasks() {
+  const year   = document.getElementById('mp-year').value;
+  const month  = document.getElementById('mp-month').value;
+  const week   = document.getElementById('mp-week').value;
+  const dept   = document.getElementById('mp-dept').value;
+  const goal   = document.getElementById('mp-goal').value;
+  const member = document.getElementById('mp-member').value;
+  const status = document.getElementById('mp-status').value;
+  const search = (document.getElementById('mp-search').value || '').toLowerCase();
+  if (!year || !month || !dept) return { tasks: [], year, month, week, dept };
+  let tasks = DB.tasks.filter(t => t.year === year && t.month === month && t.dept === dept);
+  if (week)   tasks = tasks.filter(t => t.week === week);
+  if (goal)   tasks = tasks.filter(t => t.goal === goal);
+  if (member) tasks = tasks.filter(t => t.member === member);
+  if (status) tasks = tasks.filter(t => t.status === status);
+  if (search) tasks = tasks.filter(t => t.action.toLowerCase().includes(search) || (t.subcat||'').toLowerCase().includes(search) || (t.cat||'').toLowerCase().includes(search));
+  tasks.sort((a,b) => {
+    const wa = WEEKS.indexOf(a.week), wb = WEEKS.indexOf(b.week);
+    if (wa !== wb) return wa - wb;
+    const ca = a.createdAt || '', cb = b.createdAt || '';
+    if (ca !== cb) return ca < cb ? 1 : -1;
+    return 0;
+  });
+  return { tasks, year, month, week, dept };
+}
+
+// Lazy-load SheetJS (only fetched the first time someone exports).
+let _xlsxLoading = null;
+function ensureXLSX() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  if (_xlsxLoading) return _xlsxLoading;
+  _xlsxLoading = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = () => window.XLSX ? resolve(window.XLSX) : reject(new Error('Excel library did not initialise'));
+    s.onerror = () => reject(new Error('Could not load the Excel library (check your connection)'));
+    document.head.appendChild(s);
+  });
+  return _xlsxLoading;
+}
+
+async function exportPlanExcel() {
+  const { tasks, year, month, week, dept } = currentPlanTasks();
+  if (!year || !month || !dept) { toast('Select Academic Year, Month and Department first'); return; }
+  if (!tasks.length) { toast('No tasks to export for this selection'); return; }
+
+  // Columns exactly as shown on screen, minus the Actions column.
+  const cols = visibleCols().filter(c => c.grp !== 'act');
+
+  let XLSX;
+  try { XLSX = await ensureXLSX(); }
+  catch (e) { toast('⚠ ' + (e.message || 'Could not load Excel library')); return; }
+
+  const header = cols.map(c => c.label);
+  const rows   = tasks.map(t => cols.map(c => planCellValue(t, c.key)));
+
+  // Total row — mirrors the on-screen Total row (sums these four numeric columns).
+  const sumKeys = ['plannedItems','est','actualHrs','actualItems'];
+  const totals = {}; sumKeys.forEach(k => totals[k] = tasks.reduce((a,t) => a + (parseFloat(t[k])||0), 0));
+  const round2 = v => Math.round(v*100)/100;
+  const labelIdx = cols.findIndex(c => !sumKeys.includes(c.key));
+  const totalRow = cols.map((c,i) => {
+    if (sumKeys.includes(c.key)) return round2(totals[c.key]);
+    if (i === labelIdx) return 'Total';
+    return '';
+  });
+
+  const aoa = [header, ...rows, totalRow];
+  const ws  = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = cols.map(c => ({ wpx: Math.max(60, c.w || 100) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Monthly Plan');
+
+  const safe = s => String(s || '').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  const parts = ['Monthly-Plan', safe(dept), safe(month), safe(year), week ? safe(week) : 'All-Weeks'];
+  const fname = parts.filter(Boolean).join('_') + '.xlsx';
+  XLSX.writeFile(wb, fname);
+  toast('Excel downloaded ✓');
+}
+
+
 function saveInlineRow(id) {
   const t=DB.tasks.find(x=>x.id===id); if(!t){toast('Task not found');return;}
   if(!canEditTask(t)){toast('You can only edit your own plan');return;}
@@ -2069,11 +2245,19 @@ function saveNewMember() {
     if (idx < 0) { editingMemberId = null; toast('Member not found'); return; }
     const clash = DB.settings.members.some(function (x, j) { return j !== idx && x.name === name; });
     if (clash) { toast('Another member already has that name'); return; }
+    // Capture the old name BEFORE overwriting the row, so the cascade
+    // knows what to look for in goals / tasks / reviews.
+    const prevName = DB.settings.members[idx].name;
     DB.settings.members[idx] = { id: editingMemberId, name, dept, role, email, managerName, managerEmail: mgrEmail };
     editingMemberId = null;
+    const relinked = cascadeMemberRename(prevName, name);
     save(); populateAllSelects(); renderSettings(); renderSidebar();
+    // Renaming changes what every view is filtered by, so redraw them too.
+    try { renderDashboard(); renderSmartGoals(); renderPlan(); renderReviews(); } catch (e) {}
     closeModal('add-member-modal');
-    toast(`${name} updated`);
+    toast(relinked
+        ? `${name} updated \u00b7 ${relinked} linked record(s) renamed`
+        : `${name} updated`);
     return;
   }
   if (memberNames().includes(name)) { toast('Member already exists'); return; }
@@ -2915,6 +3099,7 @@ try { window.toggleReviewCard = toggleReviewCard; } catch(e){}
 try { window.sgRefresh = sgRefresh; } catch(e){}
 try { window.saveGoal = saveGoal; } catch(e){}
 try { window.saveInlineRow = saveInlineRow; } catch(e){}
+try { window.exportPlanExcel = exportPlanExcel; } catch(e){}
 try { window.sgToggleDate = sgToggleDate; } catch(e){}
 try { window.sgSyncDate = sgSyncDate; } catch(e){}
 try { window.saveNewAdmin = saveNewAdmin; } catch(e){}
