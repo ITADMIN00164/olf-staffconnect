@@ -121,6 +121,42 @@
     };
 
     /* ====================================================
+       ANALYTICS MASTER LIST
+       The districts OLF actually operates in, supplied per
+       community. Drives the Analytics tab so every district
+       shows a row even with zero uploads. Kept separate from
+       STATE_DISTRICTS (the full official upload list) on
+       purpose: these names are the operational ones.
+    ==================================================== */
+    const ANALYTICS_DISTRICTS = {
+        MH: [
+            "Ahilyanagar", "Amravati", "Bhandara", "Bid", "Buldhana",
+            "Chandrapur", "Dharashiv", "Gadchiroli", "Hingoli", "Jalgaon",
+            "Jalna", "Latur", "Nagpur", "Nanded", "Nandurbar", "Nashik",
+            "Palghar", "Pune", "Raigarh MH", "Ratnagiri", "Kolhapur",
+            "Solapur", "Satara", "Wardha", "Washim", "Yavatmal"
+        ],
+        MH_MC: [
+            "Amravati - MC", "KDMC", "Pune MC", "PCMC", "Sangli - MC",
+            "Mumbai Suburban", "Nagpur - MC", "Nashik - MC"
+        ],
+        MH_ATC: [
+            "Nagpur - ATC"
+        ],
+        CG: [
+            "Bastar", "Dantewada", "Dhamtari", "Durg", "Gariaband",
+            "Janjgir - Champa", "Jashpur", "Raigarh", "Raipur",
+            "Rajnandgaon", "Sukma"
+        ],
+        BR: [
+            "Begusarai"
+        ],
+        MP: [
+            "Balaghat", "Seoni"
+        ]
+    };
+
+    /* ====================================================
        SMALL HELPERS
     ==================================================== */
 
@@ -367,6 +403,7 @@
             wireMyUploadsFilters();
             wireDashboardFilters();
             wireSummaryFilters();
+            wireAnalyticsFilters();
 
             const who = document.getElementById("grWhoAmI");
             if (who) {
@@ -442,6 +479,7 @@
                 });
                 if (target === "detailed") renderDetailed();
                 if (target === "summary") renderSummary();
+                if (target === "analytics") renderAnalytics();
                 if (target === "upload") renderMyUploads();
             });
         });
@@ -934,6 +972,7 @@
         if (!active) return;
         if (active.dataset.tab === "detailed") renderDetailed();
         if (active.dataset.tab === "summary") renderSummary();
+        if (active.dataset.tab === "analytics") renderAnalytics();
     }
 
     /* ====================================================
@@ -1724,14 +1763,15 @@
         // With "Select All" ticked the individual rows are shown ticked but
         // locked. Otherwise they are free until SUM_MAX of them are ticked,
         // so the chart never gets more groups than it can render legibly.
+        const cap = (typeof cfg.max === "number") ? cfg.max : SUM_MAX;
         const sync = () => {
             const all = !!(allBox && allBox.checked);
             const n = boxes.filter(b => b.checked).length;
-            boxes.forEach(b => { b.disabled = all || (!b.checked && n >= SUM_MAX); });
+            boxes.forEach(b => { b.disabled = all || (!b.checked && n >= cap); });
             if (hint) {
                 hint.textContent = all
                     ? "All, combined into one group"
-                    : (n >= SUM_MAX ? "Maximum " + SUM_MAX + " at a time"
+                    : (n >= cap ? "Maximum " + cap + " at a time"
                                     : (n ? n + " selected" : "Nothing ticked = all, combined"));
             }
         };
@@ -1931,6 +1971,196 @@
             </div>`;
     }
 
+
+    /* ====================================================
+       ANALYTICS TAB
+       District x (GR / Circular) matrix. Every operational
+       district gets a row, even at zero. Rows sort by total
+       uploads (most first); zero-upload districts sink to the
+       bottom in red. Community & district multi-selects reuse
+       the shared control; both default to "all".
+    ==================================================== */
+    let anStates = [];      // [] = all communities
+    let anDistricts = [];   // [] = all districts of the chosen communities
+
+    // Master districts for the chosen communities (all when none chosen),
+    // de-duplicated and alpha-sorted for the filter dropdown.
+    function analyticsDistrictsForStates(states) {
+        const codes = states.length ? states : Object.keys(ANALYTICS_DISTRICTS);
+        const out = [];
+        codes.forEach(c => (ANALYTICS_DISTRICTS[c] || []).forEach(d => {
+            if (out.indexOf(d) < 0) out.push(d);
+        }));
+        return out.sort(cmpStr);
+    }
+
+    function wireAnalyticsFilters() {
+        const commWrap = document.getElementById("grAnCommMS");
+        const distWrap = document.getElementById("grAnDistrictMS");
+        if (!commWrap || !distWrap) return;
+
+        buildMultiSelect(commWrap, {
+            allLabel: "All Communities",
+            max: Infinity,
+            options: () => Object.keys(STATE_LABELS).map(c => ({ value: c, label: STATE_LABELS[c] })),
+            selected: () => anStates,
+            onApply: (vals) => {
+                anStates = vals;
+                // Keep only districts that still belong to the chosen
+                // communities, then repaint the district control.
+                const allowed = new Set(analyticsDistrictsForStates(anStates));
+                anDistricts = anDistricts.filter(d => allowed.has(d));
+                renderMultiSelect(distWrap);
+                renderAnalytics();
+            }
+        });
+
+        buildMultiSelect(distWrap, {
+            allLabel: "All Districts",
+            max: Infinity,
+            options: () => analyticsDistrictsForStates(anStates).map(d => ({ value: d, label: d })),
+            selected: () => anDistricts,
+            onApply: (vals) => { anDistricts = vals; renderAnalytics(); }
+        });
+
+        const clearBtn = document.getElementById("grAnClear");
+        if (clearBtn) clearBtn.addEventListener("click", clearAnalyticsFilters);
+    }
+
+    function clearAnalyticsFilters() {
+        anStates = [];
+        anDistricts = [];
+        closeAllMultiSelects();
+        renderMultiSelect(document.getElementById("grAnCommMS"));
+        renderMultiSelect(document.getElementById("grAnDistrictMS"));
+        renderAnalytics();
+    }
+
+    function anBlankBucket() { return { grUp: 0, grVal: 0, cUp: 0, cVal: 0 }; }
+    function anAddRecord(bucket, r) {
+        const validated = String(r.status || "").toLowerCase() === "validated";
+        if (isGrType(r.type)) { bucket.grUp += 1; if (validated) bucket.grVal += 1; }
+        else                  { bucket.cUp  += 1; if (validated) bucket.cVal  += 1; }
+    }
+
+    // A cell that dims a plain zero, greens a positive validated count,
+    // and leaves uploaded counts in the default ink.
+    function anNumCell(n, isVal) {
+        const cls = n === 0 ? "gr-an-num gr-an-zero-num"
+                            : (isVal ? "gr-an-num gr-an-val" : "gr-an-num");
+        return "<td class=\"" + cls + "\">" + n + "</td>";
+    }
+
+    function renderAnalytics() {
+        const body = document.getElementById("grAnBody");
+        const foot = document.getElementById("grAnFoot");
+        const meta = document.getElementById("grAnMeta");
+        if (!body) return;
+
+        const commCodes = anStates.length ? anStates : Object.keys(ANALYTICS_DISTRICTS);
+        const commSet = new Set(commCodes);
+        const distFilter = anDistricts.length ? new Set(anDistricts) : null;
+
+        // Community-scoped key so identical district names in two
+        // communities never collide. State codes never contain "::".
+        const key = (state, dist) => state + "::" + dist;
+        const masterKeys = new Set();
+        const rows = [];
+        const byKey = new Map();
+
+        commCodes.forEach(code => {
+            (ANALYTICS_DISTRICTS[code] || []).forEach(dist => {
+                const k = key(code, dist);
+                masterKeys.add(k);
+                if (distFilter && !distFilter.has(dist)) return;
+                const row = { state: code, district: dist, isExtra: false, bucket: anBlankBucket() };
+                rows.push(row);
+                byKey.set(k, row);
+            });
+        });
+
+        // Fold in every record. Anything that does not match a master row
+        // (name drift, or a district not on OLF's list) becomes its own
+        // flagged "extra" row, so no upload is ever silently dropped.
+        const extraByKey = new Map();
+        allRecords.forEach(r => {
+            const st = r.state || "";
+            const dist = r.district || "";
+            if (!commSet.has(st)) return;
+            const k = key(st, dist);
+            let row = byKey.get(k);
+            if (!row) {
+                if (masterKeys.has(k)) return;            // filtered-out master district
+                if (distFilter && !distFilter.has(dist)) return;
+                row = extraByKey.get(k);
+                if (!row) {
+                    row = { state: st, district: dist || "\u2014", isExtra: true, bucket: anBlankBucket() };
+                    extraByKey.set(k, row);
+                    rows.push(row);
+                }
+            }
+            anAddRecord(row.bucket, r);
+        });
+
+        // Sort: most uploads first; zero-upload districts drop to the
+        // bottom, alpha-sorted; ties broken by community then name.
+        rows.forEach(row => { row.total = row.bucket.grUp + row.bucket.cUp; });
+        rows.sort((a, b) => {
+            if ((a.total === 0) !== (b.total === 0)) return a.total === 0 ? 1 : -1;
+            if (b.total !== a.total) return b.total - a.total;
+            const c = cmpStr(stateShort(a.state), stateShort(b.state));
+            return c || cmpStr(a.district, b.district);
+        });
+
+        if (!rows.length) {
+            body.innerHTML = "<tr><td colspan=\"5\" class=\"gr-empty-cell\">" +
+                grEmptyHtml("\ud83d\udced", "No districts match these filters.") + "</td></tr>";
+            if (foot) foot.innerHTML = "";
+            if (meta) meta.textContent = "";
+            return;
+        }
+
+        let rank = 0, zeroCount = 0;
+        const tot = anBlankBucket();
+        body.innerHTML = rows.map(row => {
+            const b = row.bucket;
+            tot.grUp += b.grUp; tot.grVal += b.grVal; tot.cUp += b.cUp; tot.cVal += b.cVal;
+            const zero = row.total === 0;
+            if (zero) zeroCount += 1;
+            const rankCell = zero ? "" : "<span class=\"gr-an-rank\">" + (++rank) + "</span>";
+            return "" +
+                "<tr class=\"" + (zero ? "gr-an-zero" : "") + (row.isExtra ? " gr-an-extra" : "") + "\">" +
+                    "<td>" + rankCell +
+                        "<span class=\"gr-an-dname\">" + escHtml(row.district) + "</span>" +
+                        "<div class=\"gr-an-comm\">" + escHtml(STATE_LABELS[row.state] || row.state) + "</div>" +
+                    "</td>" +
+                    anNumCell(b.grUp, false) +
+                    anNumCell(b.grVal, true) +
+                    anNumCell(b.cUp, false) +
+                    anNumCell(b.cVal, true) +
+                "</tr>";
+        }).join("");
+
+        if (foot) {
+            foot.innerHTML =
+                "<tr>" +
+                    "<td>Total \u00b7 " + rows.length + " districts</td>" +
+                    "<td>" + tot.grUp + "</td>" +
+                    "<td>" + tot.grVal + "</td>" +
+                    "<td>" + tot.cUp + "</td>" +
+                    "<td>" + tot.cVal + "</td>" +
+                "</tr>";
+        }
+
+        if (meta) {
+            const scope = anStates.length
+                ? anStates.map(c => STATE_LABELS[c] || c).join(", ")
+                : "All communities";
+            const grandUp = tot.grUp + tot.cUp;
+            meta.textContent = scope + " \u2014 " + rows.length + " districts, " + grandUp + " uploads" +
+                (zeroCount ? ", " + zeroCount + " with none yet" : "");
+        }
+    }
 
     /* ====================================================
        SHARED RENDER HELPERS
