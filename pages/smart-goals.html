@@ -149,6 +149,8 @@
 
 /* ── METRICS ── */
 #sg-app .metrics-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px; }
+#sg-app .sub-hd { font-size: 12px; font-weight: 700; color: var(--text2); margin: 0 0 8px; }
+#sg-app .dash-section-label { font-size: 15px; font-weight: 800; color: var(--text); margin: 4px 0 10px; }
 #sg-app .metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
 #sg-app .metric-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; font-weight: 600; }
 #sg-app .metric-val { font-size: 28px; font-weight: 800; line-height: 1; letter-spacing: -.02em; }
@@ -787,20 +789,25 @@
     <select id="dash-month-filter" onchange="renderDashboard()"><option value="">All Months</option></select>
     <select id="dash-dept-filter" onchange="renderDashboard()"><option value="">All Departments</option></select>
   </div>
-  <div class="metrics-row" id="dash-metrics"></div>
+
 
   <div class="card" style="margin-bottom:20px">
     <div class="card-header"><span class="card-title">Monthly Plan Progress — by Department</span></div>
     <div class="card-body">
-      <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:20px;align-items:center" id="dash-plan-progress"></div>
+      <div id="dash-plan-progress"></div>
     </div>
   </div>
 
   <div class="card">
-    <div class="card-header"><span class="card-title">Review Score — by Department</span></div>
+    <div class="card-header"><span class="card-title">Review Overview</span></div>
     <div class="card-body">
-      <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:20px;align-items:center" id="dash-review-score"></div>
+      <div id="dash-review-score"></div>
     </div>
+  </div>
+
+  <div class="card" id="dash-dq-card" style="margin-top:20px">
+    <div class="card-header"><span class="card-title">🧮 Data Quality (admin)</span></div>
+    <div class="card-body"><div id="dash-dataquality"></div></div>
   </div>
 </div>
 
@@ -1063,6 +1070,16 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="member-analytics-modal">
+  <div class="modal" style="max-width:880px">
+    <div class="modal-head">
+      <span class="modal-title">Member Analytics</span>
+      <button class="modal-close" onclick="closeModal('member-analytics-modal')">×</button>
+    </div>
+    <div class="modal-body" id="member-analytics-body"></div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="review-modal">
   <div class="modal" style="max-width:1120px">
     <div class="modal-head">
@@ -1095,6 +1112,7 @@
         <span style="color:var(--blue);font-weight:600">Manager Score</span> = filled by Dept Head / Admin.
       </p>
       <button class="btn btn-secondary" style="margin-bottom:14px" onclick="loadGoalsForReview()">⟳ Load Goals</button>
+      <div id="review-assist"></div>
       <div id="review-score-table"></div>
     </div>
     <div class="modal-foot">

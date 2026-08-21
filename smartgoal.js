@@ -419,6 +419,65 @@ function roleBadge(role) {
 }
 function pctColor(p) { return p>=80?'#3F6B2A':p>=50?'#C07C0A':'#C0392B'; }
 function scoreClass(sc,mx) { const r=mx>0?sc/mx:0; return r>=.8?'score-hi':r>=.5?'score-mid':'score-lo'; }
+
+// ═══════════════════ PHASE 0 — shared correctness helpers ═══════════════════
+// Academic-year month order (June → May). MONTHS stays calendar-order.
+const AY_MONTHS = ['June','July','August','September','October','November','December','January','February','March','April','May'];
+function ayMonthPos(m){ var i = AY_MONTHS.indexOf(m); return i < 0 ? -1 : i; }
+function ayPrevMonth(m){ var i = AY_MONTHS.indexOf(m); return i > 0 ? AY_MONTHS[i-1] : null; } // June has no previous within the AY
+
+// A score is "entered" only if it's a real value (null/''/NaN = not entered).
+// Post-migration, an untouched score is NULL and a manager-entered 0 counts.
+function sgScoreEntered(v){ return v !== null && v !== undefined && v !== '' && !(typeof v === 'number' && isNaN(v)); }
+function sgScoreNum(v){ return sgScoreEntered(v) ? Number(v) : 0; }               // for arithmetic (unscored → 0)
+function sgReadScore(raw){ var t = (raw == null ? '' : String(raw)).trim(); if (t === '') return null; var n = Number(t); return isNaN(n) ? null : n; } // blank → null, else number (incl 0)
+
+// Dates: compare in IST, whole days only. Handles ISO (…Z), 'YYYY-MM-DD' and
+// 'YYYY-MM-DD HH:MM:SS' consistently by reading the IST wall-clock calendar day.
+function sgIstYMD(sv){ if(!sv) return null; var d=new Date(sv); if(isNaN(d.getTime())) return null; var ist=new Date(d.getTime()+5.5*3600000); return [ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate()]; }
+function sgIstTodayYMD(){ var ist=new Date(Date.now()+5.5*3600000); return [ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate()]; }
+function sgDaysLate(tgt, comp){ var a=sgIstYMD(tgt), b=sgIstYMD(comp); if(!a||!b) return null; return Math.round((Date.UTC(b[0],b[1],b[2]) - Date.UTC(a[0],a[1],a[2]))/86400000); } // +ve = completed late
+function isTaskOverdue(t){ if(!t||!t.tgtDate) return false; var st=String(t.status||''); if(st==='Completed'||st==='Cancelled') return false; var tg=sgIstYMD(t.tgtDate); if(!tg) return false; var td=sgIstTodayYMD(); return Date.UTC(tg[0],tg[1],tg[2]) < Date.UTC(td[0],td[1],td[2]); }
+
+// Single source of truth for a review's weighted performance + status.
+// Per goal: (sum ManagerScore ÷ sum MaxScore) × Weightage, rounded, then summed
+// — identical to the Reviews-tab card, so dashboard numbers always match.
+function computeReviewPerformance(review){
+  var items = (review && review.items) || [];
+  var scored = items.some(function(i){ return sgScoreEntered(i.mgrScore); });
+  var memEntered = items.some(function(i){ return sgScoreEntered(i.memberScore); });
+  var status = scored ? 'scored' : (memEntered ? 'awaiting' : 'draft');
+  var perf = 0;
+  groupByGoal(items).forEach(function(grp){
+    var gMax = grp.rows.reduce(function(a,x){ return a + (parseFloat(x.maxScore)||0); }, 0);
+    var gMgr = grp.rows.reduce(function(a,x){ return a + sgScoreNum(x.mgrScore); }, 0);
+    var w = parseFloat(grp.weightage)||0;
+    perf += Math.round((gMax>0 ? gMgr/gMax : 0) * w);
+  });
+  return { performance: perf, status: status };
+}
+
+// Plan-side rollup helpers (used by Plan Overview + Member Effectiveness later).
+function computeHoursVariance(tasks){
+  var est=0, act=0; (tasks||[]).forEach(function(t){ est+=parseFloat(t.est)||0; act+=parseFloat(t.actualHrs)||0; });
+  return { estTotal: est, actualTotal: act, variancePct: est>0 ? Math.round((act-est)/est*100) : null };
+}
+function computeItemsCompletion(tasks){
+  var pl=0, ac=0; (tasks||[]).forEach(function(t){ var p=parseFloat(t.plannedItems); if(!isNaN(p)) pl+=p; var a=parseFloat(t.actualItems); if(!isNaN(a)) ac+=a; });
+  return { plannedTotal: pl, actualTotal: ac, ratioPct: pl>0 ? Math.round(ac/pl*100) : null };
+}
+function computeMgrQuality(tasks){
+  var pts={A:3,B:2,C:1}, graded=0, sum=0, completed=0;
+  (tasks||[]).forEach(function(t){
+    if (String(t.status)==='Completed') completed++;
+    var g=String(t.managerGrade||'').trim().toUpperCase();
+    if (pts[g]) { graded++; sum+=pts[g]; }
+  });
+  return { gradedCount: graded, completedCount: completed,
+           coveragePct: completed>0 ? Math.round(graded/completed*100) : null,
+           qualityPct: graded>0 ? Math.round(sum/(graded*3)*100) : null };
+}
+// ═════════════════════════════════════════════════════════════════════════
 // Render the Sheet B link callout as "🔗 Sheet B Link - Click Here". "Click Here" is the link when the
 // value is a URL — a value without a scheme (e.g. "docs.google.com/…") is treated as https; a non-http
 // scheme (javascript:, data:, …) is not linked and the raw value is shown instead so it can't inject.
@@ -717,6 +776,457 @@ function donutLegend(segments) {
   </div>`).join('');
 }
 
+// ═══════════════════ PHASE 1 — Review Overview (Dashboard) ═══════════════════
+// Per-goal Manager-Score % for one review (ignores weightage; null if not scored).
+function computeGoalScores(review){
+  var items=(review&&review.items)||[];
+  return groupByGoal(items).map(function(grp){
+    var scored=grp.rows.some(function(x){return sgScoreEntered(x.mgrScore);});
+    if(!scored) return {goal:grp.goal, scorePct:null};
+    var gMax=grp.rows.reduce(function(a,x){return a+(parseFloat(x.maxScore)||0);},0);
+    var gMgr=grp.rows.reduce(function(a,x){return a+sgScoreNum(x.mgrScore);},0);
+    return {goal:grp.goal, scorePct:(gMax>0?Math.round(gMgr/gMax*100):0)};
+  });
+}
+function _annReviews(list){ return (list||[]).map(function(r){ var c=computeReviewPerformance(r); return {r:r, perf:c.performance, status:c.status}; }); }
+function _avgScoredPerf(list){ var a=_annReviews(list).filter(function(x){return x.status==='scored';}); return a.length?Math.round(a.reduce(function(s,x){return s+x.perf;},0)/a.length):null; }
+function _perfCell(v){ return v==null?'<span style="color:var(--text3)">—</span>':'<span style="font-weight:700;color:'+pctColor(v)+'">'+v+'%</span>'; }
+function _momCell(cur,prev){ if(cur==null||prev==null) return '—'; var d=cur-prev; return d>=0?'<span style="color:var(--green);font-weight:700">▲ +'+d+'</span>':'<span style="color:var(--red);font-weight:700">▼ '+d+'</span>'; }
+
+function renderReviewOverview(){
+  var el=document.getElementById('dash-review-score'); if(!el) return;
+  var year=(document.getElementById('dash-year-filter')||{}).value||'';
+  var month=(document.getElementById('dash-month-filter')||{}).value||'';
+  var deptFilter=(document.getElementById('dash-dept-filter')||{}).value||currentDept;
+
+  var base=applyRoleFilter(DB.reviews,'review'); if(year) base=base.filter(function(r){return r.year===year;});
+  var scoped=base.slice(); if(deptFilter) scoped=scoped.filter(function(r){return r.dept===deptFilter;}); if(month) scoped=scoped.filter(function(r){return r.month===month;});
+
+  var A=_annReviews(scoped);
+  var filed=A.filter(function(x){return x.status!=='draft';}).length;
+  var pending=A.filter(function(x){return x.status==='awaiting';}).length;
+  var scoredArr=A.filter(function(x){return x.status==='scored';});
+  var avgPerf=scoredArr.length?Math.round(scoredArr.reduce(function(s,x){return s+x.perf;},0)/scoredArr.length):null;
+
+  var momVal='—', momTxt=month?'':'select a single month';
+  if(month){
+    var db=deptFilter?base.filter(function(r){return r.dept===deptFilter;}):base;
+    var cur=_avgScoredPerf(db.filter(function(r){return r.month===month;}));
+    var pm=ayPrevMonth(month);
+    if(!pm){ momTxt='no prior month (June)'; }
+    else { var prev=_avgScoredPerf(db.filter(function(r){return r.month===pm;}));
+      momVal=_momCell(cur,prev);
+      momTxt=(cur==null||prev==null)?('vs '+pm+' — not enough data'):('vs '+pm+' ('+prev+'% → '+cur+'%)'); }
+  }
+
+  var kpi='<div class="metrics-row" style="margin-bottom:14px">'
+    +'<div class="metric-card"><div class="metric-label">Reviews Filed</div><div class="metric-val">'+filed+'</div></div>'
+    +'<div class="metric-card"><div class="metric-label">Pending Mgr Score</div><div class="metric-val" style="color:var(--amber)">'+pending+'</div></div>'
+    +'<div class="metric-card"><div class="metric-label">Mgr Scored</div><div class="metric-val" style="color:var(--green)">'+scoredArr.length+'</div></div>'
+    +'<div class="metric-card"><div class="metric-label">Org Avg Performance</div><div class="metric-val">'+(avgPerf==null?'—':avgPerf+'%')+'</div><div class="metric-sub">'+(scoredArr.length?'n='+scoredArr.length+' scored':'no scored reviews')+'</div></div>'
+    +'<div class="metric-card"><div class="metric-label">MoM Change</div><div class="metric-val">'+momVal+'</div><div class="metric-sub">'+momTxt+'</div></div>'
+    +'</div>';
+
+  el.innerHTML=kpi
+    +'<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:20px;align-items:start">'
+      +'<div><div class="sub-hd">By Department</div>'+_reviewDeptTable(scoped,base,deptFilter,month)+'</div>'
+      +'<div><div class="sub-hd">Performance Distribution</div>'+_reviewDonut(scoped)+'</div>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:20px;align-items:start;margin-top:16px">'
+      +'<div>'+_reviewMemberTable(base,deptFilter,month)+'</div>'
+      +'<div><div class="sub-hd">Avg Performance % — month-wise trend (org-wide'+(year?', '+esc(year):'')+')</div>'+_reviewTrend(base)+'</div>'
+    +'</div>'
+    +'<div class="sub-hd" style="margin-top:14px">SMART Goal Performance — by Department <span style="font-weight:400;color:var(--text3);font-size:11px">(Avg Score %, ignores weightage)</span></div>'+_goalScoreTable(scoped);
+}
+
+function _reviewTrend(base){
+  var rows=AY_MONTHS.map(function(m){
+    var sc=_annReviews(base.filter(function(r){return r.month===m;})).filter(function(x){return x.status==='scored';});
+    if(!sc.length) return null;
+    return {m:m, avg:Math.round(sc.reduce(function(s,x){return s+x.perf;},0)/sc.length), n:sc.length};
+  }).filter(Boolean);
+  if(!rows.length) return '<p style="color:var(--text3);font-size:12px;padding:6px 2px">No scored reviews yet for this academic year.</p>';
+  return '<div style="display:flex;flex-direction:column;gap:6px">'+rows.map(function(x){
+    return '<div style="display:flex;align-items:center;gap:10px">'
+      +'<div style="width:80px;font-size:11px;color:var(--text2)">'+x.m+'</div>'
+      +'<div class="bar" style="flex:1;height:14px"><div class="bar-fill" style="width:'+x.avg+'%;background:'+pctColor(x.avg)+'"></div></div>'
+      +'<div style="width:96px;text-align:right;font-size:11px;font-weight:700">'+x.avg+'% <span style="font-weight:400;color:var(--text3)">(n='+x.n+')</span></div>'
+    +'</div>';
+  }).join('')+'</div>';
+}
+
+function _reviewDeptTable(scoped,base,deptFilter,month){
+  var depts=deptsInScope(deptFilter);
+  var head='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Department</th><th style="text-align:center">Filed</th><th style="text-align:center">Pending</th><th style="text-align:center">Scored</th><th style="text-align:center">Avg Perf %</th><th style="text-align:center">MoM</th></tr></thead><tbody>';
+  if(!depts.length) return head+'<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:16px">No department in scope for your role</td></tr></tbody></table></div>';
+  var pm=month?ayPrevMonth(month):null;
+  var rows=depts.map(function(d){
+    var a=_annReviews(scoped.filter(function(r){return r.dept===d;}));
+    var filed=a.filter(function(x){return x.status!=='draft';}).length;
+    var pend=a.filter(function(x){return x.status==='awaiting';}).length;
+    var sc=a.filter(function(x){return x.status==='scored';});
+    var avg=sc.length?Math.round(sc.reduce(function(s,x){return s+x.perf;},0)/sc.length):null;
+    var momCell='—';
+    if(month&&pm){ var db=base.filter(function(r){return r.dept===d;});
+      momCell=_momCell(_avgScoredPerf(db.filter(function(r){return r.month===month;})), _avgScoredPerf(db.filter(function(r){return r.month===pm;}))); }
+    return '<tr><td style="font-weight:600">'+esc(d)+'</td>'
+      +'<td style="text-align:center">'+filed+'</td>'
+      +'<td style="text-align:center;color:var(--amber)">'+pend+'</td>'
+      +'<td style="text-align:center;color:var(--green)">'+sc.length+'</td>'
+      +'<td style="text-align:center">'+_perfCell(avg)+(sc.length?' <span style="font-size:10px;color:var(--text3)">(n='+sc.length+')</span>':'')+'</td>'
+      +'<td style="text-align:center">'+momCell+'</td></tr>';
+  }).join('');
+  return head+rows+'</tbody></table></div>';
+}
+
+function _reviewDonut(scoped){
+  var b={High:0,Medium:0,Low:0,Pending:0};
+  _annReviews(scoped).forEach(function(x){
+    if(x.status==='draft') return;                 // not filed → excluded from the distribution
+    if(x.status!=='scored'){ b.Pending++; return; }
+    if(x.perf>=80) b.High++; else if(x.perf>=50) b.Medium++; else b.Low++;
+  });
+  var seg=[{label:'High (≥80%)',value:b.High,color:'#3f6b2a'},{label:'Medium (50–79%)',value:b.Medium,color:'#c07c0a'},{label:'Low (<50%)',value:b.Low,color:'#c0392b'},{label:'Mgr Score Pending',value:b.Pending,color:'#8a9aaa'}];
+  return '<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;justify-content:flex-start">'+svgDonut(seg)+'<div style="width:210px">'+donutLegend(seg)+'</div></div>';
+}
+
+function _reviewMemberTable(base,deptFilter,month){
+  var dept=null;
+  if(currentUser.role===ROLES.DEPT_HEAD) dept=currentUser.dept;
+  else if(currentUser.role===ROLES.ADMIN && deptFilter) dept=deptFilter;
+  else if(currentUser.role===ROLES.MEMBER) dept=currentUser.dept;
+  if(!dept) return '<div style="margin-top:14px;padding:14px;text-align:center;color:var(--text3);font-size:12px;background:var(--surface2);border-radius:var(--radius)">Select a Department to see member-level performance.</div>';
+
+  var refMonth=month;
+  if(!refMonth){ for(var i=AY_MONTHS.length-1;i>=0;i--){ var mm=AY_MONTHS[i];
+    if(_annReviews(base.filter(function(r){return r.dept===dept&&r.month===mm;})).some(function(x){return x.status==='scored';})){ refMonth=mm; break; } } }
+  if(!refMonth) return '<div class="sub-hd" style="margin-top:14px">Member Performance — '+esc(dept)+'</div><p style="color:var(--text3);font-size:12px;padding:6px 2px">No scored reviews yet for this department.</p>';
+  var pm1=ayPrevMonth(refMonth), pm2=pm1?ayPrevMonth(pm1):null;
+  function mp(member,mm){ return mm?_avgScoredPerf(base.filter(function(r){return r.dept===dept&&r.member===member&&r.month===mm;})):null; }
+  var members=(DB.settings.members||[]).filter(function(m){return m.dept===dept;}).map(function(m){return m.name;});
+  var rows=members.map(function(mn){
+    var a=mp(mn,refMonth), b=mp(mn,pm1), c=mp(mn,pm2);
+    var flag=(a!=null&&b!=null&&a<50&&b<50)?'<span title="Low two months running" style="color:var(--red);font-weight:700">⚠</span>':'';
+    return '<tr><td>'+_memberLink(mn,dept)+'</td><td style="text-align:center">'+_perfCell(a)+'</td><td style="text-align:center">'+_perfCell(b)+'</td><td style="text-align:center">'+_perfCell(c)+'</td><td style="text-align:center">'+flag+'</td></tr>';
+  }).join('');
+  return '<div class="sub-hd" style="margin-top:14px">Member Performance — '+esc(dept)+' <span style="font-weight:400;color:var(--text3);font-size:11px">(reference: '+refMonth+')</span></div>'
+    +'<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Member</th><th style="text-align:center">'+refMonth+' %</th><th style="text-align:center">'+(pm1||'—')+' %</th><th style="text-align:center">'+(pm2||'—')+' %</th><th style="text-align:center">Flag</th></tr></thead><tbody>'+(rows||'<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:12px">No members in this department</td></tr>')+'</tbody></table></div>';
+}
+
+function _goalScoreTable(scoped){
+  var map={};
+  _annReviews(scoped).forEach(function(x){
+    if(x.status!=='scored') return;
+    computeGoalScores(x.r).forEach(function(gs){
+      if(gs.scorePct==null) return;
+      var key=x.r.dept+'||'+gs.goal;
+      if(!map[key]) map[key]={dept:x.r.dept,goal:gs.goal,sum:0,n:0};
+      map[key].sum+=gs.scorePct; map[key].n++;
+    });
+  });
+  var arr=Object.keys(map).map(function(k){var o=map[k];o.avg=Math.round(o.sum/o.n);return o;});
+  arr.sort(function(a,b){return a.avg-b.avg;});
+  if(!arr.length) return '<p style="color:var(--text3);font-size:12px;padding:6px 2px">No scored SMART Goals in the current filter.</p>';
+  var rows=arr.map(function(o){ return '<tr><td style="font-weight:600">'+esc(o.dept)+'</td><td>'+esc(o.goal)+'</td><td style="text-align:center">'+o.n+'</td><td style="text-align:center"><span style="font-weight:700;color:'+pctColor(o.avg)+'">'+o.avg+'%</span></td></tr>'; }).join('');
+  return '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Department</th><th>SMART Goal</th><th style="text-align:center">Reviews Counted</th><th style="text-align:center">Avg Score %</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════ PHASE 2 — Plan Overview (Dashboard) ═══════════════════
+// Colour by variance magnitude: over-effort (positive) amber→red, under (negative) blue, <10% neutral.
+function varColor(v){ if(v==null) return 'var(--text3)'; var a=Math.abs(v); if(a<10) return 'var(--text2)'; if(v>0) return a>=30?'#C0392B':'#C07C0A'; return a>=30?'#2E5FA3':'#4A78C0'; }
+function _varCell(hv){ if(hv.variancePct==null) return '<span style="color:var(--text3)">—</span>'; var t=(hv.variancePct>0?'+':'')+hv.variancePct+'%'; return '<span style="font-weight:700;color:'+varColor(hv.variancePct)+'" title="'+(hv.estTotal||0)+'h est → '+(hv.actualTotal||0)+'h actual">'+t+'</span>'; }
+
+function renderPlanOverview(){
+  var el=document.getElementById('dash-plan-progress'); if(!el) return;
+  var year=(document.getElementById('dash-year-filter')||{}).value||'';
+  var month=(document.getElementById('dash-month-filter')||{}).value||'';
+  var deptFilter=(document.getElementById('dash-dept-filter')||{}).value||currentDept;
+  var base=applyRoleFilter(DB.tasks,'task'); if(year) base=base.filter(function(t){return t.year===year;});
+  var scoped=base.slice(); if(deptFilter) scoped=scoped.filter(function(t){return t.dept===deptFilter;}); if(month) scoped=scoped.filter(function(t){return t.month===month;});
+
+  // Two balanced full-width rows: wide tables on the left, their companion chart on the right.
+  var total=scoped.length, done=scoped.filter(function(t){return t.status==='Completed';}).length, ip=scoped.filter(function(t){return t.status==='In Process';}).length, pend=scoped.filter(function(t){return t.status==='Pending';}).length;
+  var overdue=scoped.filter(isTaskOverdue).length, onhold=scoped.filter(function(t){return t.status==='On Hold';}).length, cancelled=scoped.filter(function(t){return t.status==='Cancelled';}).length;
+  var pct=total>0?Math.round(done/total*100):0, hv=computeHoursVariance(scoped), ic=computeItemsCompletion(scoped);
+  var hvTxt=hv.variancePct==null?'—':(hv.variancePct>0?'+':'')+hv.variancePct+'%';
+  var kpi='<div class="metrics-row" style="margin-bottom:16px">'
+    +'<div class="metric-card"><div class="metric-label">Total Tasks</div><div class="metric-val">'+total+'</div></div>'
+    +'<div class="metric-card"><div class="metric-label">Completed</div><div class="metric-val" style="color:var(--green)">'+done+'</div><div class="bar"><div class="bar-fill" style="width:'+pct+'%;background:var(--green)"></div></div><div class="metric-sub">'+pct+'% completion</div></div>'
+    +'<div class="metric-card"><div class="metric-label">In Process</div><div class="metric-val" style="color:var(--amber)">'+ip+'</div></div>'
+    +'<div class="metric-card"><div class="metric-label">Pending</div><div class="metric-val" style="color:var(--red)">'+pend+'</div></div>'
+    +'<div class="metric-card"><div class="metric-label">On Hold / Cancelled</div><div class="metric-val">'+onhold+'<span style="color:var(--text3)"> / </span>'+cancelled+'</div></div>'
+    +'<div class="metric-card"><div class="metric-label">Overdue</div><div class="metric-val" style="color:var(--red)">'+overdue+'</div><div class="metric-sub">past target, not done</div></div>'
+    +'<div class="metric-card"><div class="metric-label">Est vs Actual Hrs</div><div class="metric-val" style="color:'+varColor(hv.variancePct)+'">'+hvTxt+'</div><div class="metric-sub">'+(hv.estTotal||0)+'h → '+(hv.actualTotal||0)+'h</div></div>'
+    +'<div class="metric-card"><div class="metric-label">Items Delivered</div><div class="metric-val">'+(ic.ratioPct==null?'—':ic.ratioPct+'%')+'</div><div class="metric-sub">'+(ic.actualTotal||0)+' / '+(ic.plannedTotal||0)+' items</div></div>'
+    +'</div>';
+  el.innerHTML=kpi+'<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:20px;align-items:start">'
+      +'<div><div class="sub-hd">By Department</div>'+_planDeptTable(scoped,deptFilter)+'</div>'
+      +'<div><div class="sub-hd">Status Distribution</div>'+_planDonut(scoped)+'</div>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:20px;align-items:start;margin-top:16px">'
+      +'<div>'+_planMemberTable(scoped,deptFilter)+'</div>'
+      +'<div><div class="sub-hd">Completion % — month-wise trend (org-wide'+(year?', '+esc(year):'')+')</div>'+_planTrend(base)+'</div>'
+    +'</div>';
+}
+
+function _planTrend(base){
+  var rows=AY_MONTHS.map(function(m){
+    var mt=base.filter(function(t){return t.month===m;});
+    if(!mt.length) return null;
+    var done=mt.filter(function(t){return t.status==='Completed';}).length;
+    return {m:m, pct:Math.round(done/mt.length*100), n:mt.length};
+  }).filter(Boolean);
+  if(!rows.length) return '<p style="color:var(--text3);font-size:12px;padding:6px 2px">No tasks logged yet for this academic year.</p>';
+  return '<div style="display:flex;flex-direction:column;gap:6px">'+rows.map(function(x){
+    return '<div style="display:flex;align-items:center;gap:10px">'
+      +'<div style="width:80px;font-size:11px;color:var(--text2)">'+x.m+'</div>'
+      +'<div class="bar" style="flex:1;height:14px"><div class="bar-fill" style="width:'+x.pct+'%;background:'+pctColor(x.pct)+'"></div></div>'
+      +'<div style="width:104px;text-align:right;font-size:11px;font-weight:700">'+x.pct+'% <span style="font-weight:400;color:var(--text3)">('+x.n+' tasks)</span></div>'
+    +'</div>';
+  }).join('')+'</div>';
+}
+
+function _planDeptTable(scoped,deptFilter){
+  var depts=deptsInScope(deptFilter);
+  var head='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Department</th><th style="text-align:center">Total</th><th style="text-align:center">Completed</th><th style="text-align:center">% Complete</th><th style="text-align:center">Overdue</th><th style="text-align:center">Hrs Variance</th></tr></thead><tbody>';
+  if(!depts.length) return head+'<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:16px">No department in scope for your role</td></tr></tbody></table></div>';
+  var rows=depts.map(function(d){
+    var dt=scoped.filter(function(t){return t.dept===d;});
+    var done=dt.filter(function(t){return t.status==='Completed';}).length;
+    var pct=dt.length?Math.round(done/dt.length*100):0;
+    var od=dt.filter(isTaskOverdue).length;
+    var hv=computeHoursVariance(dt);
+    return {d:d,n:dt.length,done:done,pct:pct,od:od,hv:hv,vsort:(hv.variancePct==null?-Infinity:hv.variancePct)};
+  });
+  rows.sort(function(a,b){return b.vsort-a.vsort;}); // most over-effort first, "—" depts last
+  var body=rows.map(function(x){
+    return '<tr><td style="font-weight:600">'+esc(x.d)+'</td>'
+      +'<td style="text-align:center">'+x.n+'</td>'
+      +'<td style="text-align:center;color:var(--green)">'+x.done+'</td>'
+      +'<td style="text-align:center"><div style="display:flex;align-items:center;gap:6px;justify-content:center"><div class="bar" style="width:52px;height:6px"><div class="bar-fill" style="width:'+x.pct+'%;background:'+pctColor(x.pct)+'"></div></div><span style="font-size:11px;font-weight:700">'+x.pct+'%</span></div></td>'
+      +'<td style="text-align:center">'+(x.od>0?'<span style="color:var(--red);font-weight:700">'+x.od+'</span>':'0')+'</td>'
+      +'<td style="text-align:center">'+_varCell(x.hv)+'</td></tr>';
+  }).join('');
+  return head+body+'</tbody></table></div>';
+}
+
+function _planDonut(scoped){
+  var agg={Completed:0,'In Process':0,Pending:0,'On Hold':0,Cancelled:0,Planned:0};
+  scoped.forEach(function(t){ if(agg[t.status]!==undefined) agg[t.status]++; });
+  var seg=[{label:'Completed',value:agg['Completed'],color:'#3f6b2a'},{label:'In Process',value:agg['In Process'],color:'#c07c0a'},{label:'Pending',value:agg['Pending'],color:'#c0392b'},{label:'On Hold',value:agg['On Hold'],color:'#2e5fa3'},{label:'Cancelled',value:agg['Cancelled'],color:'#5a6b7a'},{label:'Planned',value:agg['Planned'],color:'#a0adba'}];
+  return '<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;justify-content:flex-start">'+svgDonut(seg)+'<div style="width:210px">'+donutLegend(seg)+'</div></div>';
+}
+
+function _planMemberTable(scoped,deptFilter){
+  var dept=null;
+  if(currentUser.role===ROLES.DEPT_HEAD) dept=currentUser.dept;
+  else if(currentUser.role===ROLES.ADMIN && deptFilter) dept=deptFilter;
+  else if(currentUser.role===ROLES.MEMBER) dept=currentUser.dept;
+  if(!dept) return '<div style="margin-top:14px;padding:14px;text-align:center;color:var(--text3);font-size:12px;background:var(--surface2);border-radius:var(--radius)">Select a Department to see member-level plan performance.</div>';
+  var members=(DB.settings.members||[]).filter(function(m){return m.dept===dept;}).map(function(m){return m.name;});
+  var rows=members.map(function(mn){
+    var mt=scoped.filter(function(t){return t.dept===dept&&t.member===mn;});
+    var done=mt.filter(function(t){return t.status==='Completed';}).length;
+    var pct=mt.length?Math.round(done/mt.length*100):0;
+    var od=mt.filter(isTaskOverdue).length;
+    var hv=computeHoursVariance(mt);
+    return '<tr><td>'+_memberLink(mn,dept)+'</td>'
+      +'<td style="text-align:center">'+mt.length+'</td>'
+      +'<td style="text-align:center">'+(mt.length?'<span style="font-weight:700;color:'+pctColor(pct)+'">'+pct+'%</span>':'<span style="color:var(--text3)">—</span>')+'</td>'
+      +'<td style="text-align:center">'+(od>0?'<span style="color:var(--red);font-weight:700">'+od+'</span>':'0')+'</td>'
+      +'<td style="text-align:center">'+_varCell(hv)+'</td></tr>';
+  }).join('');
+  return '<div class="sub-hd" style="margin-top:14px">Member Plan Performance — '+esc(dept)+'</div>'
+    +'<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Member</th><th style="text-align:center">Total Tasks</th><th style="text-align:center">% Complete</th><th style="text-align:center">Overdue</th><th style="text-align:center">Hrs Variance</th></tr></thead><tbody>'+(rows||'<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:12px">No members in this department</td></tr>')+'</tbody></table></div>';
+}
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════ PHASE 3 — Member Effectiveness ═══════════════════
+// On-time = Completed tasks whose Completion Date is on/before Target Date (IST, whole days).
+function computeOnTimeRate(tasks){
+  var completed=0, onTime=0;
+  (tasks||[]).forEach(function(t){
+    if(String(t.status)!=='Completed') return;
+    completed++;
+    var late=sgDaysLate(t.tgtDate,t.compDate);
+    if(late!=null && late<=0) onTime++;
+  });
+  return { completedCount:completed, onTimeCount:onTime, onTimePct:completed>0?Math.round(onTime/completed*100):null };
+}
+function memberMonthTasks(member,dept,year,month){
+  return DB.tasks.filter(function(t){ return t.member===member && t.dept===dept && (!year||t.year===year) && (!month||t.month===month); });
+}
+function memberMonthMetrics(member,dept,year,month){
+  var mt=memberMonthTasks(member,dept,year,month);
+  return { n:mt.length, hv:computeHoursVariance(mt), ic:computeItemsCompletion(mt), q:computeMgrQuality(mt), ot:computeOnTimeRate(mt), pr:computePlannedRatio(mt), fl:computeFlagFreq(mt) };
+}
+function _memberLink(name,dept){ return '<a href="javascript:void(0)" onclick="openMemberAnalytics(\''+encodeURIComponent(name)+'\',\''+encodeURIComponent(dept)+'\')" style="font-weight:600;color:var(--blue);text-decoration:none" title="View member analytics">'+esc(name)+'</a>'; }
+function _pctBar(v){ if(v==null) return '<span style="color:var(--text3)">—</span>'; return '<div style="display:flex;align-items:center;gap:6px"><div class="bar" style="width:46px;height:6px"><div class="bar-fill" style="width:'+v+'%;background:'+pctColor(v)+'"></div></div><span style="font-size:11px;font-weight:700">'+v+'%</span></div>'; }
+function _arrow(cur,prev){ if(cur==null||prev==null) return ''; var d=cur-prev; if(d===0) return ''; return d>0?' <span style="color:var(--green);font-size:10px">▲'+d+'</span>':' <span style="color:var(--red);font-size:10px">▼'+Math.abs(d)+'</span>'; }
+
+// ── Placement 1: Member Analytics Trend View (dashboard drill-down) ──
+function openMemberAnalytics(member, dept){
+  member=decodeURIComponent(member); dept=decodeURIComponent(dept);
+  var year=(document.getElementById('dash-year-filter')||{}).value||'';
+  var m=(DB.settings.members||[]).find(function(x){return x.name===member && x.dept===dept;}) || {};
+  var roleLabel=m.role==='dept_head'?'Dept Head':(m.role==='admin'?'Admin':'Member');
+  var monthRows=AY_MONTHS.map(function(mo){ var met=memberMonthMetrics(member,dept,year,mo); return met.n?{mo:mo,met:met}:null; }).filter(Boolean);
+  var refMonth=(document.getElementById('dash-month-filter')||{}).value||'';
+  if(!refMonth && monthRows.length) refMonth=monthRows[monthRows.length-1].mo;
+
+  var head='<div style="margin-bottom:12px"><div style="font-size:16px;font-weight:800">'+esc(member)+'</div>'
+    +'<div style="font-size:12px;color:var(--text3)">'+esc(dept)+' · '+roleLabel+(year?' · '+esc(year):'')+'</div></div>';
+
+  var trend;
+  if(!monthRows.length){ trend='<p style="color:var(--text3);font-size:12px;padding:8px">No plan data for this member in the selected academic year.</p>'; }
+  else {
+    var body=monthRows.map(function(r,idx){
+      var prev=idx>0?monthRows[idx-1].met:null, met=r.met;
+      var hvTxt=met.hv.variancePct==null?'<span style="color:var(--text3)">—</span>':'<span style="font-weight:700;color:'+varColor(met.hv.variancePct)+'">'+(met.hv.variancePct>0?'+':'')+met.hv.variancePct+'%</span>';
+      var cov=met.q.coveragePct==null?'':' <span style="font-size:10px;color:var(--text3)">('+met.q.coveragePct+'% graded)</span>';
+      return '<tr><td style="font-weight:600">'+r.mo+' <span style="font-weight:400;color:var(--text3);font-size:10px">('+met.n+')</span></td>'
+        +'<td style="text-align:center">'+hvTxt+'</td>'
+        +'<td>'+_pctBar(met.ic.ratioPct)+_arrow(met.ic.ratioPct, prev&&prev.ic.ratioPct)+'</td>'
+        +'<td>'+_pctBar(met.q.qualityPct)+cov+'</td>'
+        +'<td>'+_pctBar(met.ot.onTimePct)+_arrow(met.ot.onTimePct, prev&&prev.ot.onTimePct)+'</td>'+'<td>'+_pctBar(met.pr.plannedPct)+'</td>'+'<td style="text-align:center">'+(met.fl>0?'<span style="color:var(--amber);font-weight:700">'+met.fl+'</span>':'0')+'</td></tr>';
+    }).join('');
+    trend='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Month</th><th style="text-align:center">Hrs Variance</th><th>Items %</th><th>Mgr Quality %</th><th>On-Time %</th><th>Planned %</th><th style="text-align:center">Dev/Help</th></tr></thead><tbody>'+body+'</tbody></table></div>';
+  }
+
+  var weekly='';
+  if(refMonth){
+    var wt=memberMonthTasks(member,dept,year,refMonth), maxH=0;
+    var wk=WEEKS.map(function(w){ var h=wt.filter(function(t){return t.week===w;}).reduce(function(a,t){return a+(parseFloat(t.actualHrs)||0);},0); if(h>maxH)maxH=h; return {w:w,h:h}; });
+    weekly='<div class="sub-hd" style="margin-top:14px">Weekly Actual Hours — '+refMonth+'</div>'
+      +'<div style="display:flex;gap:20px;flex-wrap:wrap;padding:2px 0">'+wk.map(function(x){
+        return '<div style="font-size:12px"><span style="color:var(--text3)">'+x.w+':</span> <span style="font-weight:700">'+(Math.round(x.h*10)/10)+'h</span></div>';
+      }).join('')+'</div>';
+  }
+  document.getElementById('member-analytics-body').innerHTML=head+trend+weekly;
+  openModal('member-analytics-modal');
+}
+
+// ── Placement 2: Review Assist panel (reviewer-only, in the review scoring modal) ──
+function renderReviewAssist(){
+  var el=document.getElementById('review-assist'); if(!el) return; el.innerHTML='';
+  var year=(document.getElementById('rf-year')||{}).value||'';
+  var month=(document.getElementById('rf-month')||{}).value||'';
+  var dept=(document.getElementById('rf-dept')||{}).value||'';
+  var member=(document.getElementById('rf-member')||{}).value||'';
+  if(!member||!dept||!month) return;
+  var isReviewer = currentUser.role===ROLES.ADMIN
+    || (currentUser.role===ROLES.DEPT_HEAD && dept===currentUser.dept)
+    || isManagerOf(member,dept);
+  if(!isReviewer || member===currentUser.name) return;   // hidden from the member during self-review
+
+  var met=memberMonthMetrics(member,dept,year,month);
+  var pm=ayPrevMonth(month); var prev=pm?memberMonthMetrics(member,dept,year,pm):null;
+  function cell(label,val){ return '<div style="flex:1;min-width:120px"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;font-weight:600">'+label+'</div><div style="font-size:14px;font-weight:700;margin-top:2px">'+val+'</div></div>'; }
+  var hvTxt=met.hv.variancePct==null?'—':'<span style="color:'+varColor(met.hv.variancePct)+'">'+(met.hv.variancePct>0?'+':'')+met.hv.variancePct+'%</span>';
+  var it=met.ic.ratioPct==null?'—':'<span style="color:'+pctColor(met.ic.ratioPct)+'">'+met.ic.ratioPct+'%</span>'+_arrow(met.ic.ratioPct, prev&&prev.ic.ratioPct);
+  var q=met.q.qualityPct==null?'—':'<span style="color:'+pctColor(met.q.qualityPct)+'">'+met.q.qualityPct+'%</span>'+(met.q.coveragePct==null?'':' <span style="font-size:10px;color:var(--text3);font-weight:400">('+met.q.coveragePct+'% graded)</span>');
+  var ot=met.ot.onTimePct==null?'—':'<span style="color:'+pctColor(met.ot.onTimePct)+'">'+met.ot.onTimePct+'%</span>'+_arrow(met.ot.onTimePct, prev&&prev.ot.onTimePct);
+
+  el.innerHTML='<div style="border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:14px;background:var(--surface2)">'
+    +'<div style="font-size:12px;font-weight:700;margin-bottom:8px">📊 Plan Effectiveness Snapshot — '+esc(member)+', '+esc(month)+(year?' '+esc(year):'')+' <span style="font-weight:400;color:var(--text3)">('+met.n+' tasks)</span></div>'
+    +'<div style="display:flex;gap:16px;flex-wrap:wrap">'+cell('Est vs Actual Hrs',hvTxt)+cell('Items Completion',it)+cell('Mgr Quality',q)+cell('On-Time Completion',ot)+'</div>'
+    +'<div style="font-size:10px;color:var(--text3);margin-top:8px">Reviewer-only · ▲/▼ vs '+(pm||'previous month')+'</div></div>';
+}
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════ PHASE 4 — Watchlist · Data-Quality · Staleness ═══════════════════
+var STALE_DAYS = 7;
+function daysSince(ts){ if(!ts) return null; var d=new Date(ts); if(isNaN(d.getTime())) return null; return Math.floor((Date.now()-d.getTime())/86400000); }
+// Stale = overdue AND not touched (updated_at) for >= STALE_DAYS days.
+function isTaskStale(t){ if(!isTaskOverdue(t)) return false; var ds=daysSince(t.updatedAt); return ds!=null && ds>=STALE_DAYS; }
+function computePlannedRatio(tasks){ var tot=(tasks||[]).length, pl=(tasks||[]).filter(function(t){return t.planned==='Yes';}).length; return { total:tot, plannedCount:pl, plannedPct: tot>0?Math.round(pl/tot*100):null }; }
+function computeFlagFreq(tasks){ return (tasks||[]).filter(function(t){ return (t.deviation&&String(t.deviation).trim())||(t.helpNeeded&&String(t.helpNeeded).trim()); }).length; }
+function _hasVal(v){ return !!(v&&String(v).trim()); }
+function _dashScope(kind){
+  var year=(document.getElementById('dash-year-filter')||{}).value||'';
+  var month=(document.getElementById('dash-month-filter')||{}).value||'';
+  var deptFilter=(document.getElementById('dash-dept-filter')||{}).value||currentDept;
+  var arr=applyRoleFilter(kind==='task'?DB.tasks:DB.reviews, kind==='task'?'task':'review');
+  if(deptFilter) arr=arr.filter(function(x){return x.dept===deptFilter;});
+  if(year) arr=arr.filter(function(x){return x.year===year;});
+  if(month) arr=arr.filter(function(x){return x.month===month;});
+  return {arr:arr, year:year, month:month, deptFilter:deptFilter};
+}
+
+// ── #1 Watchlist ──
+function renderWatchlist(){
+  var el=document.getElementById('dash-watchlist'); if(!el) return;
+  var ts=_dashScope('task'), rv=_dashScope('review');
+  var tasks=ts.arr, reviews=rv.arr, deptFilter=ts.deptFilter, year=ts.year, month=ts.month;
+  var depts=deptsInScope(deptFilter);
+  var items=[];
+
+  var awaiting=reviews.filter(function(r){return computeReviewPerformance(r).status==='awaiting';});
+  if(awaiting.length) items.push({icon:'⏳',color:'var(--amber)',text:awaiting.length+' review'+(awaiting.length>1?'s':'')+' awaiting manager score',detail:awaiting.slice(0,5).map(function(r){return r.member+' ('+r.month+')';}).join(', ')+(awaiting.length>5?' …':'')});
+
+  var stale=tasks.filter(isTaskStale);
+  if(stale.length) items.push({icon:'🕒',color:'var(--red)',text:stale.length+' overdue task'+(stale.length>1?'s':'')+' untouched ≥'+STALE_DAYS+' days',detail:stale.slice(0,4).map(function(t){return t.member+' — '+String(t.action||t.goal||'').slice(0,40);}).join('; ')+(stale.length>4?' …':'')});
+
+  var odDepts=depts.map(function(d){return {d:d,n:tasks.filter(function(t){return t.dept===d&&isTaskOverdue(t);}).length};}).filter(function(x){return x.n>0;});
+  if(odDepts.length) items.push({icon:'📌',color:'var(--red)',text:'Overdue tasks in '+odDepts.length+' department'+(odDepts.length>1?'s':''),detail:odDepts.map(function(x){return x.d+' ('+x.n+')';}).join(', ')});
+
+  var over=depts.map(function(d){var v=computeHoursVariance(tasks.filter(function(t){return t.dept===d;}));return {d:d,v:v.variancePct};}).filter(function(x){return x.v!=null&&x.v>=30;});
+  if(over.length) items.push({icon:'⏱',color:'var(--red)',text:over.length+' department'+(over.length>1?'s':'')+' ≥30% over hours estimate',detail:over.map(function(x){return x.d+' (+'+x.v+'%)';}).join(', ')});
+
+  var base=applyRoleFilter(DB.reviews,'review'); if(year) base=base.filter(function(r){return r.year===year;});
+  var low=[];
+  depts.forEach(function(d){
+    var refMonth=month;
+    if(!refMonth){ for(var i=AY_MONTHS.length-1;i>=0;i--){ var mm=AY_MONTHS[i]; if(base.filter(function(r){return r.dept===d&&r.month===mm;}).some(function(r){return computeReviewPerformance(r).status==='scored';})){refMonth=mm;break;} } }
+    if(!refMonth) return; var pm=ayPrevMonth(refMonth); if(!pm) return;
+    (DB.settings.members||[]).filter(function(m){return m.dept===d;}).forEach(function(m){
+      var a=_avgScoredPerf(base.filter(function(r){return r.dept===d&&r.member===m.name&&r.month===refMonth;}));
+      var b=_avgScoredPerf(base.filter(function(r){return r.dept===d&&r.member===m.name&&r.month===pm;}));
+      if(a!=null&&b!=null&&a<50&&b<50) low.push(m.name+' ('+d+')');
+    });
+  });
+  if(low.length) items.push({icon:'⚠',color:'var(--red)',text:low.length+' member'+(low.length>1?'s':'')+' low performance two months running',detail:low.slice(0,6).join(', ')+(low.length>6?' …':'')});
+
+  var _wlHd='<div style="font-size:12px;font-weight:700;color:var(--text2);border-top:1px solid var(--border);padding-top:10px;margin-bottom:4px">⚠ Watchlist</div>';
+  if(!items.length){ el.innerHTML=_wlHd+'<div style="padding:6px 2px;color:var(--green);font-size:13px;font-weight:600">✓ All clear — no flags in the current scope.</div>'; return; }
+  el.innerHTML=_wlHd+items.map(function(x){
+    return '<div style="display:flex;gap:10px;padding:7px 2px;border-bottom:1px solid var(--border)">'
+      +'<div style="font-size:15px;line-height:1.3">'+x.icon+'</div>'
+      +'<div style="flex:1"><div style="font-size:13px;font-weight:700;color:'+x.color+'">'+esc(x.text)+'</div>'
+      +(x.detail?'<div style="font-size:11px;color:var(--text3);margin-top:2px">'+esc(x.detail)+'</div>':'')+'</div></div>';
+  }).join('');
+}
+
+// ── #2 Data-Quality (admin only) ──
+function renderDataQuality(){
+  var card=document.getElementById('dash-dq-card'); var el=document.getElementById('dash-dataquality'); if(!el) return;
+  if(currentUser.role!==ROLES.ADMIN){ if(card) card.style.display='none'; return; }
+  if(card) card.style.display='';
+  var ts=_dashScope('task'), rv=_dashScope('review');
+  var depts=deptsInScope(ts.deptFilter);
+  function cell(v){ if(v==null) return '<span style="color:var(--text3)">—</span>'; var c=v>=80?'var(--green)':v>=50?'var(--amber)':'var(--red)'; return '<span style="font-weight:700;color:'+c+'">'+v+'%</span>'; }
+  function pc(n,d){ return d>0?Math.round(n/d*100):null; }
+  var body=depts.map(function(d){
+    var dt=ts.arr.filter(function(t){return t.dept===d;});
+    var completed=dt.filter(function(t){return t.status==='Completed';});
+    var graded=completed.filter(function(t){return ['A','B','C'].indexOf(String(t.managerGrade||'').trim().toUpperCase())>=0;}).length;
+    var withTgt=dt.filter(function(t){return _hasVal(t.tgtDate);}).length;
+    var withComp=completed.filter(function(t){return _hasVal(t.compDate);}).length;
+    var dr=rv.arr.filter(function(r){return r.dept===d;});
+    var filed=dr.filter(function(r){return computeReviewPerformance(r).status!=='draft';}).length;
+    var scored=dr.filter(function(r){return computeReviewPerformance(r).status==='scored';}).length;
+    return '<tr><td style="font-weight:600">'+esc(d)+'</td>'
+      +'<td style="text-align:center">'+cell(pc(graded,completed.length))+'</td>'
+      +'<td style="text-align:center">'+cell(pc(withTgt,dt.length))+'</td>'
+      +'<td style="text-align:center">'+cell(pc(withComp,completed.length))+'</td>'
+      +'<td style="text-align:center">'+cell(pc(scored,filed))+'</td></tr>';
+  }).join('');
+  el.innerHTML='<p style="font-size:11px;color:var(--text3);margin-bottom:8px">How complete is the input feeding these analytics? Low numbers mean the metrics above rest on thin data.</p>'
+    +'<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Department</th><th style="text-align:center">Completed Tasks Graded</th><th style="text-align:center">Tasks w/ Target Date</th><th style="text-align:center">Completed w/ Comp Date</th><th style="text-align:center">Reviews Mgr-Scored</th></tr></thead><tbody>'+(body||'<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:12px">No data</td></tr>')+'</tbody></table></div>';
+}
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
 function renderDashboard() {
   const year = document.getElementById('dash-year-filter')?.value || '';
   const month = document.getElementById('dash-month-filter')?.value || '';
@@ -734,106 +1244,29 @@ function renderDashboard() {
   const planned=tasks.filter(t=>t.planned==='Yes').length;
   const unplanned=tasks.filter(t=>t.planned==='No').length;
   const pct=total>0?Math.round(done/total*100):0;
+  const overdue = tasks.filter(isTaskOverdue).length;
+  const onhold = tasks.filter(t=>t.status==='On Hold').length;
+  const cancelled = tasks.filter(t=>t.status==='Cancelled').length;
+  const hv = computeHoursVariance(tasks);
+  const ic = computeItemsCompletion(tasks);
+  const hvTxt = hv.variancePct==null ? '—' : (hv.variancePct>0?'+':'')+hv.variancePct+'%';
 
-  document.getElementById('dash-metrics').innerHTML=`
+  var _dm=document.getElementById('dash-metrics'); if(_dm) _dm.innerHTML=`
     <div class="metric-card"><div class="metric-label">Total Tasks</div><div class="metric-val">${total}</div></div>
     <div class="metric-card"><div class="metric-label">Completed</div><div class="metric-val" style="color:var(--green)">${done}</div>
       <div class="bar"><div class="bar-fill" style="width:${pct}%;background:var(--green)"></div></div>
       <div class="metric-sub">${pct}% completion</div></div>
     <div class="metric-card"><div class="metric-label">In Process</div><div class="metric-val" style="color:var(--amber)">${ip}</div></div>
     <div class="metric-card"><div class="metric-label">Pending</div><div class="metric-val" style="color:var(--red)">${pend}</div></div>
-    <div class="metric-card"><div class="metric-label">Planned</div><div class="metric-val">${planned}</div><div class="metric-sub">of ${total}</div></div>
-    <div class="metric-card"><div class="metric-label">Unplanned</div><div class="metric-val" style="color:var(--amber)">${unplanned}</div></div>`;
+    <div class="metric-card"><div class="metric-label">On Hold / Cancelled</div><div class="metric-val">${onhold}<span style="color:var(--text3)"> / </span>${cancelled}</div></div>
+    <div class="metric-card"><div class="metric-label">Overdue</div><div class="metric-val" style="color:var(--red)">${overdue}</div><div class="metric-sub">past target, not done</div></div>
+    <div class="metric-card"><div class="metric-label">Est vs Actual Hrs</div><div class="metric-val" style="color:${varColor(hv.variancePct)}">${hvTxt}</div><div class="metric-sub">${hv.estTotal||0}h → ${hv.actualTotal||0}h</div></div>
+    <div class="metric-card"><div class="metric-label">Items Delivered</div><div class="metric-val">${ic.ratioPct==null?'—':ic.ratioPct+'%'}</div><div class="metric-sub">${ic.actualTotal||0} / ${ic.plannedTotal||0} items</div></div>`;
 
-  // ── Monthly Plan Progress — by Department ──
-  const scopeDepts = deptsInScope(deptFilter);
-  let planRows = '';
-  const aggStatus = {Completed:0,'In Process':0,Pending:0,'On Hold':0,Cancelled:0};
-  scopeDepts.forEach(d => {
-    const dt = tasks.filter(t=>t.dept===d);
-    const dDone = dt.filter(t=>t.status==='Completed').length;
-    const dPct = dt.length>0?Math.round(dDone/dt.length*100):0;
-    dt.forEach(t=>{ if (aggStatus[t.status]!==undefined) aggStatus[t.status]++; });
-    planRows += `<tr>
-      <td style="font-weight:600">${esc(d)}</td>
-      <td style="text-align:center">${dt.length}</td>
-      <td style="text-align:center;color:var(--green)">${dDone}</td>
-      <td style="text-align:center">
-        <div style="display:flex;align-items:center;gap:6px;justify-content:center">
-          <div class="bar" style="width:56px;height:6px"><div class="bar-fill" style="width:${dPct}%;background:${pctColor(dPct)}"></div></div>
-          <span style="font-size:11px;font-weight:700">${dPct}%</span>
-        </div>
-      </td>
-    </tr>`;
-  });
-  if (!scopeDepts.length) planRows = `<tr><td colspan="4" style="text-align:center;color:var(--text3);padding:16px">No department in scope for your role</td></tr>`;
-  const planTableHtml = `<div class="tbl-wrap"><table class="tbl">
-    <thead><tr><th>Department</th><th style="text-align:center">Total Tasks</th><th style="text-align:center">Completed</th><th style="text-align:center">% Complete</th></tr></thead>
-    <tbody>${planRows}</tbody>
-  </table></div>`;
-  const planSegments = [
-    {label:'Completed', value:aggStatus['Completed'], color:'#3f6b2a'},
-    {label:'In Process', value:aggStatus['In Process'], color:'#c07c0a'},
-    {label:'Pending', value:aggStatus['Pending'], color:'#c0392b'},
-    {label:'On Hold', value:aggStatus['On Hold'], color:'#2e5fa3'},
-    {label:'Cancelled', value:aggStatus['Cancelled'], color:'#5a6b7a'}
-  ];
-  const planChartHtml = `<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:center">
-    ${svgDonut(planSegments)}
-    <div style="flex:1;min-width:140px">${donutLegend(planSegments)}</div>
-  </div>`;
-  document.getElementById('dash-plan-progress').innerHTML = planTableHtml + planChartHtml;
+  renderPlanOverview();
 
-  // ── Review Score — by Department ──
-  let reviews = DB.reviews;
-  reviews = applyRoleFilter(reviews, 'review');
-  if (deptFilter) reviews = reviews.filter(r=>r.dept===deptFilter);
-  if (year) reviews = reviews.filter(r=>r.year===year);
-  if (month) reviews = reviews.filter(r=>r.month===month);
-
-  let reviewRows = '';
-  const scoreBands = {High:0, Medium:0, Low:0, Pending:0};
-  scopeDepts.forEach(d => {
-    const dr = reviews.filter(r=>r.dept===d);
-    let sumPct = 0, scoredCount = 0;
-    dr.forEach(r => {
-      const items = r.items||[];
-      const tMax = items.reduce((a,i)=>a+(parseFloat(i.maxScore)||0),0);
-      const tMgr = items.reduce((a,i)=>a+(parseFloat(i.mgrScore)||0),0);
-      const mgrDone = items.some(i=>parseFloat(i.mgrScore)>0);
-      if (!mgrDone) { scoreBands.Pending++; return; }
-      const p = tMax>0 ? Math.round(tMgr/tMax*100) : 0;
-      sumPct += p; scoredCount++;
-      if (p>=80) scoreBands.High++; else if (p>=50) scoreBands.Medium++; else scoreBands.Low++;
-    });
-    const avgPct = scoredCount>0 ? Math.round(sumPct/scoredCount) : 0;
-    reviewRows += `<tr>
-      <td style="font-weight:600">${esc(d)}</td>
-      <td style="text-align:center">${dr.length}</td>
-      <td style="text-align:center">
-        <div style="display:flex;align-items:center;gap:6px;justify-content:center">
-          <div class="bar" style="width:56px;height:6px"><div class="bar-fill" style="width:${avgPct}%;background:${pctColor(avgPct)}"></div></div>
-          <span style="font-size:11px;font-weight:700">${scoredCount>0?avgPct+'%':'—'}</span>
-        </div>
-      </td>
-    </tr>`;
-  });
-  if (!scopeDepts.length) reviewRows = `<tr><td colspan="3" style="text-align:center;color:var(--text3);padding:16px">No department in scope for your role</td></tr>`;
-  const reviewTableHtml = `<div class="tbl-wrap"><table class="tbl">
-    <thead><tr><th>Department</th><th style="text-align:center">Reviews</th><th style="text-align:center">Avg Mgr Score</th></tr></thead>
-    <tbody>${reviewRows}</tbody>
-  </table></div>`;
-  const reviewSegments = [
-    {label:'High (≥80%)', value:scoreBands.High, color:'#3f6b2a'},
-    {label:'Medium (50–79%)', value:scoreBands.Medium, color:'#c07c0a'},
-    {label:'Low (<50%)', value:scoreBands.Low, color:'#c0392b'},
-    {label:'Mgr Score Pending', value:scoreBands.Pending, color:'#8a9aaa'}
-  ];
-  const reviewChartHtml = `<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:center">
-    ${svgDonut(reviewSegments)}
-    <div style="flex:1;min-width:140px">${donutLegend(reviewSegments)}</div>
-  </div>`;
-  document.getElementById('dash-review-score').innerHTML = reviewTableHtml + reviewChartHtml;
+  renderReviewOverview();
+  renderDataQuality();
 }
 
 // ── SMART GOALS ──
@@ -1690,8 +2123,8 @@ function renderReviews() {
     const totalMax  = items.reduce((a,i) => a + (parseFloat(i.maxScore)||0), 0);
     const totalMem  = items.reduce((a,i) => a + (parseFloat(i.memberScore)||0), 0);
     const totalMgr  = items.reduce((a,i) => a + (parseFloat(i.mgrScore)||0), 0);
-    const mgrDone = items.some(i => parseFloat(i.mgrScore) > 0);
-    const memDone = items.some(i => parseFloat(i.memberScore) > 0);
+    const mgrDone = items.some(i => sgScoreEntered(i.mgrScore));
+    const memDone = items.some(i => sgScoreEntered(i.memberScore));
     const statusPill = mgrDone
       ? `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--green-lt);color:var(--green);border:1px solid var(--green)">✓ Mgr Scored</span>`
       : memDone
@@ -1725,8 +2158,8 @@ function renderReviews() {
           <td style="text-align:center">${esc(i.actual||'—')}</td>
           <td style="text-align:center"><button type="button" class="remark-icon-btn ${hasRemark?'has-remark':''}" title="${hasRemark?'View / edit remark':(canEditRemark?'Add remark':'No remark')}" onclick="sgOpenItemRemarkModal('${r.id}',${itemIndex})">${hasRemark?'📝':'✏️'}</button></td>
           <td style="text-align:center;font-weight:700">${i.maxScore}</td>
-          <td style="text-align:center"><span class="score-badge ${scoreClass(i.memberScore,i.maxScore)}">${i.memberScore||'—'}</span></td>
-          <td style="text-align:center">${parseFloat(i.mgrScore)>0?`<span class="score-badge ${scoreClass(i.mgrScore,i.maxScore)}">${i.mgrScore}</span>`:'<span style="font-size:11px;color:var(--text3)">—</span>'}</td>
+          <td style="text-align:center"><span class="score-badge ${scoreClass(i.memberScore,i.maxScore)}">${sgScoreEntered(i.memberScore)?i.memberScore:'—'}</span></td>
+          <td style="text-align:center">${sgScoreEntered(i.mgrScore)?`<span class="score-badge ${scoreClass(i.mgrScore,i.maxScore)}">${i.mgrScore}</span>`:'<span style="font-size:11px;color:var(--text3)">—</span>'}</td>
         </tr>`;
       }).join('');
 
@@ -1839,6 +2272,7 @@ function openReviewModal(id) {
   ['rf-reviewer','rf-remarks','rf-sheetb'].forEach(fid => document.getElementById(fid).value = '');
   document.getElementById('rf-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('review-score-table').innerHTML = '';
+  var _ra=document.getElementById('review-assist'); if(_ra) _ra.innerHTML='';
   document.getElementById('rf-helpneeded').value = '';
   document.getElementById('rf-areas').value = '';
 
@@ -1935,8 +2369,8 @@ function loadGoalsForReview() {
         <td style="text-align:center"><input type="text" class="item-actual" value="${esc(ex?.actual||'')}" style="width:100%;border:1px solid var(--border2);border-radius:4px;padding:3px 6px;font-size:12px;font-family:inherit;text-align:center"></td>
         <td style="text-align:center"><input type="text" placeholder="Remark…" class="item-remark" value="${esc(ex?.remark||'')}" style="width:100%;border:1px solid var(--border2);border-radius:4px;padding:3px 7px;font-size:12px;font-family:inherit"></td>
         <td style="text-align:center"><input class="score-input-sm item-maxscore" type="number" min="0" value="${maxVal}" title="Max Score is fetched from SMART Goals, but can be adjusted here" style="width:100%;max-width:64px"></td>
-        <td style="text-align:center"><input class="score-input-sm item-memberscore" type="number" min="0" value="${ex?.memberScore||0}" ${memberDisabled} style="width:100%;max-width:64px"></td>
-        <td style="text-align:center"><input class="score-input-sm item-mgrscore" type="number" min="0" value="${ex?.mgrScore||0}" ${mgrDisabled} style="width:100%;max-width:64px"></td>
+        <td style="text-align:center"><input class="score-input-sm item-memberscore" type="number" min="0" value="${(ex && sgScoreEntered(ex.memberScore))?ex.memberScore:''}" ${memberDisabled} style="width:100%;max-width:64px"></td>
+        <td style="text-align:center"><input class="score-input-sm item-mgrscore" type="number" min="0" value="${(ex && sgScoreEntered(ex.mgrScore))?ex.mgrScore:''}" ${mgrDisabled} style="width:100%;max-width:64px"></td>
       </tr>`;
     });
     html += `<tr style="background:var(--surface2);font-weight:700">
@@ -1948,6 +2382,7 @@ function loadGoalsForReview() {
     html += `</tbody></table></div></div>`;
   });
   document.getElementById('review-score-table').innerHTML = html;
+  renderReviewAssist();
 }
 
 function saveReview() {
@@ -1969,8 +2404,8 @@ function saveReview() {
       target: row.querySelector('.item-target').value,
       actual: row.querySelector('.item-actual').value,
       remark: row.querySelector('.item-remark').value,
-      memberScore: parseFloat(row.querySelector('.item-memberscore').value)||0,
-      mgrScore: parseFloat(row.querySelector('.item-mgrscore').value)||0
+      memberScore: sgReadScore(row.querySelector('.item-memberscore').value),
+      mgrScore: sgReadScore(row.querySelector('.item-mgrscore').value)
     });
   });
 
@@ -3089,6 +3524,7 @@ try { window.removeAdmin = removeAdmin; } catch(e){}
 try { window.removeDept = removeDept; } catch(e){}
 try { window.removeMember = removeMember; } catch(e){}
 try { window.renderDashboard = renderDashboard; } catch(e){}
+try { window.openMemberAnalytics = openMemberAnalytics; } catch(e){}
 try { window.renderPlan = renderPlan; } catch(e){}
 try { window.openMgrComment = openMgrComment; } catch(e){}
 try { window.saveMgrComment = saveMgrComment; } catch(e){}

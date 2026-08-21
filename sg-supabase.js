@@ -29,6 +29,7 @@
 
   // ---- helpers: match GAS num_ coercion exactly ----
   function sgNum0(v) { if (v === '' || v == null) return 0; var n = Number(v); return isNaN(n) ? 0 : n; }
+  function sgScoreOrNull(v) { if (v === '' || v == null) return null; var n = Number(v); return isNaN(n) ? null : n; } // unscored → NULL; entered (incl 0) → number
   function sgNumOrEmpty(v) { return (v == null) ? '' : (v === '' ? '' : Number(v)); }
   function sgUid() {
     // matches GAS style: id_ + 12 hex chars
@@ -92,7 +93,9 @@
           goalItemId: it.goal_item_id, goal: it.goal, weightage: sgNum0(it.weightage),
           description: it.description || '', cat: it.cat, particulars: it.particulars,
           maxScore: sgNum0(it.max_score), target: it.target, actual: it.actual,
-          remark: it.remark, memberScore: sgNum0(it.member_score), mgrScore: sgNum0(it.mgr_score)
+          remark: it.remark,
+          memberScore: (it.member_score == null ? null : Number(it.member_score)),
+          mgrScore: (it.mgr_score == null ? null : Number(it.mgr_score))
         });
       });
 
@@ -123,7 +126,7 @@
                    tgtDate: t.tgt_date || '', compDate: t.comp_date || '', actualHrs: sgNum0(t.actual_hrs),
                    actualItems: sgNumOrEmpty(t.actual_items), status: t.status || '', deviation: t.deviation || '',
                    helpNeeded: t.help_needed || '', revisedTgtDate: t.revised_tgt_date || '',
-                   managerComment: t.manager_comment || '', managerGrade: t.manager_grade || '', createdAt: t.created_at || '' };
+                   managerComment: t.manager_comment || '', managerGrade: t.manager_grade || '', createdAt: t.created_at || '', updatedAt: t.updated_at || '' };
         }),
         reviews: reviews.map(function (r) {
           return { id: String(r.id || ''), year: r.year || '', month: r.month || '', dept: r.dept || '',
@@ -224,7 +227,7 @@
                  particulars: it.particulars || '',
                  max_score: (it.maxScore == null || it.maxScore === '') ? 0 : Number(it.maxScore),
                  target: it.target || '', actual: it.actual || '', remark: it.remark || '',
-                 member_score: sgNum0(it.memberScore), mgr_score: sgNum0(it.mgrScore) };
+                 member_score: sgScoreOrNull(it.memberScore), mgr_score: sgScoreOrNull(it.mgrScore) };
       });
       return sb.from('review_items').delete().eq('review_id', r.id).then(function (d) {
         sgThrow(d.error);
