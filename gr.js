@@ -281,9 +281,16 @@
             });
         } catch (e) {
             if (e && e.name === "AbortError") {
-                throw new Error("The upload took too long and was stopped. It may not have saved — tap Refresh Data to check before retrying.");
+                const te = new Error("The upload took too long and was stopped. It may not have saved — tap Refresh Data to check before retrying.");
+                te.code = "timeout";
+                throw te;
             }
-            throw new Error("Network error reaching the backend. Check the Web App URL and that it is deployed for 'Anyone'.");
+            // A phone that has been idle drops its warm connection to Google,
+            // so the first request after a pause often fails outright. That is
+            // a transient condition, and the caller retries it.
+            const ne = new Error("Could not reach the server — this is usually a temporary network blip. Please try again.");
+            ne.code = "network";
+            throw ne;
         } finally {
             if (_timer) clearTimeout(_timer);
         }
@@ -316,6 +323,10 @@
 
     // Detailed dashboard — clickable stat filter (state/district/month come from the filter bar)
     let dashStatFilter = "all";                 // all | validated | not_validated
+
+    // The file chosen in the upload form, with its bytes already read.
+    // { file, base64, error, promise } — see the change handler in wireUploadForm().
+    let pickedFile = null;
 
     /* ----------------------------------------------------------
        SPEED
@@ -555,9 +566,28 @@
         const fileNameEl = document.getElementById("grUpFileName");
         if (fileInput && fileNameEl) {
             fileInput.addEventListener("change", () => {
-                fileNameEl.textContent = (fileInput.files && fileInput.files[0])
-                    ? fileInput.files[0].name
-                    : "No file chosen";
+                const f = (fileInput.files && fileInput.files[0]) || null;
+                fileNameEl.textContent = f ? f.name : "No file chosen";
+
+                // A picked file is only a REFERENCE to something on disk. If the
+                // form then sits open for a few minutes (screen locked, tab in the
+                // background), Android can release that reference and the read at
+                // upload time fails. So grab the bytes right now, while the handle
+                // is certainly still good, and reuse them later.
+                pickedFile = null;
+                if (!f) return;
+                const entry = {
+                    file: f,
+                    base64: null,   // filled in when the read below resolves
+                    error: ""
+                };
+                pickedFile = entry;
+                entry.promise = fileToBase64(f)
+                    .then(b64 => { entry.base64 = b64; return b64; })
+                    .catch(err => {
+                        entry.error = (err && err.message) || "Could not read the selected file";
+                        return null;   // handled at upload time; never an unhandled rejection
+                    });
             });
         }
 
@@ -662,6 +692,11 @@
         if (show) {
             const title = document.getElementById("grUpTitle");
             if (title) setTimeout(() => title.focus(), 50);
+            // Re-open the connection to Apps Script now, while the form is being
+            // filled in, so the upload itself doesn't pay the cold-start cost of
+            // a fresh TLS handshake + redirect hop. Cheap (a few bytes) and
+            // entirely best-effort — a failure here changes nothing.
+            try { api({ action: "ver" }).catch(() => {}); } catch (e) {}
         }
     }
 
@@ -719,6 +754,9 @@
         sessionMyIds.add(localId);
         pendingUploads[localId] = {
             file,
+            // Bytes captured when the file was picked (see wireUploadForm).
+            // Survives the OS releasing the file handle while the form was open.
+            picked: (pickedFile && pickedFile.file === file) ? pickedFile : null,
             meta: {
                 action: "upload",
                 // Stable across retries so the backend can dedup and never
@@ -752,33 +790,82 @@
         setSync(localId, "uploading", "");
         renderMyUploads();
 
-        try {
-            const fileBase64 = await fileToBase64(p.file);
-            const data = await api({
-                ...p.meta,
-                fileBase64,
-                fileName: p.file.name,
-                mimeType: p.file.type || "application/octet-stream"
-            }, { timeoutMs: 120000 });
-
-            if (data.version) dataVersion = String(data.version);
-            const idx = allRecords.findIndex(r => String(r.recordId) === localId);
-            if (data.record) {
-                sessionMyIds.add(String(data.record.recordId));
-                if (idx >= 0) allRecords[idx] = data.record;
-                else allRecords.unshift(data.record);
-            } else if (idx >= 0) {
-                allRecords[idx]._sync = "";
-            }
-            delete pendingUploads[localId];
-            sessionMyIds.delete(localId);
-            persistLocal();
-            notify("Uploaded to Drive ✓", "success");
-        } catch (err) {
-            console.error(err);
-            setSync(localId, "failed", err.message);
-            notify("Upload failed — use Retry on the list.", "error");
+        // --- 1. Get the file's bytes -------------------------------------
+        // Prefer the copy taken when the file was picked; only fall back to
+        // reading from disk if that isn't available.
+        let fileBase64 = null;
+        if (p.picked) {
+            try { await p.picked.promise; } catch (e) {}
+            if (p.picked.base64) fileBase64 = p.picked.base64;
         }
+        if (fileBase64 == null) {
+            try {
+                fileBase64 = await fileToBase64(p.file);
+            } catch (readErr) {
+                const msg = "Could not read the chosen file — the phone released it while the form was open. Please discard this row and upload the file again.";
+                console.error(readErr);
+                setSync(localId, "failed", msg);
+                notify("Upload failed — " + msg, "error");
+                refreshMonthOptions();
+                rerenderAll();
+                return;
+            }
+        }
+
+        // --- 2. Send it, retrying transient failures ----------------------
+        // A page left open for a few minutes loses its warm connection to
+        // Google, so the first attempt after a pause can fail instantly even
+        // on a perfect network and a tiny file. Retrying re-establishes the
+        // connection and almost always succeeds. This cannot create a
+        // duplicate: the backend dedups on clientUploadId, which is the same
+        // across every attempt and every Retry.
+        const MAX_TRIES = 3;
+        let lastErr = null;
+        for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
+            try {
+                const data = await api({
+                    ...p.meta,
+                    fileBase64,
+                    fileName: p.file.name,
+                    mimeType: p.file.type || "application/octet-stream"
+                }, { timeoutMs: 120000 });
+
+                if (data.version) dataVersion = String(data.version);
+                const idx = allRecords.findIndex(r => String(r.recordId) === localId);
+                if (data.record) {
+                    sessionMyIds.add(String(data.record.recordId));
+                    if (idx >= 0) allRecords[idx] = data.record;
+                    else allRecords.unshift(data.record);
+                } else if (idx >= 0) {
+                    allRecords[idx]._sync = "";
+                }
+                delete pendingUploads[localId];
+                sessionMyIds.delete(localId);
+                persistLocal();
+                notify(attempt > 1 ? "Uploaded to Drive ✓ (after a retry)" : "Uploaded to Drive ✓", "success");
+                refreshMonthOptions();
+                rerenderAll();
+                return;
+            } catch (err) {
+                lastErr = err;
+                // A timeout may mean the file DID save and only the reply was
+                // lost. Re-sending is handled safely by the backend's dedup, but
+                // there is no point burning another 2 minutes — stop and let the
+                // user refresh and decide.
+                if (err && err.code === "timeout") break;
+                if (attempt < MAX_TRIES) {
+                    setSync(localId, "uploading", "Retrying (" + attempt + "/" + (MAX_TRIES - 1) + ")…");
+                    renderMyUploads();
+                    await new Promise(r => setTimeout(r, 800 * attempt));   // 0.8s, then 1.6s
+                }
+            }
+        }
+
+        // --- 3. Out of attempts: surface the REAL reason ------------------
+        console.error(lastErr);
+        const reason = (lastErr && lastErr.message) || "Unknown error";
+        setSync(localId, "failed", reason);
+        notify("Upload failed — " + reason, "error");
         refreshMonthOptions();
         rerenderAll();
     }
@@ -799,6 +886,9 @@
         setVal("grUpDesc", "");
         setVal("grUpDate", "");
         setVal("grUpFile", "");
+        // The in-flight upload keeps its own reference to the old entry,
+        // so dropping this one never disturbs a pending send.
+        pickedFile = null;
         const fn = document.getElementById("grUpFileName");
         if (fn) fn.textContent = "No file chosen";
     }
@@ -1059,6 +1149,7 @@
             if (act === "retry") performUpload(btn.dataset.id);
             else if (act === "discard") discardFailedUpload(btn.dataset.id);
             else if (act === "remark") openDescModal(btn.dataset.desc || "", "Validator remark");
+            else if (act === "why") openDescModal(btn.dataset.desc || "Upload failed", "Why the upload failed");
         });
     }
 
@@ -1092,7 +1183,7 @@
         if (r._sync === "uploading") {
             fileCell = `<span class="gr-sync gr-sync--busy">⏳ Uploading…</span>`;
         } else if (r._sync === "failed") {
-            fileCell = `<span class="gr-sync gr-sync--fail" title="${escHtml(r._syncError)}">⚠ Failed</span>`;
+            fileCell = `<button type="button" class="gr-sync gr-sync--fail" data-act="why" data-desc="${escHtml(r._syncError || "Upload failed")}" title="Tap to see why" style="font:inherit;font-size:11px;font-weight:700;border:0;cursor:pointer;">⚠ Failed</button>`;
         } else if (r.fileUrl) {
             fileCell = `<a href="${escHtml(r.fileUrl)}" target="_blank" rel="noopener" class="gr-file-link gr-file-icon" title="Open file">📄</a>`;
         } else {
