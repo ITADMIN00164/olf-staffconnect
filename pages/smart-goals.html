@@ -327,6 +327,10 @@
 #sg-app .score-lo { background: var(--red-lt); color: var(--red); }
 
 #sg-app .filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+#sg-app .dash-subtabs { display: flex; gap: 8px; margin: 0 0 18px; }
+#sg-app .dash-subtab-btn { padding: 8px 18px; border: 1px solid var(--border); background: var(--surface); border-radius: 9px; font-size: 13px; font-weight: 700; color: var(--text2); cursor: pointer; font-family: inherit; transition: all .12s; }
+#sg-app .dash-subtab-btn:hover { border-color: var(--brand); }
+#sg-app .dash-subtab-btn.active { background: var(--brand); color: #fff; border-color: var(--brand); }
 #sg-app .filter-bar select, #sg-app .filter-bar input { border: 1px solid var(--border2); border-radius: var(--radius); padding: 6px 10px; font-size: 12.5px; color: var(--text); background: var(--surface); font-family: inherit; }
 #sg-app .filter-bar select:focus, #sg-app .filter-bar input:focus { outline: none; border-color: var(--brand); }
 
@@ -787,27 +791,36 @@
   <div class="filter-bar">
     <select id="dash-year-filter" onchange="renderDashboard()"><option value="">All Academic Years</option></select>
     <select id="dash-month-filter" onchange="renderDashboard()"><option value="">All Months</option></select>
+    <select id="dash-week-filter" onchange="renderDashboard()"><option value="">All Weeks</option></select>
     <select id="dash-dept-filter" onchange="renderDashboard()"><option value="">All Departments</option></select>
   </div>
 
+  <div class="dash-subtabs">
+    <button class="dash-subtab-btn active" data-subtab="plan" onclick="switchDashSubtab('plan')">Monthly Plan Progress</button>
+    <button class="dash-subtab-btn" data-subtab="review" onclick="switchDashSubtab('review')">Monthly Review</button>
+  </div>
 
-  <div class="card" style="margin-bottom:20px">
-    <div class="card-header"><span class="card-title">Monthly Plan Progress — by Department</span></div>
-    <div class="card-body">
-      <div id="dash-plan-progress"></div>
+  <div id="dash-subtab-plan">
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header"><span class="card-title">Monthly Plan Progress — by Department</span></div>
+      <div class="card-body">
+        <div id="dash-plan-progress"></div>
+      </div>
+    </div>
+
+    <div class="card" id="dash-dq-card">
+      <div class="card-header"><span class="card-title">Target vs Completion</span></div>
+      <div class="card-body"><div id="dash-dataquality"></div></div>
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-header"><span class="card-title">Review Overview</span></div>
-    <div class="card-body">
-      <div id="dash-review-score"></div>
+  <div id="dash-subtab-review" style="display:none">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Review Overview</span></div>
+      <div class="card-body">
+        <div id="dash-review-score"></div>
+      </div>
     </div>
-  </div>
-
-  <div class="card" id="dash-dq-card" style="margin-top:20px">
-    <div class="card-header"><span class="card-title">🧮 Data Quality (admin)</span></div>
-    <div class="card-body"><div id="dash-dataquality"></div></div>
   </div>
 </div>
 

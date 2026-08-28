@@ -563,6 +563,7 @@ function populateAllSelects() {
 
   populateYearSelect('dash-year-filter', {emptyLabel:'All Academic Years', selectCurrent:true});
   populateSelect('dash-month-filter', MONTHS, 'All Months');
+  populateSelect('dash-week-filter', WEEKS, 'All Weeks');
   populateSelect('dash-dept-filter', depts, 'All Departments');
 }
 
@@ -835,8 +836,7 @@ function renderReviewOverview(){
     +'<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:20px;align-items:start;margin-top:16px">'
       +'<div>'+_reviewMemberTable(base,deptFilter,month)+'</div>'
       +'<div><div class="sub-hd">Avg Performance % — month-wise trend (org-wide'+(year?', '+esc(year):'')+')</div>'+_reviewTrend(base)+'</div>'
-    +'</div>'
-    +'<div class="sub-hd" style="margin-top:14px">SMART Goal Performance — by Department <span style="font-weight:400;color:var(--text3);font-size:11px">(Avg Score %, ignores weightage)</span></div>'+_goalScoreTable(scoped);
+    +'</div>';
 }
 
 function _reviewTrend(base){
@@ -887,7 +887,7 @@ function _reviewDonut(scoped){
     if(x.perf>=80) b.High++; else if(x.perf>=50) b.Medium++; else b.Low++;
   });
   var seg=[{label:'High (≥80%)',value:b.High,color:'#3f6b2a'},{label:'Medium (50–79%)',value:b.Medium,color:'#c07c0a'},{label:'Low (<50%)',value:b.Low,color:'#c0392b'},{label:'Mgr Score Pending',value:b.Pending,color:'#8a9aaa'}];
-  return '<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;justify-content:flex-start">'+svgDonut(seg)+'<div style="width:210px">'+donutLegend(seg)+'</div></div>';
+  return '<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;justify-content:center;padding:6px 0">'+svgDonut(seg)+'<div style="width:200px">'+donutLegend(seg)+'</div></div>';
 }
 
 function _reviewMemberTable(base,deptFilter,month){
@@ -944,6 +944,7 @@ function renderPlanOverview(){
   var deptFilter=(document.getElementById('dash-dept-filter')||{}).value||currentDept;
   var base=applyRoleFilter(DB.tasks,'task'); if(year) base=base.filter(function(t){return t.year===year;});
   var scoped=base.slice(); if(deptFilter) scoped=scoped.filter(function(t){return t.dept===deptFilter;}); if(month) scoped=scoped.filter(function(t){return t.month===month;});
+  var week=(document.getElementById('dash-week-filter')||{}).value||''; if(week) scoped=scoped.filter(function(t){return t.week===week;});
 
   // Two balanced full-width rows: wide tables on the left, their companion chart on the right.
   var total=scoped.length, done=scoped.filter(function(t){return t.status==='Completed';}).length, ip=scoped.filter(function(t){return t.status==='In Process';}).length, pend=scoped.filter(function(t){return t.status==='Pending';}).length;
@@ -1015,7 +1016,7 @@ function _planDonut(scoped){
   var agg={Completed:0,'In Process':0,Pending:0,'On Hold':0,Cancelled:0,Planned:0};
   scoped.forEach(function(t){ if(agg[t.status]!==undefined) agg[t.status]++; });
   var seg=[{label:'Completed',value:agg['Completed'],color:'#3f6b2a'},{label:'In Process',value:agg['In Process'],color:'#c07c0a'},{label:'Pending',value:agg['Pending'],color:'#c0392b'},{label:'On Hold',value:agg['On Hold'],color:'#2e5fa3'},{label:'Cancelled',value:agg['Cancelled'],color:'#5a6b7a'},{label:'Planned',value:agg['Planned'],color:'#a0adba'}];
-  return '<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;justify-content:flex-start">'+svgDonut(seg)+'<div style="width:210px">'+donutLegend(seg)+'</div></div>';
+  return '<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;justify-content:center;padding:6px 0">'+svgDonut(seg)+'<div style="width:200px">'+donutLegend(seg)+'</div></div>';
 }
 
 function _planMemberTable(scoped,deptFilter){
@@ -1151,7 +1152,9 @@ function _dashScope(kind){
   if(deptFilter) arr=arr.filter(function(x){return x.dept===deptFilter;});
   if(year) arr=arr.filter(function(x){return x.year===year;});
   if(month) arr=arr.filter(function(x){return x.month===month;});
-  return {arr:arr, year:year, month:month, deptFilter:deptFilter};
+  var week=(document.getElementById('dash-week-filter')||{}).value||'';
+  if(kind==='task' && week) arr=arr.filter(function(x){return x.week===week;});
+  return {arr:arr, year:year, month:month, week:week, deptFilter:deptFilter};
 }
 
 // ── #1 Watchlist ──
@@ -1201,29 +1204,56 @@ function renderWatchlist(){
 // ── #2 Data-Quality (admin only) ──
 function renderDataQuality(){
   var card=document.getElementById('dash-dq-card'); var el=document.getElementById('dash-dataquality'); if(!el) return;
-  if(currentUser.role!==ROLES.ADMIN){ if(card) card.style.display='none'; return; }
+  if(currentUser.role===ROLES.MEMBER){ if(card) card.style.display='none'; return; }
   if(card) card.style.display='';
-  var ts=_dashScope('task'), rv=_dashScope('review');
-  var depts=deptsInScope(ts.deptFilter);
-  function cell(v){ if(v==null) return '<span style="color:var(--text3)">—</span>'; var c=v>=80?'var(--green)':v>=50?'var(--amber)':'var(--red)'; return '<span style="font-weight:700;color:'+c+'">'+v+'%</span>'; }
+  var ts=_dashScope('task'), rv=_dashScope('review'); var deptFilter=ts.deptFilter;
   function pc(n,d){ return d>0?Math.round(n/d*100):null; }
-  var body=depts.map(function(d){
-    var dt=ts.arr.filter(function(t){return t.dept===d;});
-    var completed=dt.filter(function(t){return t.status==='Completed';});
-    var graded=completed.filter(function(t){return ['A','B','C'].indexOf(String(t.managerGrade||'').trim().toUpperCase())>=0;}).length;
-    var withTgt=dt.filter(function(t){return _hasVal(t.tgtDate);}).length;
+  function cell(v){ if(v==null) return '<span style="color:var(--text3)">—</span>'; var c=v>=80?'var(--green)':v>=50?'var(--amber)':'var(--red)'; return '<span style="font-weight:700;color:'+c+'">'+v+'%</span>'; }
+  function hasGrade(t){ return ['A','B','C'].indexOf(String(t.managerGrade||'').trim().toUpperCase())>=0; }
+
+  // ── Target vs Completion — per-member rows when a dept is selected, else per-dept ──
+  function tvcRow(label, tasks, reviews){
+    var completed=tasks.filter(function(t){return t.status==='Completed';});
+    var graded=completed.filter(hasGrade).length;
+    var withTgt=tasks.filter(function(t){return _hasVal(t.tgtDate);}).length;
     var withComp=completed.filter(function(t){return _hasVal(t.compDate);}).length;
-    var dr=rv.arr.filter(function(r){return r.dept===d;});
-    var filed=dr.filter(function(r){return computeReviewPerformance(r).status!=='draft';}).length;
-    var scored=dr.filter(function(r){return computeReviewPerformance(r).status==='scored';}).length;
-    return '<tr><td style="font-weight:600">'+esc(d)+'</td>'
+    var filed=reviews.filter(function(r){return computeReviewPerformance(r).status!=='draft';}).length;
+    var scored=reviews.filter(function(r){return computeReviewPerformance(r).status==='scored';}).length;
+    return '<tr><td style="font-weight:600">'+esc(label)+'</td>'
       +'<td style="text-align:center">'+cell(pc(graded,completed.length))+'</td>'
-      +'<td style="text-align:center">'+cell(pc(withTgt,dt.length))+'</td>'
+      +'<td style="text-align:center">'+cell(pc(withTgt,tasks.length))+'</td>'
       +'<td style="text-align:center">'+cell(pc(withComp,completed.length))+'</td>'
       +'<td style="text-align:center">'+cell(pc(scored,filed))+'</td></tr>';
-  }).join('');
-  el.innerHTML='<p style="font-size:11px;color:var(--text3);margin-bottom:8px">How complete is the input feeding these analytics? Low numbers mean the metrics above rest on thin data.</p>'
-    +'<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Department</th><th style="text-align:center">Completed Tasks Graded</th><th style="text-align:center">Tasks w/ Target Date</th><th style="text-align:center">Completed w/ Comp Date</th><th style="text-align:center">Reviews Mgr-Scored</th></tr></thead><tbody>'+(body||'<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:12px">No data</td></tr>')+'</tbody></table></div>';
+  }
+  var tvcHead, tvcBody;
+  if(deptFilter){
+    tvcHead='Member';
+    tvcBody=(DB.settings.members||[]).filter(function(m){return m.dept===deptFilter;}).map(function(m){
+      return tvcRow(m.name, ts.arr.filter(function(t){return t.member===m.name;}), rv.arr.filter(function(r){return r.member===m.name;})); }).join('');
+  } else {
+    tvcHead='Department';
+    tvcBody=deptsInScope(deptFilter).map(function(d){
+      return tvcRow(d, ts.arr.filter(function(t){return t.dept===d;}), rv.arr.filter(function(r){return r.dept===d;})); }).join('');
+  }
+  var table1='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>'+tvcHead+'</th><th style="text-align:center">Completed Tasks Graded</th><th style="text-align:center">Tasks w/ Target Date</th><th style="text-align:center">Completed w/ Comp Date</th><th style="text-align:center">Reviews Mgr-Scored</th></tr></thead><tbody>'+(tvcBody||'<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:12px">No data</td></tr>')+'</tbody></table></div>';
+
+  // ── Quality of Tasks — per member: completed count + A/B/C grade counts ──
+  var qMembers = deptFilter ? (DB.settings.members||[]).filter(function(m){return m.dept===deptFilter;}) : (DB.settings.members||[]);
+  var qBody = qMembers.map(function(m){
+    var dt=ts.arr.filter(function(t){return t.member===m.name && t.dept===m.dept;});
+    var completed=dt.filter(function(t){return t.status==='Completed';}).length;
+    function gc(g){ return dt.filter(function(t){return String(t.managerGrade||'').trim().toUpperCase()===g;}).length; }
+    var a=gc('A'), b=gc('B'), c=gc('C');
+    if(!completed && !a && !b && !c) return '';
+    function gcell(n,col){ return '<td style="text-align:center">'+(n>0?'<span style="font-weight:700;color:'+col+'">'+n+'</span>':'<span style="color:var(--text3)">0</span>')+'</td>'; }
+    return '<tr><td style="font-weight:600">'+esc(m.name)+(deptFilter?'':' <span style="font-size:10px;color:var(--text3)">('+esc(m.dept)+')</span>')+'</td>'
+      +'<td style="text-align:center">'+completed+'</td>'+gcell(a,'#3f6b2a')+gcell(b,'#c07c0a')+gcell(c,'#c0392b')+'</tr>';
+  }).filter(Boolean).join('');
+  var table2='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Team Member</th><th style="text-align:center">Tasks Completed</th><th style="text-align:center">Grade A</th><th style="text-align:center">Grade B</th><th style="text-align:center">Grade C</th></tr></thead><tbody>'+(qBody||'<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:12px">No completed tasks in scope</td></tr>')+'</tbody></table></div>';
+
+  el.innerHTML='<p style="font-size:11px;color:var(--text3);margin-bottom:8px">Input completeness for the current scope'+(deptFilter?' — by member':' — by department')+'.</p>'
+    +table1
+    +'<div class="sub-hd" style="margin-top:18px">Quality of Tasks</div>'+table2;
 }
 // ═══════════════════════════════════════════════════════════════════════════════════════
 
@@ -3523,6 +3553,14 @@ try { window.populateTaskMemberDropdown = populateTaskMemberDropdown; } catch(e)
 try { window.removeAdmin = removeAdmin; } catch(e){}
 try { window.removeDept = removeDept; } catch(e){}
 try { window.removeMember = removeMember; } catch(e){}
+function switchDashSubtab(which){
+  var p=document.getElementById('dash-subtab-plan'), r=document.getElementById('dash-subtab-review');
+  if(p) p.style.display = which==='review' ? 'none' : '';
+  if(r) r.style.display = which==='review' ? '' : 'none';
+  var btns=document.querySelectorAll('#page-dashboard .dash-subtab-btn');
+  Array.prototype.forEach.call(btns, function(b){ b.classList.toggle('active', b.getAttribute('data-subtab')===which); });
+}
+try { window.switchDashSubtab = switchDashSubtab; } catch(e){}
 try { window.renderDashboard = renderDashboard; } catch(e){}
 try { window.openMemberAnalytics = openMemberAnalytics; } catch(e){}
 try { window.renderPlan = renderPlan; } catch(e){}
