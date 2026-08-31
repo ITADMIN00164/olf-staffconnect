@@ -305,6 +305,349 @@
     }
 
     /* ====================================================
+       UPLOAD SIZE LIMITS
+       The payload is base64, which inflates a file by a third, and it
+       has to travel up a rural mobile uplink. Measured against a weak
+       link (~30 KB/s) a 2 MB PDF takes about 90 s and a 5 MB one cannot
+       finish inside the request timeout at all. So: 2 MB is the
+       comfortable ceiling, 4 MB is the absolute one.
+    ==================================================== */
+    const FILE_SOFT_LIMIT = 2 * 1024 * 1024;   // above this: allowed, but warned
+    const FILE_HARD_LIMIT = 4 * 1024 * 1024;   // above this: refused
+
+    function fmtBytes(n) {
+        if (!n && n !== 0) return "";
+        const mb = n / (1024 * 1024);
+        if (mb >= 1) return mb.toFixed(mb >= 10 ? 0 : 1) + " MB";
+        return Math.max(1, Math.round(n / 1024)) + " KB";
+    }
+
+    /* ====================================================
+       CAN THIS UPLOAD ACTUALLY SUCCEED?
+       Asked BEFORE anything is sent. A field member on a 2G signal
+       cannot push a 3 MB payload up in the time available, and finding
+       that out after a three-minute wait is the worst possible outcome.
+       So we measure what we can and refuse up front when it is hopeless.
+
+
+       navigator.connection is available on Android Chrome (which is what
+       the field team uses); on iOS it is absent, in which case we do not
+       pretend to know and simply allow the attempt.
+    ==================================================== */
+    // Conservative real-world uplink capacity in KB/s by effective type.
+    // These are the numbers that hold up on a weak rural signal, not
+    // best-case tower figures — being optimistic here defeats the point.
+    const UPLINK_KBPS = { "slow-2g": 8, "2g": 20, "3g": 90, "4g": 350 };
+    const UPLOAD_TIMEOUT_MS = 180000;
+
+    function connectionInfo() {
+        const c = navigator.connection || navigator.mozConnection ||
+                  navigator.webkitConnection || null;
+        return {
+            online: navigator.onLine !== false,
+            effectiveType: (c && c.effectiveType) ? String(c.effectiveType) : "",
+            downlink: (c && typeof c.downlink === "number") ? c.downlink : null,
+            rtt: (c && typeof c.rtt === "number") ? c.rtt : null,
+            saveData: !!(c && c.saveData),
+            deviceMemory: (typeof navigator.deviceMemory === "number") ? navigator.deviceMemory : null,
+            cores: (typeof navigator.hardwareConcurrency === "number") ? navigator.hardwareConcurrency : null
+        };
+    }
+
+    function isLowEndDevice(info) {
+        // <= 1 GB reported RAM, or a single/dual core CPU, is the profile of
+        // the cheap handsets in the field. Such a phone is also the most
+        // likely to have its browser tab evicted mid-upload.
+        return (info.deviceMemory !== null && info.deviceMemory <= 1) ||
+               (info.cores !== null && info.cores <= 2);
+    }
+
+    /**
+     * "impossible" -> refuse, and say so plainly.
+     * "slow"       -> allow, but warn it will take a while.
+     * "ok" / "unknown" -> proceed quietly.
+     */
+    function assessUpload(sizeBytes) {
+        const info = connectionInfo();
+        if (!info.online) return { verdict: "impossible", reason: "offline", info };
+
+        const kbs = UPLINK_KBPS[info.effectiveType];
+        if (!kbs) {
+            // No Network Information API (iOS, some desktops). Don't guess.
+            return { verdict: "unknown", info };
+        }
+        const payloadKb = (sizeBytes * 4 / 3) / 1024;
+        const secs = payloadKb / kbs;
+        // Refuse anything that cannot finish inside the request window —
+        // with a margin, because throughput on a weak link only gets worse.
+        if (secs > (UPLOAD_TIMEOUT_MS / 1000) * 0.8) {
+            return { verdict: "impossible", reason: "too-slow", secs, info };
+        }
+        if (secs > 45) return { verdict: "slow", secs, info };
+        return { verdict: "ok", secs, info };
+    }
+
+    function connectionLabel(info) {
+        const names = {
+            "slow-2g": "a very slow 2G connection", "2g": "a 2G connection",
+            "3g": "a 3G connection", "4g": "a 4G connection"
+        };
+        return names[info.effectiveType] || "your current connection";
+    }
+
+    /* ====================================================
+       SERVER-SIDE VERIFICATION
+       The only way to know whether a document really reached the sheet is
+       to ask. Used whenever the outcome is ambiguous, so the member is
+       never told 'saved' on a guess — and never told 'not saved' for
+       something that actually saved (which is what creates duplicates).
+       Needs Code.gs v7 or later; if the endpoint is missing we report
+       'cannot confirm' rather than inventing an answer.
+    ==================================================== */
+    async function verifyUploadSaved(clientUploadId) {
+        if (!clientUploadId) return { known: false, error: "no id" };
+        try {
+            const data = await api(
+                { action: "checkUpload", clientUploadId },
+                { timeoutMs: 30000 }
+            );
+            return { known: true, exists: !!data.exists, record: data.record || null };
+        } catch (e) {
+            return { known: false, error: (e && e.message) || "" };
+        }
+    }
+
+    /* ====================================================
+       ATTEMPT JOURNAL
+       Written to localStorage BEFORE the upload starts, so if the phone
+       kills the tab mid-upload there is still a record that the attempt
+       happened. On the next visit each unsettled entry is checked against
+       the server and the member is told, per document, whether it saved.
+       Metadata only — a few hundred bytes, no file bytes.
+    ==================================================== */
+    const LS_ATTEMPTS = "olf_gr_attempts_v1";
+    let orphanAttempts = [];   // attempts confirmed NOT saved, or unconfirmable
+
+    function readAttempts() {
+        try {
+            const raw = localStorage.getItem(LS_ATTEMPTS);
+            const arr = raw ? JSON.parse(raw) : [];
+            return Array.isArray(arr) ? arr : [];
+        } catch (e) { return []; }
+    }
+    function writeAttempts(list) {
+        try { localStorage.setItem(LS_ATTEMPTS, JSON.stringify(list.slice(-40))); }
+        catch (e) {}
+    }
+    function journalAdd(entry) {
+        const list = readAttempts().filter(a => a.clientUploadId !== entry.clientUploadId);
+        list.push(entry);
+        writeAttempts(list);
+    }
+    function journalRemove(clientUploadId) {
+        writeAttempts(readAttempts().filter(a => a.clientUploadId !== clientUploadId));
+    }
+
+    /**
+     * Runs once per mount. Every journalled attempt that never got a
+     * confirmed outcome is checked against the sheet:
+     *   saved      -> drop it, the record is in the list already
+     *   not saved  -> keep it and tell the member, by name, to re-upload
+     *   no answer  -> keep it and say we could not confirm (do NOT re-upload
+     *                 yet, or you risk a duplicate)
+     */
+    async function reconcileAttempts() {
+        const list = readAttempts();
+        if (!list.length) return;
+
+        const stillOpen = [];
+        const orphans = [];
+        for (const a of list) {
+            // An attempt still in flight in THIS session isn't orphaned.
+            if (pendingUploads[a.localId]) { stillOpen.push(a); continue; }
+            const v = await verifyUploadSaved(a.clientUploadId);
+            if (v.known && v.exists) continue;                 // saved: forget it
+            if (v.known) orphans.push({ ...a, state: "not-saved" });
+            else         orphans.push({ ...a, state: "unconfirmed" });
+            stillOpen.push(a);
+        }
+        writeAttempts(stillOpen);
+        orphanAttempts = orphans;
+        renderSyncBanner();
+    }
+
+    async function clearOrphanAttempts() {
+        const confirmed = await appConfirm({
+            title: "Remove this warning?",
+            type: "warning",
+            message: "Only do this once you have uploaded these documents again. The warning will not come back.",
+            confirmText: "Remove warning",
+            cancelText: "Keep it"
+        });
+        if (!confirmed) return;
+        orphanAttempts.forEach(a => journalRemove(a.clientUploadId));
+        orphanAttempts = [];
+        renderSyncBanner();
+    }
+
+    /* ====================================================
+       BLOCKING UPLOAD OVERLAY
+       The page is blurred and unclickable from the moment Upload is
+       tapped until the server has confirmed the record. This is
+       deliberate: the old optimistic row looked saved immediately, and on
+       a phone the member would wander off mid-upload and lose it. Now the
+       only way to see a success message is for the backend to have
+       actually written the row.
+    ==================================================== */
+    let busyTimer = null;
+    let busyStartedAt = 0;
+    let busyRetryId = null;   // which upload the 'Try again' button retries
+
+    function grBusyEl(id) { return document.getElementById(id); }
+
+    function grBusyShow(fileName, sizeBytes) {
+        const ov = grBusyEl("grBusyOverlay");
+        if (!ov) return;
+        const isLarge = sizeBytes > FILE_SOFT_LIMIT;
+
+        const set = (id, txt) => { const el = grBusyEl(id); if (el) el.textContent = txt; };
+        const show = (id, on) => { const el = grBusyEl(id); if (el) el.style.display = on ? "" : "none"; };
+
+        show("grBusySpin", true);
+        show("grBusyIcon", false);
+        show("grBusyBar", true);
+        show("grBusyWarn", true);
+
+        if (isLarge) {
+            set("grBusyTitle", "Large file — uploading…");
+            set("grBusyMsg", "This file is over 2 MB, so it will take longer on a mobile network. Please wait until it finishes — do not close this page.");
+        } else {
+            set("grBusyTitle", "Your file is being uploaded…");
+            set("grBusyMsg", "Please wait. The record is saved only once the server confirms it.");
+        }
+
+        const fileEl = grBusyEl("grBusyFile");
+        if (fileEl) {
+            fileEl.innerHTML = "<b>" + escHtml(fileName || "file") + "</b>" +
+                (sizeBytes ? " · " + escHtml(fmtBytes(sizeBytes)) : "");
+        }
+
+        const acts = grBusyEl("grBusyActions");
+        if (acts) acts.classList.remove("show");
+
+        busyStartedAt = Date.now();
+        set("grBusyElapsed", "0s elapsed");
+        if (busyTimer) clearInterval(busyTimer);
+        busyTimer = setInterval(() => {
+            const s = Math.round((Date.now() - busyStartedAt) / 1000);
+            set("grBusyElapsed", s + "s elapsed");
+        }, 1000);
+
+        ov.classList.add("open");
+    }
+
+    // Progress note while the retry loop is working through attempts.
+    function grBusyNote(txt) {
+        const el = grBusyEl("grBusyMsg");
+        if (el) el.textContent = txt;
+    }
+
+    function grBusyStopTimer() {
+        if (busyTimer) { clearInterval(busyTimer); busyTimer = null; }
+    }
+
+    // Confirmed saved. This is the ONLY place a success message appears.
+    function grBusySuccess() {
+        grBusyStopTimer();
+        const set = (id, txt) => { const el = grBusyEl(id); if (el) el.textContent = txt; };
+        const show = (id, on) => { const el = grBusyEl(id); if (el) el.style.display = on ? "" : "none"; };
+        show("grBusySpin", false);
+        show("grBusyBar", false);
+        show("grBusyWarn", false);
+        const ic = grBusyEl("grBusyIcon");
+        if (ic) {
+            ic.className = "gr-busy-icon gr-busy-icon--ok";
+            ic.textContent = "✓";
+            ic.style.display = "";
+        }
+        set("grBusyTitle", "Upload successful");
+        set("grBusyMsg", "Saved to the server and recorded. It is now visible in your uploads.");
+        const secs = Math.round((Date.now() - busyStartedAt) / 1000);
+        set("grBusyElapsed", "Took " + secs + "s");
+        setTimeout(grBusyHide, 1600);   // let them read it, then get out of the way
+    }
+
+    // Not saved. Stays open until dismissed, so it cannot be missed.
+    function grBusyFailed(reason, localId) {
+        grBusyStopTimer();
+        const set = (id, txt) => { const el = grBusyEl(id); if (el) el.textContent = txt; };
+        const show = (id, on) => { const el = grBusyEl(id); if (el) el.style.display = on ? "" : "none"; };
+        show("grBusySpin", false);
+        show("grBusyBar", false);
+        show("grBusyWarn", false);
+        const ic = grBusyEl("grBusyIcon");
+        if (ic) {
+            ic.className = "gr-busy-icon gr-busy-icon--fail";
+            ic.textContent = "!";
+            ic.style.display = "";
+        }
+        set("grBusyTitle", "NOT saved — please re-upload");
+        set("grBusyMsg", "This document did not reach the server, so it has NOT been saved. " + (reason || ""));
+        set("grBusyElapsed", "");
+        busyRetryId = localId || null;
+        const acts = grBusyEl("grBusyActions");
+        if (acts) acts.classList.add("show");
+    }
+
+    // Neither confirmed nor refused: the server could not be reached to
+    // check. Saying either 'saved' or 'not saved' here would be a lie, and
+    // a wrong 'not saved' is what makes members upload duplicates.
+    function grBusyUnconfirmed(localId) {
+        grBusyStopTimer();
+        const set = (id, txt) => { const el = grBusyEl(id); if (el) el.textContent = txt; };
+        const show = (id, on) => { const el = grBusyEl(id); if (el) el.style.display = on ? "" : "none"; };
+        show("grBusySpin", false);
+        show("grBusyBar", false);
+        show("grBusyWarn", false);
+        const ic = grBusyEl("grBusyIcon");
+        if (ic) {
+            ic.className = "gr-busy-icon gr-busy-icon--warn";
+            ic.textContent = "?";
+            ic.style.display = "";
+        }
+        set("grBusyTitle", "Could not confirm — do not re-upload yet");
+        set("grBusyMsg", "The network dropped before we could check whether this saved. Tap Refresh Data once you have signal and look for it in your uploads. Only upload it again if it is missing — otherwise you will create a duplicate.");
+        set("grBusyElapsed", "");
+        busyRetryId = localId || null;
+        const acts = grBusyEl("grBusyActions");
+        if (acts) acts.classList.add("show");
+    }
+
+    function grBusyHide() {
+        grBusyStopTimer();
+        const ov = grBusyEl("grBusyOverlay");
+        if (ov) ov.classList.remove("open");
+        busyRetryId = null;
+    }
+
+    function wireBusyOverlay() {
+        const closeBtn = grBusyEl("grBusyClose");
+        const retryBtn = grBusyEl("grBusyRetry");
+        if (closeBtn && !closeBtn.dataset.wired) {
+            closeBtn.dataset.wired = "1";
+            closeBtn.addEventListener("click", grBusyHide);
+        }
+        if (retryBtn && !retryBtn.dataset.wired) {
+            retryBtn.dataset.wired = "1";
+            retryBtn.addEventListener("click", () => {
+                const id = busyRetryId;
+                grBusyHide();
+                if (id) performUpload(id);
+            });
+        }
+    }
+
+    /* ====================================================
        MODULE STATE (survives page navigation — gr.js is a
        plain script, so background syncs keep running even
        if the user leaves the page; render functions all
@@ -415,6 +758,7 @@
             wireDashboardFilters();
             wireSummaryFilters();
             wireAnalyticsFilters();
+            wireBusyOverlay();
 
             const who = document.getElementById("grWhoAmI");
             if (who) {
@@ -441,6 +785,10 @@
             if (_banner && !_banner.dataset.wired) {
                 _banner.dataset.wired = "1";
                 _banner.addEventListener("click", (e) => {
+                    if (e.target.closest('[data-act="clearOrphans"]')) {
+                        clearOrphanAttempts();
+                        return;
+                    }
                     if (e.target.closest('[data-act="gotoUpload"]')) {
                         const t = document.querySelector('#grPage .gr-tab[data-tab="upload"]');
                         if (t) t.click();
@@ -449,6 +797,9 @@
             }
 
             syncRecords();
+            // Settle anything left unfinished by a previous visit (a killed
+            // tab, a phone that went to sleep) and report it accurately.
+            reconcileAttempts();
         }
     };
 
@@ -568,6 +919,43 @@
             fileInput.addEventListener("change", () => {
                 const f = (fileInput.files && fileInput.files[0]) || null;
                 fileNameEl.textContent = f ? f.name : "No file chosen";
+
+                // Check the size the moment it is picked, not at submit time, so
+                // nobody fills in the whole form only to be refused at the end.
+                const hintEl = document.getElementById("grUpFileHint");
+                const setHint = (cls, txt) => {
+                    if (!hintEl) return;
+                    hintEl.className = "gr-file-hint gr-file-hint--" + cls;
+                    hintEl.textContent = txt;
+                };
+                if (f && f.size > FILE_HARD_LIMIT) {
+                    fileInput.value = "";
+                    fileNameEl.textContent = "No file chosen";
+                    pickedFile = null;
+                    setHint("err", "This PDF is " + fmtBytes(f.size) + " — too large to upload (limit 4 MB). Please re-scan it in Document or Black & White mode, which usually makes it much smaller, then choose it again.");
+                    appAlert({
+                        title: "File is too large",
+                        type: "error",
+                        message: "\"" + f.name + "\" is " + fmtBytes(f.size) + ". The maximum is 4 MB.\n\nOn a mobile network a file this big will not finish uploading, so it would be lost. Please re-scan the document in Document or Black & White mode (not Colour/Photo) and choose it again — that usually brings it under 1 MB."
+                    });
+                    return;
+                }
+                // Beyond size: can this connection actually carry it?
+                const pre = f ? assessUpload(f.size) : null;
+                if (pre && pre.verdict === "impossible") {
+                    setHint("err", pre.reason === "offline"
+                        ? "You have no internet connection right now, so this cannot be uploaded. Connect first, then try again."
+                        : "Upload is not possible on " + connectionLabel(pre.info) + ": a " + fmtBytes(f.size) +
+                          " file would need about " + Math.round(pre.secs) + " seconds and will fail. Move to a better signal, or re-scan the document smaller.");
+                } else if (f && f.size > FILE_SOFT_LIMIT) {
+                    setHint("warn", "Large file (" + fmtBytes(f.size) + "). This will still upload, but it may take a minute or more on a mobile network — keep the page open until it finishes.");
+                } else if (pre && pre.verdict === "slow") {
+                    setHint("warn", "Your connection is slow (" + connectionLabel(pre.info) + "). This should still work but may take around " + Math.round(pre.secs) + " seconds — keep the page open.");
+                } else if (f) {
+                    setHint("info", "Good size (" + fmtBytes(f.size) + ").");
+                } else {
+                    setHint("info", "PDF up to 4 MB. Under 2 MB uploads fastest — scan in Document or Black & White mode to keep it small.");
+                }
 
                 // A picked file is only a REFERENCE to something on disk. If the
                 // form then sits open for a few minutes (screen locked, tab in the
@@ -723,10 +1111,34 @@
         if (!title) errors.push("Enter a title.");
         if (!docDate) errors.push("Enter the date of the GR / Circular.");
         if (!file) errors.push("Choose a file to upload.");
+        // Safety net: the pick-time check above is the real gate, but never
+        // let an oversized file through even if the input was set some other way.
+        if (file && file.size > FILE_HARD_LIMIT) {
+            errors.push("The file is " + fmtBytes(file.size) + " — the maximum is 4 MB. Please re-scan it smaller.");
+        }
 
         if (errors.length) {
             appAlert({ title: "Please complete the form", type: "warning", list: errors });
             return;
+        }
+
+        // --- Pre-flight: is this even possible right now? -----------------
+        // Refusing here is kinder than a three-minute wait that ends in
+        // failure, and it stops the member believing the document is safe.
+        const pre = assessUpload(file.size);
+        if (pre.verdict === "impossible") {
+            appAlert({
+                title: "Upload is not possible right now",
+                type: "error",
+                message: pre.reason === "offline"
+                    ? "Your device has no internet connection, so this document cannot be sent to the server.\n\nNothing has been saved. Please connect to a network and upload it again."
+                    : "You are on " + connectionLabel(pre.info) + ", and a " + fmtBytes(file.size) +
+                      " file needs roughly " + Math.round(pre.secs) + " seconds to upload — more than the connection will hold.\n\nNothing has been saved. Please either move to a place with better signal, or re-scan the document in Document / Black & White mode to make it smaller, then upload again."
+            });
+            return;
+        }
+        if (pre.verdict !== "ok" && isLowEndDevice(pre.info)) {
+            console.warn("Low-end device on a slow link — upload may struggle.", pre.info);
         }
 
         // --- Optimistic insert: visible instantly ---
@@ -774,11 +1186,22 @@
             }
         };
 
+        // Journalled BEFORE the upload starts, so that even if the phone
+        // kills this tab mid-flight, the next visit can tell the member
+        // exactly what happened to this document.
+        journalAdd({
+            clientUploadId: localId,
+            localId,
+            title, type, district, docDate,
+            fileName: file.name,
+            sizeBytes: file.size || 0,
+            startedAt: new Date().toISOString()
+        });
+
         toggleUploadForm(false);
         resetUploadForm();
         refreshMonthOptions();
         rerenderAll();
-        notify("Upload started — saving to Drive in the background.", "info");
 
         performUpload(localId); // background, not awaited
     }
@@ -786,6 +1209,10 @@
     async function performUpload(localId) {
         const p = pendingUploads[localId];
         if (!p) return;
+
+        // Blur and lock the page for the whole attempt. Nothing else can be
+        // touched until the server has either confirmed or refused.
+        grBusyShow(p.file.name, p.file.size || 0);
 
         setSync(localId, "uploading", "");
         renderMyUploads();
@@ -802,10 +1229,11 @@
             try {
                 fileBase64 = await fileToBase64(p.file);
             } catch (readErr) {
-                const msg = "Could not read the chosen file — the phone released it while the form was open. Please discard this row and upload the file again.";
+                const msg = "The phone released the file while the form was open. Please choose the file again and re-upload.";
                 console.error(readErr);
                 setSync(localId, "failed", msg);
-                notify("Upload failed — " + msg, "error");
+                grBusyFailed(msg, localId);
+                notify("NOT saved — " + msg, "error");
                 refreshMonthOptions();
                 rerenderAll();
                 return;
@@ -813,13 +1241,14 @@
         }
 
         // --- 2. Send it, retrying transient failures ----------------------
-        // A page left open for a few minutes loses its warm connection to
-        // Google, so the first attempt after a pause can fail instantly even
-        // on a perfect network and a tiny file. Retrying re-establishes the
-        // connection and almost always succeeds. This cannot create a
-        // duplicate: the backend dedups on clientUploadId, which is the same
-        // across every attempt and every Retry.
+        // A phone that has been idle loses its warm connection to Google, so
+        // the first attempt after a pause can fail instantly. The backoff is
+        // deliberately generous: a rural link often needs several seconds to
+        // come back, and a too-quick retry just fails again.
+        // This cannot create a duplicate: the backend dedups on
+        // clientUploadId, which is identical across every attempt.
         const MAX_TRIES = 3;
+        const BACKOFF = [2000, 5000];   // after attempt 1, then after attempt 2
         let lastErr = null;
         for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
             try {
@@ -828,46 +1257,113 @@
                     fileBase64,
                     fileName: p.file.name,
                     mimeType: p.file.type || "application/octet-stream"
-                }, { timeoutMs: 120000 });
+                }, { timeoutMs: UPLOAD_TIMEOUT_MS });
 
                 if (data.version) dataVersion = String(data.version);
-                const idx = allRecords.findIndex(r => String(r.recordId) === localId);
-                if (data.record) {
-                    sessionMyIds.add(String(data.record.recordId));
-                    if (idx >= 0) allRecords[idx] = data.record;
-                    else allRecords.unshift(data.record);
-                } else if (idx >= 0) {
-                    allRecords[idx]._sync = "";
+
+                // A success reply WITHOUT a record is not proof of anything.
+                // Claiming success here is exactly how a row could show as
+                // uploaded and then vanish on refresh, so verify instead.
+                if (!data.record) {
+                    grBusyNote("Confirming with the server…");
+                    const v = await verifyUploadSaved(p.meta.clientUploadId);
+                    if (v.known && v.exists && v.record) {
+                        adoptSavedRecord(localId, v.record);
+                        grBusySuccess();
+                        refreshMonthOptions();
+                        rerenderAll();
+                        return;
+                    }
+                    if (!v.known) {
+                        setSync(localId, "unknown", "The server accepted the upload but it could not be confirmed.");
+                        grBusyUnconfirmed(localId);
+                        refreshMonthOptions();
+                        rerenderAll();
+                        return;
+                    }
+                    // Verified absent: it genuinely did not save.
+                    const miss = "The server replied but the record was not written. Please upload it again.";
+                    setSync(localId, "failed", miss);
+                    grBusyFailed(miss, localId);
+                    refreshMonthOptions();
+                    rerenderAll();
+                    return;
                 }
-                delete pendingUploads[localId];
-                sessionMyIds.delete(localId);
-                persistLocal();
-                notify(attempt > 1 ? "Uploaded to Drive ✓ (after a retry)" : "Uploaded to Drive ✓", "success");
+
+                // Confirmed: a real server record came back.
+                adoptSavedRecord(localId, data.record);
+                grBusySuccess();
                 refreshMonthOptions();
                 rerenderAll();
                 return;
             } catch (err) {
                 lastErr = err;
                 // A timeout may mean the file DID save and only the reply was
-                // lost. Re-sending is handled safely by the backend's dedup, but
-                // there is no point burning another 2 minutes — stop and let the
-                // user refresh and decide.
+                // lost, so re-sending blindly wastes another 3 minutes of the
+                // member's data. Stop and tell them to refresh and check.
                 if (err && err.code === "timeout") break;
                 if (attempt < MAX_TRIES) {
-                    setSync(localId, "uploading", "Retrying (" + attempt + "/" + (MAX_TRIES - 1) + ")…");
+                    const wait = BACKOFF[attempt - 1] || 5000;
+                    grBusyNote("Connection problem — trying again (attempt " + (attempt + 1) + " of " + MAX_TRIES + ")…");
+                    setSync(localId, "uploading", "Retrying " + (attempt + 1) + "/" + MAX_TRIES + "…");
                     renderMyUploads();
-                    await new Promise(r => setTimeout(r, 800 * attempt));   // 0.8s, then 1.6s
+                    await new Promise(r => setTimeout(r, wait));
                 }
             }
         }
 
-        // --- 3. Out of attempts: surface the REAL reason ------------------
+        // --- 3. Out of attempts: find out what actually happened ----------
+        // Never guess. A dropped connection can hide a save that DID happen
+        // (the request completed, only the reply was lost), and telling the
+        // member 'not saved' in that case is what produces duplicates.
         console.error(lastErr);
-        const reason = (lastErr && lastErr.message) || "Unknown error";
+        const reason = (lastErr && lastErr.message) || "Unknown error.";
+
+        grBusyNote("Checking with the server whether it saved…");
+        const v = await verifyUploadSaved(p.meta.clientUploadId);
+
+        if (v.known && v.exists && v.record) {
+            // It did save after all.
+            adoptSavedRecord(localId, v.record);
+            grBusySuccess();
+            notify("Saved ✓ (the reply was lost, but the record is on the server)", "success");
+            refreshMonthOptions();
+            rerenderAll();
+            return;
+        }
+
+        if (!v.known) {
+            setSync(localId, "unknown", reason + " We also could not reach the server to check whether it saved.");
+            grBusyUnconfirmed(localId);
+            notify("Could not confirm whether this saved — do not re-upload yet.", "error");
+            refreshMonthOptions();
+            rerenderAll();
+            return;
+        }
+
+        // Verified: definitely not in the backend.
         setSync(localId, "failed", reason);
-        notify("Upload failed — " + reason, "error");
+        grBusyFailed(reason, localId);
+        notify("NOT saved — " + reason, "error");
         refreshMonthOptions();
         rerenderAll();
+    }
+
+    /**
+     * Swap the local placeholder for the confirmed server record. Only
+     * called once the backend has been shown to hold it — which is what
+     * makes it safe to persist and to stop journalling.
+     */
+    function adoptSavedRecord(localId, record) {
+        const idx = allRecords.findIndex(r => String(r.recordId) === String(localId));
+        sessionMyIds.add(String(record.recordId));
+        if (idx >= 0) allRecords[idx] = record;
+        else allRecords.unshift(record);
+        delete pendingUploads[localId];
+        sessionMyIds.delete(localId);
+        journalRemove(localId);          // settled: no orphan warning needed
+        orphanAttempts = orphanAttempts.filter(a => a.clientUploadId !== localId);
+        persistLocal();
     }
 
     function setSync(recordId, state, msg) {
@@ -891,6 +1387,11 @@
         pickedFile = null;
         const fn = document.getElementById("grUpFileName");
         if (fn) fn.textContent = "No file chosen";
+        const fh = document.getElementById("grUpFileHint");
+        if (fh) {
+            fh.className = "gr-file-hint gr-file-hint--info";
+            fh.textContent = "PDF up to 4 MB. Under 2 MB uploads fastest — scan in Document or Black & White mode to keep it small.";
+        }
     }
 
     /* ====================================================
@@ -1029,28 +1530,60 @@
        saved when it isn't.
     ==================================================== */
     function unsyncedRecords() {
-        return allRecords.filter(r => r._sync === "uploading" || r._sync === "failed" || isLocal(r));
+        return allRecords.filter(r => r._sync === "uploading" || r._sync === "failed" ||
+                                      r._sync === "unknown" || isLocal(r));
     }
 
     function renderSyncBanner() {
         const el = document.getElementById("grSyncBanner");
         if (!el) return;
         const list = unsyncedRecords();
-        if (!list.length) { el.style.display = "none"; el.innerHTML = ""; return; }
+
+        // Documents from an earlier visit that were never confirmed. These are
+        // the ones that used to disappear without a word — now they are named.
+        const notSaved = orphanAttempts.filter(a => a.state === "not-saved");
+        const unconf   = orphanAttempts.filter(a => a.state === "unconfirmed");
+
+        if (!list.length && !orphanAttempts.length) {
+            el.style.display = "none"; el.innerHTML = ""; return;
+        }
+
+        const parts = [];
         const failed = list.filter(r => r._sync === "failed").length;
-        const busy = list.length - failed;
-        let msg;
-        if (failed && busy) msg = failed + " upload" + (failed > 1 ? "s" : "") + " failed to save and " + busy + " still saving to the backend";
-        else if (failed)    msg = failed + " upload" + (failed > 1 ? "s" : "") + " did NOT save to the backend";
-        else                msg = busy + " upload" + (busy > 1 ? "s" : "") + " still saving to the backend";
-        const tail = failed
-            ? " — open the Upload tab to Retry, or they will be lost if you leave."
-            : " — keep this tab open until it finishes.";
-        el.className = "gr-banner " + (failed ? "gr-banner--fail" : "gr-banner--busy");
+        const unknown = list.filter(r => r._sync === "unknown").length;
+        const busy = list.length - failed - unknown;
+        if (busy)    parts.push(busy + " upload" + (busy > 1 ? "s" : "") + " still sending");
+        if (failed)  parts.push(failed + " did NOT save");
+        if (unknown) parts.push(unknown + " could not be confirmed");
+
+        let extra = "";
+        if (notSaved.length) {
+            const names = notSaved.map(a => a.title || a.fileName).slice(0, 3).join(", ");
+            extra += " Earlier document" + (notSaved.length > 1 ? "s" : "") + " that did NOT reach the server: " +
+                     names + (notSaved.length > 3 ? " and " + (notSaved.length - 3) + " more" : "") +
+                     ". Please upload " + (notSaved.length > 1 ? "them" : "it") + " again.";
+        }
+        if (unconf.length) {
+            extra += " " + unconf.length + " earlier upload" + (unconf.length > 1 ? "s" : "") +
+                     " could not be confirmed — tap Refresh Data and check your list before re-uploading.";
+        }
+
+        const bad = failed || unknown || orphanAttempts.length;
+        // Join the clauses into one readable sentence rather than running
+        // them together, since this banner is the main thing a worried
+        // member reads.
+        let head = parts.join(", ");
+        if (head) head += (busy && !bad) ? " — keep this page open until it finishes." : ".";
+        const msg = (head + extra).trim();
+
+        el.className = "gr-banner " + (bad ? "gr-banner--fail" : "gr-banner--busy");
         el.innerHTML =
             '<span class="gr-banner-ic">⚠</span>' +
-            '<span class="gr-banner-msg">' + escHtml(msg + tail) + '</span>' +
-            '<button type="button" class="gr-banner-btn" data-act="gotoUpload">View</button>';
+            '<span class="gr-banner-msg">' + escHtml(msg) + '</span>' +
+            '<button type="button" class="gr-banner-btn" data-act="gotoUpload">View</button>' +
+            (orphanAttempts.length
+                ? '<button type="button" class="gr-banner-btn" data-act="clearOrphans">Done — remove</button>'
+                : '');
         el.style.display = "flex";
     }
 
@@ -1183,7 +1716,9 @@
         if (r._sync === "uploading") {
             fileCell = `<span class="gr-sync gr-sync--busy">⏳ Uploading…</span>`;
         } else if (r._sync === "failed") {
-            fileCell = `<button type="button" class="gr-sync gr-sync--fail" data-act="why" data-desc="${escHtml(r._syncError || "Upload failed")}" title="Tap to see why" style="font:inherit;font-size:11px;font-weight:700;border:0;cursor:pointer;">⚠ Failed</button>`;
+            fileCell = `<button type="button" class="gr-sync gr-sync--fail" data-act="why" data-desc="${escHtml(r._syncError || "Upload failed")}" title="Tap to see why" style="font:inherit;font-size:11px;font-weight:700;border:0;cursor:pointer;">⚠ NOT saved</button>`;
+        } else if (r._sync === "unknown") {
+            fileCell = `<button type="button" class="gr-sync gr-sync--unknown" data-act="why" data-desc="${escHtml(r._syncError || "Could not confirm")}" title="Tap to see why" style="font:inherit;font-size:11px;font-weight:700;border:0;cursor:pointer;">? Unconfirmed</button>`;
         } else if (r.fileUrl) {
             fileCell = `<a href="${escHtml(r.fileUrl)}" target="_blank" rel="noopener" class="gr-file-link gr-file-icon" title="Open file">📄</a>`;
         } else {
@@ -1191,7 +1726,7 @@
         }
 
         let actionCell = `<span class="gr-muted">—</span>`;
-        if (r._sync === "failed") {
+        if (r._sync === "failed" || r._sync === "unknown") {
             actionCell = `
                 <div class="gr-row-actions">
                     <button class="gr-btn-mini gr-btn-retry" data-act="retry" data-id="${escHtml(r.recordId)}">↻ Retry</button>
@@ -1229,6 +1764,7 @@
         allRecords = allRecords.filter(r => String(r.recordId) !== String(localId));
         delete pendingUploads[localId];
         sessionMyIds.delete(localId);
+        journalRemove(localId);
         refreshMonthOptions();
         rerenderAll();
     }
@@ -1358,11 +1894,13 @@
 
     function detailedRowHtml(r, sr) {
         const s = (r.status || "Pending").toLowerCase();
-        const syncing = r._sync === "uploading" || r._sync === "failed" || isLocal(r);
+        const syncing = r._sync === "uploading" || r._sync === "failed" ||
+                        r._sync === "unknown" || isLocal(r);
 
         let actionCell;
         if (syncing) {
-            actionCell = `<span class="gr-muted">${r._sync === "failed" ? "Not synced" : "Syncing…"}</span>`;
+            actionCell = `<span class="gr-muted">${r._sync === "failed" ? "NOT saved" :
+                (r._sync === "unknown" ? "Unconfirmed" : "Syncing…")}</span>`;
         } else if (!user.isValidator) {
             actionCell = `<span class="gr-muted">View only</span>`;
         } else if (s === "validated") {
@@ -1385,6 +1923,7 @@
         let fileCell;
         if (r._sync === "uploading") fileCell = `<span class="gr-sync gr-sync--busy">⏳</span>`;
         else if (r._sync === "failed") fileCell = `<span class="gr-sync gr-sync--fail">⚠</span>`;
+        else if (r._sync === "unknown") fileCell = `<span class="gr-sync gr-sync--unknown">?</span>`;
         else fileCell = r.fileUrl
             ? `<a href="${escHtml(r.fileUrl)}" target="_blank" rel="noopener" class="gr-file-link gr-file-icon" title="Open file">📄</a>`
             : "—";
@@ -1542,7 +2081,8 @@
         const idx = allRecords.findIndex(r => String(r.recordId) === String(recordId));
         if (idx < 0) return;
         const rec = allRecords[idx];
-        if (isLocal(rec) || rec._sync === "uploading" || rec._sync === "failed") {
+        if (isLocal(rec) || rec._sync === "uploading" || rec._sync === "failed" ||
+            rec._sync === "unknown") {
             appAlert({
                 title: "Not synced yet",
                 type: "warning",

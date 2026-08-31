@@ -194,6 +194,11 @@
     #grPage .gr-sync { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px; white-space: nowrap; }
     #grPage .gr-sync--busy { background: #e0f2fe; color: #0369a1; }
     #grPage .gr-sync--fail { background: #fee2e2; color: #b91c1c; }
+    /* Amber, not red: "we could not confirm" is a different fact from
+       "it did not save", and conflating the two is what makes members
+       upload duplicates. */
+    #grPage .gr-sync--unknown { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+    #grPage .gr-busy-icon--warn { background: #fffbeb; color: #b45309; }
     #grPage .gr-banner { align-items: center; gap: 10px; margin: 12px 0 0; padding: 10px 14px; border-radius: 10px; font-size: 13px; font-weight: 600; }
     #grPage .gr-banner--busy { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
     #grPage .gr-banner--fail { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
@@ -473,6 +478,97 @@
     }
     #grPage .gr-an-table tfoot td:first-child { left: 0; z-index: 3; text-align: left; }
     @media (max-width: 720px) { #grPage .gr-an-wrap { height: 56vh; } }
+    /* ============ Blocking upload overlay ============ */
+    /* Sits above the upload modal (z-index 600) so the entire page is
+       behind it. Nothing on the page can be clicked while a file is in
+       flight — that is the point: on a phone, wandering off mid-upload is
+       what used to lose the record. */
+    #grPage .gr-busy-overlay {
+        display: none; position: fixed; inset: 0; z-index: 700;
+        align-items: center; justify-content: center; padding: 24px;
+        background: rgba(10, 11, 15, 0.55);
+        backdrop-filter: blur(10px) saturate(120%);
+        -webkit-backdrop-filter: blur(10px) saturate(120%);
+    }
+    #grPage .gr-busy-overlay.open { display: flex; }
+    #grPage .gr-busy-box {
+        background: #fff; border-radius: 18px; width: 420px; max-width: 100%;
+        padding: 30px 28px 26px; text-align: center;
+        box-shadow: 0 28px 80px rgba(0,0,0,0.32);
+        animation: grModalIn .18s ease-out;
+    }
+
+
+    /* Spinner (hidden once the upload settles) */
+    #grPage .gr-busy-spin {
+        width: 46px; height: 46px; margin: 0 auto 18px;
+        border: 4px solid #e5e7eb; border-top-color: #4f8ef7;
+        border-radius: 50%; animation: grBusySpin .85s linear infinite;
+    }
+    @keyframes grBusySpin { to { transform: rotate(360deg); } }
+
+
+    /* Result icon, shown instead of the spinner when done */
+    #grPage .gr-busy-icon {
+        display: none; width: 46px; height: 46px; margin: 0 auto 18px;
+        border-radius: 50%; font-size: 24px; line-height: 46px; font-weight: 700;
+    }
+    #grPage .gr-busy-icon--ok   { background: #dcfce7; color: #16a34a; }
+    #grPage .gr-busy-icon--fail { background: #fee2e2; color: #dc2626; }
+
+
+    #grPage .gr-busy-title {
+        font-size: 16.5px; font-weight: 800; color: #1a1d23; margin-bottom: 7px;
+    }
+    #grPage .gr-busy-msg {
+        font-size: 13px; color: #4b5563; line-height: 1.55; margin-bottom: 14px;
+    }
+    #grPage .gr-busy-file {
+        font-size: 11.5px; color: #6b7280; word-break: break-all;
+        background: #f9fafb; border: 1px solid #f3f4f6; border-radius: 8px;
+        padding: 8px 10px; margin-bottom: 14px;
+    }
+    #grPage .gr-busy-file b { color: #1f2937; }
+
+
+    /* Indeterminate bar: the browser cannot report upload progress for a
+       fetch(), so this signals 'still working' rather than a false %. */
+    #grPage .gr-busy-bar {
+        height: 5px; border-radius: 999px; background: #eef2f7;
+        overflow: hidden; margin-bottom: 12px;
+    }
+    #grPage .gr-busy-bar i {
+        display: block; height: 100%; width: 38%; border-radius: 999px;
+        background: linear-gradient(90deg, #4f8ef7, #7db2ff);
+        animation: grBusySlide 1.25s ease-in-out infinite;
+    }
+    @keyframes grBusySlide {
+        0%   { transform: translateX(-100%); }
+        100% { transform: translateX(305%); }
+    }
+
+
+    #grPage .gr-busy-elapsed {
+        font-size: 11.5px; color: #9ca3af; font-variant-numeric: tabular-nums;
+    }
+    #grPage .gr-busy-warn {
+        margin-top: 14px; font-size: 11.5px; font-weight: 700; color: #b45309;
+        background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px;
+        padding: 9px 11px; line-height: 1.5;
+    }
+    #grPage .gr-busy-actions {
+        display: none; gap: 10px; justify-content: center; margin-top: 18px;
+    }
+    #grPage .gr-busy-actions.show { display: flex; }
+
+
+    /* Size hint under the file picker */
+    #grPage .gr-file-hint { font-size: 11.5px; margin-top: 7px; line-height: 1.5; }
+    #grPage .gr-file-hint--info { color: #6b7280; }
+    #grPage .gr-file-hint--warn { color: #b45309; font-weight: 700; }
+    #grPage .gr-file-hint--err  { color: #dc2626; font-weight: 700; }
+
+
 </style>
 
 <div id="grPage">
@@ -502,12 +598,34 @@
     <div class="gr-panel active" data-panel="upload">
 
         <!-- Add / upload form: now a popup modal, hidden until "+ Add New" is clicked -->
+        <!-- ============ BLOCKING UPLOAD OVERLAY ============ -->
+        <!-- Shown for the whole duration of an upload. The page is blurred and
+             unclickable until the server confirms the record, so 'Upload
+             successful' can only ever mean actually saved. -->
+        <div class="gr-busy-overlay" id="grBusyOverlay" role="alertdialog" aria-modal="true" aria-live="polite">
+            <div class="gr-busy-box">
+                <div class="gr-busy-spin" id="grBusySpin"></div>
+                <div class="gr-busy-icon" id="grBusyIcon"></div>
+                <div class="gr-busy-title" id="grBusyTitle">Uploading…</div>
+                <div class="gr-busy-msg" id="grBusyMsg"></div>
+                <div class="gr-busy-file" id="grBusyFile"></div>
+                <div class="gr-busy-bar" id="grBusyBar"><i></i></div>
+                <div class="gr-busy-elapsed" id="grBusyElapsed"></div>
+                <div class="gr-busy-warn" id="grBusyWarn">Please keep this page open and the screen on. Do not switch apps until it finishes.</div>
+                <div class="gr-busy-actions" id="grBusyActions">
+                    <button type="button" class="gr-btn-secondary" id="grBusyClose">Close</button>
+                    <button type="button" class="gr-btn-primary" id="grBusyRetry">Try again</button>
+                </div>
+            </div>
+        </div>
+
+
         <div class="gr-modal-overlay" id="grFormModalOverlay">
             <div class="gr-modal-box" id="grFormCard" role="dialog" aria-modal="true">
                 <div class="gr-modal-header">
                     <div>
                         <h2>Upload a GR / Circular</h2>
-                        <p>The file is saved to Drive under <em>month → district</em> in the background — you can keep working while it uploads.</p>
+                        <p>The file is saved to Drive under <em>month → district</em>. Please stay on this page while it uploads — the record is confirmed only once the server has it.</p>
                     </div>
                     <button class="gr-modal-close" id="grFormCloseX" type="button">✕</button>
                 </div>
@@ -550,9 +668,10 @@
                                 <label>File <span class="req">*</span></label>
                                 <div class="gr-file-row">
                                     <label class="gr-file-btn" for="grUpFile">Choose file</label>
-                                    <input type="file" id="grUpFile">
+                                    <input type="file" id="grUpFile" accept="application/pdf,.pdf">
                                     <span class="gr-file-name" id="grUpFileName">No file chosen</span>
                                 </div>
+                                <div class="gr-file-hint gr-file-hint--info" id="grUpFileHint">PDF up to 4 MB. Under 2 MB uploads fastest — scan in Document or Black &amp; White mode to keep it small.</div>
                             </div>
                         </div>
                     </div>
