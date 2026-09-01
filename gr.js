@@ -31,8 +31,13 @@
     const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxSfjU4yDl38EaBderQ28qrhp5LKJT4z5Wam1pDJycdVxZPtOsDFJPLE0sKdwIyP9O7/exec";
 
     /* ====================================================
-       STATE → DISTRICTS  (verified official lists)
-       MH 36 · MP 55 · CG 33 · Bihar 38
+       STATE → DISTRICTS  (OLF's operational districts)
+       MH 27 · MH-ATC 1 · MH-MC 8 · CG 11 · BR 1 · MP 2  =  50
+
+       These are the districts OLF actually works in, not every district
+       in each state. ONE list drives both the upload dropdowns and the
+       Analytics table, so a district can never be uploadable but missing
+       from analytics, or listed in analytics but not uploadable.
     ==================================================== */
     const STATE_LABELS = {
         MH: "Maharashtra",
@@ -72,76 +77,18 @@
 
     const STATE_DISTRICTS = {
         MH: [
-            "Ahilyanagar", "Akola", "Amravati", "Beed", "Bhandara", "Buldhana",
-            "Chandrapur", "Chhatrapati Sambhajinagar", "Dharashiv", "Dhule",
-            "Gadchiroli", "Gondia", "Hingoli", "Jalgaon", "Jalna", "Kolhapur",
-            "Latur", "Mumbai City", "Mumbai Suburban", "Nagpur", "Nanded",
-            "Nandurbar", "Nashik", "Palghar", "Parbhani", "Pune", "Raigad",
-            "Ratnagiri", "Sangli", "Satara", "Sindhudurg", "Solapur", "Thane",
-            "Wardha", "Washim", "Yavatmal"
-        ],
-        MH_ATC: [
-            "Nagpur - ATC"
-        ],
-        MH_MC: [
-            "Amravati - MC", "Pune MC", "PCMC",
-            "Sangli - MC", "Nagpur - MC", "Nashik - MC"
-        ],
-        MP: [
-            "Agar Malwa", "Alirajpur", "Anuppur", "Ashoknagar", "Balaghat",
-            "Barwani", "Betul", "Bhind", "Bhopal", "Burhanpur", "Chhatarpur",
-            "Chhindwara", "Damoh", "Datia", "Dewas", "Dhar", "Dindori", "Guna",
-            "Gwalior", "Harda", "Indore", "Jabalpur", "Jhabua", "Katni",
-            "Khandwa", "Khargone", "Maihar", "Mandla", "Mandsaur", "Mauganj",
-            "Morena", "Narmadapuram", "Narsinghpur", "Neemuch", "Niwari",
-            "Pandhurna", "Panna", "Raisen", "Rajgarh", "Ratlam", "Rewa",
-            "Sagar", "Satna", "Sehore", "Seoni", "Shahdol", "Shajapur",
-            "Sheopur", "Shivpuri", "Sidhi", "Singrauli", "Tikamgarh", "Ujjain",
-            "Umaria", "Vidisha"
-        ],
-        CG: [
-            "Balod", "Baloda Bazar", "Balrampur-Ramanujganj", "Bastar",
-            "Bemetara", "Bijapur", "Bilaspur", "Dantewada", "Dhamtari", "Durg",
-            "Gariaband", "Gaurela-Pendra-Marwahi", "Janjgir-Champa", "Jashpur",
-            "Kabirdham", "Kanker", "Khairagarh-Chhuikhadan-Gandai", "Kondagaon",
-            "Korba", "Koriya", "Mahasamund", "Manendragarh-Chirmiri-Bharatpur",
-            "Mohla-Manpur-Ambagarh Chowki", "Mungeli", "Narayanpur", "Raigarh",
-            "Raipur", "Rajnandgaon", "Sakti", "Sarangarh-Bilaigarh", "Sukma",
-            "Surajpur", "Surguja"
-        ],
-        BR: [
-            "Araria", "Arwal", "Aurangabad", "Banka", "Begusarai", "Bhagalpur",
-            "Bhojpur", "Buxar", "Darbhanga", "East Champaran", "Gaya",
-            "Gopalganj", "Jamui", "Jehanabad", "Kaimur", "Katihar", "Khagaria",
-            "Kishanganj", "Lakhisarai", "Madhepura", "Madhubani", "Munger",
-            "Muzaffarpur", "Nalanda", "Nawada", "Patna", "Purnia", "Rohtas",
-            "Saharsa", "Samastipur", "Saran", "Sheikhpura", "Sheohar",
-            "Sitamarhi", "Siwan", "Supaul", "Vaishali", "West Champaran"
-        ]
-    };
-
-    /* ====================================================
-       ANALYTICS MASTER LIST
-       The districts OLF actually operates in, supplied per
-       community. Drives the Analytics tab so every district
-       shows a row even with zero uploads. Kept separate from
-       STATE_DISTRICTS (the full official upload list) on
-       purpose: these names are the operational ones.
-    ==================================================== */
-    const ANALYTICS_DISTRICTS = {
-        MH: [
             "Ahilyanagar", "Amravati", "Bhandara", "Bid", "Buldhana",
             "Chandrapur", "Dharashiv", "Gadchiroli", "Hingoli", "Jalgaon",
             "Jalna", "Latur", "Nagpur", "Nanded", "Nandurbar", "Nashik",
             "Palghar", "Pune", "Raigarh MH", "Ratnagiri", "Kolhapur",
-            "Solapur", "Satara", "Wardha", "Washim", "Yavatmal"
+            "Solapur", "Satara", "Thane", "Wardha", "Washim", "Yavatmal"
+        ],
+        MH_ATC: [
+            "Nagpur - ATC"
         ],
         MH_MC: [
             "Amravati - MC", "KDMC", "Pune MC", "PCMC", "Sangli - MC",
             "Mumbai Suburban", "Nagpur - MC", "Nashik - MC"
-        ],
-        MH_ATC: [
-            "Nagpur - ATC"
         ],
         CG: [
             "Bastar", "Dantewada", "Dhamtari", "Durg", "Gariaband",
@@ -155,6 +102,65 @@
             "Balaghat", "Seoni"
         ]
     };
+
+    /* ====================================================
+       RETIRED DISTRICT NAMES
+       Records already in the sheet may carry a name the upload form no
+       longer offers — either an older spelling or a district that has
+       since been renamed. Those uploads are real, so they are MERGED into
+       the correct district rather than shown as a separate row: the table
+       stays at exactly the master 50 and the counts stay complete.
+
+       Keyed by community, because the same word can mean different
+       districts in different states — Chhattisgarh has "Raigarh" while
+       Maharashtra has "Raigarh MH", and those must never be conflated.
+    ==================================================== */
+    const RETIRED_DISTRICT_NAMES = {
+        MH: {
+            "Beed": "Bid",                 // earlier spelling
+            "Raigad": "Raigarh MH",        // earlier spelling
+            "Ahmednagar": "Ahilyanagar",   // renamed district
+            "Osmanabad": "Dharashiv"       // renamed district
+        },
+        CG: {
+            "Janjgir-Champa": "Janjgir - Champa"   // spacing differs
+        }
+    };
+
+    // Districts that now sit under a different community.
+    const MOVED_DISTRICTS = {
+        "Mumbai Suburban": { from: "MH", to: "MH_MC" }
+    };
+
+    /**
+     * Maps whatever is stored on a record to the master (state, district)
+     * it belongs to. Returns the input unchanged when no rule applies.
+     */
+    function canonicalDistrict(state, district) {
+        let st = state || "";
+        let d = String(district == null ? "" : district).trim();
+
+        const byState = RETIRED_DISTRICT_NAMES[st];
+        if (byState && byState[d]) d = byState[d];
+
+        const moved = MOVED_DISTRICTS[d];
+        if (moved && st === moved.from) st = moved.to;
+
+        return { state: st, district: d };
+    }
+
+    /* ====================================================
+       ANALYTICS DISTRICT SOURCE
+       The Analytics tab reads STATE_DISTRICTS above — the same list the
+       upload form offers — so every district a member can pick gets a
+       row, even at zero.
+
+       A district that appears in the data but NOT in that list is still
+       shown, flagged "not in upload list". That is not an error state: it
+       means an older record was saved under a name the form no longer
+       offers (for instance the earlier spellings Beed, Raigad or
+       Janjgir-Champa), and the row in the sheet is worth correcting.
+    ==================================================== */
 
     /* ====================================================
        SMALL HELPERS
@@ -2611,40 +2617,134 @@
        bottom in red. Community & district multi-selects reuse
        the shared control; both default to "all".
     ==================================================== */
+    /* ----------------------------------------------------
+       Columns the chooser can show or hide. District is not
+       listed: it is the row label, so it is always present.
+    ---------------------------------------------------- */
+    // Total leads: it is what the table is ranked by, so it belongs beside
+    // the district name rather than at the far end of the row.
+    //
+    // Widths are fixed pixels, not percentages. With table-layout:fixed a
+    // percentage width stretches every number column on a wide screen, which
+    // pushed the figures far from their headings and made the rows hard to
+    // compare. Fixed widths keep the numbers in a tight, scannable block and
+    // let the district name absorb the slack instead.
+    const AN_COLUMNS = [
+        { key: "total", label: "Total<br>Uploaded",      total: true,        group: "total", w: 116 },
+        { key: "grUp",  label: "GRs<br>Uploaded",        pick: b => b.grUp,  isVal: false, group: "gr",   w: 100 },
+        { key: "grVal", label: "GRs<br>Validated",       pick: b => b.grVal, isVal: true,  group: "gr",   w: 100 },
+        { key: "cUp",   label: "Circulars<br>Uploaded",  pick: b => b.cUp,   isVal: false, group: "circ", w: 108 },
+        { key: "cVal",  label: "Circulars<br>Validated", pick: b => b.cVal,  isVal: true,  group: "circ", w: 108 }
+    ];
+    // Plain labels for the chooser list (the table headings use <br>).
+    const AN_COLUMN_LABELS = {
+        grUp: "GRs Uploaded", grVal: "GRs Validated",
+        cUp: "Circulars Uploaded", cVal: "Circulars Validated",
+        total: "Total Uploaded"
+    };
+
+    /* ----------------------------------------------------
+       UPLOAD-DATE RANGE
+       Filters on when the document was UPLOADED (uploadTimestamp), not
+       the date printed on the GR (docDate) — those are often months apart.
+
+       uploadTimestamp is stored as UTC ISO. It is converted to the
+       viewer's LOCAL calendar date before comparing, so "31 Aug" means
+       31 August as the person reading the screen experiences it. Comparing
+       the raw UTC string instead would push a late-evening IST upload into
+       the following day.
+    ---------------------------------------------------- */
+    function uploadDateKey(record) {
+        const ts = record && record.uploadTimestamp;
+        if (!ts) return "";
+        const d = new Date(ts);
+        if (isNaN(d.getTime())) return "";
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return d.getFullYear() + "-" + m + "-" + day;
+    }
+
+    let anFrom = "";       // "" = no lower bound (YYYY-MM-DD)
+    let anTo = "";         // "" = no upper bound
+    let anCols = [];       // [] = show every column
+    // Snapshot of the last render, so the Excel export is guaranteed to
+    // match the screen instead of recomputing and possibly diverging.
+    let anLastView = null;
+
     let anStates = [];      // [] = all communities
     let anDistricts = [];   // [] = all districts of the chosen communities
 
     // Master districts for the chosen communities (all when none chosen),
     // de-duplicated and alpha-sorted for the filter dropdown.
     function analyticsDistrictsForStates(states) {
-        const codes = states.length ? states : Object.keys(ANALYTICS_DISTRICTS);
+        const codes = states.length ? states : Object.keys(STATE_DISTRICTS);
         const out = [];
-        codes.forEach(c => (ANALYTICS_DISTRICTS[c] || []).forEach(d => {
+        codes.forEach(c => (STATE_DISTRICTS[c] || []).forEach(d => {
             if (out.indexOf(d) < 0) out.push(d);
         }));
         return out.sort(cmpStr);
     }
 
-    function wireAnalyticsFilters() {
-        const commWrap = document.getElementById("grAnCommMS");
-        const distWrap = document.getElementById("grAnDistrictMS");
-        if (!commWrap || !distWrap) return;
+    // One tab per community, plus All. Each carries its upload count, so a
+    // community with nothing uploaded is obvious before you even open it.
+    function renderAnalyticsTabs() {
+        const wrap = document.getElementById("grAnTabs");
+        if (!wrap) return;
 
-        buildMultiSelect(commWrap, {
-            allLabel: "All Communities",
-            max: Infinity,
-            options: () => Object.keys(STATE_LABELS).map(c => ({ value: c, label: STATE_LABELS[c] })),
-            selected: () => anStates,
-            onApply: (vals) => {
-                anStates = vals;
-                // Keep only districts that still belong to the chosen
-                // communities, then repaint the district control.
-                const allowed = new Set(analyticsDistrictsForStates(anStates));
-                anDistricts = anDistricts.filter(d => allowed.has(d));
-                renderMultiSelect(distWrap);
-                renderAnalytics();
-            }
+        // Counted exactly the way the table counts, so a tab number can
+        // never disagree with the total shown inside it: retired names are
+        // mapped first, and anything outside the master 50 is left out of
+        // both (it is reported separately in the meta line instead).
+        const master = Object.create(null);
+        Object.keys(STATE_DISTRICTS).forEach(c => {
+            master[c] = new Set(STATE_DISTRICTS[c]);
         });
+
+        const counts = Object.create(null);
+        let grand = 0;
+        allRecords.forEach(r => {
+            if (!r.district) return;
+            const c = canonicalDistrict(r.state, r.district);
+            if (!master[c.state] || !master[c.state].has(c.district)) return;
+            counts[c.state] = (counts[c.state] || 0) + 1;
+            grand += 1;
+        });
+
+        const active = anStates.length === 1 ? anStates[0] : "";
+        const tabs = [{ code: "", label: "All Communities", n: grand }].concat(
+            Object.keys(STATE_LABELS).map(c => ({
+                code: c, label: STATE_LABELS[c], n: counts[c] || 0
+            }))
+        );
+
+        wrap.innerHTML = tabs.map(t =>
+            '<button type="button" class="gr-an-tab' + (t.code === active ? " active" : "") +
+            '" data-comm="' + escHtml(t.code) + '" role="tab">' +
+            escHtml(t.label) +
+            '<span class="gr-an-tab-count' + (t.n ? "" : " gr-an-tab-count--zero") + '">' + t.n + "</span>" +
+            "</button>"
+        ).join("");
+
+        if (!wrap.dataset.wired) {
+            wrap.dataset.wired = "1";
+            wrap.addEventListener("click", (e) => {
+                const btn = e.target.closest(".gr-an-tab");
+                if (!btn) return;
+                const code = btn.dataset.comm;
+                anStates = code ? [code] : [];
+                anDistricts = [];   // districts belong to a community; start clean
+                closeAllMultiSelects();
+                renderMultiSelect(document.getElementById("grAnDistrictMS"));
+                renderAnalytics();
+            });
+        }
+    }
+
+    function wireAnalyticsFilters() {
+        const distWrap = document.getElementById("grAnDistrictMS");
+        if (!distWrap) return;
+
+        renderAnalyticsTabs();
 
         buildMultiSelect(distWrap, {
             allLabel: "All Districts",
@@ -2654,16 +2754,71 @@
             onApply: (vals) => { anDistricts = vals; renderAnalytics(); }
         });
 
+        // Columns: nothing ticked means all, which is the same default the
+        // other multi-selects on this page use.
+        const colsWrap = document.getElementById("grAnColsMS");
+        if (colsWrap) {
+            buildMultiSelect(colsWrap, {
+                allLabel: "All Columns",
+                max: Infinity,
+                options: () => AN_COLUMNS.map(c => ({ value: c.key, label: AN_COLUMN_LABELS[c.key] })),
+                selected: () => anCols,
+                onApply: (vals) => { anCols = vals; renderAnalytics(); }
+            });
+        }
+
+        const fromEl = document.getElementById("grAnFrom");
+        const toEl = document.getElementById("grAnTo");
+        if (fromEl) fromEl.addEventListener("change", () => {
+            anFrom = fromEl.value;
+            syncAnDateStyles();
+            renderAnalytics();
+        });
+        if (toEl) toEl.addEventListener("change", () => {
+            anTo = toEl.value;
+            syncAnDateStyles();
+            renderAnalytics();
+        });
+
         const clearBtn = document.getElementById("grAnClear");
         if (clearBtn) clearBtn.addEventListener("click", clearAnalyticsFilters);
+        const exportBtn = document.getElementById("grAnExport");
+        if (exportBtn) exportBtn.addEventListener("click", exportAnalyticsExcel);
+    }
+
+    // Highlight a date box once it holds a value, so a filtered view never
+    // looks like the full picture.
+    function syncAnDateStyles() {
+        [["grAnFrom", anFrom], ["grAnTo", anTo]].forEach(([id, val]) => {
+            const el = document.getElementById(id);
+            if (el) el.classList.toggle("gr-date-set", !!val);
+        });
+    }
+
+    // True when this record's upload date sits inside the chosen range.
+    // Returns null when the record has no usable upload date at all, so the
+    // caller can report those instead of quietly dropping them.
+    function anInDateRange(record) {
+        if (!anFrom && !anTo) return true;
+        const key = uploadDateKey(record);
+        if (!key) return null;              // no upload date recorded
+        if (anFrom && key < anFrom) return false;
+        if (anTo && key > anTo) return false;
+        return true;
     }
 
     function clearAnalyticsFilters() {
         anStates = [];
         anDistricts = [];
+        anFrom = "";
+        anTo = "";
+        anCols = [];
+        const f = document.getElementById("grAnFrom"); if (f) f.value = "";
+        const t = document.getElementById("grAnTo");   if (t) t.value = "";
+        syncAnDateStyles();
         closeAllMultiSelects();
-        renderMultiSelect(document.getElementById("grAnCommMS"));
         renderMultiSelect(document.getElementById("grAnDistrictMS"));
+        renderMultiSelect(document.getElementById("grAnColsMS"));
         renderAnalytics();
     }
 
@@ -2676,19 +2831,98 @@
 
     // A cell that dims a plain zero, greens a positive validated count,
     // and leaves uploaded counts in the default ink.
-    function anNumCell(n, isVal) {
-        const cls = n === 0 ? "gr-an-num gr-an-zero-num"
-                            : (isVal ? "gr-an-num gr-an-val" : "gr-an-num");
+    function anNumCell(n, isVal, extra) {
+        let cls = n === 0 ? "gr-an-num gr-an-zero-num"
+                          : (isVal ? "gr-an-num gr-an-val" : "gr-an-num");
+        if (extra) cls += " " + extra;
         return "<td class=\"" + cls + "\">" + n + "</td>";
     }
 
+    /**
+     * The Total cell, with a faint bar behind the figure scaled against the
+     * biggest total on screen. Reading the ranking becomes a glance rather
+     * than a comparison of digits.
+     */
+    function anTotalCell(total, max, extra) {
+        const cls = "gr-an-total" + (extra ? " " + extra : "");
+        return "<td class=\"" + cls + "\">" + total + "</td>";
+    }
+
+    /**
+     * A share bar drawn across the district column, scaled against the
+     * largest total in the current view.
+     *
+     * It lives here rather than in the Total cell for a practical reason:
+     * the number columns are deliberately narrow, so a bar inside one is
+     * only ~100px and reads as decoration. The district column is the wide
+     * one, so the same bar becomes genuinely comparable there \u2014 and it puts
+     * that otherwise empty space to use.
+     */
+    function anShareBar(total, max) {
+        if (!(max > 0) || !(total > 0)) return "";
+        const pct = Math.max(1.5, (total / max) * 100);
+        return '<span class="gr-an-dbar" style="width:' + pct.toFixed(1) + '%"></span>';
+    }
+
+    // The columns currently on show, in their fixed order. Nothing ticked
+    // in the chooser means all of them.
+    function anVisibleColumns() {
+        const picked = anCols.length
+            ? AN_COLUMNS.filter(c => anCols.indexOf(c.key) >= 0)
+            : AN_COLUMNS.slice();
+        // Mark where one group ends and the next begins, so GRs and
+        // Circulars read as two blocks rather than four loose columns.
+        let prev = null;
+        return picked.map(c => {
+            const sep = prev !== null && c.group !== prev;
+            prev = c.group;
+            return Object.assign({}, c, { sep });
+        });
+    }
+
+    // The number columns take fixed widths; the district column is left
+    // unsized so it absorbs whatever space is left over. The table's
+    // min-width is recomputed from the visible columns, so hiding some
+    // tightens the table instead of leaving a stretched, empty layout.
+    const AN_DISTRICT_MIN = 250;
+
+    function anRenderHead(cols) {
+        const colgroup = document.getElementById("grAnCols");
+        const head = document.getElementById("grAnHead");
+        const table = document.querySelector("#grPage table.gr-an-table");
+
+        if (colgroup) {
+            colgroup.innerHTML =
+                '<col>' +   // district: unsized, takes the remainder
+                cols.map(c => '<col style="width:' + c.w + 'px">').join("");
+        }
+        if (head) {
+            head.innerHTML =
+                '<th class="gr-an-dcol">District</th>' +
+                cols.map(c => {
+                    const cls = [c.total ? "gr-an-totcol" : "", c.sep ? "gr-an-gsep" : ""]
+                        .filter(Boolean).join(" ");
+                    return "<th" + (cls ? ' class="' + cls + '"' : "") + ">" + c.label + "</th>";
+                }).join("");
+        }
+        if (table) {
+            const need = AN_DISTRICT_MIN + cols.reduce((a, c) => a + c.w, 0);
+            table.style.minWidth = need + "px";
+        }
+    }
+
     function renderAnalytics() {
+        renderAnalyticsTabs();   // counts move as records arrive
         const body = document.getElementById("grAnBody");
         const foot = document.getElementById("grAnFoot");
         const meta = document.getElementById("grAnMeta");
         if (!body) return;
 
-        const commCodes = anStates.length ? anStates : Object.keys(ANALYTICS_DISTRICTS);
+        const cols = anVisibleColumns();
+        anRenderHead(cols);
+        const span = cols.length + 1;
+
+        const commCodes = anStates.length ? anStates : Object.keys(STATE_DISTRICTS);
         const commSet = new Set(commCodes);
         const distFilter = anDistricts.length ? new Set(anDistricts) : null;
 
@@ -2700,35 +2934,43 @@
         const byKey = new Map();
 
         commCodes.forEach(code => {
-            (ANALYTICS_DISTRICTS[code] || []).forEach(dist => {
+            (STATE_DISTRICTS[code] || []).forEach(dist => {
                 const k = key(code, dist);
                 masterKeys.add(k);
                 if (distFilter && !distFilter.has(dist)) return;
-                const row = { state: code, district: dist, isExtra: false, bucket: anBlankBucket() };
+                const row = { state: code, district: dist, bucket: anBlankBucket() };
                 rows.push(row);
                 byKey.set(k, row);
             });
         });
 
-        // Fold in every record. Anything that does not match a master row
-        // (name drift, or a district not on OLF's list) becomes its own
-        // flagged "extra" row, so no upload is ever silently dropped.
-        const extraByKey = new Map();
+        // Fold in every record, mapping retired names onto the master
+        // district first so those uploads land in the right row instead of
+        // creating a row outside the 50.
+        //
+        // A record that STILL does not match after mapping is counted in
+        // `unmapped` and surfaced in the meta line. It is deliberately not
+        // given a row (the table is strictly the master 50) but it is never
+        // silently dropped either — otherwise the totals here would quietly
+        // disagree with the sheet.
+        let unmapped = 0;
+        let noUploadDate = 0;
+        const unmappedNames = new Set();
         allRecords.forEach(r => {
-            const st = r.state || "";
-            const dist = r.district || "";
-            if (!commSet.has(st)) return;
-            const k = key(st, dist);
-            let row = byKey.get(k);
+            const inRange = anInDateRange(r);
+            if (inRange === false) return;          // outside the chosen dates
+            if (inRange === null) { noUploadDate += 1; return; }
+            const c = canonicalDistrict(r.state, r.district);
+            if (!commSet.has(c.state)) return;
+            const k = key(c.state, c.district);
+            const row = byKey.get(k);
             if (!row) {
-                if (masterKeys.has(k)) return;            // filtered-out master district
-                if (distFilter && !distFilter.has(dist)) return;
-                row = extraByKey.get(k);
-                if (!row) {
-                    row = { state: st, district: dist || "\u2014", isExtra: true, bucket: anBlankBucket() };
-                    extraByKey.set(k, row);
-                    rows.push(row);
-                }
+                // In the master list but filtered out of this view: not a problem.
+                if (masterKeys.has(k)) return;
+                if (distFilter && !distFilter.has(c.district)) return;
+                unmapped += 1;
+                unmappedNames.add((STATE_SHORT[c.state] || c.state) + " / " + (c.district || "(blank)"));
+                return;
             }
             anAddRecord(row.bucket, r);
         });
@@ -2744,31 +2986,37 @@
         });
 
         if (!rows.length) {
-            body.innerHTML = "<tr><td colspan=\"5\" class=\"gr-empty-cell\">" +
+            body.innerHTML = "<tr><td colspan=\"" + span + "\" class=\"gr-empty-cell\">" +
                 grEmptyHtml("\ud83d\udced", "No districts match these filters.") + "</td></tr>";
             if (foot) foot.innerHTML = "";
             if (meta) meta.textContent = "";
+            anLastView = null;   // nothing to export
             return;
         }
 
         let rank = 0, zeroCount = 0;
         const tot = anBlankBucket();
+        // Bars are scaled against the largest total in THIS view, so the
+        // comparison stays meaningful after filtering.
+        const maxTotal = rows.reduce((m, r) => Math.max(m, r.total), 0);
         body.innerHTML = rows.map(row => {
             const b = row.bucket;
+            // Totals always accumulate every metric, whether or not its
+            // column is on show, so hiding a column never changes the
+            // ranking or the footer of the columns that remain.
             tot.grUp += b.grUp; tot.grVal += b.grVal; tot.cUp += b.cUp; tot.cVal += b.cVal;
             const zero = row.total === 0;
             if (zero) zeroCount += 1;
             const rankCell = zero ? "" : "<span class=\"gr-an-rank\">" + (++rank) + "</span>";
             return "" +
-                "<tr class=\"" + (zero ? "gr-an-zero" : "") + (row.isExtra ? " gr-an-extra" : "") + "\">" +
-                    "<td>" + rankCell +
+                "<tr class=\"" + (zero ? "gr-an-zero" : "") + "\">" +
+                    "<td>" + anShareBar(row.total, maxTotal) + rankCell +
                         "<span class=\"gr-an-dname\">" + escHtml(row.district) + "</span>" +
                         "<div class=\"gr-an-comm\">" + escHtml(STATE_LABELS[row.state] || row.state) + "</div>" +
                     "</td>" +
-                    anNumCell(b.grUp, false) +
-                    anNumCell(b.grVal, true) +
-                    anNumCell(b.cUp, false) +
-                    anNumCell(b.cVal, true) +
+                    cols.map(c => c.total
+                        ? anTotalCell(row.total, maxTotal, c.sep ? "gr-an-gsep" : "")
+                        : anNumCell(c.pick(b), c.isVal, c.sep ? "gr-an-gsep" : "")).join("") +
                 "</tr>";
         }).join("");
 
@@ -2776,21 +3024,335 @@
             foot.innerHTML =
                 "<tr>" +
                     "<td>Total \u00b7 " + rows.length + " districts</td>" +
-                    "<td>" + tot.grUp + "</td>" +
-                    "<td>" + tot.grVal + "</td>" +
-                    "<td>" + tot.cUp + "</td>" +
-                    "<td>" + tot.cVal + "</td>" +
+                    cols.map(c => {
+                        const sep = c.sep ? " gr-an-gsep" : "";
+                        return c.total
+                            ? "<td class=\"gr-an-total" + sep + "\">" + (tot.grUp + tot.cUp) + "</td>"
+                            : "<td class=\"gr-an-fnum" + sep + "\">" + c.pick(tot) + "</td>";
+                    }).join("") +
                 "</tr>";
         }
 
+        const scope = anStates.length
+            ? anStates.map(c => STATE_LABELS[c] || c).join(", ")
+            : "All communities";
+        // Spell the active range out, so a reduced count is never a
+        // mystery to whoever is looking at the screen.
+        let range = "";
+        if (anFrom && anTo)      range = " \u00b7 uploaded " + fmtDate(anFrom) + " to " + fmtDate(anTo);
+        else if (anFrom)         range = " \u00b7 uploaded from " + fmtDate(anFrom);
+        else if (anTo)           range = " \u00b7 uploaded up to " + fmtDate(anTo);
+        const grandUp = tot.grUp + tot.cUp;
+
+        anLastView = {
+            rows, cols, scope,
+            districts: anDistricts.length ? anDistricts.join(", ") : "All districts",
+            from: anFrom, to: anTo,
+            tot: { grUp: tot.grUp, grVal: tot.grVal, cUp: tot.cUp, cVal: tot.cVal },
+            unmapped, unmappedNames: [...unmappedNames].sort(), noUploadDate
+        };
+
         if (meta) {
-            const scope = anStates.length
-                ? anStates.map(c => STATE_LABELS[c] || c).join(", ")
-                : "All communities";
-            const grandUp = tot.grUp + tot.cUp;
-            meta.textContent = scope + " \u2014 " + rows.length + " districts, " + grandUp + " uploads" +
-                (zeroCount ? ", " + zeroCount + " with none yet" : "");
+            const dLbl = rows.length === 1 ? " district" : " districts";
+            const uLbl = grandUp === 1 ? " upload" : " uploads";
+            let html = escHtml(scope + range + " \u2014 " + rows.length + dLbl + ", " + grandUp + uLbl +
+                (zeroCount ? ", " + zeroCount + " with none yet" : ""));
+            // Only ever shown when the sheet holds a district outside the
+            // master 50 that no mapping rule covers. Normally absent.
+            if (unmapped) {
+                const list = [...unmappedNames].sort().join(", ");
+                html += ' <span class="gr-an-warn" title="These uploads are not counted in the table above, because their district is not one of the 50. Correct the district in the sheet, or tell me to add a mapping rule.">\u26a0 ' +
+                        unmapped + " upload" + (unmapped === 1 ? "" : "s") +
+                        " not counted — unknown district: " + escHtml(list) + "</span>";
+            }
+            // Records that carry no upload date cannot be placed in a range,
+            // so they are left out while a date filter is on — said plainly
+            // rather than silently.
+            if (noUploadDate) {
+                html += ' <span class="gr-an-warn" title="These records have no upload timestamp in the sheet, so they cannot be matched against a date range. Clear the dates to include them.">\u26a0 ' +
+                        noUploadDate + " record" + (noUploadDate === 1 ? "" : "s") +
+                        " skipped — no upload date recorded</span>";
+            }
+            meta.innerHTML = html;
         }
+    }
+
+    /* ====================================================
+       XLSX WRITER (no external library)
+       An .xlsx is a ZIP of XML parts. At this size compression buys
+       nothing, so entries are STORED uncompressed and no deflate
+       implementation is needed. Deliberately not a CDN library: this page
+       is used on weak rural connections where a large script at page load
+       is a real cost, and an export must keep working offline.
+    ==================================================== */
+    let GR_CRC_TABLE = null;
+    function grCrcTable() {
+        if (GR_CRC_TABLE) return GR_CRC_TABLE;
+        const t = new Uint32Array(256);
+        for (let n = 0; n < 256; n++) {
+            let c = n;
+            for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+            t[n] = c >>> 0;
+        }
+        GR_CRC_TABLE = t;
+        return t;
+    }
+    function grCrc32(buf) {
+        const t = grCrcTable();
+        let c = 0xFFFFFFFF;
+        for (let i = 0; i < buf.length; i++) c = t[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
+        return (c ^ 0xFFFFFFFF) >>> 0;
+    }
+
+    function grUtf8(str) {
+        return new TextEncoder().encode(str);
+    }
+
+    /* A ZIP with STORED (uncompressed) entries. An .xlsx is just a ZIP, and at
+       this size compression buys nothing while deflate would need a library. */
+    function grZipStore(files) {
+        const chunks = [];
+        const central = [];
+        let offset = 0;
+
+        const u16 = (n) => [n & 0xFF, (n >>> 8) & 0xFF];
+        const u32 = (n) => [n & 0xFF, (n >>> 8) & 0xFF, (n >>> 16) & 0xFF, (n >>> 24) & 0xFF];
+
+        // Fixed DOS timestamp keeps the output byte-identical run to run.
+        const dosTime = 0, dosDate = ((2026 - 1980) << 9) | (1 << 5) | 1;
+
+        files.forEach(f => {
+            const name = grUtf8(f.name);
+            const data = f.data;
+            const crc = grCrc32(data);
+
+            const local = [].concat(
+                u32(0x04034b50), u16(20), u16(0x0800), u16(0),
+                u16(dosTime), u16(dosDate),
+                u32(crc), u32(data.length), u32(data.length),
+                u16(name.length), u16(0)
+            );
+            chunks.push(new Uint8Array(local), name, data);
+
+            central.push([].concat(
+                u32(0x02014b50), u16(20), u16(20), u16(0x0800), u16(0),
+                u16(dosTime), u16(dosDate),
+                u32(crc), u32(data.length), u32(data.length),
+                u16(name.length), u16(0), u16(0),
+                u16(0), u16(0), u32(0),
+                u32(offset)
+            ));
+            central.push(name);
+
+            offset += local.length + name.length + data.length;
+        });
+
+        const cdParts = [];
+        let cdSize = 0;
+        central.forEach(p => {
+            const arr = (p instanceof Uint8Array) ? p : new Uint8Array(p);
+            cdParts.push(arr);
+            cdSize += arr.length;
+        });
+
+        const eocd = new Uint8Array([].concat(
+            u32(0x06054b50), u16(0), u16(0),
+            u16(files.length), u16(files.length),
+            u32(cdSize), u32(offset), u16(0)
+        ));
+
+        const all = chunks.concat(cdParts, [eocd]);
+        const total = all.reduce((n, a) => n + a.length, 0);
+        const out = new Uint8Array(total);
+        let p = 0;
+        all.forEach(a => { out.set(a, p); p += a.length; });
+        return out;
+    }
+
+    function grXmlEsc(s) {
+        return String(s == null ? "" : s)
+            .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;").replace(/'/g, "&apos;")
+            // Control characters are illegal in XML and would corrupt the file.
+            .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+    }
+
+    function grColName(i) {
+        let s = "";
+        i += 1;
+        while (i > 0) {
+            const r = (i - 1) % 26;
+            s = String.fromCharCode(65 + r) + s;
+            i = Math.floor((i - 1) / 26);
+        }
+        return s;
+    }
+
+    /**
+     * rows: array of arrays. A cell is either a number, or a string, or
+     * { v, bold } for a styled string.
+     */
+    function grBuildXlsx(sheetName, rows) {
+        const safeSheet = String(sheetName || "Sheet1")
+            .replace(/[\[\]\*\?\/\\:]/g, "-").slice(0, 31) || "Sheet1";
+
+        const sheetRows = rows.map((row, ri) => {
+            const cells = row.map((cell, ci) => {
+                const ref = grColName(ci) + (ri + 1);
+                const isNum = (typeof cell === "number" && isFinite(cell));
+                const obj = (cell && typeof cell === "object") ? cell : null;
+                const style = (obj && obj.bold) ? ' s="1"' : "";
+                if (isNum) return '<c r="' + ref + '"' + style + '><v>' + cell + "</v></c>";
+                const text = obj ? obj.v : cell;
+                if (text === "" || text == null) return '<c r="' + ref + '"' + style + "/>";
+                if (typeof text === "number") return '<c r="' + ref + '"' + style + '><v>' + text + "</v></c>";
+                return '<c r="' + ref + '"' + style + ' t="inlineStr"><is><t xml:space="preserve">' +
+                       grXmlEsc(text) + "</t></is></c>";
+            }).join("");
+            return '<row r="' + (ri + 1) + '">' + cells + "</row>";
+        }).join("");
+
+        const sheet =
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+            '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+            '<sheetData>' + sheetRows + '</sheetData></worksheet>';
+
+        const workbook =
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+            '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
+            'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+            '<sheets><sheet name="' + grXmlEsc(safeSheet) + '" sheetId="1" r:id="rId1"/></sheets>' +
+            '</workbook>';
+
+        const wbRels =
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
+            '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
+            '</Relationships>';
+
+        // Two styles: default, and bold (used for headings and the total row).
+        const styles =
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+            '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+            '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font>' +
+            '<font><b/><sz val="11"/><name val="Calibri"/></font></fonts>' +
+            '<fills count="1"><fill><patternFill patternType="none"/></fill></fills>' +
+            '<borders count="1"><border/></borders>' +
+            '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+            '<cellXfs count="2">' +
+            '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+            '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +
+            '</cellXfs>' +
+            '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
+            '</styleSheet>';
+
+        const rels =
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
+            '</Relationships>';
+
+        const contentTypes =
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+            '<Default Extension="xml" ContentType="application/xml"/>' +
+            '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+            '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+            '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+            '</Types>';
+
+        return grZipStore([
+            { name: "[Content_Types].xml", data: grUtf8(contentTypes) },
+            { name: "_rels/.rels", data: grUtf8(rels) },
+            { name: "xl/workbook.xml", data: grUtf8(workbook) },
+            { name: "xl/_rels/workbook.xml.rels", data: grUtf8(wbRels) },
+            { name: "xl/styles.xml", data: grUtf8(styles) },
+            { name: "xl/worksheets/sheet1.xml", data: grUtf8(sheet) }
+        ]);
+    }
+
+    /* ====================================================
+       EXPORT THE ANALYTICS VIEW
+       Uses the snapshot taken by the last render, so the file always
+       matches what is on screen — same tab, districts, dates, columns
+       and sort order — rather than re-deriving it and risking a drift.
+    ==================================================== */
+    function exportAnalyticsExcel() {
+        const v = anLastView;
+        if (!v || !v.rows.length) {
+            notify("Nothing to export for the current filters.", "error");
+            return;
+        }
+
+        const B = (t) => ({ v: t, bold: true });
+        const out = [];
+        out.push([B("GR & Circulars — District Analytics")]);
+        out.push([]);
+        out.push([B("Community"), v.scope]);
+        out.push([B("Districts"), v.districts]);
+        out.push([B("Uploaded from"), v.from || "(no limit)"]);
+        out.push([B("Uploaded to"), v.to || "(no limit)"]);
+        out.push([B("Columns"), v.cols.map(c => AN_COLUMN_LABELS[c.key]).join(", ")]);
+        out.push([B("Generated"), new Date().toLocaleString("en-IN")]);
+        out.push([B("Generated by"), user.email || "(unknown)"]);
+        out.push([]);
+
+        // Community gets its own column here: in a spreadsheet people sort
+        // and pivot, and the on-screen two-line cell would not survive that.
+        out.push([B("Rank"), B("District"), B("Community")]
+            .concat(v.cols.map(c => B(AN_COLUMN_LABELS[c.key]))));
+
+        let rank = 0;
+        v.rows.forEach(row => {
+            const b = row.bucket;
+            const rk = row.total === 0 ? "" : (++rank);
+            out.push([rk, row.district, STATE_LABELS[row.state] || row.state]
+                .concat(v.cols.map(c => c.total ? row.total : c.pick(b))));
+        });
+
+        out.push([B(""), B("Total · " + v.rows.length + " districts"), B("")]
+            .concat(v.cols.map(c => c.total
+                ? B(v.tot.grUp + v.tot.cUp)
+                : B(c.pick(v.tot)))));
+
+        // Carry the same caveats the screen shows, so a downloaded file is
+        // never read as a complete picture when it is not.
+        if (v.unmapped || v.noUploadDate) {
+            out.push([]);
+            out.push([B("Not included in the figures above")]);
+            if (v.unmapped) {
+                out.push(["Uploads under a district outside the master list", v.unmapped]);
+                out.push(["Those districts", v.unmappedNames.join(", ")]);
+            }
+            if (v.noUploadDate) {
+                out.push(["Records with no upload date (excluded by the date filter)", v.noUploadDate]);
+            }
+        }
+
+        const bytes = grBuildXlsx("District Analytics", out);
+        const stamp = new Date().toISOString().slice(0, 10);
+        const scopeTag = (v.scope === "All communities" ? "All" : v.scope)
+            .replace(/[^A-Za-z0-9\- ]/g, "").replace(/\s+/g, "-").slice(0, 40);
+        grDownloadBlob(bytes, "GR-Circular-Analytics_" + scopeTag + "_" + stamp + ".xlsx");
+        notify("Excel downloaded — " + v.rows.length + " districts.", "success");
+    }
+
+    function grDownloadBlob(bytes, filename) {
+        const blob = new Blob([bytes], {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+        // Revoked on a timer: revoking immediately can cancel the download
+        // in some browsers before it has started reading the blob.
+        setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 2000);
     }
 
     /* ====================================================

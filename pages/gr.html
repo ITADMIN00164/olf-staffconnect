@@ -461,12 +461,13 @@
     #grPage .gr-an-table tr.gr-an-zero td.gr-an-num { color: #dc2626; }
     #grPage .gr-an-table tr.gr-an-zero:hover td { background: #fee2e2; }
 
-    /* "Extra" rows: a district in the data but not on the master list */
-    #grPage .gr-an-table tr.gr-an-extra .gr-an-dname::after {
-        content: "not in master list"; margin-left: 8px;
-        font-size: 9px; font-weight: 700; color: #b45309; background: #fef3c7;
-        padding: 1px 6px; border-radius: 20px; text-transform: uppercase;
-        letter-spacing: .3px; vertical-align: middle;
+    /* Shown in the meta line only when the sheet holds a district outside
+       the master 50 that no mapping rule covers, so its uploads are not
+       counted in the table. Normally absent. */
+    #grPage .gr-an-warn {
+        display: inline-block; margin-left: 8px; cursor: help;
+        font-size: 11px; font-weight: 700; color: #b45309; background: #fffbeb;
+        border: 1px solid #fde68a; padding: 2px 9px; border-radius: 20px;
     }
 
     /* Sticky totals footer */
@@ -567,6 +568,135 @@
     #grPage .gr-file-hint--info { color: #6b7280; }
     #grPage .gr-file-hint--warn { color: #b45309; font-weight: 700; }
     #grPage .gr-file-hint--err  { color: #dc2626; font-weight: 700; }
+
+
+    /* ============ Analytics community tabs ============ */
+    /* Scrolls sideways rather than wrapping, so on a phone the strip stays
+       one line and the active tab can be scrolled into view. */
+    #grPage .gr-an-tabs {
+        display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 10px;
+        margin-bottom: 4px; -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+    }
+    #grPage .gr-an-tabs::-webkit-scrollbar { height: 5px; }
+    #grPage .gr-an-tabs::-webkit-scrollbar-thumb { background: #d7dde7; border-radius: 999px; }
+    #grPage .gr-an-tab {
+        flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px;
+        border: 1px solid #e3e8ef; background: #fff; color: #4b5563;
+        font-size: 12px; font-weight: 700; font-family: inherit;
+        padding: 7px 13px; border-radius: 999px; cursor: pointer;
+        transition: background .12s, border-color .12s, color .12s;
+        white-space: nowrap;
+    }
+    #grPage .gr-an-tab:hover { background: #f4f7fb; border-color: #cfd8e3; }
+    #grPage .gr-an-tab.active {
+        background: #4f8ef7; border-color: #4f8ef7; color: #fff;
+        box-shadow: 0 2px 8px rgba(79,142,247,.35);
+    }
+    #grPage .gr-an-tab-count {
+        font-size: 10.5px; font-weight: 800; padding: 1px 7px; border-radius: 999px;
+        background: #eef2f7; color: #6b7280; font-variant-numeric: tabular-nums;
+    }
+    #grPage .gr-an-tab.active .gr-an-tab-count { background: rgba(255,255,255,.25); color: #fff; }
+    /* A community with nothing uploaded at all is worth spotting. */
+    #grPage .gr-an-tab-count--zero { background: #fee2e2; color: #dc2626; }
+    #grPage .gr-an-tab.active .gr-an-tab-count--zero { background: rgba(255,255,255,.3); color: #fff; }
+
+
+    /* ============ Analytics table: reading the numbers ============ */
+    /* Tighter rows than the other tables: this one is scanned vertically,
+       so less leading between rows means more of it fits on screen. */
+    #grPage .gr-an-table tbody td { padding: 6px 10px; }
+    #grPage .gr-an-table thead th { padding: 7px 10px; }
+
+    /* Zebra striping. Very light, purely to help the eye track across a
+       row of five numbers without drifting a line. */
+    #grPage .gr-an-table tbody tr:nth-child(even) td { background: #fcfdfe; }
+    #grPage .gr-an-table tbody tr:hover td { background: #f2f7ff; }
+
+    /* Group divider between Total | GRs | Circulars. */
+    #grPage .gr-an-table th.gr-an-gsep,
+    #grPage .gr-an-table td.gr-an-gsep { border-left: 1px solid #e8edf4; }
+
+    /* TOTAL UPLOADED — the ranking column, so it gets the emphasis:
+       tinted, bolder, larger, and separated from the breakdown columns. */
+    #grPage .gr-an-table th.gr-an-totcol {
+        background: #eef4ff; color: #2f6fd0; border-right: 1px solid #dbe6f7;
+    }
+    #grPage .gr-an-table td.gr-an-total {
+        position: relative; text-align: right; white-space: nowrap;
+        background: #f6f9ff; border-right: 1px solid #e6eefb;
+        font-variant-numeric: tabular-nums; font-weight: 800;
+        font-size: 13.5px; color: #1a1d23;
+    }
+    #grPage .gr-an-table tbody tr:nth-child(even) td.gr-an-total { background: #f2f7ff; }
+    #grPage .gr-an-table tbody tr:hover td.gr-an-total { background: #e8f1ff; }
+
+    /* Share bar across the district column. The district column is the wide
+       one, so a bar here is long enough to compare at a glance — and it fills
+       space that was otherwise empty. Sits behind the text, low contrast. */
+    #grPage .gr-an-table td:first-child { position: relative; }
+    #grPage .gr-an-dbar {
+        position: absolute; left: 0; top: 3px; bottom: 3px; z-index: 0;
+        background: linear-gradient(90deg, rgba(79,142,247,.16), rgba(79,142,247,.05));
+        border-right: 2px solid rgba(79,142,247,.35);
+        border-radius: 0 3px 3px 0; pointer-events: none;
+    }
+    #grPage .gr-an-rank, #grPage .gr-an-dname, #grPage .gr-an-comm { position: relative; z-index: 1; }
+    /* Empty districts get no bar, and their red row tint should not be
+       overlaid by one either. */
+    #grPage .gr-an-table tr.gr-an-zero .gr-an-dbar { display: none; }
+
+    /* Breakdown numbers: tabular figures, right-aligned, so digits line up
+       column-wise and two rows can be compared at a glance. */
+    #grPage .gr-an-table td.gr-an-num { font-size: 12.5px; font-weight: 700; }
+    /* Validated counts are the ones people look for, so they keep the green;
+       a zero is dimmed right down so it never draws the eye. */
+    #grPage .gr-an-table td.gr-an-val { color: #16a34a; }
+    #grPage .gr-an-table td.gr-an-zero-num { color: #d5dbe3; font-weight: 600; }
+
+    /* District cell: name and community on two tight lines. */
+    #grPage .gr-an-table td:first-child { padding-left: 12px; }
+    #grPage .gr-an-dname { font-size: 12.5px; }
+
+    /* Footer figures match the body's alignment. */
+    #grPage .gr-an-table tfoot td.gr-an-fnum,
+    #grPage .gr-an-table tfoot td.gr-an-total {
+        text-align: right; font-variant-numeric: tabular-nums;
+    }
+    #grPage .gr-an-table tfoot td.gr-an-total {
+        background: #eaf1fd; color: #1a1d23; font-size: 13.5px;
+    }
+
+
+
+    /* Date inputs in a filter bar — matched to the filter selects so the
+       row reads as one set of controls. */
+    #grPage .gr-date-input {
+        padding: 6px 9px; border: 1px solid #e5e7eb; border-radius: 8px;
+        font-size: 12.5px; font-family: inherit; outline: none; background: #fff;
+        color: #1f2937; min-width: 0;
+    }
+    #grPage .gr-date-input:focus {
+        border-color: #4f8ef7; box-shadow: 0 0 0 3px rgba(79,142,247,0.12);
+    }
+    /* A set date reads as active, so it is obvious why counts look low. */
+    #grPage .gr-date-input.gr-date-set {
+        border-color: #4f8ef7; background: #f5f9ff; font-weight: 700;
+    }
+
+
+    /* Export + clear sit together at the right end of the filter bar. */
+    #grPage .gr-an-actions { display: flex; gap: 8px; align-items: center; }
+    #grPage .gr-export-btn {
+        display: inline-flex; align-items: center; gap: 6px;
+        border: 1px solid #16a34a; background: #16a34a; color: #fff;
+        font-size: 12px; font-weight: 700; font-family: inherit;
+        padding: 7px 13px; border-radius: 8px; cursor: pointer; white-space: nowrap;
+        transition: background .12s, box-shadow .12s;
+    }
+    #grPage .gr-export-btn:hover { background: #15803d; box-shadow: 0 2px 8px rgba(22,163,74,.3); }
+    #grPage .gr-export-btn:disabled { background: #9ca3af; border-color: #9ca3af; cursor: default; box-shadow: none; }
 
 
 </style>
@@ -859,17 +989,32 @@
 
     <!-- ============ ANALYTICS PANEL ============ -->
     <div class="gr-panel" data-panel="analytics">
+        <!-- One tab per community. Built in JS so each can carry its own
+             upload count, and so the list never drifts from STATE_LABELS. -->
+        <div class="gr-an-tabs" id="grAnTabs" role="tablist"></div>
+
         <div class="gr-filters">
-            <div class="gr-filter">
-                <label>Community</label>
-                <div class="gr-ms" id="grAnCommMS"></div>
-            </div>
             <div class="gr-filter">
                 <label>District</label>
                 <div class="gr-ms" id="grAnDistrictMS"></div>
             </div>
+            <div class="gr-filter">
+                <label for="grAnFrom">Uploaded from</label>
+                <input type="date" id="grAnFrom" class="gr-date-input">
+            </div>
+            <div class="gr-filter">
+                <label for="grAnTo">Uploaded to</label>
+                <input type="date" id="grAnTo" class="gr-date-input">
+            </div>
+            <div class="gr-filter">
+                <label>Columns</label>
+                <div class="gr-ms" id="grAnColsMS"></div>
+            </div>
             <div class="gr-filter gr-filter-clear">
-                <button type="button" class="gr-clear-btn" id="grAnClear" title="Reset the community & district filters">↺ Clear filters</button>
+                <div class="gr-an-actions">
+                    <button type="button" class="gr-export-btn" id="grAnExport" title="Download exactly what is shown below — same communities, districts, dates and columns">⬇ Download Excel</button>
+                    <button type="button" class="gr-clear-btn" id="grAnClear" title="Reset community, district, dates and columns">↺ Clear filters</button>
+                </div>
             </div>
         </div>
 
@@ -877,20 +1022,15 @@
 
         <div class="gr-table-wrap gr-an-wrap">
             <table class="gr-table gr-an-table">
-                <colgroup>
-                    <col style="width:34%"><col style="width:16.5%"><col style="width:16.5%"><col style="width:16.5%"><col style="width:16.5%">
-                </colgroup>
+                <!-- colgroup and header row are built in JS: the column
+                     chooser removes columns outright and the remaining
+                     widths re-balance, rather than leaving blank gaps. -->
+                <colgroup id="grAnCols"></colgroup>
                 <thead>
-                    <tr>
-                        <th class="gr-an-dcol">District</th>
-                        <th>GRs<br>Uploaded</th>
-                        <th>GRs<br>Validated</th>
-                        <th>Circulars<br>Uploaded</th>
-                        <th>Circulars<br>Validated</th>
-                    </tr>
+                    <tr id="grAnHead"></tr>
                 </thead>
                 <tbody id="grAnBody">
-                    <tr><td colspan="5" class="gr-empty-cell">
+                    <tr><td colspan="6" class="gr-empty-cell">
                         <div class="gr-empty"><div class="gr-empty-icon">⏳</div>Loading analytics…</div>
                     </td></tr>
                 </tbody>
