@@ -1,7 +1,7 @@
 console.log("POM JS FILE LOADED");
 
 const API_URL =
-  "https://script.google.com/macros/s/AKfycbyHvxHR2nzx8JZ2FRDtx5dSqnrQVieOiPWguZCIKtohD1TBDdENPjyzlJhQwQEHYdJfUw/exec";
+  "https://script.google.com/macros/s/AKfycbxTITLCE-CwfLLW9p5nwf7Tziy2xNj7oQtsctbVmG8C4toadIGq5x63qR4w17ZluZXt/exec";
 
 const VERIFIER_COLLECTION = "verifier";
 
@@ -1363,6 +1363,9 @@ window.initPomPageUI = function () {
 
   // Init dashboard (uses shared allMonths + monthCache via shared state)
   initDashboard();
+
+  // Init Event Management (its own tab; independent of the award data)
+  pevInit();
 };
 
 // ===============================
@@ -1371,23 +1374,33 @@ window.initPomPageUI = function () {
 window.switchPomTab = function (tab) {
   // The Award Data Dashboard tab stays disabled (showing a spinner) until its
   // data has finished loading, so the user can never land on an empty/error view.
+  // Event Management has no such dependency — it loads its own data.
   if (tab === "dash" && !dashLoaded) return;
 
   const manage = document.getElementById("pomManageView");
   const dash   = document.getElementById("pomDashView");
+  const event  = document.getElementById("pomEventView");
   const tManage = document.getElementById("tabManage");
   const tDash   = document.getElementById("tabDash");
+  const tEvent  = document.getElementById("tabEvent");
+
+  const hideView = (el) => { if (el) { el.style.display = "none"; el.classList.remove("active"); } };
+  const showView = (el) => { if (el) { el.style.display = "flex"; el.classList.add("active"); } };
+
+  hideView(manage); hideView(dash); hideView(event);
+  [tManage, tDash, tEvent].forEach(t => { if (t) t.classList.remove("active"); });
+
   if (tab === "dash") {
-    if (manage) manage.style.display = "none";
-    if (dash)   { dash.style.display = "flex"; dash.classList.add("active"); }
-    if (tManage) tManage.classList.remove("active");
-    if (tDash)   tDash.classList.add("active");
+    showView(dash);
+    if (tDash) tDash.classList.add("active");
     renderPomDashboard();
+  } else if (tab === "event") {
+    showView(event);
+    if (tEvent) tEvent.classList.add("active");
+    pevOnShow();
   } else {
-    if (dash)   { dash.style.display = "none"; dash.classList.remove("active"); }
-    if (manage) manage.style.display = "flex";
+    showView(manage);
     if (tManage) tManage.classList.add("active");
-    if (tDash)   tDash.classList.remove("active");
   }
 };
 
@@ -2263,3 +2276,606 @@ function _zipStore(files) {
   let p = 0; all.forEach(a => { out.set(a, p); p += a.length; });
   return out;
 }
+
+
+// =============================================================================
+// EVENT MANAGEMENT  (all functions prefixed pev*)
+// =============================================================================
+// A standalone tab. Pick a district, and every month that Award Management
+// shows for that district appears as a row with four counts to fill in:
+//   Total Block Events | Total District Events |
+//   Teachers Felicitated (Block Level) | Teachers Felicitated (District Level) |
+//   SU/NS Events | Teachers Felicitated (SU/NS Events)
+//
+// The counts live in their own Google Sheet ("Event Management Data") created by
+// Code.gs inside the same Drive folder. Nothing here reads or writes the award
+// data, and the module never appears on the Award Data Dashboard.
+// =============================================================================
+
+let pevEvents        = [];      // every saved row from Event Management Data
+let pevEventsLoaded  = false;
+let pevEventsLoading = false;
+let pevDistrict      = "";      // district currently open in this tab
+let pevYear          = "";      // academic year currently open in this tab
+let pevRows          = [];      // rows on screen for pevDistrict + pevYear
+let pevSaving        = false;   // a save is in flight
+let pevDistricts     = [];      // district list backing the dropdown
+
+// The six editable count fields, in column order.
+const PEV_FIELDS = [
+  { key: "blockEvents",      label: "Total Block Events" },
+  { key: "districtEvents",   label: "Total District Events" },
+  { key: "blockTeachers",    label: "Teachers Felicitated (Block Level)" },
+  { key: "districtTeachers", label: "Teachers Felicitated (District Level)" },
+  { key: "suNsEvents",       label: "SU/NS Events" },
+  { key: "suNsTeachers",     label: "Teachers Felicitated (SU/NS Events)" }
+];
+
+// ── Academic years ───────────────────────────────────────────────────────────
+// An academic year runs June → May, so AY 2026-27 is Jun-2026 … May-2027. Rows
+// are generated from this, NOT from the award data, so a district can log events
+// in a month that has no awards.
+const PEV_MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const PEV_AY_START_MONTH = 6;              // June (1-based)
+const PEV_YEARS = ["2026-27", "2027-28", "2028-29"];
+const PEV_DEFAULT_YEAR = "2026-27";
+
+// "2026-27" -> ["Jun-2026", ... , "May-2027"]
+function pevMonthsForYear(year) {
+  const startYear = parseInt(String(year).split("-")[0], 10);
+  if (isNaN(startYear)) return [];
+  const out = [];
+  for (let i = 0; i < 12; i++) {
+    const mi = (PEV_AY_START_MONTH - 1 + i) % 12;                    // 0-based month
+    const yr = startYear + (PEV_AY_START_MONTH - 1 + i >= 12 ? 1 : 0);
+    out.push(PEV_MONTH_NAMES[mi] + "-" + yr);
+  }
+  return out;
+}
+
+// ── District list (cached, refreshed in the background) ──────────────────────
+// The names come from Raw Data, but we do NOT wait on that request to paint the
+// dropdown. The list is kept in localStorage and reused instantly on every
+// visit; a refresh runs quietly in the background once the cache is older than
+// PEV_DISTRICTS_TTL_MS, so a district newly added to Raw Data appears on its own
+// without anyone touching this file.
+const PEV_DISTRICTS_KEY = "olfPomEventDistricts.v1";
+const PEV_DISTRICTS_TTL_MS = 12 * 60 * 60 * 1000;   // 12 hours
+
+function pevReadDistrictCache() {
+  try {
+    const raw = localStorage.getItem(PEV_DISTRICTS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.districts) || !parsed.districts.length) return null;
+    return parsed;                                   // { districts, savedAt }
+  } catch (e) { return null; }
+}
+
+function pevWriteDistrictCache(districts) {
+  try {
+    localStorage.setItem(PEV_DISTRICTS_KEY,
+      JSON.stringify({ districts: districts, savedAt: Date.now() }));
+  } catch (e) { /* storage full or blocked — the in-memory list still works */ }
+}
+
+// Districts that only exist in saved event data are folded in too, so a row
+// already in the sheet can never become unreachable from the dropdown.
+function pevDistrictsFromEvents() {
+  return [...new Set(pevEvents.map(r => String(r.districtName || "").trim()).filter(Boolean))];
+}
+
+function pevMergeDistricts(list) {
+  const merged = [...new Set([...(list || []), ...pevDistrictsFromEvents()].filter(Boolean))];
+  merged.sort((a, b) => a.localeCompare(b));
+  return merged;
+}
+
+// Ask Raw Data for the current district list and update the cache. Runs in the
+// background; failure is silent because the cached list is already on screen.
+async function pevRefreshDistrictsFromServer() {
+  try {
+    const res = await fetch(`${API_URL}?action=getFilters`);
+    const data = await res.json();
+    const fromRaw = (data && Array.isArray(data.districts)) ? data.districts.filter(Boolean) : [];
+    if (!fromRaw.length) return false;
+    pevWriteDistrictCache(fromRaw);
+    const before = pevDistricts.join("|");
+    pevDistricts = pevMergeDistricts(fromRaw);
+    if (pevDistricts.join("|") !== before) pevRenderDistrictOptions();
+    return true;
+  } catch (e) {
+    console.error("District list refresh failed:", e);
+    return false;
+  }
+}
+
+function pevInit() {
+  const dd = document.getElementById("pevDistrict");
+  if (dd) {
+    const fresh = dd.cloneNode(true);
+    dd.parentNode.replaceChild(fresh, dd);
+    fresh.addEventListener("change", pevOnDistrictChange);
+  }
+
+  const yearDd = document.getElementById("pevYear");
+  if (yearDd) {
+    const freshYear = yearDd.cloneNode(true);
+    yearDd.parentNode.replaceChild(freshYear, yearDd);
+    freshYear.addEventListener("change", pevOnYearChange);
+  }
+
+  const refreshBtn = document.getElementById("pevRefreshBtn");
+  if (refreshBtn) refreshBtn.onclick = (e) => { e.stopPropagation(); pevRefresh(); };
+
+  const saveAllBtn = document.getElementById("pevSaveAllBtn");
+  if (saveAllBtn) saveAllBtn.onclick = (e) => { e.stopPropagation(); pevSaveAll(); };
+}
+
+// Called every time the Event Management tab is opened.
+function pevOnShow() {
+  pevPopulateYears();
+  pevPopulateDistricts();
+  if (!pevEventsLoaded && !pevEventsLoading) pevLoadEvents();
+}
+
+function pevPopulateYears() {
+  const dd = document.getElementById("pevYear");
+  if (!dd) return;
+  if (!pevYear) pevYear = PEV_DEFAULT_YEAR;
+  if (!dd.options.length) {
+    dd.innerHTML = PEV_YEARS.map(y => `<option value="${y}">AY ${y}</option>`).join("");
+  }
+  dd.value = pevYear;
+}
+
+// The district list is the same one Award Management uses, so we mirror the
+// options straight from that <select> once loadFilters() has filled it.
+function pevRenderDistrictOptions() {
+  const dd = document.getElementById("pevDistrict");
+  if (!dd) return;
+  const keep = pevDistrict;
+  dd.innerHTML = '<option value="">Select District</option>' +
+    pevDistricts.map(d => `<option value="${d}">${d}</option>`).join("");
+  dd.disabled = false;
+  if (keep && pevDistricts.indexOf(keep) >= 0) dd.value = keep;
+}
+
+function pevPopulateDistricts() {
+  const dd = document.getElementById("pevDistrict");
+  if (!dd) return;
+
+  // 1) Paint whatever we can right now — cache first, then the list the award
+  //    module may already have fetched this session. No waiting.
+  if (!pevDistricts.length) {
+    const cached = pevReadDistrictCache();
+    if (cached) pevDistricts = pevMergeDistricts(cached.districts);
+  }
+  if (!pevDistricts.length) {
+    const src = document.getElementById("pomDistrict");
+    const fromAward = src ? Array.from(src.options).map(o => o.value).filter(Boolean) : [];
+    if (fromAward.length) {
+      pevDistricts = pevMergeDistricts(fromAward);
+      pevWriteDistrictCache(fromAward);
+    }
+  }
+
+  if (pevDistricts.length) {
+    pevRenderDistrictOptions();
+  } else {
+    dd.innerHTML = '<option value="">Loading districts…</option>';
+    dd.disabled = true;
+  }
+
+  // 2) Refresh in the background only when the cache is missing or stale, so a
+  //    newly added Raw Data district turns up without slowing anyone down.
+  const cached = pevReadDistrictCache();
+  const stale = !cached || (Date.now() - (cached.savedAt || 0)) > PEV_DISTRICTS_TTL_MS;
+  if (stale) {
+    pevRefreshDistrictsFromServer().then(ok => {
+      if (!ok && !pevDistricts.length) {
+        const el = document.getElementById("pevDistrict");
+        if (el) {
+          el.innerHTML = '<option value="">Couldn\u2019t load districts \u2014 use Refresh</option>';
+          el.disabled = false;
+        }
+      }
+    });
+  }
+}
+
+// ── Load the saved event rows ────────────────────────────────────────────────
+async function pevLoadEvents() {
+  pevEventsLoading = true;
+  try {
+    const res = await fetch(`${API_URL}?action=getEvents`);
+    const rows = await res.json();
+    if (!Array.isArray(rows)) throw new Error("getEvents is not deployed yet");
+    pevEvents = rows;
+    pevEventsLoaded = true;
+    // A district may appear in the event sheet without being in Raw Data (a
+    // rename, or a row saved before the district was added). Merge those in so
+    // saved data is never stranded out of reach of the dropdown.
+    const beforeMerge = pevDistricts.join("|");
+    pevDistricts = pevMergeDistricts(pevDistricts);
+    if (pevDistricts.join("|") !== beforeMerge) pevRenderDistrictOptions();
+    if (pevDistrict) pevBuildRows();
+  } catch (e) {
+    console.error("Event data load failed:", e);
+    pevEvents = [];
+    pevEventsLoaded = false;
+    pevMessage("Couldn't load saved event data. Use Refresh to try again.", true);
+  } finally {
+    pevEventsLoading = false;
+  }
+}
+
+// Months to show for a district = exactly the months Award Management lists for
+// it. The dashboard's bulk data already knows this when it has loaded; if not,
+// fall back to asking the server month by month (same request the award list
+// makes) and cache the answer for the session.
+// Rows are the twelve months of the selected academic year — always all of
+// them, whether or not anything is saved yet. Event Management Data is the only
+// sheet this tab reads, so nothing here depends on the award data.
+function pevCurrentMonths() {
+  return pevMonthsForYear(pevYear || PEV_DEFAULT_YEAR);
+}
+
+// A district may have saved rows for months outside the year on screen (for
+// example a month logged before the year ran June → May). Those rows are never
+// touched, but we surface them so they don't quietly disappear from view.
+function pevOutOfRangeMonths() {
+  const shown = new Set(pevCurrentMonths());
+  return pevEvents
+    .filter(r => String(r.districtName || "").trim() === pevDistrict)
+    .map(r => String(r.month || "").trim())
+    .filter(m => m && !shown.has(m));
+}
+
+function pevRenderNote() {
+  const el = document.getElementById("pevNote");
+  if (!el) return;
+  const extra = pevDistrict ? pevOutOfRangeMonths() : [];
+  if (!extra.length) { el.style.display = "none"; el.textContent = ""; return; }
+  el.textContent = `Note: ${pevDistrict} also has saved data for ${extra.join(", ")}, `
+    + `which falls outside AY ${pevYear}. That data is untouched in the sheet.`;
+  el.style.display = "block";
+}
+
+async function pevOnDistrictChange() {
+  const dd = document.getElementById("pevDistrict");
+  const district = dd ? dd.value : "";
+
+  if (pevHasUnsaved()) {
+    const choice = await showModal({
+      title: "Unsaved event data",
+      message: "You have counts that haven't been saved yet. They'll be lost if you switch district now.",
+      buttons: [
+        { label: "Cancel", value: "cancel", variant: "cancel" },
+        { label: "Discard & Switch", value: "go", variant: "danger" }
+      ]
+    });
+    if (choice !== "go") { if (dd) dd.value = pevDistrict; return; }
+  }
+
+  pevDistrict = district;
+  pevRows = [];
+
+  if (!district) {
+    pevMessage("Select a District to begin");
+    pevUpdateSaveBar();
+    pevRenderNote();
+    return;
+  }
+
+  // The months are generated locally, so the table can be drawn at once. If the
+  // saved rows haven't arrived yet the inputs simply start empty and fill in.
+  pevBuildRows();
+  if (!pevEventsLoaded && !pevEventsLoading) {
+    await pevLoadEvents();
+    if (pevDistrict !== district) return;        // user switched again mid-load
+    pevBuildRows();
+  }
+}
+
+async function pevOnYearChange() {
+  const dd = document.getElementById("pevYear");
+  const year = dd ? dd.value : PEV_DEFAULT_YEAR;
+
+  if (pevHasUnsaved()) {
+    const choice = await showModal({
+      title: "Unsaved event data",
+      message: "You have counts that haven't been saved yet. They'll be lost if you switch academic year now.",
+      buttons: [
+        { label: "Cancel", value: "cancel", variant: "cancel" },
+        { label: "Discard & Switch", value: "go", variant: "danger" }
+      ]
+    });
+    if (choice !== "go") { if (dd) dd.value = pevYear; return; }
+  }
+
+  pevYear = year;
+  pevRows = [];
+  if (!pevDistrict) { pevMessage("Select a District to begin"); pevUpdateSaveBar(); pevRenderNote(); return; }
+  pevBuildRows();
+}
+
+// Build the on-screen rows for the open district by merging the month list with
+// whatever is already saved in Event Management Data.
+function pevBuildRows(monthsArg) {
+  const months = monthsArg || pevCurrentMonths();
+  const saved = {};
+  pevEvents.forEach(r => {
+    if (String(r.districtName || "").trim() === pevDistrict) saved[String(r.month || "").trim()] = r;
+  });
+
+  pevRows = months.map(m => {
+    const s = saved[m] || {};
+    const row = {
+      month: m,
+      districtName: pevDistrict,
+      updatedBy: s.updatedBy || "",
+      updatedAt: s.updatedAt || "",
+      _existed: false,
+      _dirty: false
+    };
+    PEV_FIELDS.forEach(f => { row[f.key] = s[f.key] === undefined || s[f.key] === null ? "" : String(s[f.key]); });
+    row._existed = PEV_FIELDS.some(f => String(row[f.key]).trim() !== "");
+    return row;
+  });
+
+  pevRender();
+  pevRenderNote();
+}
+
+function pevMessage(msg, isError) {
+  const tbody = document.getElementById("pevTableBody");
+  if (tbody) {
+    tbody.innerHTML = `<tr><td colspan="9" class="pom-msg${isError ? " error" : ""}">${msg}</td></tr>`;
+  }
+}
+
+// ── Validation ───────────────────────────────────────────────────────────────
+// A blank cell means "not entered yet" and is left blank in the sheet. Anything
+// entered must be a whole number of zero or more.
+function pevValidCount(v) {
+  const s = String(v == null ? "" : v).trim();
+  if (s === "") return true;
+  return /^\d+$/.test(s);
+}
+function pevRowHasAny(r) {
+  return PEV_FIELDS.some(f => String(r[f.key] == null ? "" : r[f.key]).trim() !== "");
+}
+function pevRowBadFields(r) {
+  return PEV_FIELDS.filter(f => !pevValidCount(r[f.key])).map(f => f.label);
+}
+function pevRowSaveable(r) {
+  return pevRowHasAny(r) && !pevRowBadFields(r).length;
+}
+function pevHasUnsaved() {
+  return (pevRows || []).some(r => r._dirty);
+}
+
+// ── Render ───────────────────────────────────────────────────────────────────
+function pevRender() {
+  const tbody = document.getElementById("pevTableBody");
+  if (!tbody) return;
+
+  if (!pevRows.length) {
+    pevMessage(pevDistrict ? "No data found for this district." : "Select a District to begin");
+    pevUpdateSaveBar();
+    return;
+  }
+
+  const totals = {};
+  PEV_FIELDS.forEach(f => { totals[f.key] = 0; });
+  pevRows.forEach(r => PEV_FIELDS.forEach(f => {
+    const n = Number(String(r[f.key]).trim());
+    if (String(r[f.key]).trim() !== "" && !isNaN(n)) totals[f.key] += n;
+  }));
+
+  tbody.innerHTML = pevRows.map((r, i) => `
+    <tr>
+      <td class="pev-month">${r.month}</td>
+      ${PEV_FIELDS.map(f => `
+      <td><input type="number" min="0" step="1" inputmode="numeric" class="pev-input${pevValidCount(r[f.key]) ? "" : " bad"}"
+                 value="${r[f.key] == null ? "" : r[f.key]}" placeholder="—"
+                 oninput="pevUpdateField(${i},'${f.key}',this.value)"></td>`).join("")}
+      <td class="col-center" id="pevsave-${i}">${pevRenderSaveCell(i)}</td>
+      <td class="pev-updated">${pevRenderUpdated(r)}</td>
+    </tr>`).join("") + `
+    <tr class="pev-totals">
+      <td class="pev-month">Total</td>
+      ${PEV_FIELDS.map(f => `<td>${totals[f.key]}</td>`).join("")}
+      <td></td><td></td>
+    </tr>`;
+
+  pevUpdateSaveBar();
+}
+
+function pevRenderSaveCell(index) {
+  const r = pevRows[index];
+  if (!r) return "";
+
+  if (!pevRowHasAny(r)) return "";                       // nothing entered yet
+  if (r._existed && !r._dirty) {
+    return `<span class="rowsave-saved" title="These counts are saved">${CHECK_SVG} Saved</span>`;
+  }
+  const ok = pevRowSaveable(r);
+  const cls = ok ? "rowsave-btn ready" : "rowsave-btn";
+  const title = ok ? "Save this month's counts" : "Counts must be whole numbers (0 or more)";
+  return `<button class="${cls}" title="${title}" onclick="pevSaveRow(${index})">${SAVE_SVG}Save</button>`;
+}
+
+function pevRenderUpdated(r) {
+  if (!r.updatedAt && !r.updatedBy) return "";
+  const who = nameFromEmail(r.updatedBy || "");
+  const when = String(r.updatedAt || "").trim();
+  return `${who ? `<span class="pev-who" title="${r.updatedBy}">${who}</span>` : ""}${when ? `<span class="pev-when">${when}</span>` : ""}`;
+}
+
+function pevRefreshRowControls(index) {
+  const cell = document.getElementById("pevsave-" + index);
+  if (cell) cell.innerHTML = pevRenderSaveCell(index);
+}
+
+function pevUpdateSaveBar() {
+  const bar = document.getElementById("pevSaveBar");
+  if (!bar) return;
+  const any = (pevRows || []).some(r => r._dirty && pevRowHasAny(r));
+  bar.style.display = any ? "block" : "none";
+}
+
+window.pevUpdateField = function (index, field, value) {
+  const r = pevRows[index];
+  if (!r) return;
+  r[field] = value;
+  r._dirty = true;
+  pevRefreshRowControls(index);
+  pevUpdateSaveBar();
+};
+
+// ── Save ─────────────────────────────────────────────────────────────────────
+function pevPayload(r) {
+  const rec = { month: r.month, districtName: pevDistrict, updatedBy: currentUser() };
+  PEV_FIELDS.forEach(f => { rec[f.key] = String(r[f.key] == null ? "" : r[f.key]).trim(); });
+  return rec;
+}
+
+async function pevPost(records) {
+  const res = await fetch(API_URL, {
+    method: "POST",
+    body: JSON.stringify({ action: "saveEvents", records: records })
+  });
+  const out = await res.json();
+  if (!out || !out.success) throw new Error((out && out.error) || "Save failed");
+  return out;
+}
+
+// Fold a saved row back into the local cache so a later district switch (or a
+// tab revisit) shows the saved values without another fetch.
+function pevCacheSaved(r, stamp) {
+  const me = currentUser();
+  r._existed = pevRowHasAny(r);
+  r._dirty = false;
+  r.updatedBy = me;
+  r.updatedAt = stamp || r.updatedAt || "";
+
+  const idx = pevEvents.findIndex(e =>
+    String(e.districtName || "").trim() === pevDistrict &&
+    String(e.month || "").trim() === r.month);
+  const entry = { month: r.month, districtName: pevDistrict, updatedBy: r.updatedBy, updatedAt: r.updatedAt };
+  PEV_FIELDS.forEach(f => { entry[f.key] = String(r[f.key] == null ? "" : r[f.key]).trim(); });
+  if (idx >= 0) pevEvents[idx] = entry;
+  else pevEvents.push(entry);
+}
+
+window.pevSaveRow = async function (index) {
+  const r = pevRows[index];
+  if (!r || pevSaving) return;
+
+  const bad = pevRowBadFields(r);
+  if (bad.length) {
+    showToast("These must be whole numbers (0 or more): " + bad.join(", ") + ".", "error");
+    return;
+  }
+  if (!pevRowHasAny(r)) { showToast("Enter at least one count before saving.", "info"); return; }
+
+  pevSaving = true;
+  const cell = document.getElementById("pevsave-" + index);
+  if (cell) cell.innerHTML = '<span class="img-status">⏳ Saving…</span>';
+
+  try {
+    const out = await pevPost([pevPayload(r)]);
+    pevCacheSaved(r, out.updatedAt);
+    pevRender();
+    showToast(`${r.month} — event data saved.`);
+  } catch (e) {
+    console.error(e);
+    pevRefreshRowControls(index);
+    showToast("Failed to save this month's event data.", "error");
+  } finally {
+    pevSaving = false;
+  }
+};
+
+async function pevSaveAll() {
+  if (pevSaving) return;
+
+  const dirtyRows = (pevRows || []).filter(r => r._dirty && pevRowHasAny(r));
+  if (!dirtyRows.length) { showToast("Nothing new to save.", "info"); return; }
+
+  const invalid = dirtyRows.filter(r => pevRowBadFields(r).length);
+  if (invalid.length) {
+    const names = invalid.map(r => r.month).slice(0, 4).join(", ");
+    const extra = invalid.length > 4 ? ` and ${invalid.length - 4} more` : "";
+    showToast(`Counts must be whole numbers (0 or more). Check ${names}${extra}.`, "error");
+    return;
+  }
+
+  const choice = await showModal({
+    title: "Save event data?",
+    message: `${dirtyRows.length} month${dirtyRows.length === 1 ? "" : "s"} will be saved for ${pevDistrict}.`,
+    buttons: [
+      { label: "Cancel", value: "cancel", variant: "cancel" },
+      { label: "Save", value: "go", variant: "primary" }
+    ]
+  });
+  if (choice !== "go") return;
+
+  pevSaving = true;
+  const btn = document.getElementById("pevSaveAllBtn");
+  if (btn) { btn.disabled = true; btn.innerText = "Saving..."; }
+  showLoader();
+
+  try {
+    const out = await pevPost(dirtyRows.map(pevPayload));
+    dirtyRows.forEach(r => pevCacheSaved(r, out.updatedAt));
+    pevRender();
+    showToast(dirtyRows.length === 1 ? "Event data saved." : dirtyRows.length + " months saved.");
+  } catch (e) {
+    console.error(e);
+    showToast("Failed to save event data.", "error");
+  } finally {
+    pevSaving = false;
+    if (btn) { btn.disabled = false; btn.innerText = "💾 Save All Changes"; }
+    hideLoader();
+  }
+}
+
+// Re-pull the saved rows from the sheet, discarding unsaved edits after asking.
+async function pevRefresh() {
+  if (pevSaving) return;
+
+  if (pevHasUnsaved()) {
+    const choice = await showModal({
+      title: "Refresh event data?",
+      message: "Refreshing will discard your unsaved counts and load the latest saved data.",
+      buttons: [
+        { label: "Cancel", value: "cancel", variant: "cancel" },
+        { label: "Discard & Refresh", value: "go", variant: "danger" }
+      ]
+    });
+    if (choice !== "go") return;
+  }
+
+  showLoader();
+  try {
+    pevEventsLoaded = false;
+    await Promise.all([pevLoadEvents(), pevRefreshDistrictsFromServer()]);
+    pevRenderDistrictOptions();
+    if (pevDistrict) pevBuildRows();
+    showToast("Event data refreshed.");
+  } catch (e) {
+    console.error(e);
+    showToast("Failed to refresh event data.", "error");
+  } finally {
+    hideLoader();
+  }
+}
+
+window.pevInit    = pevInit;
+window.pevOnShow  = pevOnShow;
+window.pevRefresh = pevRefresh;
+window.pevSaveAll = pevSaveAll;
+window.pevOnYearChange = pevOnYearChange;
