@@ -1168,16 +1168,25 @@ function frmSubmit() {
   var multi = !!(f.allowMultiple && f.multiMode);
   var answers = frmCollectAnswers();
 
-  var missing = f.questions.filter(function (q) {
-    if (!q.required) return false;
+  var missing = [];
+  f.questions.forEach(function (q, i) {
+    if (!q.required) return;
     var v = answers[q.id];
-    return v === '' || v === undefined || (Array.isArray(v) && !v.length);
+    if (v === '' || v === undefined || (Array.isArray(v) && !v.length)) {
+      missing.push({ q: q, n: i + 1 });
+    }
   });
   if (missing.length) {
-    frmToast('Still needed: ' +
-      missing.map(function (q) { return q.label; }).join(', '), 'error');
+    // Listing 20 long question titles in a toast produced a wall of red text.
+    // Say how many, mark them, and go to the first one instead.
+    frmMarkMissing(missing);
+    frmToast(missing.length === 1
+      ? 'One required question still needs an answer.'
+      : missing.length + ' required questions still need an answer.',
+      'error');
     return;
   }
+  frmMarkMissing([]);
 
   var entryKey = '', entryLabel = '', entryDept = '';
   if (multi && !editing) {
@@ -1324,6 +1333,55 @@ function frmAskOverride(d, payload) {
   });
 }
 
+/**
+ * Outlines the unanswered required questions, notes the count on each, and
+ * scrolls to the first. The highlight clears as soon as one is answered.
+ */
+function frmMarkMissing(missing) {
+  var all = document.querySelectorAll('.frm-q');
+  for (var i = 0; i < all.length; i++) {
+    all[i].classList.remove('is-missing');
+    var old = all[i].querySelector('.frm-q__need');
+    if (old) old.parentNode.removeChild(old);
+  }
+  if (!missing.length) return;
+
+  var first = null;
+  missing.forEach(function (m) {
+    var el = all[m.n - 1];
+    if (!el) return;
+    el.classList.add('is-missing');
+    var note = document.createElement('p');
+    note.className = 'frm-q__need';
+    note.textContent = 'This one is required.';
+    el.appendChild(note);
+    if (!first) first = el;
+  });
+
+  if (first) {
+    if (first.scrollIntoView) {
+      first.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+    var field = first.querySelector('input, textarea, select');
+    if (field && field.focus) field.focus({ preventScroll: true });
+  }
+
+  // Clear a mark as soon as that question is answered.
+  if (!frmMarkMissing.wired) {
+    frmMarkMissing.wired = true;
+    document.addEventListener('input', frmClearMark, true);
+    document.addEventListener('change', frmClearMark, true);
+  }
+}
+
+function frmClearMark(e) {
+  var q = e.target && e.target.closest ? e.target.closest('.frm-q') : null;
+  if (!q || !q.classList.contains('is-missing')) return;
+  q.classList.remove('is-missing');
+  var note = q.querySelector('.frm-q__need');
+  if (note) note.parentNode.removeChild(note);
+}
+
 var frmUnloadHandler = null;
 function frmGuardUnload(on) {
   if (on && !frmUnloadHandler) {
@@ -1356,8 +1414,8 @@ function frmBlankQuestion(n) {
 function frmNewForm() {
   frmState.pickView = 'all';
   frmState.draft = {
-    formId: '', clientFormId: frmUuid(), title: '', description: '',
-    status: 'draft',
+    formId: '', clientFormId: frmUuid(), baseUpdatedAt: '',
+    title: '', description: '', status: 'draft',
     allowMultiple: false, multiMode: '', entryDepts: [], scored: false,
     openFrom: '', openUntil: '',
     audience: 'ALL', audienceEmails: [],
@@ -1371,6 +1429,9 @@ function frmNewForm() {
 function frmDraftFrom(f) {
   return {
     formId: f.formId, clientFormId: '',
+    // The version this editor was opened on. Sent back on save so the
+    // server can refuse to overwrite somebody else's newer changes.
+    baseUpdatedAt: f.updatedAt || '',
     title: f.title || '', description: f.description || '',
     status: f.status, allowMultiple: !!f.allowMultiple,
     multiMode: f.multiMode || '',
@@ -2125,12 +2186,29 @@ function frmSaveDraft(status) {
   var hint = document.getElementById('frmBuilderHint');
   if (hint) hint.textContent = 'Saving\u2026';
 
+  frmSendSave(d, status, false);
+}
+
+/**
+ * @param overwrite  true only after the person has been told that somebody
+ *                   else changed this form since they opened it, and has
+ *                   chosen to replace their version anyway
+ */
+function frmSendSave(d, status, overwrite) {
+  var hint = document.getElementById('frmBuilderHint');
+
   frmBusyApi('saveForm', {
     form: Object.assign({}, d, { status: status }),
-    clientFormId: d.clientFormId || ''
+    clientFormId: d.clientFormId || '',
+    baseUpdatedAt: d.baseUpdatedAt || '',
+    overwriteStale: !!overwrite
   }, 'Saving form')
     .then(function (r) {
       if (hint) hint.textContent = '';
+
+      // Somebody else changed this form while it was open here.
+      if (r && r.stale) return frmAskStale(r, d, status);
+
       frmState.forms = r.forms || frmState.forms;
       frmState.draft = null;
       frmState.view = null;
@@ -2142,6 +2220,41 @@ function frmSaveDraft(status) {
       if (hint) hint.textContent = '';
       frmToast('Not saved: ' + err.message, 'error');
     });
+}
+
+/**
+ * Offers the only two honest choices when two admins have edited the same
+ * form: take their version, or knowingly replace it. Nothing is written
+ * until one is picked, so neither person loses work without being asked.
+ */
+function frmAskStale(r, d, status) {
+  return frmConfirm({
+    title: 'Someone else changed this form',
+    body: (r.updatedBy || 'Another admin') + ' saved changes at ' +
+          frmStamp(r.updatedAt) + ', after you opened it. Saving now would ' +
+          'replace their version with yours.',
+    detail: 'Discard mine to load their version instead. Nothing has been ' +
+            'saved yet either way, and a replaced version is recorded in the ' +
+            'activity log.',
+    ok: 'Replace theirs with mine',
+    cancel: 'Discard mine and reload',
+    danger: true
+  }).then(function (yes) {
+    if (yes) return frmSendSave(d, status, true);
+
+    // Take their version: drop this draft and reopen from the server.
+    var formId = d.formId;
+    frmState.draft = null;
+    frmState.view = null;
+    frmState.tab = 'settings';
+    frmToast('Your changes were discarded. Loading their version.', 'info');
+    return frmApi('getForm', { formId: formId }).then(function (g) {
+      frmStartDraft(g.form);
+    }).catch(function (err) {
+      frmRender();
+      frmToast(err.message, 'error');
+    });
+  });
 }
 
 /* -------------------------------------------------- 12b. form detail view */
@@ -2654,6 +2767,7 @@ window.frmRender = frmRender;
 window.frmOpenForm = frmOpenForm;
 window.frmCloseForm = frmCloseForm;
 window.frmSubmit = frmSubmit;
+window.frmMarkMissing = frmMarkMissing;
 window.frmAddEntry = frmAddEntry;
 window.frmCancelAdd = frmCancelAdd;
 window.frmEditEntry = frmEditEntry;
@@ -2684,6 +2798,8 @@ window.frmRemoveQuestion = frmRemoveQuestion;
 window.frmMoveQuestion = frmMoveQuestion;
 window.frmSyncDraft = frmSyncDraft;
 window.frmSaveDraft = frmSaveDraft;
+window.frmSendSave = frmSendSave;
+window.frmAskStale = frmAskStale;
 window.frmCancelBuilder = frmCancelBuilder;
 window.frmOpenAdmins = frmOpenAdmins;
 window.frmCloseAdmins = frmCloseAdmins;

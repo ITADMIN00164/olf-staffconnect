@@ -307,6 +307,17 @@
 #page-forms .frm-q__help { margin:0 0 7px 29px; font-size:12.5px; color:var(--soft); }
 #page-forms .frm-q .frm-input, #page-forms .frm-q .frm-opts { margin-left:29px;
   width:calc(100% - 29px); }
+/* An unanswered required question marks itself, so the message can stay
+   short instead of listing every title. */
+#page-forms .frm-q.is-missing { border-left:3px solid var(--stop);
+  padding-left:12px; margin-left:-15px; }
+#page-forms .frm-q.is-missing .frm-q__label { color:var(--stop); }
+#page-forms .frm-q.is-missing .frm-q__n { background:#fbe9e7;
+  color:var(--stop); }
+#page-forms .frm-q.is-missing .frm-input { border-color:#e0a9a1; }
+#page-forms .frm-q__need { margin:6px 0 0 29px; font-size:12px;
+  font-weight:600; color:var(--stop); }
+
 #page-forms .frm-key { background:var(--wash); border:1px solid var(--rule);
   border-radius:8px; padding:13px; margin-bottom:20px; }
 #page-forms .frm-key__label { display:block; font-size:13px; font-weight:600;
