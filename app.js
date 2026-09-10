@@ -938,6 +938,39 @@ async function renderUpcomingEvents() {
 
 const pageFragments = new Map();
 
+/* ====================================
+   STAFF LIST FOR OLF FORMS
+   The Forms audience picker needs every employee, but the Employees
+   page owns the `employees` array and only fills it when visited.
+   This fetches a slim copy once per page load and publishes it as
+   window.__olfEmployees for forms.js to read.
+==================================== */
+
+let staffListLoaded = false;
+
+async function ensureFormsStaffList() {
+    if (staffListLoaded && Array.isArray(window.__olfEmployees)) return;
+    try {
+        const snapshot = await getDocs(collection(db, "Employees"));
+        const list = [];
+        snapshot.forEach(d => {
+            const r = d.data();
+            const email = String(r.Email || "").trim();
+            if (!email) return;               // no email, cannot be a recipient
+            list.push({
+                name: String(r.Name || "").trim(),
+                email,
+                dept: String(r.Dept || "").trim()
+            });
+        });
+        window.__olfEmployees = list;
+        staffListLoaded = true;
+    } catch (err) {
+        // Never surfaced: the picker shows its own "not loaded" notice.
+        console.error("Forms: staff list load failed:", err);
+    }
+}
+
 async function getPageHtml(page) {
     if (pageFragments.has(page)) return pageFragments.get(page);
     const res  = await fetch(`pages/${page}.html`);
@@ -1084,6 +1117,23 @@ window.navigate = async function (page) {
         if (window.GRCirculars && typeof window.GRCirculars.mount === "function") {
             window.GRCirculars.mount();
         }
+    }
+
+    else if (page === "forms") {
+        // forms.js reads window.__olfUser itself, so there is nothing to
+        // inject here. Forms admin rights are decided by the Apps Script
+        // backend (SUPER_ADMINS in Code.gs), not by Firestore.
+        if (typeof window.frmInit === "function") {
+            window.frmInit();
+        }
+        // The audience picker needs the staff list. Off the critical path:
+        // the page renders first, and the picker refreshes if it is open.
+        ensureFormsStaffList().then(() => {
+            if (typeof window.frmRender === "function" &&
+                window.frmState && window.frmState.view === "builder") {
+                window.frmRender();
+            }
+        });
     }
 
     else if (

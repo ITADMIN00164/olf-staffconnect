@@ -1,0 +1,592 @@
+<!-- =====================================================================
+     OLF Staff Connect - OLF Forms
+     Lives at pages/forms.html: navigate() in app.js fetches page fragments
+     from `pages/${page}.html` and injects them into #pageContent.
+     ===================================================================== -->
+
+<!-- No class="page" here on purpose: index.html sets .page{display:none}
+     and only .page.active is shown. navigate() replaces #pageContent
+     instead of toggling .active, so this section must stay unclassed. -->
+<section id="page-forms">
+
+  <header class="frm-head">
+    <div class="frm-head__text">
+      <h1>OLF Forms</h1>
+      <p>Forms sent to you, and everything you have recorded so far.</p>
+    </div>
+    <div class="frm-head__side">
+      <span class="frm-hint" id="frmStatus"></span>
+      <button class="frm-btn" onclick="frmBootstrap(true)">Refresh</button>
+    </div>
+  </header>
+
+  <!-- The veil sits outside #frmShell so it stays sharp while the content
+       behind it blurs. -->
+  <div class="frm-shell" id="frmShell">
+    <div id="frmRoot">
+      <div class="frm-blank">Loading your forms&hellip;</div>
+    </div>
+  </div>
+
+  <div class="frm-veil" id="frmVeil" hidden aria-live="polite" aria-busy="false">
+    <div class="frm-veil__box">
+      <span class="frm-spin" aria-hidden="true"></span>
+      <span class="frm-veil__text">Working&hellip;</span>
+    </div>
+  </div>
+
+  <div class="frm-modal" id="frmModal" hidden></div>
+
+  <div class="frm-toasts" id="frmToasts"></div>
+
+</section>
+
+<style>
+/* Everything is scoped under #page-forms so no rule can leak into the
+   other modules that share this shell. */
+#page-forms {
+  --ink:    #14203a;   /* headings and body */
+  --soft:   #63708a;   /* secondary text */
+  --rule:   #dfe5ee;   /* hairlines and field borders */
+  --paper:  #ffffff;
+  --wash:   #f5f8fc;   /* quiet panel fill */
+  --accent: #2563c9;
+  --accent-deep: #1a49a0;
+  --go:     #0e7a52;   /* published / done */
+  --wait:   #a35a06;   /* draft */
+  --stop:   #b02a1e;   /* errors, archived */
+
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;   /* a ledger: keep figures aligned */
+  position: relative;
+}
+
+/* ---------------------------------------------------------------- header */
+#page-forms .frm-head { display:flex; flex-wrap:wrap; gap:14px;
+  align-items:flex-start; justify-content:space-between; margin-bottom:20px; }
+#page-forms .frm-head h1 { font-size:23px; line-height:1.15; margin:0 0 5px;
+  font-weight:640; letter-spacing:-0.011em; }
+#page-forms .frm-head p { margin:0; color:var(--soft); font-size:13.5px;
+  max-width:62ch; }
+#page-forms .frm-head__side { display:flex; align-items:center; gap:10px; }
+
+/* ------------------------------------------------------------------ tabs */
+#page-forms .frm-tabs { display:flex; gap:2px; border-bottom:1px solid var(--rule);
+  margin-bottom:22px; }
+#page-forms .frm-tab { appearance:none; background:none; border:0;
+  border-bottom:2px solid transparent; margin-bottom:-1px;
+  padding:9px 14px; font:inherit; font-size:14px; color:var(--soft);
+  cursor:pointer; }
+#page-forms .frm-tab:hover { color:var(--ink); }
+#page-forms .frm-tab.is-on { color:var(--accent); border-bottom-color:var(--accent);
+  font-weight:600; }
+
+/* --------------------------------------------------------------- buttons */
+#page-forms .frm-btn { appearance:none; background:var(--paper);
+  border:1px solid var(--rule); border-radius:7px; padding:8px 14px;
+  font:inherit; font-size:13px; line-height:1.25; color:var(--ink);
+  cursor:pointer; transition:background .12s ease, border-color .12s ease; }
+#page-forms .frm-btn:hover { background:var(--wash); border-color:#c9d3e2; }
+#page-forms .frm-btn:active { transform:translateY(1px); }
+#page-forms .frm-btn:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+#page-forms .frm-btn--key { background:var(--accent); border-color:var(--accent);
+  color:#fff; font-weight:550; }
+#page-forms .frm-btn--key:hover { background:var(--accent-deep);
+  border-color:var(--accent-deep); }
+#page-forms .frm-btn--tiny { padding:5px 9px; font-size:12px; border-radius:6px; }
+#page-forms .frm-btn--warn { color:var(--stop); border-color:#eec7c2; }
+#page-forms .frm-btn--warn:hover { background:#fdf3f2; border-color:#e0a9a1; }
+#page-forms .frm-btn--danger { background:var(--stop); border-color:var(--stop);
+  color:#fff; font-weight:550; }
+#page-forms .frm-btn--danger:hover { background:#8f2118; border-color:#8f2118; }
+#page-forms .frm-back { appearance:none; display:inline-flex; align-items:center;
+  gap:7px; background:var(--paper); border:1px solid var(--rule);
+  border-radius:7px; padding:7px 13px 7px 11px; margin-bottom:16px;
+  font:inherit; font-size:13px; font-weight:550; color:var(--ink);
+  cursor:pointer; transition:background .12s ease, border-color .12s ease; }
+#page-forms .frm-back::before { content:'\2190'; font-size:14px;
+  color:var(--accent); }
+#page-forms .frm-back:hover { background:var(--wash); border-color:#c9d3e2; }
+#page-forms .frm-back:active { transform:translateY(1px); }
+#page-forms .frm-rowacts { display:flex; flex-wrap:wrap; gap:5px; }
+
+#page-forms :focus-visible { outline:2px solid var(--accent); outline-offset:2px;
+  border-radius:4px; }
+
+/* ------------------------------------------------------------- headings */
+#page-forms .frm-h2 { font-size:14px; font-weight:620; margin:26px 0 10px;
+  letter-spacing:-0.005em; }
+#page-forms #frmBody > .frm-h2:first-child { margin-top:0; }
+#page-forms .frm-page__title { font-size:21px; font-weight:640; margin:0 0 6px;
+  letter-spacing:-0.011em; }
+#page-forms .frm-page__lede { margin:0 0 20px; color:var(--soft); font-size:13.5px;
+  max-width:70ch; }
+#page-forms .frm-page { max-width:820px; }
+
+/* ------------------------------------------------- figures (summary bar) */
+/* One inline bar with hairline dividers, not four identical cards. */
+#page-forms .frm-figures { display:flex; flex-wrap:wrap;
+  border:1px solid var(--rule); border-radius:10px; background:var(--paper);
+  padding:2px 0; margin-bottom:24px; }
+#page-forms .frm-figure { flex:1 1 96px; padding:12px 18px;
+  border-left:1px solid var(--rule); }
+#page-forms .frm-figure:first-child { border-left:0; }
+#page-forms .frm-figure__n { display:block; font-size:25px; font-weight:640;
+  line-height:1.05; letter-spacing:-0.02em; }
+#page-forms .frm-figure__l { display:block; font-size:12px; color:var(--soft);
+  margin-top:3px; }
+
+/* ----------------------------------------------------------- form items */
+#page-forms .frm-items { list-style:none; margin:0; padding:0;
+  display:flex; flex-direction:column; gap:10px; }
+#page-forms .frm-item { display:flex; gap:16px; align-items:center;
+  background:var(--paper); border:1px solid var(--rule); border-radius:10px;
+  padding:15px 17px; position:relative; overflow:hidden; }
+/* The status rail: carries state, so it is information rather than trim. */
+#page-forms .frm-item::before { content:''; position:absolute; inset:0 auto 0 0;
+  width:3px; background:var(--accent); }
+#page-forms .frm-item[data-done="true"]::before { background:var(--go); }
+#page-forms .frm-item__body { flex:1 1 auto; min-width:0; }
+#page-forms .frm-item__title { margin:0; font-size:15.5px; font-weight:600; }
+#page-forms .frm-item__desc { margin:4px 0 0; color:var(--soft); font-size:13px; }
+#page-forms .frm-item__meta { display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; }
+#page-forms .frm-meta { font-size:11.5px; color:var(--soft);
+  background:var(--wash); border-radius:5px; padding:3px 8px; }
+#page-forms .frm-meta b { font-weight:640; color:var(--ink); }
+#page-forms .frm-meta--done { background:#e6f3ec; color:var(--go); }
+#page-forms .frm-meta--done b { color:var(--go); }
+
+/* ----------------------------------------------------------------- grids */
+#page-forms .frm-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch;
+  border:1px solid var(--rule); border-radius:10px; background:var(--paper); }
+#page-forms .frm-grid { width:100%; border-collapse:collapse; font-size:13px; }
+#page-forms .frm-grid th, #page-forms .frm-grid td { text-align:left;
+  padding:10px 12px; border-bottom:1px solid var(--rule); vertical-align:top; }
+#page-forms .frm-grid thead th { background:var(--wash); font-weight:600;
+  font-size:12px; color:var(--soft); white-space:nowrap; }
+#page-forms .frm-grid tbody tr:last-child td { border-bottom:0; }
+#page-forms .frm-grid tbody tr:hover td { background:#fafcfe; }
+#page-forms .frm-grid__name { font-weight:550; }
+#page-forms .frm-grid__rail { width:3px; padding:0; background:var(--rule); }
+#page-forms .frm-grid__rail[data-state="published"] { background:var(--go); }
+#page-forms .frm-grid__rail[data-state="draft"] { background:var(--wait); }
+#page-forms .frm-grid__rail[data-state="closed"] { background:#9aa7bd; }
+#page-forms .frm-grid__rail[data-state="archived"] { background:var(--stop); }
+#page-forms .frm-num { text-align:right; }
+#page-forms .frm-soft { color:var(--soft); }
+#page-forms .frm-ref { display:block; font-size:11px; color:var(--soft);
+  font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+#page-forms .frm-tally { margin:9px 0 0; font-size:12px; color:var(--soft); }
+
+#page-forms .frm-tag { display:inline-block; font-size:11px; font-weight:600;
+  padding:2px 8px; border-radius:11px; text-transform:capitalize;
+  background:var(--wash); color:var(--soft); }
+#page-forms .frm-tag[data-state="published"] { background:#e6f3ec; color:var(--go); }
+#page-forms .frm-tag[data-state="draft"] { background:#fdf1e3; color:var(--wait); }
+#page-forms .frm-tag[data-state="archived"] { background:#f8e9e7; color:var(--stop); }
+
+/* ------------------------------------------------------ bars and notices */
+#page-forms .frm-bar { display:flex; flex-wrap:wrap; align-items:center; gap:9px;
+  margin-bottom:18px; }
+#page-forms .frm-bar__note { margin:0; font-size:12px; color:var(--soft);
+  flex:1 1 220px; }
+#page-forms .frm-blank { border:1px dashed #cfd8e6; border-radius:10px;
+  padding:30px 20px; text-align:center; color:var(--soft); font-size:13.5px; }
+#page-forms .frm-blank--tight { padding:18px; }
+#page-forms .frm-blank--bad { border-color:#eec7c2; color:var(--stop); }
+#page-forms .frm-blank__head { margin:0 0 5px; font-size:15px; font-weight:600;
+  color:var(--ink); }
+#page-forms .frm-blank--bad .frm-blank__head { color:var(--stop); }
+#page-forms .frm-blank__body { margin:0 0 14px; }
+#page-forms .frm-blank__body:last-child { margin-bottom:0; }
+#page-forms .frm-note { background:var(--wash); border:1px solid var(--rule);
+  border-radius:8px; padding:11px 13px; font-size:13px; color:var(--soft);
+  margin:0 0 14px; }
+#page-forms .frm-note--bad { background:#fdf3f2; border-color:#eec7c2;
+  color:var(--stop); }
+#page-forms .frm-hint { font-size:12px; color:var(--soft); }
+
+/* ---------------------------------------------------------------- sheets */
+#page-forms .frm-sheet { background:var(--paper); border:1px solid var(--rule);
+  border-radius:10px; padding:18px; margin-bottom:14px; }
+#page-forms .frm-sheet--quiet { background:var(--wash); }
+#page-forms .frm-sheet__head { display:flex; align-items:center; gap:9px;
+  font-size:14px; font-weight:620; margin:0 0 14px; }
+#page-forms .frm-sheet__foot { margin:12px 0 0; font-size:12px; color:var(--soft); }
+#page-forms .frm-count { font-size:11.5px; font-weight:600; color:var(--soft);
+  background:var(--paper); border:1px solid var(--rule); border-radius:9px;
+  padding:1px 7px; }
+#page-forms .frm-sheet--quiet .frm-count { background:var(--paper); }
+
+/* ---------------------------------------------------------------- fields */
+#page-forms .frm-field { margin-bottom:14px; }
+#page-forms .frm-field:last-child { margin-bottom:0; }
+#page-forms .frm-field > label { display:block; font-size:12.5px; font-weight:600;
+  color:var(--soft); margin-bottom:5px; }
+#page-forms .frm-field__note { margin:10px 0 0; font-size:12px; color:var(--soft); }
+#page-forms .frm-pair { display:flex; flex-wrap:wrap; gap:14px; }
+#page-forms .frm-pair > .frm-field { flex:1 1 190px; min-width:0; }
+#page-forms .frm-field--narrow { flex:0 0 110px; }
+#page-forms .frm-field--mid { display:flex; align-items:flex-end; padding-bottom:9px; }
+#page-forms .frm-input { width:100%; box-sizing:border-box; font:inherit;
+  font-size:14px; color:var(--ink); background:var(--paper);
+  border:1px solid #cfd8e6; border-radius:7px; padding:9px 11px;
+  transition:border-color .12s ease, box-shadow .12s ease; }
+#page-forms .frm-input:hover { border-color:#b6c3d6; }
+#page-forms .frm-input:focus { outline:none; border-color:var(--accent);
+  box-shadow:0 0 0 3px rgba(37,99,201,.14); }
+#page-forms .frm-input:disabled { background:var(--wash); color:var(--soft); }
+#page-forms .frm-input--auto { width:auto; min-width:200px; max-width:100%; }
+#page-forms textarea.frm-input { resize:vertical; line-height:1.5; }
+#page-forms .frm-star { color:var(--stop); margin-left:3px; }
+
+/* --------------------------------------------------------------- options */
+#page-forms .frm-opts { display:flex; flex-direction:column; gap:2px; }
+#page-forms .frm-opts--row { flex-direction:row; flex-wrap:wrap; gap:8px; }
+#page-forms .frm-opt > span { white-space:pre-wrap; }
+#page-forms .frm-opt { display:flex; align-items:flex-start; gap:9px;
+  font-size:14px; padding:8px 11px; border:1px solid transparent;
+  border-radius:7px; cursor:pointer; transition:background .12s ease; }
+#page-forms .frm-opt:hover { background:var(--wash); }
+#page-forms .frm-opt input { width:17px; height:17px; flex:0 0 auto; margin:1px 0 0;
+  accent-color:var(--accent); }
+#page-forms .frm-opt--wide { border-color:var(--rule); margin-bottom:8px; }
+#page-forms .frm-opt--wide b { display:block; font-weight:600; font-size:14px; }
+#page-forms .frm-opt--wide em { display:block; font-style:normal; font-size:12.5px;
+  color:var(--soft); margin-top:2px; line-height:1.45; }
+#page-forms .frm-opts--row .frm-opt { border-color:var(--rule); }
+
+/* --------------------------------------------------------- questions (fill) */
+#page-forms .frm-qs { display:flex; flex-direction:column; gap:20px; }
+#page-forms .frm-q__label { display:flex; gap:9px; align-items:baseline;
+  font-size:14.5px; font-weight:550; margin-bottom:7px; }
+#page-forms .frm-q__n { flex:0 0 auto; min-width:20px; height:20px;
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:11.5px; font-weight:640; color:var(--accent);
+  background:#eaf1fd; border-radius:5px; }
+#page-forms .frm-q__help { margin:0 0 7px 29px; font-size:12.5px; color:var(--soft); }
+#page-forms .frm-q .frm-input, #page-forms .frm-q .frm-opts { margin-left:29px;
+  width:calc(100% - 29px); }
+#page-forms .frm-key { background:var(--wash); border:1px solid var(--rule);
+  border-radius:8px; padding:13px; margin-bottom:20px; }
+#page-forms .frm-key__label { display:block; font-size:13px; font-weight:600;
+  margin-bottom:7px; }
+#page-forms .frm-key__note { margin:7px 0 0; font-size:12px; color:var(--soft); }
+
+/* ---------------------------------------------------- recorded entries */
+#page-forms .frm-entries { list-style:none; margin:0; padding:0;
+  display:flex; flex-direction:column; gap:1px; }
+#page-forms .frm-entry { display:flex; align-items:center; gap:12px;
+  background:var(--paper); border:1px solid var(--rule); border-radius:7px;
+  padding:9px 12px; }
+#page-forms .frm-entry.is-on { border-color:var(--accent);
+  box-shadow:0 0 0 2px rgba(37,99,201,.12); }
+#page-forms .frm-entry__key { font-weight:600; font-size:13.5px; flex:1 1 auto;
+  min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#page-forms .frm-entry__when { font-size:11.5px; color:var(--soft);
+  flex:0 0 auto; }
+#page-forms .frm-done { display:flex; flex-wrap:wrap; align-items:center;
+  gap:12px; background:#e9f4ee; border:1px solid #bfe0cd; border-radius:9px;
+  padding:12px 15px; margin-bottom:16px; font-size:13.5px; font-weight:550;
+  color:var(--go); }
+#page-forms .frm-done .frm-ref { display:inline; color:var(--go); opacity:.75; }
+#page-forms .frm-done__score { margin-left:auto; }
+#page-forms .frm-answers { margin:0; }
+#page-forms .frm-answers dt { font-size:12.5px; font-weight:600;
+  color:var(--soft); margin-top:14px; }
+#page-forms .frm-answers dt:first-child { margin-top:0; }
+#page-forms .frm-answers dd { margin:4px 0 0; font-size:14px;
+  padding-bottom:12px; border-bottom:1px solid var(--rule); }
+#page-forms .frm-answers dd:last-child { border-bottom:0; padding-bottom:0; }
+
+#page-forms .frm-addbar { display:flex; flex-wrap:wrap; align-items:center;
+  gap:12px; margin-top:14px; padding-top:14px;
+  border-top:1px solid var(--rule); }
+
+/* ---------------------------------------------------------------- picker */
+#page-forms .frm-picker { border-top:1px solid var(--rule); margin-top:13px;
+  padding-top:14px; }
+#page-forms .frm-picker__top { display:flex; align-items:center; gap:11px;
+  margin-bottom:11px; }
+#page-forms .frm-picker__top .frm-input { flex:1 1 auto; }
+#page-forms .frm-picker__n { font-size:12px; color:var(--soft); white-space:nowrap; }
+#page-forms .frm-picker__n.is-on { color:var(--accent); font-weight:640; }
+#page-forms .frm-chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:11px; }
+#page-forms .frm-chip { appearance:none; font:inherit; font-size:12px;
+  background:var(--paper); border:1px solid var(--rule); border-radius:14px;
+  padding:4px 12px; color:var(--ink); cursor:pointer;
+  transition:background .12s ease, color .12s ease, border-color .12s ease; }
+#page-forms .frm-chip:hover { background:var(--wash); }
+#page-forms .frm-chip.is-on { background:var(--accent); border-color:var(--accent);
+  color:#fff; font-weight:550; }
+#page-forms .frm-picker__acts { display:flex; flex-wrap:wrap; align-items:center;
+  gap:6px; margin-bottom:10px; }
+/* Segmented switch: which staff the list is showing. */
+#page-forms .frm-pickview { display:inline-flex; margin-right:auto;
+  border:1px solid var(--rule); border-radius:7px; overflow:hidden;
+  background:var(--paper); }
+#page-forms .frm-pv { appearance:none; background:none; border:0;
+  padding:6px 12px; font:inherit; font-size:12px; color:var(--soft);
+  cursor:pointer; transition:background .12s ease, color .12s ease; }
+#page-forms .frm-pv + .frm-pv { border-left:1px solid var(--rule); }
+#page-forms .frm-pv:hover { background:var(--wash); }
+#page-forms .frm-pv.is-on { background:var(--accent); color:#fff;
+  font-weight:600; }
+#page-forms .frm-people__none { margin:0; padding:22px 16px; text-align:center;
+  font-size:13px; color:var(--soft); }
+#page-forms .frm-people__none[hidden] { display:none; }
+#page-forms .frm-people { max-height:302px; overflow-y:auto;
+  -webkit-overflow-scrolling:touch; border:1px solid var(--rule);
+  border-radius:8px; background:var(--paper); }
+#page-forms .frm-person { display:flex; align-items:center; gap:11px;
+  padding:9px 12px; font-size:13px; cursor:pointer;
+  border-bottom:1px solid var(--rule); }
+#page-forms .frm-person:last-child { border-bottom:0; }
+#page-forms .frm-person:hover { background:var(--wash); }
+#page-forms .frm-person input { width:16px; height:16px; flex:0 0 auto; margin:0;
+  accent-color:var(--accent); }
+#page-forms .frm-person__name { flex:1 1 auto; min-width:0; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; }
+#page-forms .frm-person__dept { flex:0 0 auto; font-size:11.5px; color:var(--soft); }
+
+/* ---------------------------------------------------------------- admins */
+#page-forms .frm-admins { list-style:none; margin:0; padding:0;
+  display:flex; flex-direction:column; gap:8px; }
+#page-forms .frm-admin { display:flex; align-items:center; gap:14px;
+  border:1px solid var(--rule); border-radius:8px; padding:11px 13px; }
+#page-forms .frm-admin__who { flex:1 1 auto; min-width:0; }
+#page-forms .frm-admin__name { display:flex; align-items:center; gap:7px;
+  font-size:14px; font-weight:600; }
+#page-forms .frm-admin__you { font-size:10.5px; font-weight:640;
+  color:var(--accent); background:#eaf1fd; border-radius:4px; padding:1px 6px; }
+#page-forms .frm-admin__mail { display:block; font-size:12px; color:var(--soft);
+  margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#page-forms .frm-admin__meta { flex:0 0 auto; font-size:11.5px;
+  color:var(--soft); text-align:right; }
+#page-forms .frm-admin__fixed { flex:0 0 auto; font-size:11.5px;
+  color:var(--soft); font-style:italic; }
+#page-forms .frm-people--tall { max-height:360px; }
+#page-forms .frm-person--act { gap:12px; }
+#page-forms .frm-person--act .frm-person__name { font-weight:550; }
+#page-forms .frm-person__mail { display:block; font-size:11.5px;
+  color:var(--soft); font-weight:400; margin-top:1px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#page-forms .frm-person__is { flex:0 0 auto; font-size:11.5px;
+  color:var(--go); font-weight:600; }
+
+/* ------------------------------------------------------- builder blocks */
+#page-forms .frm-sub { border-top:1px solid var(--rule); margin-top:13px;
+  padding-top:14px; }
+#page-forms .frm-sub--tight { margin-top:10px; padding-top:12px; }
+#page-forms .frm-chip__n { display:inline-block; margin-left:7px;
+  font-size:10.5px; font-weight:640; opacity:.65; }
+
+/* One box per choice: a choice can be a paragraph, and it is always clear
+   which text belongs to which option. */
+#page-forms .frm-choicelist { display:flex; flex-direction:column; gap:7px; }
+#page-forms .frm-choicerow { display:flex; align-items:flex-start; gap:9px; }
+#page-forms .frm-choicerow__n { flex:0 0 auto; width:22px; height:34px;
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:11.5px; font-weight:640; color:var(--soft); }
+#page-forms .frm-choicerow__box { flex:1 1 auto; min-width:0; min-height:38px;
+  line-height:1.5; resize:vertical; overflow:hidden; white-space:pre-wrap; }
+#page-forms .frm-choicerow .frm-btn { margin-top:4px; flex:0 0 auto; }
+#page-forms .frm-addopt { appearance:none; display:inline-flex;
+  align-items:center; gap:8px; margin-top:9px; background:none;
+  border:1px dashed #a9c2ea; border-radius:7px; padding:7px 13px;
+  font:inherit; font-size:12.5px; font-weight:600; color:var(--accent-deep);
+  cursor:pointer; transition:background .12s ease; }
+#page-forms .frm-addopt:hover { background:#eef4fd; }
+#page-forms .frm-addopt__plus { display:inline-flex; align-items:center;
+  justify-content:center; width:17px; height:17px; border-radius:5px;
+  background:var(--accent); color:#fff; font-size:13px; line-height:1; }
+
+/* The answer key ticks real choices instead of retyping them. */
+#page-forms .frm-keylist { display:flex; flex-direction:column; gap:2px;
+  border:1px solid var(--rule); border-radius:7px; background:var(--paper);
+  padding:5px; max-height:230px; overflow-y:auto; }
+#page-forms .frm-opt--key { font-size:13px; padding:6px 8px;
+  align-items:flex-start; }
+#page-forms .frm-opt--key span { white-space:pre-wrap; line-height:1.45; }
+#page-forms .frm-keylist .frm-btn { align-self:flex-start; margin:4px 4px 2px; }
+#page-forms .frm-sub__ask { margin:0 0 9px; font-size:13px; font-weight:600; }
+#page-forms .frm-qlist { display:flex; flex-direction:column; gap:8px;
+  margin:14px 0; }
+
+/* A question is a one-line summary until it is opened. */
+#page-forms .frm-qcard { border:1px solid var(--rule); border-radius:9px;
+  background:var(--paper); overflow:hidden;
+  transition:border-color .12s ease, box-shadow .12s ease; }
+#page-forms .frm-qcard:hover { border-color:#c9d3e2; }
+#page-forms .frm-qcard[data-open="true"] { border-color:var(--accent);
+  box-shadow:0 0 0 3px rgba(37,99,201,.11); }
+#page-forms .frm-qcard__head { display:flex; align-items:center; gap:8px;
+  padding:6px 10px 6px 6px; }
+#page-forms .frm-qcard__toggle { flex:1 1 auto; min-width:0; appearance:none;
+  display:flex; align-items:center; gap:10px; background:none; border:0;
+  padding:7px 6px; font:inherit; text-align:left; cursor:pointer;
+  color:var(--ink); border-radius:6px; }
+#page-forms .frm-qcard__toggle:hover { background:var(--wash); }
+#page-forms .frm-qcard__n { flex:0 0 auto; width:22px; height:22px;
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:11.5px; font-weight:640; color:var(--accent); background:#eaf1fd;
+  border-radius:6px; }
+#page-forms .frm-qcard__title { flex:1 1 auto; min-width:0; font-size:14px;
+  font-weight:550; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#page-forms .frm-qcard__title.is-empty { color:var(--soft); font-weight:400;
+  font-style:italic; }
+#page-forms .frm-qcard__type { flex:0 0 auto; font-size:11.5px;
+  color:var(--soft); background:var(--wash); border-radius:5px;
+  padding:3px 8px; }
+#page-forms .frm-qcard__req { flex:0 0 auto; font-size:11px; font-weight:600;
+  color:var(--stop); }
+#page-forms .frm-qcard__chev { flex:0 0 auto; width:9px; height:9px;
+  border-right:2px solid var(--soft); border-bottom:2px solid var(--soft);
+  transform:rotate(45deg); margin:0 2px 3px 2px;
+  transition:transform .16s ease; }
+#page-forms .frm-qcard[data-open="true"] .frm-qcard__chev {
+  transform:rotate(-135deg); margin-bottom:0; margin-top:3px; }
+#page-forms .frm-qedit { border-top:1px solid var(--rule); padding:14px;
+  background:var(--wash); }
+#page-forms .frm-qedit .frm-input { background:var(--paper); }
+
+/* The add button has to be findable at the end of a long list. */
+#page-forms .frm-addq { appearance:none; width:100%; display:flex;
+  align-items:center; justify-content:center; gap:9px;
+  background:#eef4fd; border:1.5px dashed #a9c2ea; border-radius:9px;
+  padding:14px; font:inherit; font-size:14px; font-weight:600;
+  color:var(--accent-deep); cursor:pointer;
+  transition:background .12s ease, border-color .12s ease; }
+#page-forms .frm-addq:hover { background:#e3edfb; border-color:var(--accent); }
+#page-forms .frm-addq:active { transform:translateY(1px); }
+#page-forms .frm-addq__plus { display:inline-flex; align-items:center;
+  justify-content:center; width:21px; height:21px; border-radius:6px;
+  background:var(--accent); color:#fff; font-size:15px; font-weight:600;
+  line-height:1; }
+
+/* --------------------------------------------------------------- actions */
+#page-forms .frm-acts { display:flex; flex-wrap:wrap; align-items:center; gap:9px;
+  margin-top:20px; padding-top:16px; border-top:1px solid var(--rule); }
+#page-forms .frm-acts--sticky { position:sticky; bottom:0; z-index:20;
+  margin-top:0; padding:14px 16px; border:1px solid var(--rule);
+  border-radius:11px; background:var(--paper);
+  box-shadow:0 -6px 22px rgba(20,32,58,.10); }
+#page-forms .frm-acts--sticky .frm-hint { margin-left:auto; }
+
+/* ------------------------------------------------- busy veil and spinner */
+#page-forms .frm-shell.is-busy { filter:blur(2.5px) saturate(.85);
+  pointer-events:none; user-select:none; }
+#page-forms .frm-shell { transition:filter .18s ease; }
+/* Fixed, not absolute: on a long form the page top is scrolled away, and an
+   overlay anchored there left the person watching a blurred page with no
+   visible indicator. */
+#page-forms .frm-veil { position:fixed; inset:0; z-index:60;
+  display:flex; align-items:center; justify-content:center;
+  background:rgba(20,32,58,.16); }
+#page-forms .frm-veil[hidden] { display:none; }
+#page-forms .frm-veil__box { display:flex; align-items:center; gap:12px;
+  background:var(--paper); border:1px solid var(--rule); border-radius:11px;
+  padding:15px 22px; box-shadow:0 16px 44px rgba(20,32,58,.24);
+  font-size:14px; font-weight:550; }
+#page-forms .frm-spin { width:17px; height:17px; flex:0 0 auto;
+  border:2px solid #d8e2f0; border-top-color:var(--accent); border-radius:50%;
+  animation:frm-turn .7s linear infinite; }
+@keyframes frm-turn { to { transform:rotate(360deg); } }
+
+/* ---------------------------------------------------------------- dialog */
+#page-forms .frm-modal { position:fixed; inset:0; z-index:80; display:flex;
+  align-items:center; justify-content:center; padding:20px;
+  background:rgba(20,32,58,.34); }
+#page-forms .frm-modal[hidden] { display:none; }
+#page-forms .frm-modal__sheet { width:min(94vw, 430px); background:var(--paper);
+  border-radius:13px; padding:22px; box-shadow:0 22px 60px rgba(20,32,58,.32); }
+#page-forms .frm-modal__title { margin:0 0 9px; font-size:17px; font-weight:640;
+  letter-spacing:-0.008em; }
+#page-forms .frm-modal__body { margin:0; font-size:13.5px; line-height:1.55;
+  color:var(--ink); }
+#page-forms .frm-modal__detail { margin:10px 0 0; font-size:12.5px;
+  line-height:1.5; color:var(--soft); }
+#page-forms .frm-modal__acts { display:flex; justify-content:flex-end; gap:9px;
+  margin-top:20px; }
+
+/* ---------------------------------------------------------------- toasts */
+#page-forms .frm-toasts { position:fixed; left:50%; bottom:22px;
+  transform:translateX(-50%); z-index:9999; display:flex;
+  flex-direction:column; gap:8px; width:min(92vw, 460px); }
+#page-forms .frm-toast { background:#18243c; color:#fff; border-radius:9px;
+  padding:12px 15px; font-size:13px; line-height:1.45;
+  box-shadow:0 8px 26px rgba(20,32,58,.28);
+  transition:opacity .3s ease, transform .3s ease; }
+#page-forms .frm-toast--success { background:var(--go); }
+#page-forms .frm-toast--error { background:var(--stop); }
+#page-forms .frm-toast.is-out { opacity:0; transform:translateY(7px); }
+
+/* ---------------------------------------------------------------- mobile */
+@media (max-width: 640px) {
+  #page-forms .frm-head { flex-direction:column; }
+  #page-forms .frm-head h1 { font-size:20px; }
+  #page-forms .frm-item { flex-direction:column; align-items:stretch; }
+  #page-forms .frm-item .frm-btn { width:100%; }
+  #page-forms .frm-figure { flex:1 1 50%; border-left:0;
+    border-top:1px solid var(--rule); }
+  #page-forms .frm-figure:nth-child(-n+2) { border-top:0; }
+  #page-forms .frm-figure:nth-child(even) { border-left:1px solid var(--rule); }
+  #page-forms .frm-sheet { padding:14px; }
+  #page-forms .frm-entry { flex-wrap:wrap; }
+  #page-forms .frm-entry__when { flex:1 1 100%; }
+  #page-forms .frm-grid th, #page-forms .frm-grid td { padding:9px 8px; }
+  #page-forms .frm-qcard__type, #page-forms .frm-qcard__req { display:none; }
+  #page-forms .frm-qcard__head { flex-wrap:wrap; }
+  #page-forms .frm-qcard__head .frm-rowacts { width:100%;
+    padding:0 6px 6px 38px; }
+  #page-forms .frm-acts--sticky { padding:12px; }
+  #page-forms .frm-acts--sticky .frm-hint { margin-left:0; width:100%; }
+  #page-forms .frm-modal__sheet { padding:18px; }
+  #page-forms .frm-admin { flex-wrap:wrap; gap:8px; }
+  #page-forms .frm-admin__meta { flex:1 1 100%; text-align:left; }
+  #page-forms .frm-person--act { flex-wrap:wrap; }
+  #page-forms .frm-person--act .frm-person__dept { order:3; }
+  #page-forms .frm-pickview { margin-right:0; width:100%; }
+  #page-forms .frm-pv { flex:1 1 50%; }
+  #page-forms .frm-choicerow { flex-wrap:wrap; }
+  #page-forms .frm-choicerow .frm-btn { margin-left:31px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #page-forms .frm-spin { animation-duration:2.4s; }
+  #page-forms .frm-btn, #page-forms .frm-input, #page-forms .frm-chip,
+  #page-forms .frm-opt, #page-forms .frm-shell, #page-forms .frm-toast,
+  #page-forms .frm-qcard, #page-forms .frm-qcard__chev,
+  #page-forms .frm-addq, #page-forms .frm-back, #page-forms .frm-pv,
+  #page-forms .frm-addopt {
+    transition:none; }
+  #page-forms .frm-btn:active { transform:none; }
+}
+</style>
+
+<!-- =====================================================================
+     WIRE-UP - already in place, recorded here for reference
+
+  index.html  nav item, after GR's & Circulars:
+      <button class="nav-item" data-page="forms" onclick="navigate('forms')"
+              title="OLF Forms"> ... </button>
+    data-page="forms" also lets prefetchPages() warm this fragment on idle.
+
+  index.html  script tag, after gr.js:
+      <script src="forms.js"></script>
+
+  app.js      branch inside window.navigate, after the "gr" branch:
+      else if (page === "forms") { window.frmInit(); ensureFormsStaffList(); }
+
+  IDENTITY    forms.js reads window.__olfUser ({ email, displayName, role }).
+              Override with window.frmGetUser = () => ({ email, name, role }).
+
+  STAFF LIST  app.js publishes window.__olfEmployees for the audience picker
+              and the per-employee entry picker.
+
+  ADMIN       Forms admins come from SUPER_ADMINS in Code.gs. Nothing in this
+              page can change that list.
+
+  BACKEND     forms.js line 23. A new VERSION of the deployment keeps the
+              URL; a NEW deployment changes it.
+     ===================================================================== -->
