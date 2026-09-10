@@ -435,8 +435,11 @@ function frmBootstrap(showBusy) {
   frmSetStatus('Refreshing');
   if (showBusy) frmBusy(true, 'Refreshing');
 
-  // One request carries the form list AND the person's own entries.
-  frmApi('bootstrap', {}).then(function (d) {
+  // One request carries the form list AND the person's own entries. A
+  // person-pressed Refresh also asks the backend to re-check every form's
+  // index against its own sheet, which is what you want right after editing
+  // a sheet by hand.
+  frmApi('bootstrap', { reconcileAll: !!showBusy }).then(function (d) {
     frmState.booted = true;
     frmState.isAdmin = !!d.isAdmin;
     frmState.user = d.user;
