@@ -22,7 +22,8 @@
    it, and this line must then be updated to match. */
 var FRM_ENDPOINT = 'https://script.google.com/macros/s/AKfycby8wsatRiW9SFKldRqlepT0Iv2dWfhQohE9ojUVs5wcktRLWjgFWBPy6glNidDpaFYy/exec';
 
-var FRM_CACHE_KEY = 'frm_cache_v3';        // bumped: payload shape changed
+var FRM_CACHE_KEY = 'frm_cache_v4';        // bumped: payload shape changed
+var FRM_RETRIES = 2;                       // extra attempts on a dropped request
 var FRM_CACHE_TTL = 12 * 60 * 60 * 1000;
 var FRM_TIMEOUT_MS = 2 * 60 * 1000;
 
@@ -54,6 +55,7 @@ var frmState = {
   view: null,          // null | 'fill' | 'builder' | 'responses'
   openForm: null,
   myEntries: [],
+  taken: [],           // employees already recorded by somebody else
   editingId: null,
   adding: false,       // is the new-entry form open?
   entryKey: '',
@@ -65,6 +67,8 @@ var frmState = {
   responseQuestions: [],
   responseFormId: null,
   pickView: 'all',     // 'all' | 'selected' in the audience picker
+  detail: null,        // the form being inspected on the dashboard
+  detailOpen: {},      // which respondents are expanded
   admins: [],
   adminSearch: ''
 };
@@ -102,7 +106,20 @@ function frmUser() {
   return null;
 }
 
-function frmApi(action, payload) {
+/**
+ * @param tries  how many extra attempts to make if the request never reaches
+ *               the handler. Apps Script sometimes answers a slow POST with a
+ *               404 or an empty body, and a large form was hitting that. Only
+ *               transport failures are retried - a real error from the handler
+ *               comes back as JSON and is reported immediately.
+ *
+ *               Retries are safe because a save carries clientFormId and a
+ *               submission carries clientSubmitId, so the backend recognises
+ *               a repeat and updates rather than duplicating. Pass 0 for
+ *               anything without that protection.
+ */
+function frmApi(action, payload, tries) {
+  var left = (tries === undefined) ? FRM_RETRIES : tries;
   var user = frmUser();
   if (!user || !user.email) {
     return Promise.reject(new Error('Not signed in. Reload the app to continue.'));
@@ -114,6 +131,13 @@ function frmApi(action, payload) {
     userName: user.name,
     userRole: user.role
   });
+
+  var again = function (why, wait) {
+    console.log('frmApi ' + action + ': ' + why + ', retrying in ' +
+                wait + 'ms (' + left + ' left)');
+    return new Promise(function (res) { setTimeout(res, wait); })
+      .then(function () { return frmApi(action, payload, left - 1); });
+  };
 
   var ctrl = ('AbortController' in window) ? new AbortController() : null;
   var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, FRM_TIMEOUT_MS) : null;
@@ -127,30 +151,44 @@ function frmApi(action, payload) {
     redirect: 'follow'
   }).then(function (res) {
     if (timer) clearTimeout(timer);
-    if (!res.ok) throw new Error('The server returned ' + res.status + '.');
-    return res.text();
-  }).then(function (txt) {
+    if (!res.ok) {
+      if (left > 0) return again('HTTP ' + res.status, left === FRM_RETRIES ? 1200 : 3000);
+      throw new Error('The server returned ' + res.status +
+        '. Nothing was saved \u2014 try again in a moment.');
+    }
+    return res.text().then(function (txt) { return { txt: txt }; });
+  }).then(function (out) {
+    if (!out || out.retried) return out;        // a retry already resolved it
+    if (out.txt === undefined) return out;      // came back from again()
+
     var data;
     try {
-      data = JSON.parse(txt);
+      data = JSON.parse(out.txt);
     } catch (e) {
-      throw new Error('The server sent something unreadable. Try again.');
+      if (left > 0) return again('unreadable body', 1200);
+      throw new Error('The server sent something unreadable. Nothing was saved.');
     }
     if (!data.ok) throw new Error(data.error || 'That request did not go through.');
     return data;
   }).catch(function (err) {
     if (timer) clearTimeout(timer);
     if (err && err.name === 'AbortError') {
-      throw new Error('That took longer than two minutes. Check your connection and try again.');
+      // Not retried: three two-minute waits would be worse than one clear
+      // failure, and the write may well have landed anyway.
+      throw new Error('That took longer than two minutes. Check your connection, ' +
+        'then reload before trying again.');
+    }
+    if (err && err.name === 'TypeError' && left > 0) {
+      return again('network error', 1200);      // offline, DNS, dropped link
     }
     throw err;
   });
 }
 
 /** Same as frmApi, wrapped in the blur-and-spinner overlay. */
-function frmBusyApi(action, payload, label) {
+function frmBusyApi(action, payload, label, tries) {
   frmBusy(true, label);
-  return frmApi(action, payload).then(function (d) {
+  return frmApi(action, payload, tries).then(function (d) {
     frmBusy(false);
     return d;
   }).catch(function (err) {
@@ -361,6 +399,7 @@ function frmInit(force) {
     frmState.view = null;
     frmState.openForm = null;
     frmState.myEntries = [];
+    frmState.taken = [];
     frmState.editingId = null;
     frmState.adding = false;
     frmState.entryKey = '';
@@ -427,6 +466,7 @@ function frmRender() {
   if (frmState.view === 'builder' && frmState.draft) { frmRenderBuilder(); return; }
   if (frmState.view === 'responses') { frmRenderResponsesPage(); return; }
   if (frmState.view === 'admins') { frmRenderAdminsPage(); return; }
+  if (frmState.view === 'detail') { frmRenderDetailPage(); return; }
 
   var tabs = [{ k: 'dashboard', t: 'Dashboard' }];
   if (frmState.isAdmin) tabs.push({ k: 'settings', t: 'Settings' });
@@ -497,12 +537,18 @@ function frmAdminOverview() {
     f.map(function (x) {
       return '<tr>' +
         '<td class="frm-grid__rail" data-state="' + frmEsc(x.status) + '"></td>' +
-        '<td class="frm-grid__name">' + frmEsc(x.title) + '</td>' +
+        '<td class="frm-grid__name">' +
+          '<button type="button" class="frm-open" onclick="frmOpenDetail(\'' +
+            frmEsc(x.formId) + '\')">' + frmEsc(x.title) + '</button></td>' +
         '<td>' + frmStatusTag(x.status) + '</td>' +
-        '<td>' + frmAudienceLabel(x) + '</td>' +
+        '<td>' + frmAudienceLabel(x, true) + '</td>' +
         '<td>' + frmModeLabel(x) + '</td>' +
         '<td class="frm-num">' + (x.questionCount || 0) + '</td>' +
-        '<td class="frm-num">' + (x.responseCount || 0) + '</td>' +
+        '<td class="frm-num">' + ((x.responseCount || 0)
+          ? '<button type="button" class="frm-open frm-open--soft" ' +
+            'title="See who responded" onclick="frmOpenDetail(\'' +
+            frmEsc(x.formId) + '\')">' + x.responseCount + '</button>'
+          : '<span class="frm-soft">0</span>') + '</td>' +
         '<td class="frm-soft">' + frmEsc(frmStamp(x.updatedAt)) + '</td>' +
       '</tr>';
     }).join('') +
@@ -514,12 +560,19 @@ function frmStatusTag(status) {
          frmEsc(status) + '</span>';
 }
 
-function frmAudienceLabel(f) {
-  if (f.audience === 'LIST') {
-    var n = f.recipientCount || 0;
-    return n + (n === 1 ? ' member' : ' members');
-  }
-  return 'All staff';
+/**
+ * @param open  render it as a way into the form's detail, where the
+ *              recipients and their response counts are listed
+ */
+function frmAudienceLabel(f, open) {
+  var text = (f.audience === 'LIST')
+    ? (f.recipientCount || 0) +
+      ((f.recipientCount === 1) ? ' member' : ' members')
+    : 'All staff';
+  if (!open) return text;
+  return '<button type="button" class="frm-open frm-open--soft" ' +
+    'title="See who this went to" onclick="frmOpenDetail(\'' +
+    frmEsc(f.formId) + '\')">' + text + '</button>';
 }
 
 function frmModeLabel(f) {
@@ -625,7 +678,7 @@ function frmRenderSettings() {
         '<td class="frm-grid__name">' + frmEsc(f.title) +
           '<span class="frm-ref">' + frmEsc(f.formId) + '</span></td>' +
         '<td>' + frmStatusTag(f.status) + '</td>' +
-        '<td>' + frmAudienceLabel(f) + '</td>' +
+        '<td>' + frmAudienceLabel(f, true) + '</td>' +
         '<td>' + frmModeLabel(f) + '</td>' +
         '<td class="frm-num">' + (f.responseCount || 0) + '</td>' +
         '<td class="frm-soft">' + frmEsc(frmStamp(f.updatedAt)) + '</td>' +
@@ -694,7 +747,7 @@ function frmDeleteForm(formId) {
     danger: true
   }).then(function (yes) {
     if (!yes) return;
-    frmBusyApi('deleteForm', { formId: formId }, 'Deleting form')
+    frmBusyApi('deleteForm', { formId: formId }, 'Deleting form', 0)
       .then(function (d) {
         frmState.forms = d.forms || [];
         frmState.mine = (frmState.mine || []).filter(function (r) {
@@ -726,6 +779,7 @@ function frmOpenForm(formId) {
     }
     frmState.openForm = d.form;
     frmState.myEntries = d.myEntries || [];
+    frmState.taken = d.takenKeys || [];
     frmState.editingId = null;
     frmState.entryKey = '';
     frmState.submitId = null;
@@ -742,12 +796,22 @@ function frmCloseForm() {
   if (frmState.submitting) return;
   frmState.openForm = null;
   frmState.myEntries = [];
+  frmState.taken = [];
   frmState.editingId = null;
   frmState.adding = false;
   frmState.entryKey = '';
   frmState.submitId = null;
   frmState.view = null;
   frmRender();
+}
+
+/** Employees somebody else has already recorded, keyed by email. */
+function frmHeldKeys() {
+  var out = {};
+  (frmState.taken || []).forEach(function (t) {
+    if (t && t.key) out[String(t.key).toLowerCase()] = t;
+  });
+  return out;
 }
 
 /** Keys already used, so the same employee or date cannot be picked twice. */
@@ -926,17 +990,24 @@ function frmKeyField(f, editing) {
     }
   }
   var used = frmUsedKeys();
+  var held = frmHeldKeys();
   var chosen = editing ? String(editing.entryKey || '') : (frmState.entryKey || '');
   var opts = '<option value="">Choose an employee\u2026</option>';
-  var available = 0;
+  var available = 0, heldCount = 0;
   staff.forEach(function (p) {
-    var taken = !!used[p.email];
-    if (taken && p.email !== chosen) return;   // already recorded, hide it
-    available++;
+    var mine = !!used[p.email];
+    if (mine && p.email !== chosen) return;    // in your own list, editable there
+    var by = held[p.email];
+    // Someone else's record stays selectable, because choosing it is how you
+    // ask to replace it. It is labelled so that is never a surprise.
+    if (by) heldCount++; else available++;
     opts += '<option value="' + frmEsc(p.email) + '" data-name="' +
       frmEsc(p.name) + '" data-dept="' + frmEsc(p.dept) + '"' +
+      (by ? ' data-heldby="' + frmEsc(by.byName) + '"' : '') +
       (p.email === chosen ? ' selected' : '') + '>' +
-      frmEsc(p.name) + ' \u2014 ' + frmEsc(p.dept) + '</option>';
+      frmEsc(p.name) + ' \u2014 ' + frmEsc(p.dept) +
+      (by ? '  (already recorded by ' + frmEsc(by.byName) + ')' : '') +
+      '</option>';
   });
 
   return '<div class="frm-key">' +
@@ -950,7 +1021,10 @@ function frmKeyField(f, editing) {
         'entry. Cancel the edit and add a new one instead.</p>'
       : '<p class="frm-key__note">' + available + ' of ' + staff.length +
         ' still to record' +
-        (scope.length ? ' in ' + frmEsc(scope.join(', ')) : '') + '.</p>') +
+        (scope.length ? ' in ' + frmEsc(scope.join(', ')) : '') + '.' +
+        (heldCount ? ' <span class="frm-warnnote">' + heldCount +
+          ' already recorded by a colleague \u2014 choosing one asks before ' +
+          'replacing it.</span>' : '') + '</p>') +
   '</div>';
 }
 
@@ -1145,6 +1219,16 @@ function frmSubmit() {
 
   frmBusyApi(action, payload, editing ? 'Saving changes' : 'Saving entry')
     .then(function (d) {
+      // The server may answer "somebody already recorded this employee".
+      // That is a question, not a result, so nothing is reported as saved.
+      if (d && d.conflict) {
+        frmGuardUnload(false);
+        frmState.submitting = false;
+        if (btn) btn.disabled = false;
+        if (hint) hint.textContent = '';
+        return frmAskOverride(d, payload);
+      }
+
       // Only now, with a server-confirmed write, does anything say it worked.
       frmGuardUnload(false);
       frmState.submitting = false;
@@ -1160,8 +1244,11 @@ function frmSubmit() {
         // Back to the list, so the next step is a deliberate choice again.
         frmState.adding = false;
         frmState.entryKey = '';
+        frmState.taken = d.takenKeys || frmState.taken;
         frmToast(editing ? 'Changes saved.' + scoreBit
-                         : 'Entry saved.' + scoreBit, 'success');
+          : (d.overrode
+              ? 'Entry replaced and now recorded under your name.' + scoreBit
+              : 'Entry saved.' + scoreBit), 'success');
         frmRender();
       } else {
         frmState.openForm = null;
@@ -1176,6 +1263,62 @@ function frmSubmit() {
       if (hint) hint.textContent = '';
       frmToast('Not saved: ' + err.message, 'error');
     });
+}
+
+/**
+ * An employee can only be on this form once in total, so recording one that a
+ * colleague already did means replacing their entry. Asked plainly, with who
+ * and when, before anything is touched.
+ */
+function frmAskOverride(d, payload) {
+  return frmConfirm({
+    title: 'Already recorded',
+    body: (d.entryLabel || 'That employee') + ' was already recorded by ' +
+          (d.heldBy || 'a colleague') + ' on ' + frmStamp(d.heldOn) + '.',
+    detail: 'Replacing it deletes their entry and records this one under ' +
+            'your name instead. The answers they gave are kept in the ' +
+            'activity log. Their entry will no longer count towards their ' +
+            'total.',
+    ok: 'Replace their entry',
+    cancel: 'Leave it alone',
+    danger: true
+  }).then(function (yes) {
+    if (!yes) {
+      frmToast('Nothing was changed. Pick a different employee, or ask ' +
+               (d.heldBy || 'them') + ' to update their entry.', 'info');
+      return;
+    }
+
+    frmState.submitting = true;
+    var btn = document.getElementById('frmSubmitBtn');
+    var hint = document.getElementById('frmSubmitHint');
+    if (btn) btn.disabled = true;
+    if (hint) hint.textContent = 'Replacing the earlier entry\u2026';
+    frmGuardUnload(true);
+
+    // Same clientSubmitId: a retry still cannot double-write.
+    var again = Object.assign({}, payload, { override: true });
+    return frmBusyApi('submitResponse', again, 'Replacing entry')
+      .then(function (r) {
+        frmGuardUnload(false);
+        frmState.submitting = false;
+        frmState.submitId = null;
+        frmState.myEntries = r.myEntries || frmState.myEntries;
+        frmState.taken = r.takenKeys || frmState.taken;
+        frmState.editingId = null;
+        frmState.adding = false;
+        frmState.entryKey = '';
+        frmToast('Entry replaced and now recorded under your name.', 'success');
+        frmRender();
+        frmBootstrap();
+      }).catch(function (err) {
+        frmState.submitting = false;
+        frmGuardUnload(false);
+        if (btn) btn.disabled = false;
+        if (hint) hint.textContent = '';
+        frmToast('Not replaced: ' + err.message, 'error');
+      });
+  });
 }
 
 var frmUnloadHandler = null;
@@ -1210,7 +1353,8 @@ function frmBlankQuestion(n) {
 function frmNewForm() {
   frmState.pickView = 'all';
   frmState.draft = {
-    formId: '', title: '', description: '', status: 'draft',
+    formId: '', clientFormId: frmUuid(), title: '', description: '',
+    status: 'draft',
     allowMultiple: false, multiMode: '', entryDepts: [], scored: false,
     openFrom: '', openUntil: '',
     audience: 'ALL', audienceEmails: [],
@@ -1223,7 +1367,8 @@ function frmNewForm() {
 
 function frmDraftFrom(f) {
   return {
-    formId: f.formId, title: f.title || '', description: f.description || '',
+    formId: f.formId, clientFormId: '',
+    title: f.title || '', description: f.description || '',
     status: f.status, allowMultiple: !!f.allowMultiple,
     multiMode: f.multiMode || '',
     entryDepts: (f.entryDepts || []).map(function (x) { return String(x); }),
@@ -1247,34 +1392,41 @@ function frmDraftFrom(f) {
 function frmEditForm(formId) {
   // The admin form list already carries the full definition, so the editor
   // opens with no network round trip at all. Fall back only if it is absent.
+  // Only trust the cached list if it really carries the whole definition.
+  // A partial entry would open the editor with blank recipients or blank
+  // departments, which reads as "my settings were not saved".
   var cached = frmState.forms.filter(function (f) {
-    return f.formId === formId && Array.isArray(f.questions);
+    return f.formId === formId && Array.isArray(f.questions) &&
+           Array.isArray(f.audienceEmails) && Array.isArray(f.entryDepts);
   })[0];
 
   if (cached) {
-    // A form already sent to specific people opens showing that selection.
-    frmState.pickView = (cached.audience === 'LIST' &&
-      (cached.audienceEmails || []).length) ? 'selected' : 'all';
-    frmState.draft = frmDraftFrom(cached);
-    if (!frmState.draft.questions.length) {
-      frmState.draft.questions = [frmBlankQuestion(1)];
-    }
-    // Existing questions start collapsed, so the whole form is visible at once.
-    frmState.openQ = -1;
-    frmState.view = 'builder';
-    frmRender();
+    frmStartDraft(cached);
     return;
   }
 
   frmBusyApi('getForm', { formId: formId }, 'Opening form').then(function (d) {
-    frmState.draft = frmDraftFrom(d.form);
-    if (!frmState.draft.questions.length) {
-      frmState.draft.questions = [frmBlankQuestion(1)];
-    }
-    frmState.openQ = -1;
-    frmState.view = 'builder';
-    frmRender();
+    frmStartDraft(d.form);
   }).catch(function (err) { frmToast(err.message, 'error'); });
+}
+
+/**
+ * Opens the editor on a stored definition. Both routes in - the cached admin
+ * list and a fresh getForm - go through here, so neither can drift from the
+ * other in what it sets up.
+ */
+function frmStartDraft(f) {
+  frmState.draft = frmDraftFrom(f);
+  if (!frmState.draft.questions.length) {
+    frmState.draft.questions = [frmBlankQuestion(1)];
+  }
+  // A form already sent to specific people opens showing that selection.
+  frmState.pickView = (frmState.draft.audience === 'LIST' &&
+    frmState.draft.audienceEmails.length) ? 'selected' : 'all';
+  // Existing questions start collapsed, so the whole form is visible at once.
+  frmState.openQ = -1;
+  frmState.view = 'builder';
+  frmRender();
 }
 
 function frmRenderBuilder() {
@@ -1413,7 +1565,10 @@ function frmEntryDeptBlock(d) {
     '<p class="frm-sub__ask">Which departments can entries be recorded for?</p>' +
     '<div class="frm-chips">' +
       depts.map(function (dp, i) {
-        return '<button type="button" class="frm-chip' +
+        // frm-chip--entry, not the bare frm-chip the audience picker uses:
+        // these two chip groups look alike but mean different things, and
+        // sharing a selector let the picker overwrite this one's highlight.
+        return '<button type="button" class="frm-chip frm-chip--entry' +
           (picked[dp] ? ' is-on' : '') + '" data-dept="' + frmEsc(dp) +
           '" onclick="frmToggleEntryDept(' + i + ')">' + frmEsc(dp) +
           '<span class="frm-chip__n">' + (counts[dp] || 0) + '</span>' +
@@ -1570,7 +1725,11 @@ function frmDeptRows(dept) {
   return out;
 }
 
-/** Selects a whole department, or clears it if it is already fully selected. */
+/**
+ * Audience picker: selects a whole department of people, or clears it if it
+ * is already fully selected. Not to be confused with frmToggleEntryDept,
+ * which sets which departments a form's entries may be recorded for.
+ */
 function frmToggleDept(i) {
   var depts = frmDepartments(frmEmployees());
   var dept = depts[i];
@@ -1647,7 +1806,9 @@ function frmPaintPicker() {
     count.textContent = n + ' selected';
     count.className = 'frm-picker__n' + (n ? ' is-on' : '');
   }
-  var chips = document.querySelectorAll('.frm-chip');
+  // Scoped to the picker: never touch the entry-department chips, which
+  // track the form's settings rather than who is currently ticked.
+  var chips = document.querySelectorAll('.frm-picker .frm-chip');
   for (var i = 0; i < chips.length; i++) {
     var rows = frmDeptRows(chips[i].getAttribute('data-dept'));
     var on = rows.length > 0;
@@ -1961,8 +2122,10 @@ function frmSaveDraft(status) {
   var hint = document.getElementById('frmBuilderHint');
   if (hint) hint.textContent = 'Saving\u2026';
 
-  frmBusyApi('saveForm', { form: Object.assign({}, d, { status: status }) },
-             'Saving form')
+  frmBusyApi('saveForm', {
+    form: Object.assign({}, d, { status: status }),
+    clientFormId: d.clientFormId || ''
+  }, 'Saving form')
     .then(function (r) {
       if (hint) hint.textContent = '';
       frmState.forms = r.forms || frmState.forms;
@@ -1976,6 +2139,182 @@ function frmSaveDraft(status) {
       if (hint) hint.textContent = '';
       frmToast('Not saved: ' + err.message, 'error');
     });
+}
+
+/* -------------------------------------------------- 12b. form detail view */
+
+function frmOpenDetail(formId) {
+  frmBusyApi('getFormDetail', { formId: formId }, 'Loading form')
+    .then(function (d) {
+      frmState.detail = d;
+      frmState.detailOpen = {};
+      frmState.view = 'detail';
+      frmRender();
+    }).catch(function (err) { frmToast(err.message, 'error'); });
+}
+
+function frmCloseDetail() {
+  frmState.view = null;
+  frmState.detail = null;
+  frmState.detailOpen = {};
+  frmState.tab = 'dashboard';
+  frmRender();
+}
+
+function frmToggleRespondent(email) {
+  frmState.detailOpen[email] = !frmState.detailOpen[email];
+  frmRender();
+}
+
+/**
+ * Who the form went to, merged with who actually replied. Recipients with
+ * nothing yet still appear, because "12 members, 4 replied" is the useful
+ * shape - a list of only the repliers hides the gap.
+ */
+function frmDetailRows() {
+  var d = frmState.detail;
+  var staff = {};
+  frmEmployees().forEach(function (p) { staff[p.email] = p; });
+
+  var replied = {};
+  (d.respondents || []).forEach(function (r) { replied[r.email] = r; });
+
+  var expected = (d.audience === 'LIST')
+    ? (d.audienceEmails || []).slice()
+    : Object.keys(staff);
+
+  var seen = {}, rows = [];
+  var add = function (email) {
+    var e = String(email).toLowerCase();
+    if (!e || seen[e]) return;
+    seen[e] = 1;
+    var r = replied[e];
+    var p = staff[e];
+    rows.push({
+      email: e,
+      name: (p && p.name) || (r && r.name) || e.split('@')[0],
+      dept: (p && p.dept) || '',
+      count: r ? r.count : 0,
+      entries: r ? r.entries : [],
+      known: !!p
+    });
+  };
+  expected.forEach(add);
+  // Somebody may have replied before the recipient list changed.
+  (d.respondents || []).forEach(function (r) { add(r.email); });
+
+  rows.sort(function (a, b) {
+    if (b.count !== a.count) return b.count - a.count;
+    return a.name.localeCompare(b.name);
+  });
+  return rows;
+}
+
+function frmRenderDetailPage() {
+  var d = frmState.detail;
+  if (!d) { frmCloseDetail(); return; }
+
+  var rows = frmDetailRows();
+  var replied = rows.filter(function (r) { return r.count > 0; }).length;
+  var noun = d.multiMode === 'date' ? 'date'
+           : d.multiMode === 'employee' ? 'employee' : 'entry';
+
+  var html = '<div class="frm-page frm-page--wide">' +
+    '<button class="frm-back" onclick="frmCloseDetail()">Back to dashboard</button>' +
+    '<h1 class="frm-page__title">' + frmEsc(d.title) + '</h1>' +
+    (d.description ? '<p class="frm-page__lede">' + frmEsc(d.description) +
+      '</p>' : '') +
+
+    '<div class="frm-figures">' +
+      frmFigure(rows.length, d.audience === 'LIST'
+        ? (rows.length === 1 ? 'recipient' : 'recipients') : 'staff') +
+      frmFigure(replied, 'replied') +
+      frmFigure(rows.length - replied, 'yet to reply') +
+      frmFigure(d.totalEntries,
+        d.totalEntries === 1 ? 'entry' : 'entries') +
+    '</div>' +
+
+    '<div class="frm-bar">' +
+      frmStatusTag(d.status) +
+      '<span class="frm-hint">' +
+        (d.allowMultiple && d.multiMode
+          ? 'One entry per ' + noun
+          : 'One submission each') +
+        (d.entryDepts && d.entryDepts.length
+          ? ', limited to ' + frmEsc(d.entryDepts.join(', ')) : '') +
+      '</span>' +
+      '<button class="frm-btn" onclick="frmViewResponses(\'' +
+        frmEsc(d.formId) + '\')">See all answers</button>' +
+    '</div>';
+
+  if (!rows.length) {
+    html += '<div class="frm-blank">' +
+      '<p class="frm-blank__head">Nobody to show</p>' +
+      '<p class="frm-blank__body">This form has no recipients and no ' +
+      'responses yet.</p></div></div>';
+    document.getElementById('frmRoot').innerHTML = html;
+    return;
+  }
+
+  html += '<div class="frm-scroll"><table class="frm-grid frm-grid--detail">' +
+    '<thead><tr><th>Sent to</th><th>Department</th>' +
+    '<th class="frm-num">Responses</th><th></th></tr></thead><tbody>' +
+    rows.map(function (r) { return frmDetailRow(r, d); }).join('') +
+    '</tbody></table></div></div>';
+
+  document.getElementById('frmRoot').innerHTML = html;
+}
+
+function frmDetailRow(r, d) {
+  var open = !!frmState.detailOpen[r.email];
+  var h = '<tr class="frm-drow' + (r.count ? '' : ' is-quiet') + '">' +
+    '<td class="frm-grid__name">' + frmEsc(r.name) +
+      '<span class="frm-ref">' + frmEsc(r.email) + '</span></td>' +
+    '<td class="frm-soft">' + (r.dept ? frmEsc(r.dept) :
+      '<span class="frm-soft">\u2014</span>') + '</td>' +
+    '<td class="frm-num">' +
+      (r.count
+        ? '<button type="button" class="frm-tally-btn' +
+            (open ? ' is-on' : '') + '" aria-expanded="' + open + '" ' +
+            'onclick="frmToggleRespondent(\'' + frmEsc(r.email) + '\')">' +
+            r.count + '</button>'
+        : '<span class="frm-soft">0</span>') +
+    '</td>' +
+    '<td>' + (r.count
+      ? '<button type="button" class="frm-btn frm-btn--tiny" ' +
+        'onclick="frmToggleRespondent(\'' + frmEsc(r.email) + '\')">' +
+        (open ? 'Hide' : 'Show') + '</button>'
+      : '<span class="frm-hint">No response yet</span>') + '</td>' +
+  '</tr>';
+
+  if (!open || !r.count) return h;
+
+  var headline = d.multiMode === 'employee' ? 'Recorded for'
+               : d.multiMode === 'date' ? 'Date'
+               : 'Submission';
+  h += '<tr class="frm-dsub"><td colspan="4">' +
+    '<table class="frm-subgrid"><thead><tr>' +
+      '<th>' + headline + '</th><th>Submitted</th>' +
+      (d.scored ? '<th class="frm-num">Score</th>' : '') +
+      '<th>Reference</th></tr></thead><tbody>' +
+    r.entries.map(function (e) {
+      var label = e.entryLabel || e.entryKey;
+      return '<tr>' +
+        '<td class="frm-grid__name">' +
+          (label ? frmEsc(frmEntryText(e)) : '<span class="frm-soft">\u2014</span>') +
+          (e.entryDept ? '<span class="frm-ref">' + frmEsc(e.entryDept) +
+            '</span>' : '') + '</td>' +
+        '<td class="frm-soft">' + frmEsc(frmStamp(e.submittedAt)) +
+          (e.editCount ? ' <span class="frm-soft">(edited ' + e.editCount +
+            'x)</span>' : '') + '</td>' +
+        (d.scored ? '<td class="frm-num">' + (e.maxScore
+          ? frmEsc(e.score) + '/' + frmEsc(e.maxScore)
+          : '<span class="frm-soft">\u2014</span>') + '</td>' : '') +
+        '<td class="frm-ref">' + frmEsc(e.responseId) + '</td>' +
+      '</tr>';
+    }).join('') +
+    '</tbody></table></td></tr>';
+  return h;
 }
 
 /* ------------------------------------------------------------- 13. admins */
@@ -2142,6 +2481,8 @@ function frmRemoveAdmin(email) {
 
 function frmViewResponses(formId) {
   frmState.responseFormId = formId || null;
+  // Remember where the person came from, so Back goes back there.
+  frmState.responseFrom = (frmState.view === 'detail') ? 'detail' : 'settings';
   frmState.view = 'responses';
   frmRender();
   frmLoadResponses();
@@ -2149,7 +2490,9 @@ function frmViewResponses(formId) {
 
 function frmRenderResponsesPage() {
   document.getElementById('frmRoot').innerHTML = '<div class="frm-page">' +
-    '<button class="frm-back" onclick="frmCloseResponses()">Back to settings</button>' +
+    '<button class="frm-back" onclick="frmCloseResponses()">' +
+      (frmState.responseFrom === 'detail' ? 'Back to the form' : 'Back to settings') +
+    '</button>' +
     '<h1 class="frm-page__title">Responses</h1>' +
     '<div class="frm-bar">' +
       '<select class="frm-input frm-input--auto" id="frmRespPick" ' +
@@ -2169,6 +2512,11 @@ function frmRenderResponsesPage() {
 }
 
 function frmCloseResponses() {
+  if (frmState.responseFrom === 'detail' && frmState.detail) {
+    frmState.view = 'detail';
+    frmRender();
+    return;
+  }
   frmState.view = null;
   frmState.tab = 'settings';
   frmRender();
@@ -2307,6 +2655,7 @@ window.frmAddEntry = frmAddEntry;
 window.frmCancelAdd = frmCancelAdd;
 window.frmEditEntry = frmEditEntry;
 window.frmCancelEdit = frmCancelEdit;
+window.frmAskOverride = frmAskOverride;
 window.frmKeyChanged = frmKeyChanged;
 window.frmNewForm = frmNewForm;
 window.frmEditForm = frmEditForm;
@@ -2339,6 +2688,9 @@ window.frmLoadAdmins = frmLoadAdmins;
 window.frmFilterAdminSearch = frmFilterAdminSearch;
 window.frmAddAdmin = frmAddAdmin;
 window.frmRemoveAdmin = frmRemoveAdmin;
+window.frmOpenDetail = frmOpenDetail;
+window.frmCloseDetail = frmCloseDetail;
+window.frmToggleRespondent = frmToggleRespondent;
 window.frmViewResponses = frmViewResponses;
 window.frmCloseResponses = frmCloseResponses;
 window.frmLoadResponses = frmLoadResponses;

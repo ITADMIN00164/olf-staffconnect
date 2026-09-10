@@ -177,6 +177,46 @@
 #page-forms .frm-ref { display:block; font-size:11px; color:var(--soft);
   font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 #page-forms .frm-tally { margin:9px 0 0; font-size:12px; color:var(--soft); }
+#page-forms .frm-page--wide { max-width:1100px; }
+
+/* A form name on the dashboard is the way into its detail. */
+#page-forms .frm-open { appearance:none; background:none; border:0; padding:0;
+  font:inherit; font-weight:600; color:var(--ink); text-align:left;
+  cursor:pointer; border-bottom:1px solid transparent; }
+#page-forms .frm-open:hover { color:var(--accent);
+  border-bottom-color:var(--accent); }
+/* Secondary ways into the same detail: readable as links, not as headings. */
+#page-forms .frm-open--soft { font-weight:550; color:var(--accent);
+  border-bottom-color:rgba(37,99,201,.3); font-variant-numeric:tabular-nums; }
+#page-forms .frm-open--soft:hover { border-bottom-color:var(--accent); }
+
+/* Detail: recipients, their counts, and the entries behind each count. */
+#page-forms .frm-grid--detail tbody tr.frm-drow > td { border-bottom:0; }
+#page-forms .frm-grid--detail tbody tr.frm-drow.is-quiet .frm-grid__name {
+  font-weight:500; color:var(--soft); }
+#page-forms .frm-grid--detail tbody tr.frm-drow + tr.frm-drow > td {
+  border-top:1px solid var(--rule); }
+#page-forms .frm-grid--detail tbody tr.frm-dsub + tr.frm-drow > td {
+  border-top:1px solid var(--rule); }
+#page-forms .frm-tally-btn { appearance:none; min-width:34px; padding:3px 9px;
+  font:inherit; font-size:13px; font-weight:640; font-variant-numeric:tabular-nums;
+  color:var(--accent); background:#eaf1fd; border:1px solid #cfe0f8;
+  border-radius:6px; cursor:pointer;
+  transition:background .12s ease, color .12s ease; }
+#page-forms .frm-tally-btn:hover { background:#d9e7fb; }
+#page-forms .frm-tally-btn.is-on { background:var(--accent);
+  border-color:var(--accent); color:#fff; }
+#page-forms .frm-dsub > td { padding:0 12px 12px 12px; background:var(--wash); }
+#page-forms .frm-subgrid { width:100%; border-collapse:collapse;
+  font-size:12.5px; background:var(--paper); border:1px solid var(--rule);
+  border-radius:8px; overflow:hidden; }
+#page-forms .frm-subgrid th, #page-forms .frm-subgrid td {
+  text-align:left; padding:8px 11px; border-bottom:1px solid var(--rule); }
+#page-forms .frm-subgrid thead th { background:#eef2f8; font-weight:600;
+  font-size:11.5px; color:var(--soft); white-space:nowrap; }
+#page-forms .frm-subgrid tbody tr:last-child td { border-bottom:0; }
+#page-forms .frm-subgrid .frm-ref { display:inline; }
+#page-forms .frm-subgrid .frm-grid__name .frm-ref { display:block; }
 
 #page-forms .frm-tag { display:inline-block; font-size:11px; font-weight:600;
   padding:2px 8px; border-radius:11px; text-transform:capitalize;
@@ -272,6 +312,8 @@
 #page-forms .frm-key__label { display:block; font-size:13px; font-weight:600;
   margin-bottom:7px; }
 #page-forms .frm-key__note { margin:7px 0 0; font-size:12px; color:var(--soft); }
+#page-forms .frm-warnnote { display:block; margin-top:4px; color:var(--wait);
+  font-weight:550; }
 
 /* ---------------------------------------------------- recorded entries */
 #page-forms .frm-entries { list-style:none; margin:0; padding:0;
@@ -380,6 +422,8 @@
 #page-forms .frm-sub--tight { margin-top:10px; padding-top:12px; }
 #page-forms .frm-chip__n { display:inline-block; margin-left:7px;
   font-size:10.5px; font-weight:640; opacity:.65; }
+#page-forms .frm-chip--entry.is-on { background:var(--accent-deep);
+  border-color:var(--accent-deep); }
 
 /* One box per choice: a choice can be a paragraph, and it is always clear
    which text belongs to which option. */
@@ -550,6 +594,8 @@
   #page-forms .frm-pv { flex:1 1 50%; }
   #page-forms .frm-choicerow { flex-wrap:wrap; }
   #page-forms .frm-choicerow .frm-btn { margin-left:31px; }
+  #page-forms .frm-dsub > td { padding:0 6px 10px 6px; }
+  #page-forms .frm-subgrid th, #page-forms .frm-subgrid td { padding:7px 8px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -558,7 +604,7 @@
   #page-forms .frm-opt, #page-forms .frm-shell, #page-forms .frm-toast,
   #page-forms .frm-qcard, #page-forms .frm-qcard__chev,
   #page-forms .frm-addq, #page-forms .frm-back, #page-forms .frm-pv,
-  #page-forms .frm-addopt {
+  #page-forms .frm-addopt, #page-forms .frm-tally-btn, #page-forms .frm-open {
     transition:none; }
   #page-forms .frm-btn:active { transform:none; }
 }
