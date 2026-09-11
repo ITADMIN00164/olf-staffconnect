@@ -405,6 +405,9 @@
         <button class="nav-item pcal-admin-only" data-pcal-tab="past">
           <span class="nav-icon">🗂</span> Past Events
         </button>
+        <button class="nav-item pcal-admin-only" data-pcal-tab="bulk">
+          <span class="nav-icon">📥</span> Bulk Import
+        </button>
       </nav>
 
       <div id="pcal-sidebar-cal-controls">
@@ -484,6 +487,38 @@
         <div id="pcal-past-table"></div>
       </div>
 
+      <!-- BULK IMPORT TAB (admin only) -->
+      <div id="pcal-tab-bulk" class="tab-panel">
+        <div class="section-heading">Bulk Import from Excel</div>
+        <div style="font-size:12.5px;color:var(--text-light);margin-bottom:14px">
+          Add many events in one go. Download the template, fill it offline, upload it back.
+          Nothing is saved and no invites are sent until you confirm the summary.
+        </div>
+
+        <div class="pcal-bulk-grid">
+          <div class="pcal-bulk-card">
+            <div class="pcal-bulk-step">Step 1</div>
+            <h3>Download the template</h3>
+            <p>The State, District and Event Type dropdowns are built from your current
+               lists, so the file is always up to date. Re-download it after adding a new event type.</p>
+            <button class="btn-primary" id="pcal-bulk-download">⬇ Download Excel Template</button>
+            <div class="pcal-bulk-note" id="pcal-bulk-dl-note"></div>
+          </div>
+          <div class="pcal-bulk-card">
+            <div class="pcal-bulk-step">Step 2</div>
+            <h3>Upload the filled file</h3>
+            <p>Pick your saved .xlsx file. It is checked first, then you get a summary of
+               every event and how many people will be invited before anything is created.</p>
+            <input type="file" id="pcal-bulk-file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+            <div class="pcal-bulk-note">Filled in Google Sheets? Use File → Download → Microsoft Excel (.xlsx) first.</div>
+          </div>
+        </div>
+
+        <div id="pcal-bulk-instructions"></div>
+        <div id="pcal-bulk-status"></div>
+        <div id="pcal-bulk-report"></div>
+      </div>
+
     </main>
   </div>
 
@@ -533,6 +568,37 @@
     #pcal-app .pcal-dtp-time select { padding:6px 8px; border:1px solid #e2e8f0; border-radius:8px; font-size:13px; background:#fff; }
     #pcal-app .pcal-dtp-clock { font-size:16px; margin-right:2px; }
     #pcal-app .pcal-dtp-foot { display:flex; gap:8px; justify-content:flex-end; margin-top:14px; }
+    /* bulk import */
+    #pcal-app .pcal-bulk-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:16px; }
+    #pcal-app .pcal-bulk-card { background:#fff; border:1px solid #e8edf4; border-radius:12px; padding:16px 18px; }
+    #pcal-app .pcal-bulk-step { font-size:10.5px; font-weight:800; letter-spacing:.5px; text-transform:uppercase;
+      color:#1d4ed8; background:#eff4ff; display:inline-block; padding:3px 9px; border-radius:20px; margin-bottom:9px; }
+    #pcal-app .pcal-bulk-card h3 { margin:0 0 6px; font-size:14.5px; color:var(--text-dark); font-weight:700; }
+    #pcal-app .pcal-bulk-card p { margin:0 0 12px; font-size:12.5px; line-height:1.55; color:var(--text-light); }
+    #pcal-app .pcal-bulk-card input[type=file] { font-size:12.5px; width:100%; }
+    #pcal-app .pcal-bulk-note { font-size:11.5px; color:var(--text-light); margin-top:9px; line-height:1.5; }
+    #pcal-app .pcal-bulk-block { border:1px solid #e8edf4; border-left-width:4px; border-radius:10px;
+      padding:14px 16px; margin-bottom:14px; background:#fff; }
+    #pcal-app .pcal-bulk-block.info { border-left-color:#1d4ed8; }
+    #pcal-app .pcal-bulk-block.ok   { border-left-color:#16a34a; background:#f6fef9; }
+    #pcal-app .pcal-bulk-block.warn { border-left-color:#d97706; background:#fffbf5; }
+    #pcal-app .pcal-bulk-block.err  { border-left-color:#dc2626; background:#fff7f7; }
+    #pcal-app .pcal-bulk-block-title { font-size:13.5px; font-weight:700; color:var(--text-dark); margin-bottom:5px; }
+    #pcal-app .pcal-bulk-block-sub { font-size:12px; color:var(--text-light); line-height:1.6; margin-top:7px; }
+    #pcal-app .pcal-bulk-steps { margin:8px 0 0; padding-left:20px; font-size:12.5px; line-height:1.75; color:var(--text-dark); }
+    #pcal-app .pcal-bulk-warnlist { margin:8px 0 0; padding-left:20px; font-size:12.5px; line-height:1.7; color:var(--text-dark); }
+    #pcal-app .pcal-bulk-tblwrap { max-height:46vh; overflow:auto; border:1px solid #eef2f7; border-radius:8px; margin-top:11px; }
+    #pcal-app .pcal-bulk-tbl { width:100%; border-collapse:collapse; font-size:12px; }
+    #pcal-app .pcal-bulk-tbl th { text-align:left; padding:8px 10px; background:#f1f5f9; color:#475569; font-size:10.5px;
+      text-transform:uppercase; letter-spacing:.3px; position:sticky; top:0; white-space:nowrap; }
+    #pcal-app .pcal-bulk-tbl td { padding:7px 10px; border-bottom:1px solid #eef2f7; vertical-align:top; }
+    #pcal-app .pcal-bulk-status { font-size:12.5px; color:var(--text-dark); background:#f8fafc; border:1px solid #e8edf4;
+      border-radius:10px; padding:11px 14px; margin-bottom:14px; line-height:1.6; }
+    #pcal-app .pcal-bulk-status.err { color:#b91c1c; background:#fff7f7; border-color:#fecaca; }
+    #pcal-app .pcal-bulk-confirm-lead { font-size:13.5px; line-height:1.65; color:var(--text-dark); background:#eff4ff;
+      border-radius:10px; padding:13px 15px; margin-bottom:13px; }
+    #pcal-app .pcal-bulk-muted { font-size:11.5px; color:var(--text-light); line-height:1.6; }
+    @media (max-width: 860px) { #pcal-app .pcal-bulk-grid { grid-template-columns:1fr; } }
   </style>
   <div class="modal-overlay" id="pcal-modal-add">
     <div class="modal pcal-modal-lg">
@@ -640,6 +706,21 @@
       <div class="modal-body" id="pcal-details-body"></div>
       <div class="modal-footer">
         <button class="btn-secondary" data-pcal-close="pcal-modal-details">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ BULK IMPORT CONFIRMATION MODAL ══ -->
+  <div class="modal-overlay" id="pcal-modal-bulk">
+    <div class="modal pcal-modal-lg">
+      <div class="modal-header">
+        <h2>📥 Confirm Bulk Import</h2>
+        <button class="modal-close" data-pcal-close="pcal-modal-bulk">×</button>
+      </div>
+      <div class="modal-body pcal-add-body" id="pcal-bulk-confirm-body"></div>
+      <div class="modal-footer">
+        <button class="btn-secondary" data-pcal-close="pcal-modal-bulk">Cancel</button>
+        <button class="btn-primary" id="pcal-bulk-confirm">Create events &amp; send invites</button>
       </div>
     </div>
   </div>
