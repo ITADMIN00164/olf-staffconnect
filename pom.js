@@ -2432,13 +2432,21 @@ let pevDistricts     = [];      // district list backing the dropdown
 // ── Columns ─────────────────────────────────────────────────────────────────
 // scope "block"    -> editable in block view, computed + read-only in district view
 // scope "district" -> district view only
+// Hover text for the "Other Events" pair, so nobody has to guess what counts
+// as "other".
+const PEV_OTHER_MSG = "Events other than POM, NS and SU.";
+
 const PEV_COLUMNS = [
   { key: "blockEvents",      head: "Total<br>Block Events",                    scope: "block"    },
   { key: "districtEvents",   head: "Total<br>District Events",                 scope: "district" },
   { key: "blockTeachers",    head: "Teachers Felicitated<br>(Block Level)",    scope: "block"    },
   { key: "districtTeachers", head: "Teachers Felicitated<br>(District Level)", scope: "district" },
   { key: "suNsEvents",       head: "SU/NS<br>Events",                          scope: "district" },
-  { key: "suNsTeachers",     head: "Teachers Felicitated<br>(SU/NS Events)",   scope: "district" }
+  { key: "suNsTeachers",     head: "Teachers Felicitated<br>(SU/NS Events)",   scope: "district" },
+  { key: "otherEvents",      head: "Other<br>Events",                          scope: "district",
+    tip: PEV_OTHER_MSG },
+  { key: "otherTeachers",    head: "Teachers Felicitated<br>(Other Events)",   scope: "district",
+    tip: PEV_OTHER_MSG }
 ];
 
 const PEV_ROLLUP_MSG = "Select any block and fill these numbers \u2014 they are reconciled here automatically.";
@@ -2539,6 +2547,29 @@ async function pevRefreshDistrictsFromServer() {
     console.error("District list refresh failed:", e);
     return false;
   }
+}
+
+// ── Default block ───────────────────────────────────────────────────────────
+// District-level figures (POM district, SU/NS, Other) are stored without a
+// block, because that is what they are. The Excel report still needs a Block
+// value for every row, so those figures are attributed to the district's
+// default block: the one whose NAME sorts first alphabetically, ignoring the
+// numeric code prefix ("272601-AKOLE" sorts as "AKOLE").
+//
+// Nothing about this is written to the sheet. It only affects the report, so
+// changing the rule later re-shapes the export and touches no stored data.
+function pevBlockName(block) {
+  return String(block || "").replace(/^\s*\d+\s*-\s*/, "").trim().toUpperCase();
+}
+
+function pevDefaultBlock(district) {
+  const blocks = pevBlocksFor(district);
+  if (!blocks.length) return "";
+  return blocks.slice().sort((a, b) => {
+    const na = pevBlockName(a), nb = pevBlockName(b);
+    if (na !== nb) return na < nb ? -1 : 1;
+    return String(a).localeCompare(String(b));   // identical names: stable by code
+  })[0];
 }
 
 function pevBlocksFor(district) {
@@ -2684,7 +2715,10 @@ function pevRenderHead() {
   const cols = pevVisibleColumns();
   const cells = cols.map(c => {
     const rollup = !pevIsBlockView() && c.scope === "block";
-    return `<th class="${rollup ? "pev-rollup-th" : ""}"${rollup ? ` title="${PEV_ROLLUP_MSG}"` : ""}>${c.head}</th>`;
+    const tip = rollup ? PEV_ROLLUP_MSG : (c.tip || "");
+    const cls = [rollup ? "pev-rollup-th" : "", c.tip ? "pev-tip-th" : ""]
+      .filter(Boolean).join(" ");
+    return `<th${cls ? ` class="${cls}"` : ""}${tip ? ` title="${tip}"` : ""}>${c.head}</th>`;
   }).join("");
 
   // Column widths: month, one per count, save, last updated.
@@ -2741,7 +2775,7 @@ function pevRender() {
       }
       const val = pevStr(r[c.key]);
       const bad = !pevValid(val);
-      return `<td><input type="number" min="0" step="1" inputmode="numeric" `
+      return `<td${c.tip ? ` title="${c.tip}"` : ""}><input type="number" min="0" step="1" inputmode="numeric" `
         + `class="pev-input${bad ? " bad" : ""}" data-row="${i}" data-key="${c.key}" `
         + `value="${val}" placeholder="\u2014" `
         + `oninput="pevUpdateField(${i},'${c.key}',this.value)"></td>`;
@@ -3189,6 +3223,134 @@ async function pevRefresh() {
   }
 }
 
+// ── Excel report ────────────────────────────────────────────────────────────
+// One row per District + Block + Month, across every saved row in the sheet.
+//
+// The two levels are merged onto the same row: a block's own figures sit on its
+// row, and the district-level figures for that month land on the district's
+// default block. When the default block ALSO has its own figures, both sets
+// share that single row rather than producing a duplicate.
+const PEV_EXPORT_HEADERS = [
+  "State", "District", "Block", "Month",
+  "Total  Block Events", "Total District Events",
+  "Teachers Felicitated (Block Level)", "Teachers Felicitated (District Level)",
+  "SU/NS Events", "Teachers Felicitated (SU/NS Events)",
+  "Other Events", "Teachers Felicitated (Other Events)"
+];
+
+// "Jun-2026" -> 2026*12+5, so months sort chronologically rather than by name.
+function pevMonthOrder(month) {
+  const parts = String(month || "").split("-");
+  const mi = PEV_MONTH_NAMES.indexOf(String(parts[0] || "").slice(0, 3));
+  const yr = parseInt(parts[1], 10);
+  if (mi < 0 || isNaN(yr)) return Number.MAX_SAFE_INTEGER;   // unknown: sort last
+  return yr * 12 + mi;
+}
+
+// Counts go into the workbook as numbers so they can be summed; a blank stays
+// blank rather than becoming a 0.
+function pevNum(v) {
+  const t = pevStr(v);
+  if (t === "") return "";
+  const n = Number(t);
+  return isNaN(n) ? t : n;
+}
+
+function pevBuildExportRows() {
+  // Group every saved row by district, then month.
+  const byDistrict = {};
+  pevEvents.forEach(r => {
+    const d = pevStr(r.districtName);
+    const m = pevStr(r.month);
+    if (!d || !m) return;                          // unkeyed: nothing to report on
+    byDistrict[d] = byDistrict[d] || {};
+    byDistrict[d][m] = byDistrict[d][m] || { district: null, blocks: {} };
+    const bucket = byDistrict[d][m];
+    const b = pevStr(r.block);
+    if (b === "") bucket.district = r;
+    else bucket.blocks[b] = r;
+  });
+
+  const out = [];
+  Object.keys(byDistrict).sort((a, b) => a.localeCompare(b)).forEach(district => {
+    const months = byDistrict[district];
+    const state = PEV_DISTRICT_STATE[district] || "";
+    const mapped = pevBlocksFor(district);
+    const fallback = pevDefaultBlock(district);
+
+    Object.keys(months)
+      .sort((a, b) => pevMonthOrder(a) - pevMonthOrder(b))
+      .forEach(month => {
+        const bucket = months[month];
+        const dRow = bucket.district;
+
+        // Which blocks need a row this month: any with their own figures, plus
+        // the default block when there are district-level figures to place.
+        const names = Object.keys(bucket.blocks);
+        if (dRow && fallback && names.indexOf(fallback) < 0) names.push(fallback);
+
+        // Report in the mapping's own order, with anything unmapped after it so
+        // a block renamed in the sheet is still exported rather than dropped.
+        names.sort((a, b) => {
+          const ia = mapped.indexOf(a), ib = mapped.indexOf(b);
+          if (ia >= 0 && ib >= 0) return ia - ib;
+          if (ia >= 0) return -1;
+          if (ib >= 0) return 1;
+          return a.localeCompare(b);
+        });
+
+        // A month with district-level figures but no block mapping at all still
+        // gets one row, with Block left blank.
+        if (!names.length && dRow) names.push("");
+
+        names.forEach(block => {
+          const bRow = bucket.blocks[block] || null;
+          const carriesDistrict = dRow && (block === fallback || (!fallback && block === ""));
+          out.push([
+            state,
+            district,
+            block,
+            month,
+            bRow ? pevNum(bRow.blockEvents) : "",
+            carriesDistrict ? pevNum(dRow.districtEvents) : "",
+            bRow ? pevNum(bRow.blockTeachers) : "",
+            carriesDistrict ? pevNum(dRow.districtTeachers) : "",
+            carriesDistrict ? pevNum(dRow.suNsEvents) : "",
+            carriesDistrict ? pevNum(dRow.suNsTeachers) : "",
+            carriesDistrict ? pevNum(dRow.otherEvents) : "",
+            carriesDistrict ? pevNum(dRow.otherTeachers) : ""
+          ]);
+        });
+      });
+  });
+
+  return out;
+}
+
+function pevDownloadExcel() {
+  if (!pevEventsLoaded) {
+    showToast("Event data is still loading. Try again in a moment.", "info");
+    return;
+  }
+  const rows = pevBuildExportRows();
+  if (!rows.length) {
+    showToast("There is no saved event data to export yet.", "info");
+    return;
+  }
+
+  const aoa = [PEV_EXPORT_HEADERS].concat(rows);
+  const stamp = new Date().toISOString().slice(0, 10);
+  try {
+    const bytes = _buildXlsx(aoa, "Event Data");
+    _downloadBytes(bytes, `OLF_Event_Report_${stamp}.xlsx`,
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    showToast(`Excel downloaded \u2014 ${rows.length} row${rows.length === 1 ? "" : "s"}.`);
+  } catch (e) {
+    console.error("Event Excel export failed:", e);
+    showToast("Could not generate the Excel file.", "error");
+  }
+}
+
 // ── Entry points ────────────────────────────────────────────────────────────
 function pevOnShow() {
   pevPopulateYears();
@@ -3212,6 +3374,7 @@ function pevInit() {
   rebind("pevYear", pevOnYearChange);
   rebind("pevRefreshBtn", (e) => { e.stopPropagation(); pevRefresh(); }, "click");
   rebind("pevSaveAllBtn", (e) => { e.stopPropagation(); pevSaveAll(); }, "click");
+  rebind("pevExportBtn", (e) => { e.stopPropagation(); pevDownloadExcel(); }, "click");
 
   // Last line of defence: never let a closing tab take unsaved counts with it.
   if (!window.__pevBeforeUnload) {
@@ -3231,3 +3394,4 @@ window.pevRefresh = pevRefresh;
 window.pevSaveAll = pevSaveAll;
 window.pevOnYearChange = pevOnYearChange;
 window.pevOnBlockChange = pevOnBlockChange;
+window.pevDownloadExcel = pevDownloadExcel;
