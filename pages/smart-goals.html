@@ -884,11 +884,11 @@
       <select id="tf-board" onchange="tfRender()"><option value="">All boards</option></select>
       <select id="tf-period" onchange="tfRender()">
         <option value="7">Last 7 days</option>
-        <option value="30">Last 30 days</option>
-        <option value="90" selected>Last 90 days</option>
+        <option value="30" selected>Last 30 days</option>
+        <option value="45">Last 45 days</option>
         <option value="180">Last 6 months</option>
         <option value="365">Last 12 months</option>
-        <option value="all">All time</option>
+        <option value="all">All history</option>
       </select>
       <select id="tf-status" onchange="tfRender()">
         <option value="">Open + closed</option>
@@ -899,7 +899,8 @@
         <option value="">Any SLA status</option>
         <option>Within SLA</option><option>Breached</option><option>At risk</option><option>On track</option><option>No SLA</option>
       </select>
-      <select id="tf-by" onchange="tfRender()"><option value="">All creators</option></select>
+      <select id="tf-by" onchange="tfRender()" title="Tickets this person created or owns"><option value="">All members</option></select>
+      <select id="tf-pri" onchange="tfRender()" style="display:none"><option value="">Any priority</option></select>
       <input id="tf-q" type="text" placeholder="Search ticket ID / name…" oninput="tfRender()" style="min-width:190px">
       <button class="btn btn-secondary btn-sm" id="tf-cfg-btn" onclick="tfToggleConfig()" style="margin-left:auto">⚙ Configuration</button>
     </div>
@@ -940,7 +941,7 @@
           <div class="tf-note" id="tf-tab-note" style="margin-bottom:8px"></div>
           <div class="tf-people" id="tf-people"></div>
           <div class="tbl-wrap"><table class="tbl">
-          <thead><tr><th>Ticket</th><th>Name</th><th>Board</th><th>Created by</th><th>Created</th><th>Current stage</th><th id="tf-th-note">Progress</th><th class="tf-num">Age / TAT</th><th>SLA</th></tr></thead>
+          <thead><tr><th>Ticket</th><th>Name</th><th>Board</th><th>Owner</th><th>Created</th><th>Current stage</th><th id="tf-th-note">Progress</th><th class="tf-num">Age / TAT</th><th>SLA</th></tr></thead>
           <tbody id="tf-t-tickets"></tbody>
         </table></div>
         <div class="tf-pager" id="tf-pager"></div></div>
