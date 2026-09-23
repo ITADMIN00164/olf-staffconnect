@@ -3604,8 +3604,8 @@ try { window.updateMemberField = updateMemberField; } catch(e){}
 // ═══════════════════════════════════════════════════════════════════════════
 var FLOW_SOURCES = [
   // ▼▼▼  PASTE each Apps Script /exec URL and the FLOW_TOKEN logged by flowSetup()  ▼▼▼
-  { key: 'issues', label: 'Issues Tracker',         url: 'PASTE_ISSUES_TRACKER_EXEC_URL', token: 'PASTE_TOKEN' },
-  { key: 'work',   label: 'IT Ops Work Management', url: 'PASTE_IT_OPS_WORK_EXEC_URL',    token: 'PASTE_TOKEN' }
+  { key: 'issues', label: 'Issues Tracker',         url: 'PASTE_ISSUES_TRACKER_EXEC_URL', token: 'Pafe6d8798e7e47ae8fe2006a9f8e76b3' },
+  { key: 'work',   label: 'IT Ops Work Management', url: 'PASTE_IT_OPS_WORK_EXEC_URL',    token: '7ca344bde1484a33a3ae145aff446db8' }
 ];
 var FLOW_DEPT = 'Back Office - IT Ops';
 var FLOW_TIMEOUT_MS = 60000;
