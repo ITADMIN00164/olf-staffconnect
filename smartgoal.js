@@ -3603,11 +3603,9 @@ try { window.updateMemberField = updateMemberField; } catch(e){}
 // each Google Sheet, so owners edit them there. Read-only: never writes.
 // ═══════════════════════════════════════════════════════════════════════════
 var FLOW_SOURCES = [
-  // Apps Script /exec URL + the FLOW_TOKEN logged by flowSetup() (Script Properties)
-  { key: 'issues', label: 'Issues Tracker',         token: 'afe6d8798e7e47ae8fe2006a9f8e76b3',
-    url: 'https://script.google.com/macros/s/AKfycbwXGtui3BEEP2VrhUsDC9lNl8CoswXJlA-UX-B4w4QjnLIp5avnN1MQ3va2XVenCPSBjA/exec' },
-  { key: 'work',   label: 'IT Ops Work Management', token: '7ca344bde1484a33a3ae145aff446db8',
-    url: 'https://script.google.com/macros/s/AKfycbz3Dov42VgnFbJ0z56JMelbtobn4Ajd1n0e21SVDj2MZTcayrK1sdu022VoB3MD_yGVbQ/exec' }
+  // ▼▼▼  PASTE each Apps Script /exec URL and the FLOW_TOKEN logged by flowSetup()  ▼▼▼
+  { key: 'issues', label: 'Issues Tracker',         url: 'https://script.google.com/macros/s/AKfycbwXGtui3BEEP2VrhUsDC9lNl8CoswXJlA-UX-B4w4QjnLIp5avnN1MQ3va2XVenCPSBjA/exec', token: 'afe6d8798e7e47ae8fe2006a9f8e76b3' },
+  { key: 'work',   label: 'IT Ops Work Management', url: 'https://script.google.com/macros/s/AKfycbz3Dov42VgnFbJ0z56JMelbtobn4Ajd1n0e21SVDj2MZTcayrK1sdu022VoB3MD_yGVbQ/exec',    token: '7ca344bde1484a33a3ae145aff446db8' }
 ];
 var FLOW_DEPT = 'Back Office - IT Ops';
 var FLOW_TIMEOUT_MS = 60000;
