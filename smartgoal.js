@@ -3610,6 +3610,11 @@ var FLOW_SOURCES = [
 var FLOW_DEPT = 'Back Office - IT Ops';
 var FLOW_TIMEOUT_MS = 45000;                 // per attempt; one automatic retry
 var TF_HISTORY_MAX_AGE_MS = 4 * 36e5;        // history is rebuilt every 4 h, so re-download at most that often
+// Firestore snapshot: the Apps Script timers overwrite one document per tracker
+// (ticketFlow/<key>); reading it skips Apps Script entirely. Same SDK + app as app.js,
+// so it uses the signed-in session. Falls back to Apps Script if missing or stale.
+var FLOW_FIRESTORE_SDK = 'https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js';
+var FLOW_FIRESTORE_STALE_MS = 30 * 60000;
 var TF_H = 36e5;
 var TF = { raw: {}, boards: [], tickets: [], sources: [], loadedAt: 0, loading: null, tab: 'attention', page: 0, config: false, events: {} };
 
@@ -3698,6 +3703,25 @@ function tfJsonp(src, params) {
     document.head.appendChild(script);
   });
 }
+var tfFs = null;
+function tfFirestore() {
+  if (!tfFs) tfFs = Promise.all([import('/firebase-config.js'), import(FLOW_FIRESTORE_SDK)])
+    .then(function (m) { return { f: m[1], db: m[1].getFirestore(m[0].app) }; });
+  return tfFs;
+}
+function tfReadSnapshotDoc(src) {
+  return tfFirestore().then(function (x) { return x.f.getDoc(x.f.doc(x.db, 'ticketFlow', src.key)); }).then(function (snap) {
+    var v = snap.exists() ? snap.data() : null;
+    if (!v || !v.detail) throw new Error('no snapshot yet');
+    var builtAt = v.builtAt && v.builtAt.toDate ? v.builtAt.toDate() : null;
+    if (!builtAt || Date.now() - builtAt > FLOW_FIRESTORE_STALE_MS) throw new Error('snapshot older than 30 min');
+    var d = JSON.parse(v.detail);
+    d.history = v.history ? JSON.parse(v.history) : null;
+    d.via = 'Firestore';
+    return d;
+  });
+}
+
 function tfConfiguredSources() {
   return FLOW_SOURCES.filter(function (s) { return s.url && s.url.indexOf('PASTE_') !== 0; });
 }
@@ -3734,7 +3758,11 @@ function tfLoadOne(s, fresh) {
       throw e;
     });
   };
-  return attempt(1).then(function (d) {
+  var fsNote = '';
+  return tfReadSnapshotDoc(s).catch(function (e) {
+    fsNote = e && (e.code || e.message) || String(e);            // e.g. permission-denied, no snapshot yet
+    return attempt(1).then(function (d) { if (d) { d.via = 'Apps Script'; d.fsNote = fsNote; } return d; });
+  }).then(function (d) {
     if (d && !d.history && oldHist) d.history = oldHist;       // history not re-sent: keep ours
     TF.raw[s.key] = { src: s, data: d };
     tfSaveSnapshot();
@@ -3792,7 +3820,7 @@ function tfIngest(res) {
     });
     return { src: r.src, name: trackerName, lastEventAt: tfParse(d.lastEventAt), generatedAt: tfParse(d.generatedAt),
              historyAt: d.history ? tfParse(d.history.builtAt) : null, sheetUrl: d.sheetUrl, settings: st, boards: d.boards || [],
-             error: r.error, loading: r.loading };
+             error: r.error, loading: r.loading, via: d.via || 'Apps Script', fsNote: d.fsNote || '' };
   });
   TF.boards = boards; TF.tickets = tickets; TF.events = {};
 }
@@ -3948,7 +3976,8 @@ function tfStatus(state) {
     if (!s.name) return '<span><span class="tf-dot err"></span> <b>' + esc(s.src.label) + '</b>: could not load (' + esc(s.error || 'no data') + '). It will retry on the next ⟳ Refresh.</span>';
     var dot = s.error ? 'warn' : (s.loading ? 'load' : '');
     var note = s.error ? ' · <span style="color:var(--amber)">tracker slow, showing its last data</span>' : (s.loading ? ' · updating…' : '');
-    return '<span><span class="tf-dot ' + dot + '"></span> <b>' + esc(s.name) + '</b>' + note + ' · last webhook ' + tfAgo(s.lastEventAt) + ' · data built ' + tfAgo(s.generatedAt) +
+    var via = '<span style="color:var(--text3)" title="' + esc(s.fsNote ? 'Firestore: ' + s.fsNote : 'Read from the Firestore snapshot') + '"> · via ' + esc(s.via) + '</span>';
+    return '<span><span class="tf-dot ' + dot + '"></span> <b>' + esc(s.name) + '</b>' + note + ' · last webhook ' + tfAgo(s.lastEventAt) + ' · data built ' + tfAgo(s.generatedAt) + via +
       (s.sheetUrl ? ' · <a href="' + esc(s.sheetUrl) + '" target="_blank" rel="noopener">Open sheet</a>' : '') + '</span>';
   });
   if (TF.fromSnapshot) parts.push('<span style="color:var(--text3)">Showing the copy saved ' + tfAgo(new Date(TF.loadedAt)) + '</span>');
