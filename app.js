@@ -1136,6 +1136,13 @@ window.navigate = async function (page) {
         });
     }
 
+    else if (page === "po") {
+        // po.js reads window.__olfUser itself (admin gate + run auth).
+        if (window.POReview && typeof window.POReview.mount === "function") {
+            window.POReview.mount();
+        }
+    }
+
     else if (
     page === "data-dashboards" ||
     page === "expense-report"

@@ -1,0 +1,259 @@
+<!-- ============================================================
+     PO REVIEW  (pages/po.html)  —  prototype-styled Weekly view
+     Logic in po.js (window.POReview.mount()).
+     ============================================================ -->
+<div id="poRoot" class="pr">
+
+  <div class="pr-head">
+    <div>
+      <h1 class="pr-title">Field Team Review System</h1>
+      <p class="pr-sub">Weekly review across POs, PMs and DMs.</p>
+    </div>
+    <nav class="pr-nav" id="prNav">
+      <button class="pr-navbtn is-active" data-view="weekly">Weekly</button>
+      <button class="pr-navbtn" data-view="summary">Summary</button>
+      <button class="pr-navbtn" data-view="monthly">Monthly</button>
+      <button class="pr-navbtn" data-view="manage" id="prManageTab" hidden>Manage</button>
+    </nav>
+  </div>
+
+  <!-- ================= WEEKLY ================= -->
+  <section class="pr-view" id="prWeekly">
+    <div class="pr-panel pr-filters">
+      <label class="pr-field"><span>Review unit</span>
+        <select id="prUnit">
+          <option value="PO">PO</option>
+          <option value="PM">PM</option>
+          <option value="DM">DM</option>
+          <option value="District">District</option>
+        </select></label>
+      <label class="pr-field"><span id="prValueLabel">PO</span>
+        <select id="prValue" disabled><option value="">—</option></select></label>
+      <label class="pr-field"><span>Month</span>
+        <select id="prMonth" disabled><option value="">—</option></select></label>
+      <button class="pr-btn pr-btn-primary" id="prLoad" disabled>Open review</button>
+    </div>
+
+    <div id="prBody">
+      <div class="pr-empty">Choose a review unit, a value and a month, then open the review.</div>
+    </div>
+  </section>
+
+  <!-- ================= SUMMARY (placeholder) ================= -->
+  <section class="pr-view" id="prSummary" hidden>
+    <div class="pr-panel"><div class="pr-placeholder">Summary — coming in a later phase.</div></div>
+  </section>
+
+  <!-- ================= MONTHLY = Sheet B feed (view-only) ================= -->
+  <section class="pr-view" id="prMonthly" hidden>
+    <div class="pr-panel pr-filters">
+      <label class="pr-field"><span>Review unit</span>
+        <select id="prMoUnit">
+          <option value="PO">PO</option>
+          <option value="PM">PM</option>
+          <option value="DM">DM</option>
+          <option value="District">District</option>
+        </select></label>
+      <label class="pr-field"><span id="prMoValueLabel">PO</span>
+        <select id="prMoValue" disabled><option value="">—</option></select></label>
+      <label class="pr-field"><span>Month</span>
+        <select id="prMoMonth"><option value="">—</option></select></label>
+      <button class="pr-btn pr-btn-primary" id="prMoLoad" disabled>Show Sheet B feed</button>
+    </div>
+    <div id="prMoBody"><div class="pr-empty">Pick a PO and a month to see the Sheet B feed.</div></div>
+  </section>
+
+  <!-- ================= MANAGE = SETTINGS (admin) ================= -->
+  <section class="pr-view" id="prManage" hidden>
+    <div class="pr-panel">
+      <h2 class="pr-h2">JSON data</h2>
+      <p class="pr-sub">Read the raw files and build the per-PO JSONs the dashboard reads.</p>
+      <div class="pr-actions">
+        <button class="pr-btn pr-btn-primary" id="poRunLatest">Update JSONs</button>
+        <button class="pr-btn" id="poRunAll">Create all JSONs</button>
+        <span class="pr-hint">“Update JSONs” rebuilds only rows whose raw data changed (and adds new); “Create all” rebuilds everything. Both keep your reviews.</span>
+      </div>
+      <div id="poRunStatus" class="pr-run-status" hidden></div>
+
+      <hr class="pr-divider">
+
+      <h2 class="pr-h2">Export data</h2>
+      <p class="pr-sub">Builds one Google Sheet with all metrics, reviews and timestamps. Reads every JSON, so it can take a while.</p>
+      <div class="pr-actions">
+        <button class="pr-btn pr-btn-primary" id="poExport">Export all data</button>
+        <span class="pr-hint">Run occasionally — open the sheet, then File → Download → Excel.</span>
+      </div>
+      <div id="poExportStatus" class="pr-run-status" hidden></div>
+
+      <hr class="pr-divider">
+
+      <h2 class="pr-h2">PO base sheet</h2>
+      <p class="pr-sub">The DM / PM / PO mapping. Edits here save straight back to the file in Drive.</p>
+      <div class="pr-actions">
+        <button class="pr-btn pr-btn-primary" id="poBaseLoad">Load base sheet</button>
+        <input type="text" id="poBaseFilter" class="pr-base-filter" placeholder="Filter rows…" hidden>
+        <button class="pr-btn" id="poBaseAddRow" hidden>+ Add row</button>
+        <button class="pr-btn pr-btn-primary" id="poBaseSave" hidden>Save changes</button>
+        <span class="pr-base-count" id="poBaseCount"></span>
+      </div>
+      <div id="poBaseNote" class="pr-base-note" hidden></div>
+      <div id="poBaseWrap" class="pr-base-wrap"></div>
+    </div>
+  </section>
+
+  <div id="poToast" class="pr-toast" hidden></div>
+
+  <div id="prModal" class="pr-modal" hidden>
+    <div class="pr-modal-box">
+      <div class="pr-modal-title" id="prModalTitle">Edit</div>
+      <textarea id="prModalText" class="pr-modal-ta" maxlength="80"></textarea>
+      <div class="pr-modal-foot">
+        <span id="prModalMsg" class="pr-modal-msg"></span>
+        <span class="pr-modal-spacer"></span>
+        <button class="pr-btn" id="prModalClose">Close</button>
+        <button class="pr-btn pr-btn-primary" id="prModalSave">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .pr{--l:#e4e7ec;--ink:#111826;--mut:#667085;--bg:#f8f9fb;--acc:#2f6db3;--acc2:#255a95;
+      --hl:#fff7e6;--good:#12894a;--warn:#b7791f;--bad:#b42318;
+      color:var(--ink);max-width:1280px;margin:0 auto;padding:18px 20px 70px;font-size:13.5px;}
+  .pr-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px;}
+  .pr-title{font-size:22px;font-weight:650;margin:0;}
+  .pr-sub{color:var(--mut);margin:3px 0 0;}
+  .pr-nav{display:flex;gap:3px;background:var(--bg);border:1px solid var(--l);border-radius:9px;padding:3px;}
+  .pr-navbtn{border:0;background:transparent;padding:7px 15px;border-radius:6px;font:inherit;color:var(--mut);cursor:pointer;}
+  .pr-navbtn.is-active{background:#fff;color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(16,24,40,.08);}
+  .pr-panel{background:#fff;border:1px solid var(--l);border-radius:12px;padding:16px;margin-bottom:14px;}
+  .pr-h2{font-size:15px;font-weight:650;margin:0 0 2px;}
+  .pr-filters{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;}
+  .pr-field{display:flex;flex-direction:column;gap:5px;min-width:190px;}
+  .pr-field>span{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;font-weight:600;}
+  .pr-field select{padding:8px 10px;border:1px solid var(--l);border-radius:8px;font:inherit;background:#fff;}
+  .pr-btn{padding:9px 16px;border:1px solid var(--l);border-radius:8px;background:#fff;font:inherit;cursor:pointer;}
+  .pr-btn:hover:not(:disabled){border-color:#c3c9d2;}
+  .pr-btn:disabled{opacity:.5;cursor:not-allowed;}
+  .pr-btn-primary{background:var(--acc);border-color:var(--acc);color:#fff;}
+  .pr-btn-primary:hover:not(:disabled){background:var(--acc2);}
+  .pr-empty,.pr-placeholder{color:var(--mut);padding:30px 8px;text-align:center;}
+  .pr-hint,.pr-base-count{color:var(--mut);font-size:12px;}
+
+  /* ----- PO header block ----- */
+  .pr-po{display:flex;flex-direction:column;gap:3px;}
+  .pr-po-name{font-size:20px;font-weight:650;}
+  .pr-po-name small{font-size:13px;color:var(--mut);font-weight:500;margin-left:8px;}
+  .pr-po-line{color:var(--mut);font-size:13px;}
+  .pr-po-line b{color:var(--ink);font-weight:600;}
+  .pr-po-line .sep{margin:0 8px;color:#c3c9d2;}
+
+  /* ----- blocks chips ----- */
+  .pr-blocks-h{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);font-weight:700;margin-bottom:9px;}
+  .pr-blocks-h b{color:var(--acc);margin-left:6px;font-size:13px;}
+  .pr-chips{display:flex;gap:7px;flex-wrap:wrap;}
+  .pr-chip{border:1px solid var(--l);border-radius:7px;padding:5px 9px;font-size:12px;background:#fff;}
+  .pr-chip code{color:var(--mut);font-size:11px;margin-right:5px;}
+
+  /* ----- cards ----- */
+  .pr-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:14px;}
+  .pr-card{background:#fff;border:1px solid var(--l);border-radius:11px;padding:14px 16px;}
+  .pr-card-k{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);font-weight:700;}
+  .pr-card-v{font-size:26px;font-weight:680;margin-top:4px;font-variant-numeric:tabular-nums;}
+  .pr-card-v small{font-size:13px;font-weight:500;color:var(--mut);margin-left:6px;}
+  .pr-wkcard .pr-card-k{display:flex;justify-content:space-between;}
+  .pr-wkcard-date{font-size:12px;color:var(--mut);margin-top:3px;}
+  .pr-bars{display:flex;gap:3px;margin-top:9px;}
+  .pr-bar{height:5px;border-radius:3px;flex:1;background:#e9edf3;}
+  .pr-bar.on{background:var(--good);}
+  .pr-bar.off{background:#e08a8a;}
+  .pr-bar.part{background:var(--warn);}
+  .pr-wkcard-foot{display:flex;justify-content:space-between;font-size:11.5px;color:var(--mut);margin-top:8px;}
+  .pr-lock{font-size:11px;margin-left:6px;}
+  .pr-wkcard.locked{background:#fafbfc;}
+  .pr-wkcard.complete{background:#eef8f0;border-color:#bfe3c9;}
+  .pr-wkcard.complete .pr-card-k>span:first-child{color:#12894a;}
+  .pr-wkcard.partial{background:#fff8e6;border-color:#ecd9a8;}
+  .pr-wkcard.partial .pr-card-k>span:first-child{color:#b7791f;}
+  .pr-wkcard.overdue{background:#fdf3f3;border-color:#e5b3b3;}
+  .pr-wkcard.overdue .pr-card-k>span:first-child{color:#b42318;}
+  th.pr-col-locked{background:#eceff3;color:#8a94a3;}
+
+  /* ----- columnar table ----- */
+  .pr-tablewrap{max-height:68vh;overflow:auto;border:1px solid var(--l);border-radius:12px;background:#fff;}
+  table.pr-tbl{border-collapse:collapse;width:100%;font-size:13px;}
+  .pr-tbl th,.pr-tbl td{border-bottom:1px solid #eef1f5;border-right:1px solid #eef1f5;padding:7px 10px;text-align:left;vertical-align:top;}
+  .pr-tbl th{background:var(--bg);font-weight:600;color:#3a4252;position:sticky;top:0;z-index:3;white-space:nowrap;font-size:11.5px;text-transform:uppercase;letter-spacing:.03em;}
+  .pr-tbl th.pr-num,.pr-tbl td.pr-num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .pr-tbl td.pr-item{min-width:230px;font-weight:500;}
+  .pr-tbl td.pr-who,.pr-tbl th.pr-who{text-align:center;}
+  .pr-who-tag{font-size:9.5px;font-weight:700;letter-spacing:.05em;border-radius:5px;padding:1px 6px;text-transform:uppercase;}
+  .pr-who-po{color:#1f5fa8;background:#e8f1fb;border:1px solid #cfe0f5;}
+  .pr-who-pm{color:#8a5a12;background:#fdf3dd;border:1px solid #ecd9a8;}
+  .pr-who-auto{color:#475467;background:#eef1f5;border:1px solid #dde1e7;}
+  .pr-mtd{background:#fbfcfe;font-weight:600;}
+  .pr-tbl tbody tr.pr-row:hover td{background:#e6eefb;}
+  th.pr-mtd{background:#eef3f9;}
+  .pr-rev-yes{color:var(--good);font-weight:600;}
+  .pr-rev-no{color:var(--mut);}
+  .pr-teamrow td.pr-item{font-weight:500;}
+  .pr-revbtn{padding:3px 9px;font-size:12px;}
+  .pr-revbtn-on{background:var(--good);border-color:var(--good);color:#fff;}
+  .pr-grp td{background:#eef1f5;font-weight:650;color:#3a4252;cursor:pointer;user-select:none;letter-spacing:.01em;}
+  .pr-grp .pr-caret{color:var(--mut);margin-right:8px;font-size:11px;display:inline-block;width:10px;}
+  .pr-grp .pr-grpcount{font-size:11px;font-weight:600;color:var(--mut);background:#fff;border:1px solid var(--l);border-radius:20px;padding:1px 8px;margin-left:8px;}
+  tr.pr-hidden{display:none;}
+  .pr-mut{color:var(--mut);}
+
+  /* editable cells */
+  .pr-seg{display:inline-flex;gap:3px;flex-wrap:wrap;}
+  .pr-segbtn{border:1px solid var(--l);background:#fff;border-radius:6px;padding:3px 8px;font:inherit;font-size:12px;cursor:pointer;color:var(--ink);}
+  .pr-segbtn.is-on{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600;}
+  .pr-ta{width:100%;min-width:150px;box-sizing:border-box;border:1px solid var(--l);border-radius:6px;padding:5px 7px;font:inherit;font-size:12.5px;resize:vertical;min-height:30px;}
+  .pr-sel{border:1px solid var(--l);border-radius:6px;padding:4px 7px;font:inherit;font-size:12.5px;background:#fff;}
+  .pr-carry{font-size:11.5px;color:var(--mut);margin-bottom:4px;max-width:190px;}
+  .pr-ro{color:var(--ink);}
+
+  .pr-savebar{display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-top:14px;}
+  .pr-savehint{color:var(--mut);font-size:12px;}
+  .pr-savehint.is-fail{color:var(--bad);font-weight:600;}
+  .pr-verified{font-size:12px;font-weight:600;color:#1a7a3e;background:#eef8f0;border:1px solid #bfe3c9;border-radius:20px;padding:3px 10px;margin-right:auto;}
+
+  /* run status + base editor (Manage) */
+  .pr-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px;}
+  .pr-divider{border:0;border-top:1px solid var(--l);margin:22px 0 18px;}
+  .pr-run-status{margin-top:16px;border:1px solid var(--l);border-radius:9px;padding:12px 14px;background:var(--bg);font-size:13px;white-space:pre-wrap;line-height:1.5;}
+  .pr-run-status.is-error{border-color:#e5b3b3;background:#fdf3f3;color:#8a2a2a;}
+  .pr-base-filter{padding:8px 10px;border:1px solid var(--l);border-radius:8px;font:inherit;min-width:220px;}
+  .pr-base-note{margin-top:12px;border:1px solid #e5cfa3;background:#fdf7e8;border-radius:9px;padding:10px 12px;font-size:13px;color:#7a5b12;}
+  .pr-base-wrap{margin-top:12px;overflow:auto;max-height:60vh;}
+  table.pr-base-tbl{border-collapse:collapse;font-size:12.5px;white-space:nowrap;}
+  .pr-base-tbl th,.pr-base-tbl td{border:1px solid var(--l);padding:2px 0;}
+  .pr-base-tbl thead th{background:var(--bg);position:sticky;top:0;padding:7px 10px;text-align:left;font-weight:600;z-index:1;}
+  .pr-base-tbl td.pr-cell{padding:0;}
+  .pr-base-tbl td.pr-cell [contenteditable]{padding:5px 8px;min-width:90px;outline:none;min-height:18px;}
+  .pr-base-tbl td.pr-cell [contenteditable]:focus{background:#eef5ff;box-shadow:inset 0 0 0 2px var(--acc);}
+  .pr-base-del{border:0;background:transparent;color:#b34141;cursor:pointer;font-size:15px;padding:4px 6px;}
+  tr.pr-row-hidden{display:none;}
+
+  .pr-toast{position:fixed;right:20px;bottom:20px;background:var(--ink);color:#fff;padding:11px 16px;border-radius:9px;box-shadow:0 6px 20px rgba(16,24,40,.25);font-size:13px;z-index:50;}
+  .pr-spin{display:inline-block;width:14px;height:14px;border:2px solid #ffffff70;border-top-color:#fff;border-radius:50%;animation:pr-rot .7s linear infinite;vertical-align:-2px;margin-right:7px;}
+  @keyframes pr-rot{to{transform:rotate(360deg)}}
+  @media (max-width:640px){.pr-field{min-width:100%;}}
+  .pr-iconbtn{border:1px solid var(--l);background:#fff;border-radius:7px;padding:4px 11px;font-size:14px;cursor:pointer;color:var(--mut);line-height:1;}
+  .pr-iconbtn:hover{border-color:#c3c9d2;}
+  .pr-iconbtn.editable{color:var(--acc);}
+  .pr-iconbtn.has-val{color:var(--good);border-color:#bfe3c9;background:#f3faf5;}
+  .pr-rev-part{color:var(--warn);font-weight:600;}
+  .pr-modal{position:fixed;inset:0;background:rgba(16,24,40,.45);align-items:center;justify-content:center;z-index:100;}
+  .pr-modal:not([hidden]){display:flex;}
+  .pr-modal-box{background:#fff;border-radius:12px;padding:18px;width:min(520px,92vw);box-shadow:0 12px 40px rgba(16,24,40,.3);}
+  .pr-modal-title{font-weight:650;font-size:15px;margin-bottom:10px;}
+  .pr-modal-ta{width:100%;box-sizing:border-box;min-height:120px;border:1px solid var(--l);border-radius:8px;padding:9px 11px;font:inherit;font-size:14px;resize:vertical;}
+  .pr-modal-ta[readonly]{background:var(--bg);color:var(--ink);}
+  .pr-modal-foot{display:flex;align-items:center;gap:10px;margin-top:12px;}
+  .pr-modal-spacer{flex:1;}
+  .pr-modal-msg{font-size:12px;color:var(--mut);}
+  .pr-modal-msg.is-over{color:var(--bad);font-weight:600;}
+</style>
