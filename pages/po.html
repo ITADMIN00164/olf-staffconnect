@@ -69,10 +69,12 @@
       <h2 class="pr-h2">JSON data</h2>
       <p class="pr-sub">Read the raw files and build the per-PO JSONs the dashboard reads.</p>
       <div class="pr-actions">
+        <label class="pr-hint" for="poRunFolder" style="font-weight:600;">Folder:</label>
+        <select id="poRunFolder" class="pr-input" style="max-width:280px;"></select>
         <button class="pr-btn pr-btn-primary" id="poRunLatest">Update JSONs</button>
         <button class="pr-btn" id="poRunAll">Create all JSONs</button>
-        <span class="pr-hint">“Update JSONs” rebuilds only rows whose raw data changed (and adds new); “Create all” rebuilds everything. Both keep your reviews.</span>
       </div>
+      <p class="pr-sub" style="margin-top:8px;">Pick the week folder you changed, then “Update JSONs” rebuilds only rows whose raw data changed there (reviews kept). “All folders” processes every week and can be slow.</p>
       <div id="poRunStatus" class="pr-run-status" hidden></div>
 
       <hr class="pr-divider">

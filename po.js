@@ -149,6 +149,7 @@
         resetDropdowns(); return;
       }
       state.base = res.data;
+      fillRunFolders();
       var mo = $("prMonth"); mo.innerHTML = "";
       if (!res.data.months.length) { mo.innerHTML = '<option value="">No months</option>'; }
       else { mo.appendChild(opt("", "Select…")); res.data.months.forEach(function (m) { mo.appendChild(opt(m.code, m.label)); }); }
@@ -612,12 +613,24 @@
     if (l) l.addEventListener("click", function () { runJson(false); });
     if (a) a.addEventListener("click", function () { runJson(true); });
   }
+  function fillRunFolders() {
+    var sel = $("poRunFolder"); if (!sel) return;
+    var periods = (state.base && state.base.periods) ? state.base.periods.slice() : [];
+    periods.sort(function (a, b) { return a.code < b.code ? 1 : -1; });   // newest first
+    var html = "";
+    for (var i = 0; i < periods.length; i++) html += '<option value="' + esc(periods[i].code) + '">' + esc(periods[i].label) + "</option>";
+    html += '<option value="">All folders (slow)</option>';
+    sel.innerHTML = html;   // defaults to the newest folder
+  }
   function runJson(overwrite) {
     if (currentEmail() !== ADMIN_EMAIL) { toast("Only the IT admin can run this."); return; }
+    var sel = $("poRunFolder"), code = sel ? sel.value : "";
+    var scopeLabel = code ? ((sel.options[sel.selectedIndex] && sel.options[sel.selectedIndex].text) || code) : "all folders";
+    if (!code && !window.confirm("Build ALL folders? This processes every week and can be slow (and may time out). Usually you only need the one folder you changed.")) return;
     var box = $("poRunStatus"), l = $("poRunLatest"), a = $("poRunAll");
     l.disabled = true; a.disabled = true; box.hidden = false; box.classList.remove("is-error");
-    box.innerHTML = '<span class="pr-spin"></span>' + (overwrite ? "Rebuilding all JSONs…" : "Updating JSONs…") + " This can take a while.";
-    post({ action: overwrite ? "runAll" : "runLatest", email: currentEmail() }, { retries: 0, timeout: 300000 }).then(function (res) {
+    box.innerHTML = '<span class="pr-spin"></span>' + (overwrite ? "Rebuilding" : "Updating") + " JSONs for " + esc(scopeLabel) + "\u2026 This can take a while.";
+    post({ action: overwrite ? "runAll" : "runLatest", email: currentEmail(), code: code }, { retries: 0, timeout: 300000, warmRetries: 0 }).then(function (res) {
       l.disabled = false; a.disabled = false;
       if (!res.ok) { box.classList.add("is-error"); box.textContent = "Failed: " + res.error; return; }
       box.textContent = summarize(res.result);
