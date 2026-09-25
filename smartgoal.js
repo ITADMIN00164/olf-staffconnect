@@ -3751,7 +3751,7 @@ function tfLoadOne(s, fresh) {
   var prev = TF.raw[s.key] || { src: s };
   var oldHist = prev.data && prev.data.history;
   var histAt = oldHist && tfParse(oldHist.builtAt);
-  var needHist = !(histAt && Date.now() - histAt < TF_HISTORY_MAX_AGE_MS);
+  var needHist = !(histAt && tfNow() - histAt < TF_HISTORY_MAX_AGE_MS);
   var attempt = function (left) {
     return tfJsonp(s, { action: 'data', fresh: fresh ? '1' : '', history: needHist ? '' : '0' }).catch(function (e) {
       if (left > 0) return new Promise(function (r) { setTimeout(r, 1500); }).then(function () { return attempt(left - 1); });
@@ -3785,6 +3785,8 @@ function tfParse(s, shiftMin) {
 
 function tfIngest(res) {
   var boards = [], tickets = [];
+  TF.holidays = {};                                        // one list: holidays from every tracker
+  res.forEach(function (r) { ((r.data && r.data.holidays) || []).forEach(function (d) { TF.holidays[d] = 1; }); });
   TF.sources = res.map(function (r) {
     if (!r.data) return { src: r.src, error: r.error, loading: r.loading };
     var d = r.data, st = d.settings || {};
@@ -3794,9 +3796,10 @@ function tfIngest(res) {
     TF.detailDays = Number(st.detail_days) || 45;
     var attnHrs = Number(st.attention_hours) || 72;
     var trackerName = String(st.tracker_name || r.src.label);
+    var clock = tfClock(st);
     (d.boards || []).forEach(function (b) {
       var board = { uid: r.src.key + ':' + b.id, src: r.src, tracker: trackerName, id: b.id, label: b.label,
-                    slaHours: Number(b.slaHours) || 0, atRisk: atRisk, attnHrs: attnHrs, lanes: b.lanes || [], sheet: b.sheet };
+                    slaHours: Number(b.slaHours) || 0, atRisk: atRisk, attnHrs: attnHrs, lanes: b.lanes || [], sheet: b.sheet, clock: clock };
       board.keyIdx = {}; board.lanes.forEach(function (l, i) { board.keyIdx[l.key] = i; });
       boards.push(board);
       ((d.tickets || {})[b.id] || []).forEach(function (row) {
@@ -3820,7 +3823,8 @@ function tfIngest(res) {
     });
     return { src: r.src, name: trackerName, lastEventAt: tfParse(d.lastEventAt), generatedAt: tfParse(d.generatedAt),
              historyAt: d.history ? tfParse(d.history.builtAt) : null, sheetUrl: d.sheetUrl, settings: st, boards: d.boards || [],
-             error: r.error, loading: r.loading, via: d.via || 'Apps Script', fsNote: d.fsNote || '' };
+             error: r.error, loading: r.loading, via: d.via || 'Apps Script', fsNote: d.fsNote || '', excluded: Number(d.excluded) || 0,
+             clock: clock };
   });
   TF.boards = boards; TF.tickets = tickets; TF.events = {};
 }
@@ -3844,9 +3848,54 @@ function tfApplyDetails(t, x) {
   t.people = [t.by].concat(t.owners).filter(function (p, i, a) { return p && a.indexOf(p) === i; });
 }
 
+// ── Time: everything is IST wall-clock ──
+// Sheet times are parsed as local Dates carrying the IST wall-clock, so "now" must be
+// the IST wall-clock too, whatever timezone the viewer's device is set to.
+var TF_IST_MS = 330 * 60000;
+function tfWall(ms) {
+  var u = new Date(ms + TF_IST_MS);
+  return new Date(u.getUTCFullYear(), u.getUTCMonth(), u.getUTCDate(), u.getUTCHours(), u.getUTCMinutes(), u.getUTCSeconds());
+}
+function tfNow() { return tfWall(Date.now()); }
+
+// ── Working-day clock (Flow_Settings: sla_clock, work_days; Flow_Holidays) ──
+// "working_days": non-working days and holidays are skipped; a working day counts 24h.
+var TF_DOW = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+function tfClock(st) {
+  var mode = String(st.sla_clock || 'working_days').trim().toLowerCase() === 'calendar' ? 'calendar' : 'working_days';
+  var days = {};   // weekday -> true (every week) or { n: true } (only the Nth one of the month)
+  String(st.work_days || 'Mon,Tue,Wed,Thu,Fri,Sat2,Sat4,Sat5').split(',').forEach(function (tok) {
+    var m = /^\s*([a-z]{3})[a-z]*\s*(\d*)\s*$/i.exec(tok); if (!m || !(m[1].toLowerCase() in TF_DOW)) return;
+    var d = TF_DOW[m[1].toLowerCase()];
+    if (!m[2]) days[d] = true;
+    else if (days[d] !== true) { days[d] = days[d] || {}; m[2].split('').forEach(function (n) { days[d][n] = true; }); }
+  });
+  if (!Object.keys(days).length) mode = 'calendar';
+  return { mode: mode, days: days, label: mode === 'calendar' ? 'calendar hours' : 'working days (' + String(st.work_days || 'Mon,Tue,Wed,Thu,Fri,Sat2,Sat4,Sat5') + ')' };
+}
+function tfDayKey(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+function tfIsWorkDay(d, clock) {
+  if (TF.holidays && TF.holidays[tfDayKey(d)]) return false;
+  var rule = clock.days[d.getDay()];
+  return rule === true || !!(rule && rule[Math.ceil(d.getDate() / 7)]);
+}
+// Milliseconds between a and b that fall on working days (or all of them on the calendar clock).
+function tfWorkMs(a, b, clock) {
+  if (!a || !b || b <= a) return 0;
+  if (!clock || clock.mode === 'calendar') return b - a;
+  var total = 0, day = new Date(a.getFullYear(), a.getMonth(), a.getDate());
+  while (day < b) {
+    var next = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
+    if (tfIsWorkDay(day, clock)) total += Math.min(+b, +next) - Math.max(+a, +day);
+    day = next;
+  }
+  return total;
+}
+function tfSpanH(a, b, board) { return tfWorkMs(a, b, board && board.clock) / TF_H; }
+
 // Derives stage segments, TAT (minus paused lanes) and SLA status for one ticket.
 function tfCompute(t) {
-  var lanes = t.board.lanes, now = new Date();
+  var lanes = t.board.lanes, now = tfNow(), clock = t.board.clock;
   var ev = [];
   t.stamps.forEach(function (d, i) { if (d) ev.push({ i: i, at: d }); });
   ev.sort(function (a, b) { return a.at - b.at; });
@@ -3868,15 +3917,15 @@ function tfCompute(t) {
     var seg = { i: e.i, from: e.at, to: to, open: !ev[k + 1] && !t.done };
     t.segs.push(seg);
     if (to && lanes[e.i].pausesSla) {
-      var a = Math.max(+e.at, +start || 0), b = Math.min(+to, +stop);
-      if (b > a) paused += b - a;
+      var a = new Date(Math.max(+e.at, +start || 0)), b = new Date(Math.min(+to, +stop));
+      paused += tfWorkMs(a, b, clock);
     }
   });
   t.cur = ev.length ? lanes[ev[ev.length - 1].i].label : '—';
-  t.hrs = start ? Math.max(0, (stop - start - paused) / TF_H) : null;
+  t.hrs = start ? Math.max(0, (tfWorkMs(start, stop, clock) - paused) / TF_H) : null;
   t.pausedHrs = paused / TF_H;
   var last = t.segs.length ? t.segs[t.segs.length - 1] : null;
-  t.inStageHrs = last && last.open ? (now - last.from) / TF_H : 0;
+  t.inStageHrs = last && last.open ? tfWorkMs(last.from, now, clock) / TF_H : 0;
   t.lastAt = ev.length ? ev[ev.length - 1].at : t.created;
   var sla = t.board.slaHours;
   if (!sla || t.hrs == null) t.sla = 'No SLA';
@@ -3886,7 +3935,7 @@ function tfCompute(t) {
   // time to start = created -> first lane that is not a Ready/queue lane
   var firstWork = null;
   lanes.forEach(function (l, i) { var s = t.stamps[i]; if (s && l.type !== 'Ready' && (!firstWork || s < firstWork)) firstWork = s; });
-  t.startHrs = firstWork && start ? Math.max(0, (firstWork - start) / TF_H) : null;
+  t.startHrs = firstWork && start ? tfWorkMs(start, firstWork, clock) / TF_H : null;
 }
 
 // ── helpers ──
@@ -3894,7 +3943,7 @@ function tfMedian(a) { if (!a.length) return null; var s = a.slice().sort(functi
 function tfH(h) { return h == null ? '—' : h < 48 ? (h < 1 ? Math.round(h * 60) + 'm' : Math.round(h) + 'h') : (h / 24).toFixed(1) + 'd'; }
 function tfD(d) { return d ? d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' }) : '—'; }
 function tfDT(d) { return d ? d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'; }
-function tfAgo(d) { if (!d) return '—'; var m = Math.round((Date.now() - d) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' d ago'; }
+function tfAgo(d) { if (!d) return '—'; var m = Math.round((tfNow() - d) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' d ago'; }
 function tfChip(s) {
   var c = { 'Within SLA': 'ok', 'On track': 'neu', 'At risk': 'warn', 'Breached': 'bad', 'No SLA': 'neu' }[s] || 'neu';
   var i = { 'Within SLA': '✓', 'On track': '•', 'At risk': '!', 'Breached': '✕', 'No SLA': '–' }[s] || '';
@@ -3949,7 +3998,7 @@ function tfOnSrcChange() { tfFillBoards(); tfRender(); }
 function tfFiltered(ignoreBoard, ignoreBy) {
   var src = tfVal('tf-src'), bd = ignoreBoard ? '' : tfVal('tf-board'), p = tfVal('tf-period'), st = tfVal('tf-status'),
       sla = tfVal('tf-sla'), by = ignoreBy ? '' : tfVal('tf-by'), pri = tfVal('tf-pri'), q = tfVal('tf-q').trim().toLowerCase();
-  var since = p === 'all' ? -Infinity : Date.now() - (+p) * 24 * TF_H;
+  var since = p === 'all' ? -Infinity : tfNow().getTime() - (+p) * 24 * TF_H;
   return TF.tickets.filter(function (t) {
     if (src && t.board.src.key !== src) return false;
     if (bd && t.board.uid !== bd) return false;
@@ -3977,12 +4026,14 @@ function tfStatus(state) {
     var dot = s.error ? 'warn' : (s.loading ? 'load' : '');
     var note = s.error ? ' · <span style="color:var(--amber)">tracker slow, showing its last data</span>' : (s.loading ? ' · updating…' : '');
     var via = '<span style="color:var(--text3)" title="' + esc(s.fsNote ? 'Firestore: ' + s.fsNote : 'Read from the Firestore snapshot') + '"> · via ' + esc(s.via) + '</span>';
+    if (s.clock && s.clock.mode !== 'calendar') via += '<span style="color:var(--text3)" title="TAT and SLA skip non-working days and Flow_Holidays (' + Object.keys(TF.holidays || {}).length + ' holidays listed)"> · SLA in working days</span>';
+    if (s.excluded) via += '<span style="color:var(--text3)" title="Tickets listed in this sheet\'s Flow_Excluded tab are left out of every number"> · ' + s.excluded + ' excluded</span>';
     return '<span><span class="tf-dot ' + dot + '"></span> <b>' + esc(s.name) + '</b>' + note + ' · last webhook ' + tfAgo(s.lastEventAt) + ' · data built ' + tfAgo(s.generatedAt) + via +
       (s.sheetUrl ? ' · <a href="' + esc(s.sheetUrl) + '" target="_blank" rel="noopener">Open sheet</a>' : '') + '</span>';
   });
-  if (TF.fromSnapshot) parts.push('<span style="color:var(--text3)">Showing the copy saved ' + tfAgo(new Date(TF.loadedAt)) + '</span>');
+  if (TF.fromSnapshot) parts.push('<span style="color:var(--text3)">Showing the copy saved ' + tfAgo(tfWall(TF.loadedAt)) + '</span>');
   if (state === 'load') parts.push('<span style="color:var(--text3)">Refreshing…</span>');
-  else if (TF.loadedAt && !TF.fromSnapshot) parts.push('<span style="color:var(--text3)">Loaded ' + tfAgo(new Date(TF.loadedAt)) + '</span>');
+  else if (TF.loadedAt && !TF.fromSnapshot) parts.push('<span style="color:var(--text3)">Loaded ' + tfAgo(tfWall(TF.loadedAt)) + '</span>');
   el.innerHTML = parts.join('');
 }
 
@@ -4018,7 +4069,7 @@ function tfRender(keepPage) {
 function tfRenderTrend(T) {
   var el = document.getElementById('tf-c-trend');
   if (!T.length) { el.innerHTML = '<div class="tf-empty">No tickets in this period.</div>'; return; }
-  var p = tfVal('tf-period'), now = new Date();
+  var p = tfVal('tf-period'), now = tfNow();
   var first = T.reduce(function (m, t) { var c = t.created || t.closedAt; return c && c < m ? c : m; }, now);
   var spanDays = p === 'all' ? Math.max(1, (now - first) / (24 * TF_H)) : +p;
   var unit = spanDays <= 31 ? 'day' : spanDays <= 200 ? 'week' : 'month';
@@ -4074,7 +4125,7 @@ function tfRenderDwell(T) {
   note.textContent = b.label + ' · median time in each stage';
   var rows = b.lanes.map(function (l, i) {
     var d = [];
-    T.forEach(function (t) { if (t.board !== b) return; t.segs.forEach(function (s) { if (s.i === i && s.to && !s.open) d.push((s.to - s.from) / TF_H); }); });
+    T.forEach(function (t) { if (t.board !== b) return; t.segs.forEach(function (s) { if (s.i === i && s.to && !s.open) d.push(tfSpanH(s.from, s.to, t.board)); }); });
     var over = l.targetHours ? d.filter(function (h) { return h > l.targetHours; }).length : 0;
     return { l: l, med: tfMedian(d), n: d.length, over: over };
   }).filter(function (r) { return r.l.type !== 'Completed'; });
@@ -4225,7 +4276,7 @@ function tfOpenDrawer(t) {
     (t.blocked ? '<dt>Blocked</dt><dd><span class="tf-chip bad">⛔</span> ' + esc(t.blocked) + '</dd>' : '') +
     (t.requestedBy ? '<dt>Requested by</dt><dd>' + esc(t.requestedBy) + '</dd>' : '') +
     (t.category ? '<dt>Category</dt><dd>' + esc(t.category) + '</dd>' : '') +
-    (t.nwStatus ? '<dt>NimbleWork</dt><dd>' + esc(t.nwStatus) + (t.nwClosed ? ' · closed ' + tfD(new Date(t.nwClosed)) : '') + '</dd>' : '') +
+    (t.nwStatus ? '<dt>NimbleWork</dt><dd>' + esc(t.nwStatus) + (t.nwClosed && !isNaN(Date.parse(t.nwClosed)) ? ' · closed ' + tfD(tfWall(Date.parse(t.nwClosed))) : '') + '</dd>' : '') +
     (t.changedBy ? '<dt>Last change</dt><dd>' + esc(t.changedBy) + (t.changedAt ? ' · ' + tfAgo(t.changedAt) : '') + '</dd>' : '') +
     '<dt>Created</dt><dd>' + tfDT(t.created) + '</dd>' +
     (t.done ? '<dt>Completed</dt><dd>' + tfDT(t.closedAt) + '</dd>' : '') +
@@ -4235,8 +4286,8 @@ function tfOpenDrawer(t) {
     '</dl><div style="font-weight:700;margin-bottom:10px">Stage timeline <span class="tf-note">(first time each lane was reached)</span></div><div class="tf-tl">' +
     lanes.map(function (l, i) {
       var st = t.stamps[i], sg = segByLane[i];
-      var dur = sg && sg.to ? '<span class="tf-dur">' + (sg.open ? 'here for ' : '') + tfH((sg.to - sg.from) / TF_H) + (l.pausesSla ? ' ⏸' : '') + '</span>' : '';
-      var over = sg && sg.to && l.targetHours && (sg.to - sg.from) / TF_H > l.targetHours ? ' <span class="tf-chip bad">✕ over ' + l.targetHours + 'h target</span>' : '';
+      var dur = sg && sg.to ? '<span class="tf-dur">' + (sg.open ? 'here for ' : '') + tfH(tfSpanH(sg.from, sg.to, t.board)) + (l.pausesSla ? ' ⏸' : '') + '</span>' : '';
+      var over = sg && sg.to && l.targetHours && tfSpanH(sg.from, sg.to, t.board) > l.targetHours ? ' <span class="tf-chip bad">✕ over ' + l.targetHours + 'h target</span>' : '';
       return '<div class="tf-tl-item' + (st ? '' : ' pending') + '"><div style="font-weight:600">' + esc(l.label) + dur + over + '</div><div class="tf-tl-sub">' + (st ? tfDT(st) : 'not reached') + '</div></div>';
     }).join('') + '</div><div id="tf-d-events"><div class="tf-note">Loading full movement history…</div></div>';
   document.getElementById('tf-d-body').innerHTML = html;
