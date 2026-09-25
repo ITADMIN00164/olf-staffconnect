@@ -3820,7 +3820,7 @@ function tfIngest(res) {
     });
     return { src: r.src, name: trackerName, lastEventAt: tfParse(d.lastEventAt), generatedAt: tfParse(d.generatedAt),
              historyAt: d.history ? tfParse(d.history.builtAt) : null, sheetUrl: d.sheetUrl, settings: st, boards: d.boards || [],
-             error: r.error, loading: r.loading, via: d.via || 'Apps Script', fsNote: d.fsNote || '' };
+             error: r.error, loading: r.loading, via: d.via || 'Apps Script', fsNote: d.fsNote || '', excluded: Number(d.excluded) || 0 };
   });
   TF.boards = boards; TF.tickets = tickets; TF.events = {};
 }
@@ -3977,6 +3977,7 @@ function tfStatus(state) {
     var dot = s.error ? 'warn' : (s.loading ? 'load' : '');
     var note = s.error ? ' · <span style="color:var(--amber)">tracker slow, showing its last data</span>' : (s.loading ? ' · updating…' : '');
     var via = '<span style="color:var(--text3)" title="' + esc(s.fsNote ? 'Firestore: ' + s.fsNote : 'Read from the Firestore snapshot') + '"> · via ' + esc(s.via) + '</span>';
+    if (s.excluded) via += '<span style="color:var(--text3)" title="Tickets listed in this sheet\'s Flow_Excluded tab are left out of every number"> · ' + s.excluded + ' excluded</span>';
     return '<span><span class="tf-dot ' + dot + '"></span> <b>' + esc(s.name) + '</b>' + note + ' · last webhook ' + tfAgo(s.lastEventAt) + ' · data built ' + tfAgo(s.generatedAt) + via +
       (s.sheetUrl ? ' · <a href="' + esc(s.sheetUrl) + '" target="_blank" rel="noopener">Open sheet</a>' : '') + '</span>';
   });
