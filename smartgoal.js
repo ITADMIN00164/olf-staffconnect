@@ -3604,13 +3604,19 @@ try { window.updateMemberField = updateMemberField; } catch(e){}
 // ═══════════════════════════════════════════════════════════════════════════
 var FLOW_SOURCES = [
   // ▼▼▼  PASTE each Apps Script /exec URL and the FLOW_TOKEN logged by flowSetup()  ▼▼▼
-  { key: 'issues', label: 'Issues Tracker',         url: 'PASTE_ISSUES_TRACKER_EXEC_URL', token: 'Pafe6d8798e7e47ae8fe2006a9f8e76b3' },
-  { key: 'work',   label: 'IT Ops Work Management', url: 'PASTE_IT_OPS_WORK_EXEC_URL',    token: '7ca344bde1484a33a3ae145aff446db8' }
+  { key: 'issues', label: 'Issues Tracker',         url: 'https://script.google.com/macros/s/AKfycbwXGtui3BEEP2VrhUsDC9lNl8CoswXJlA-UX-B4w4QjnLIp5avnN1MQ3va2XVenCPSBjA/exec', token: 'afe6d8798e7e47ae8fe2006a9f8e76b3' },
+  { key: 'work',   label: 'IT Ops Work Management', url: 'https://script.google.com/macros/s/AKfycbz3Dov42VgnFbJ0z56JMelbtobn4Ajd1n0e21SVDj2MZTcayrK1sdu022VoB3MD_yGVbQ/exec',    token: '7ca344bde1484a33a3ae145aff446db8' }
 ];
 var FLOW_DEPT = 'Back Office - IT Ops';
-var FLOW_TIMEOUT_MS = 60000;
+var FLOW_TIMEOUT_MS = 45000;                 // per attempt; one automatic retry
+var TF_HISTORY_MAX_AGE_MS = 4 * 36e5;        // history is rebuilt every 4 h, so re-download at most that often
+// Firestore snapshot: the Apps Script timers overwrite one document per tracker
+// (ticketFlow/<key>); reading it skips Apps Script entirely. Same SDK + app as app.js,
+// so it uses the signed-in session. Falls back to Apps Script if missing or stale.
+var FLOW_FIRESTORE_SDK = 'https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js';
+var FLOW_FIRESTORE_STALE_MS = 30 * 60000;
 var TF_H = 36e5;
-var TF = { boards: [], tickets: [], sources: [], loadedAt: 0, loading: null, tab: 'attention', page: 0, config: false, events: {} };
+var TF = { raw: {}, boards: [], tickets: [], sources: [], loadedAt: 0, loading: null, tab: 'attention', page: 0, config: false, events: {} };
 
 function tfIsFlowUser() {
   var e = window.__olfEmployee;
@@ -3642,10 +3648,35 @@ function tfInit() {
 }
 
 function tfShow() {
-  var staleMs = (TF.cacheMinutes || 5) * 60000;
-  if (TF.loadedAt && Date.now() - TF.loadedAt < staleMs) { tfFillFilters(); tfRender(); return; }
+  if (!TF.loadedAt) tfRestoreSnapshot();
+  var staleMs = (TF.refreshMinutes || 10) * 60000;
+  if (TF.loadedAt && !TF.fromSnapshot && Date.now() - TF.loadedAt < staleMs) { tfFillFilters(); tfRender(); return; }
   if (TF.loadedAt) { tfFillFilters(); tfRender(); }
   tfLoad(false);
+}
+
+// Last good response per tracker, kept in this browser so the tab paints
+// instantly on the next visit while fresh data loads in the background.
+function tfSnapKey() { var u = (window.SMART_GOALS_USER && window.SMART_GOALS_USER.email) || 'anon'; return 'tf_snap_v2_' + u; }
+function tfSaveSnapshot() {
+  try {
+    var res = Object.keys(TF.raw).filter(function (k) { return TF.raw[k].data; }).map(function (k) { return { key: k, data: TF.raw[k].data }; });
+    var v = JSON.stringify({ at: Date.now(), res: res });
+    if (v.length < 2500000) localStorage.setItem(tfSnapKey(), v); else localStorage.removeItem(tfSnapKey());
+  } catch (e) {}
+}
+function tfRestoreSnapshot() {
+  try {
+    var v = JSON.parse(localStorage.getItem(tfSnapKey()) || 'null');
+    if (!v || !v.res) return;
+    var any = false;
+    tfConfiguredSources().forEach(function (s) {
+      var hit = v.res.filter(function (x) { return x.key === s.key; })[0];
+      if (hit) { TF.raw[s.key] = { src: s, data: hit.data }; any = true; }
+    });
+    if (!any) return;
+    tfIngest(tfRawList()); TF.loadedAt = v.at; TF.fromSnapshot = true;
+  } catch (e) {}
 }
 
 // ── transport ──
@@ -3663,7 +3694,7 @@ function tfJsonp(src, params) {
     }
     window[cb] = function (res) {
       if (!res || res.ok === false) finish(new Error((res && res.error) || 'Server error'));
-      else finish(null, res.data);
+      else { var d = res.data; if (d && typeof d === 'object' && 'history' in res) d.history = res.history; finish(null, d); }
     };
     params.token = src.token;
     var qs = Object.keys(params).map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(params[k] == null ? '' : params[k]); }).join('&');
@@ -3672,28 +3703,75 @@ function tfJsonp(src, params) {
     document.head.appendChild(script);
   });
 }
+var tfFs = null;
+function tfFirestore() {
+  if (!tfFs) tfFs = Promise.all([import('/firebase-config.js'), import(FLOW_FIRESTORE_SDK)])
+    .then(function (m) { return { f: m[1], db: m[1].getFirestore(m[0].app) }; });
+  return tfFs;
+}
+function tfReadSnapshotDoc(src) {
+  return tfFirestore().then(function (x) { return x.f.getDoc(x.f.doc(x.db, 'ticketFlow', src.key)); }).then(function (snap) {
+    var v = snap.exists() ? snap.data() : null;
+    if (!v || !v.detail) throw new Error('no snapshot yet');
+    var builtAt = v.builtAt && v.builtAt.toDate ? v.builtAt.toDate() : null;
+    if (!builtAt || Date.now() - builtAt > FLOW_FIRESTORE_STALE_MS) throw new Error('snapshot older than 30 min');
+    var d = JSON.parse(v.detail);
+    d.history = v.history ? JSON.parse(v.history) : null;
+    d.via = 'Firestore';
+    return d;
+  });
+}
+
 function tfConfiguredSources() {
   return FLOW_SOURCES.filter(function (s) { return s.url && s.url.indexOf('PASTE_') !== 0; });
 }
+
+function tfRawList() {
+  return tfConfiguredSources().map(function (s) { return TF.raw[s.key] || { src: s }; });
+}
+function tfRebuild() { tfIngest(tfRawList()); tfFillFilters(); tfRender(true); }
 
 function tfLoad(fresh) {
   if (TF.loading) return TF.loading;
   var srcs = tfConfiguredSources();
   if (!srcs.length) { TF.sources = []; tfRender(); return Promise.resolve(); }
+  srcs.forEach(function (s) { TF.raw[s.key] = TF.raw[s.key] || { src: s }; TF.raw[s.key].loading = true; });
+  if (!TF.sources.length) TF.sources = tfRawList().map(function (r) { return { src: r.src, loading: true }; });
   tfStatus('load');
-  TF.loading = Promise.all(srcs.map(function (s) {
-    return tfJsonp(s, { action: 'data', fresh: fresh ? '1' : '' })
-      .then(function (d) { return { src: s, data: d }; }, function (e) { return { src: s, error: e.message || String(e) }; });
-  })).then(function (res) {
-    var ok = res.filter(function (r) { return r.data; });
-    // keep the previous data if every source failed
-    if (ok.length || !TF.loadedAt) tfIngest(res);
-    else TF.sources = res.map(function (r) { return { src: r.src, error: r.error }; });
-    TF.loadedAt = Date.now();
-  }).then(function () {
-    TF.loading = null; tfFillFilters(); tfRender();
+  TF.loading = Promise.all(srcs.map(function (s) { return tfLoadOne(s, fresh); })).then(function () {
+    TF.loading = null; TF.loadedAt = Date.now(); TF.fromSnapshot = false;
+    tfRebuild();
   });
   return TF.loading;
+}
+
+// One tracker: shown as soon as it answers (the other may still be loading),
+// retried once if slow, and its last good data kept if it still fails.
+function tfLoadOne(s, fresh) {
+  var prev = TF.raw[s.key] || { src: s };
+  var oldHist = prev.data && prev.data.history;
+  var histAt = oldHist && tfParse(oldHist.builtAt);
+  var needHist = !(histAt && Date.now() - histAt < TF_HISTORY_MAX_AGE_MS);
+  var attempt = function (left) {
+    return tfJsonp(s, { action: 'data', fresh: fresh ? '1' : '', history: needHist ? '' : '0' }).catch(function (e) {
+      if (left > 0) return new Promise(function (r) { setTimeout(r, 1500); }).then(function () { return attempt(left - 1); });
+      throw e;
+    });
+  };
+  var fsNote = '';
+  return tfReadSnapshotDoc(s).catch(function (e) {
+    fsNote = e && (e.code || e.message) || String(e);            // e.g. permission-denied, no snapshot yet
+    return attempt(1).then(function (d) { if (d) { d.via = 'Apps Script'; d.fsNote = fsNote; } return d; });
+  }).then(function (d) {
+    if (d && !d.history && oldHist) d.history = oldHist;       // history not re-sent: keep ours
+    TF.raw[s.key] = { src: s, data: d };
+    tfSaveSnapshot();
+  }, function (e) {
+    TF.raw[s.key] = { src: s, data: prev.data, error: e.message || String(e) };
+  }).then(function () {
+    TF.raw[s.key].loading = false;
+    tfRebuild();
+  });
 }
 
 // Sheet dates arrive as the wall-clock the sheet shows ("2026-08-03T14:05:00").
@@ -3708,11 +3786,12 @@ function tfParse(s, shiftMin) {
 function tfIngest(res) {
   var boards = [], tickets = [];
   TF.sources = res.map(function (r) {
-    if (!r.data) return { src: r.src, error: r.error };
+    if (!r.data) return { src: r.src, error: r.error, loading: r.loading };
     var d = r.data, st = d.settings || {};
     var shift = Number(st.stamp_shift_minutes) || 0;
     var atRisk = parseFloat(st.at_risk_pct); if (!(atRisk > 0)) atRisk = 75;
-    TF.cacheMinutes = Number(st.cache_minutes) || 5;
+    TF.refreshMinutes = Number(st.refresh_minutes) || 10;
+    TF.detailDays = Number(st.detail_days) || 45;
     var attnHrs = Number(st.attention_hours) || 72;
     var trackerName = String(st.tracker_name || r.src.label);
     (d.boards || []).forEach(function (b) {
@@ -3723,14 +3802,46 @@ function tfIngest(res) {
       ((d.tickets || {})[b.id] || []).forEach(function (row) {
         var t = { id: row[0], by: row[1] || '', created: tfParse(row[2], shift), name: row[3] || '', archived: !!row[4],
                   stamps: (row[5] || []).map(function (s) { return tfParse(s, shift); }), board: board, shift: shift };
+        tfApplyDetails(t, row[6]);
+        if (t.deleted) return;
+        tfCompute(t);
+        tickets.push(t);
+      });
+      // history: closed before detail_days, compact [creator, createdMinute, laneOffsets...]
+      var hist = d.history || {}, people = hist.people || [];
+      ((hist.tickets || {})[b.id] || []).forEach(function (h) {
+        var base = h[1];
+        var t = { id: '', by: people[h[0]] || '', created: tfMinDate(base, shift), name: '', archived: true, history: true,
+                  stamps: h.slice(2).map(function (o) { return o == null ? null : tfMinDate(base + o, shift); }), board: board, shift: shift };
+        tfApplyDetails(t, null);
         tfCompute(t);
         tickets.push(t);
       });
     });
     return { src: r.src, name: trackerName, lastEventAt: tfParse(d.lastEventAt), generatedAt: tfParse(d.generatedAt),
-             sheetUrl: d.sheetUrl, settings: st, boards: d.boards || [] };
+             historyAt: d.history ? tfParse(d.history.builtAt) : null, sheetUrl: d.sheetUrl, settings: st, boards: d.boards || [],
+             error: r.error, loading: r.loading, via: d.via || 'Apps Script', fsNote: d.fsNote || '' };
   });
   TF.boards = boards; TF.tickets = tickets; TF.events = {};
+}
+
+// History minutes are the sheet's wall-clock; rebuild a local Date from them.
+function tfMinDate(m, shiftMin) {
+  var u = new Date(m * 60000);
+  var d = new Date(u.getUTCFullYear(), u.getUTCMonth(), u.getUTCDate(), u.getUTCHours(), u.getUTCMinutes());
+  return shiftMin ? new Date(d.getTime() - shiftMin * 60000) : d;
+}
+
+// NimbleWork fields from Flow_Details (owners, due date, priority, ...).
+function tfApplyDetails(t, x) {
+  x = x || {};
+  t.owners = x.o || [];
+  var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(x.d || '');
+  t.due = m ? new Date(+m[1], m[2] - 1, +m[3], 23, 59, 59) : null;     // end of the due day
+  t.priority = x.p || ''; t.nwStatus = x.s || ''; t.nwClosed = x.c || '';
+  t.blocked = x.br || x.f || ''; t.requestedBy = x.r || ''; t.category = x.k || '';
+  t.changedBy = x.u || ''; t.changedAt = tfParse(x.at); t.deleted = !!x.x;
+  t.people = [t.by].concat(t.owners).filter(function (p, i, a) { return p && a.indexOf(p) === i; });
 }
 
 // Derives stage segments, TAT (minus paused lanes) and SLA status for one ticket.
@@ -3771,6 +3882,11 @@ function tfCompute(t) {
   if (!sla || t.hrs == null) t.sla = 'No SLA';
   else if (t.done) t.sla = t.hrs <= sla ? 'Within SLA' : 'Breached';
   else t.sla = t.hrs > sla ? 'Breached' : (t.hrs >= sla * t.board.atRisk / 100 ? 'At risk' : 'On track');
+  t.overdue = !t.done && t.due && now > t.due ? (now - t.due) / TF_H : 0;
+  // time to start = created -> first lane that is not a Ready/queue lane
+  var firstWork = null;
+  lanes.forEach(function (l, i) { var s = t.stamps[i]; if (s && l.type !== 'Ready' && (!firstWork || s < firstWork)) firstWork = s; });
+  t.startHrs = firstWork && start ? Math.max(0, (firstWork - start) / TF_H) : null;
 }
 
 // ── helpers ──
@@ -3804,14 +3920,22 @@ function tfBindTips(root, fn) {
 function tfFillFilters() {
   var srcEl = document.getElementById('tf-src'); if (!srcEl) return;
   var cur = srcEl.value;
-  var names = TF.sources.filter(function (s) { return !s.error; });
+  var names = TF.sources.filter(function (s) { return s.name; });
   srcEl.innerHTML = '<option value="">All trackers</option>' + names.map(function (s) { return '<option value="' + esc(s.src.key) + '">' + esc(s.name) + '</option>'; }).join('');
   if (names.some(function (s) { return s.src.key === cur; })) srcEl.value = cur;
   tfFillBoards();
   var byEl = document.getElementById('tf-by'), by = byEl.value;
-  var people = {}; TF.tickets.forEach(function (t) { if (t.by) people[t.by] = 1; });
-  byEl.innerHTML = '<option value="">All creators</option>' + Object.keys(people).sort().map(function (p) { return '<option value="' + esc(p) + '">' + esc(p) + '</option>'; }).join('');
+  var people = {}, pri = {};
+  TF.tickets.forEach(function (t) { t.people.forEach(function (p) { people[p] = 1; }); if (t.priority) pri[t.priority] = 1; });
+  byEl.innerHTML = '<option value="">All members</option>' + Object.keys(people).sort().map(function (p) { return '<option value="' + esc(p) + '">' + esc(p) + '</option>'; }).join('');
   if (people[by]) byEl.value = by;
+  var priEl = document.getElementById('tf-pri');
+  if (priEl) {
+    var cp = priEl.value, keys = Object.keys(pri).sort();
+    priEl.innerHTML = '<option value="">Any priority</option>' + keys.map(function (p) { return '<option value="' + esc(p) + '">' + esc(p) + '</option>'; }).join('');
+    priEl.style.display = keys.length ? '' : 'none';
+    if (pri[cp]) priEl.value = cp;
+  }
 }
 function tfFillBoards() {
   var el = document.getElementById('tf-board'); if (!el) return;
@@ -3824,7 +3948,7 @@ function tfOnSrcChange() { tfFillBoards(); tfRender(); }
 
 function tfFiltered(ignoreBoard, ignoreBy) {
   var src = tfVal('tf-src'), bd = ignoreBoard ? '' : tfVal('tf-board'), p = tfVal('tf-period'), st = tfVal('tf-status'),
-      sla = tfVal('tf-sla'), by = ignoreBy ? '' : tfVal('tf-by'), q = tfVal('tf-q').trim().toLowerCase();
+      sla = tfVal('tf-sla'), by = ignoreBy ? '' : tfVal('tf-by'), pri = tfVal('tf-pri'), q = tfVal('tf-q').trim().toLowerCase();
   var since = p === 'all' ? -Infinity : Date.now() - (+p) * 24 * TF_H;
   return TF.tickets.filter(function (t) {
     if (src && t.board.src.key !== src) return false;
@@ -3832,7 +3956,8 @@ function tfFiltered(ignoreBoard, ignoreBy) {
     var c = t.created || t.closedAt; if (p !== 'all' && (!c || c < since)) return false;
     if (st && (st === 'open') === t.done) return false;
     if (sla && t.sla !== sla) return false;
-    if (by && t.by !== by) return false;
+    if (by && t.people.indexOf(by) < 0) return false;
+    if (pri && t.priority !== pri) return false;
     if (q && (t.id + ' ' + t.name).toLowerCase().indexOf(q) < 0) return false;
     return true;
   });
@@ -3841,18 +3966,23 @@ function tfFiltered(ignoreBoard, ignoreBy) {
 // ── render ──
 function tfStatus(state) {
   var el = document.getElementById('tf-status-strip'); if (!el) return;
-  if (state === 'load' && !TF.loadedAt) { el.innerHTML = '<span class="tf-dot load"></span> Loading ticket data from the trackers…'; return; }
+  if (state === 'load' && !TF.sources.some(function (s) { return s.name; })) { el.innerHTML = '<span class="tf-dot load"></span> Loading ticket data from the trackers…'; return; }
   if (!tfConfiguredSources().length) {
     el.innerHTML = '<span class="tf-dot warn"></span> Ticket Flow is not connected yet. Set the Apps Script URLs in <b>FLOW_SOURCES</b> (smartgoal.js).';
     return;
   }
   var parts = TF.sources.map(function (s) {
-    if (s.error) return '<span><span class="tf-dot err"></span> <b>' + esc(s.src.label) + '</b>: could not load (' + esc(s.error) + ')</span>';
-    return '<span><span class="tf-dot"></span> <b>' + esc(s.name) + '</b> · last webhook ' + tfAgo(s.lastEventAt) +
+    if (!s.name && s.loading) return '<span><span class="tf-dot load"></span> <b>' + esc(s.src.label) + '</b> · loading…</span>';
+    if (!s.name) return '<span><span class="tf-dot err"></span> <b>' + esc(s.src.label) + '</b>: could not load (' + esc(s.error || 'no data') + '). It will retry on the next ⟳ Refresh.</span>';
+    var dot = s.error ? 'warn' : (s.loading ? 'load' : '');
+    var note = s.error ? ' · <span style="color:var(--amber)">tracker slow, showing its last data</span>' : (s.loading ? ' · updating…' : '');
+    var via = '<span style="color:var(--text3)" title="' + esc(s.fsNote ? 'Firestore: ' + s.fsNote : 'Read from the Firestore snapshot') + '"> · via ' + esc(s.via) + '</span>';
+    return '<span><span class="tf-dot ' + dot + '"></span> <b>' + esc(s.name) + '</b>' + note + ' · last webhook ' + tfAgo(s.lastEventAt) + ' · data built ' + tfAgo(s.generatedAt) + via +
       (s.sheetUrl ? ' · <a href="' + esc(s.sheetUrl) + '" target="_blank" rel="noopener">Open sheet</a>' : '') + '</span>';
   });
+  if (TF.fromSnapshot) parts.push('<span style="color:var(--text3)">Showing the copy saved ' + tfAgo(new Date(TF.loadedAt)) + '</span>');
   if (state === 'load') parts.push('<span style="color:var(--text3)">Refreshing…</span>');
-  else if (TF.loadedAt) parts.push('<span style="color:var(--text3)">Loaded ' + tfAgo(new Date(TF.loadedAt)) + '</span>');
+  else if (TF.loadedAt && !TF.fromSnapshot) parts.push('<span style="color:var(--text3)">Loaded ' + tfAgo(new Date(TF.loadedAt)) + '</span>');
   el.innerHTML = parts.join('');
 }
 
@@ -3873,6 +4003,7 @@ function tfRender(keepPage) {
     ['Created', T.length, 'in selected period'],
     ['Closed', closed.length, 'reached a Completed lane'],
     ['Open now', open.length, open.filter(function (t) { return t.sla === 'At risk'; }).length + ' at risk'],
+    ['Time to start', tfH(tfMedian(T.map(function (t) { return t.startHrs; }).filter(function (h) { return h != null; }))), 'median, created → first work lane'],
     ['Median TAT', tfH(tfMedian(closed.map(function (t) { return t.hrs; }).filter(function (h) { return h != null; }))), 'created → completed'],
     ['SLA met', pct == null ? '—' : pct + '%', met + ' of ' + scored.length + ' closed'],
     ['Breached', T.filter(function (t) { return t.sla === 'Breached'; }).length, 'closed late + open overdue'],
@@ -3995,9 +4126,11 @@ function tfRenderBoards(T) {
 
 // Ticket table tabs. "Attention" = open and past SLA, or sitting in its
 // current stage for attention_hours (Flow_Settings, default 72) or more.
-function tfNeedsAttention(t) { return !t.done && (t.sla === 'Breached' || t.inStageHrs >= t.board.attnHrs); }
+function tfNeedsAttention(t) {
+  return !t.done && (t.sla === 'Breached' || t.inStageHrs >= t.board.attnHrs || t.overdue > 0 || !!t.blocked);
+}
 var TF_TABS = {
-  attention: { note: 'Open tickets past their SLA, or stuck in the same stage for too long. Longest-waiting first.', head: 'Why',
+  attention: { note: 'Open tickets past their SLA or due date, blocked, or stuck in one stage for too long. Longest-waiting first.', head: 'Why',
                pick: function (T) { return T.filter(tfNeedsAttention).sort(function (a, b) { return (b.hrs || 0) - (a.hrs || 0); }); } },
   latest:    { note: 'Most recent activity first (any lane move, open or closed).', head: 'Last activity',
                pick: function (T) { return T.slice().sort(function (a, b) { return (b.lastAt || 0) - (a.lastAt || 0); }); } },
@@ -4014,11 +4147,20 @@ function tfPickBy(name) {
 function tfWhy(t) {
   var out = [];
   if (t.sla === 'Breached') out.push('<span class="tf-chip bad">✕ Over SLA by ' + tfH(t.hrs - t.board.slaHours) + '</span>');
+  if (t.overdue > 0) out.push('<span class="tf-chip bad">⏰ Due ' + tfH(t.overdue) + ' ago</span>');
+  if (t.blocked) out.push('<span class="tf-chip bad" title="' + esc(t.blocked) + '">⛔ Blocked</span>');
   if (t.inStageHrs >= t.board.attnHrs) out.push('<span class="tf-chip warn">! ' + tfH(t.inStageHrs) + ' in ' + esc(t.cur) + '</span>');
   return '<span class="tf-why">' + out.join('') + '</span>';
 }
 
+function tfOwnerCell(t) {
+  if (!t.owners.length) return '<span style="color:var(--text3)" title="Creator (no owner recorded yet)">' + esc(t.by) + '</span>';
+  return '<span title="' + esc(t.owners.join(', ')) + '">' + esc(t.owners[0]) + (t.owners.length > 1 ? ' <span style="color:var(--text3)">+' + (t.owners.length - 1) + '</span>' : '') + '</span>';
+}
+function tfListable(t) { return !t.history; }
+
 function tfRenderTickets(T) {
+  T = T.filter(tfListable);
   var tab = TF_TABS[TF.tab] ? TF.tab : 'attention';
   document.querySelectorAll('#tf-tabs button').forEach(function (b) {
     var k = b.getAttribute('data-tab'), n = TF_TABS[k].pick(T).length, sp = b.querySelector('span');
@@ -4026,12 +4168,12 @@ function tfRenderTickets(T) {
     sp.textContent = '(' + n + ')';
     sp.classList.toggle('has', k === 'attention' && n > 0);
   });
-  document.getElementById('tf-tab-note').textContent = TF_TABS[tab].note;
+  document.getElementById('tf-tab-note').textContent = TF_TABS[tab].note + ' Lists cover open tickets and those closed in the last ' + (TF.detailDays || 45) + ' days; charts and totals cover the whole period.';
   document.getElementById('tf-th-note').textContent = TF_TABS[tab].head;
 
   // member chips: counts for this tab, ignoring the creator filter so every name stays visible
   var by = tfVal('tf-by'), counts = {};
-  TF_TABS[tab].pick(tfFiltered(false, true)).forEach(function (t) { if (t.by) counts[t.by] = (counts[t.by] || 0) + 1; });
+  TF_TABS[tab].pick(tfFiltered(false, true).filter(tfListable)).forEach(function (t) { t.people.forEach(function (p) { counts[p] = (counts[p] || 0) + 1; }); });
   var names = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a] || a.localeCompare(b); });
   var chip = function (n, c) {
     return '<button class="' + (n === by ? 'active' : '') + '" onclick="tfPickBy(\'' + escJs(n) + '\')" title="' +
@@ -4052,7 +4194,7 @@ function tfRenderTickets(T) {
       : '<span class="tf-lanes">' + t.board.lanes.map(function (_, j) { return '<span class="' + (t.stamps[j] ? 'on' : '') + '"></span>'; }).join('') + '</span>';
     return '<tr data-i="' + i + '"><td><b>' + esc(t.id) + '</b>' + (t.archived ? ' <span class="tf-chip neu" title="In the archive sheet">archived</span>' : '') + '</td>' +
       '<td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(t.name) + '">' + esc(t.name) + '</td>' +
-      '<td>' + esc(t.board.label) + '</td><td>' + esc(t.by) + '</td><td>' + tfD(t.created) + '</td>' +
+      '<td>' + esc(t.board.label) + '</td><td>' + tfOwnerCell(t) + '</td><td>' + tfD(t.created) + '</td>' +
       '<td><span class="tf-stage">' + esc(t.cur) + '</span></td><td>' + note + '</td>' +
       '<td class="tf-num">' + tfH(t.hrs) + '</td><td>' + tfChip(t.sla) + '</td></tr>';
   }).join('') || '<tr><td colspan="9" class="tf-empty">' + (tab === 'attention' ? '✓ Nothing needs attention for these filters.' : 'No tickets match these filters.') + '</td></tr>';
@@ -4077,6 +4219,14 @@ function tfOpenDrawer(t) {
   var html = '<dl class="tf-kv">' +
     '<dt>Board</dt><dd>' + esc(t.board.label) + ' <span style="color:var(--text3)">(' + esc(t.board.tracker) + ')</span></dd>' +
     '<dt>Created by</dt><dd>' + esc(t.by || '—') + '</dd>' +
+    (t.owners.length ? '<dt>Owners</dt><dd>' + esc(t.owners.join(', ')) + '</dd>' : '') +
+    (t.priority ? '<dt>Priority</dt><dd>' + esc(t.priority) + '</dd>' : '') +
+    (t.due ? '<dt>Due date</dt><dd>' + tfD(t.due) + (t.overdue ? ' <span class="tf-chip bad">⏰ ' + tfH(t.overdue) + ' overdue</span>' : '') + '</dd>' : '') +
+    (t.blocked ? '<dt>Blocked</dt><dd><span class="tf-chip bad">⛔</span> ' + esc(t.blocked) + '</dd>' : '') +
+    (t.requestedBy ? '<dt>Requested by</dt><dd>' + esc(t.requestedBy) + '</dd>' : '') +
+    (t.category ? '<dt>Category</dt><dd>' + esc(t.category) + '</dd>' : '') +
+    (t.nwStatus ? '<dt>NimbleWork</dt><dd>' + esc(t.nwStatus) + (t.nwClosed ? ' · closed ' + tfD(new Date(t.nwClosed)) : '') + '</dd>' : '') +
+    (t.changedBy ? '<dt>Last change</dt><dd>' + esc(t.changedBy) + (t.changedAt ? ' · ' + tfAgo(t.changedAt) : '') + '</dd>' : '') +
     '<dt>Created</dt><dd>' + tfDT(t.created) + '</dd>' +
     (t.done ? '<dt>Completed</dt><dd>' + tfDT(t.closedAt) + '</dd>' : '') +
     '<dt>' + (t.done ? 'TAT' : 'Age') + '</dt><dd>' + tfH(t.hrs) + (t.pausedHrs ? ' <span style="color:var(--text3)">(excl. ' + tfH(t.pausedHrs) + ' paused)</span>' : '') + (t.board.slaHours ? ' · SLA ' + t.board.slaHours + 'h' : '') + '</dd>' +
@@ -4101,11 +4251,19 @@ function tfLoadEvents(t) {
     if (!el || document.getElementById('tf-d-id').textContent !== t.id) return;
     if (!list || !list.length) { el.innerHTML = '<div class="tf-note">No movement history logged for this ticket yet (history starts once the event log is switched on).</div>'; return; }
     var lanes = t.board.lanes;
-    el.innerHTML = '<div style="font-weight:700;margin-bottom:10px">Full movement history <span class="tf-note">(' + list.length + ' moves, incl. re-entries)</span></div><div class="tf-tl">' +
-      list.map(function (e) {
+    // edits fire webhooks too: keep only lane changes, and note how many edits happened in each lane
+    var moves = [];
+    list.forEach(function (e) {
+      var last = moves[moves.length - 1];
+      if (last && last.laneKey === e.laneKey) { last.edits++; return; }
+      moves.push({ laneKey: e.laneKey, at: e.at, by: e.by, edits: 0 });
+    });
+    el.innerHTML = '<div style="font-weight:700;margin-bottom:10px">Full movement history <span class="tf-note">(' + moves.length + ' lane changes, incl. re-entries)</span></div><div class="tf-tl">' +
+      moves.map(function (e) {
         var i = t.board.keyIdx[e.laneKey];
         var lab = i != null ? lanes[i].label : e.laneKey;
-        return '<div class="tf-tl-item"><div style="font-weight:600">' + esc(lab) + '</div><div class="tf-tl-sub">' + tfDT(tfParse(e.at, t.shift)) + '</div></div>';
+        return '<div class="tf-tl-item"><div style="font-weight:600">' + esc(lab) + '</div><div class="tf-tl-sub">' + tfDT(tfParse(e.at, t.shift)) +
+          (e.by ? ' · by ' + esc(e.by) : '') + (e.edits ? ' · ' + e.edits + ' edit' + (e.edits > 1 ? 's' : '') + ' while here' : '') + '</div></div>';
       }).join('') + '</div>';
   };
   if (TF.events[key]) { show(TF.events[key]); return; }
@@ -4125,13 +4283,13 @@ function tfRenderConfig() {
   var el = document.getElementById('tf-config');
   var html = '<div class="tf-cfg-hint">The configuration lives in each tracker\'s Google Sheet, in the <code>Flow_Settings</code>, <code>Flow_Boards</code> and <code>Flow_Lanes</code> tabs. Anyone with edit access to the sheet can change it. ' +
     'Changes show here after the cache expires, or straight away with <b>⟳ Refresh</b>. <b>Sheet Column</b> tells the dashboard where each lane\'s date is. <b>Pauses SLA</b> = Yes leaves that lane\'s time out of TAT. <b>Stage Target Hours</b> is optional.</div>';
-  var ok = TF.sources.filter(function (s) { return !s.error; });
+  var ok = TF.sources.filter(function (s) { return s.name; });
   if (!ok.length) html += '<div class="tf-empty">No tracker is connected yet.</div>';
   ok.forEach(function (s) {
     var st = s.settings || {};
     html += '<div class="card" style="margin-bottom:16px"><div class="card-header"><span class="card-title">' + esc(s.name) + '</span>' +
       (s.sheetUrl ? '<a class="btn btn-secondary btn-sm" href="' + esc(s.sheetUrl) + '" target="_blank" rel="noopener">Open sheet to edit ↗</a>' : '') + '</div><div class="card-body">' +
-      '<div style="font-size:12.5px;color:var(--text2);margin-bottom:12px">At risk at <b>' + esc(st.at_risk_pct != null ? st.at_risk_pct : 75) + '%</b> of SLA · needs attention after <b>' + esc(st.attention_hours || 72) + 'h</b> in one stage · cache <b>' + esc(st.cache_minutes || 5) + ' min</b>' +
+      '<div style="font-size:12.5px;color:var(--text2);margin-bottom:12px">At risk at <b>' + esc(st.at_risk_pct != null ? st.at_risk_pct : 75) + '%</b> of SLA · needs attention after <b>' + esc(st.attention_hours || 72) + 'h</b> in one stage · lists cover <b>' + esc(st.detail_days || 45) + ' days</b> · history <b>' + esc(st.history_months || 24) + ' months</b> · events kept <b>' + esc(st.events_keep_days || 180) + ' days</b> · rebuilt every <b>' + esc(st.refresh_minutes || 10) + ' min</b>' +
       (Number(st.stamp_shift_minutes) ? ' · time correction <b>−' + esc(st.stamp_shift_minutes) + ' min</b>' : '') + '</div>';
     s.boards.forEach(function (b) {
       html += '<div class="sub-hd" style="margin-top:14px">' + esc(b.label) + ' <span style="color:var(--text3);font-weight:500">· board ' + esc(b.id) + ' · sheet "' + esc(b.sheet) + '"' + (b.archiveSheet ? ' + "' + esc(b.archiveSheet) + '"' : '') + ' · SLA ' + (b.slaHours ? esc(b.slaHours) + 'h' : 'none') + '</span></div>' +
@@ -4147,15 +4305,15 @@ function tfRenderConfig() {
 
 // ── Excel export of the current ticket view ──
 async function tfExportExcel() {
-  var T = (TF_TABS[TF.tab] || TF_TABS.all).pick(tfFiltered());
+  var T = (TF_TABS[TF.tab] || TF_TABS.all).pick(tfFiltered().filter(tfListable));
   if (!T.length) { toast('Nothing to export'); return; }
   var XLSX;
   try { XLSX = await ensureXLSX(); } catch (e) { toast('Could not load the Excel library'); return; }
   var maxLanes = Math.max.apply(null, T.map(function (t) { return t.board.lanes.length; }));
-  var head = ['Ticket ID', 'Name', 'Tracker', 'Board', 'Created By', 'Created', 'Current Stage', 'Status', 'Completed', 'TAT / Age (hrs)', 'Paused (hrs)', 'SLA (hrs)', 'SLA Status', 'Archived'];
+  var head = ['Ticket ID', 'Name', 'Tracker', 'Board', 'Created By', 'Owners', 'Priority', 'Due Date', 'Blocked', 'Created', 'Current Stage', 'Status', 'Completed', 'TAT / Age (hrs)', 'Paused (hrs)', 'SLA (hrs)', 'SLA Status', 'Archived'];
   for (var i = 1; i <= maxLanes; i++) head.push('Stage ' + i, 'Stage ' + i + ' Reached');
   var aoa = [head].concat(T.map(function (t) {
-    var r = [t.id, t.name, t.board.tracker, t.board.label, t.by, t.created || '', t.cur, t.done ? 'Closed' : 'Open', t.closedAt || '',
+    var r = [t.id, t.name, t.board.tracker, t.board.label, t.by, t.owners.join(', '), t.priority, t.due || '', t.blocked, t.created || '', t.cur, t.done ? 'Closed' : 'Open', t.closedAt || '',
              t.hrs == null ? '' : Math.round(t.hrs * 100) / 100, Math.round(t.pausedHrs * 100) / 100, t.board.slaHours || '', t.sla, t.archived ? 'Yes' : ''];
     t.board.lanes.forEach(function (l, j) { r.push(l.label, t.stamps[j] || ''); });
     return r;
