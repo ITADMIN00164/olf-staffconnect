@@ -3608,9 +3608,15 @@ var FLOW_SOURCES = [
   { key: 'work',   label: 'IT Ops Work Management', url: 'https://script.google.com/macros/s/AKfycbz3Dov42VgnFbJ0z56JMelbtobn4Ajd1n0e21SVDj2MZTcayrK1sdu022VoB3MD_yGVbQ/exec',    token: '7ca344bde1484a33a3ae145aff446db8' }
 ];
 var FLOW_DEPT = 'Back Office - IT Ops';
-var FLOW_TIMEOUT_MS = 60000;
+var FLOW_TIMEOUT_MS = 45000;                 // per attempt; one automatic retry
+var TF_HISTORY_MAX_AGE_MS = 4 * 36e5;        // history is rebuilt every 4 h, so re-download at most that often
+// Firestore snapshot: the Apps Script timers overwrite one document per tracker
+// (ticketFlow/<key>); reading it skips Apps Script entirely. Same SDK + app as app.js,
+// so it uses the signed-in session. Falls back to Apps Script if missing or stale.
+var FLOW_FIRESTORE_SDK = 'https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js';
+var FLOW_FIRESTORE_STALE_MS = 30 * 60000;
 var TF_H = 36e5;
-var TF = { boards: [], tickets: [], sources: [], loadedAt: 0, loading: null, tab: 'attention', page: 0, config: false, events: {} };
+var TF = { raw: {}, boards: [], tickets: [], sources: [], loadedAt: 0, loading: null, tab: 'attention', page: 0, config: false, events: {} };
 
 function tfIsFlowUser() {
   var e = window.__olfEmployee;
@@ -3652,22 +3658,24 @@ function tfShow() {
 // Last good response per tracker, kept in this browser so the tab paints
 // instantly on the next visit while fresh data loads in the background.
 function tfSnapKey() { var u = (window.SMART_GOALS_USER && window.SMART_GOALS_USER.email) || 'anon'; return 'tf_snap_v2_' + u; }
-function tfSaveSnapshot(res) {
+function tfSaveSnapshot() {
   try {
-    var s = JSON.stringify({ at: Date.now(), res: res.filter(function (r) { return r.data; }).map(function (r) { return { key: r.src.key, data: r.data }; }) });
-    if (s.length < 2500000) localStorage.setItem(tfSnapKey(), s); else localStorage.removeItem(tfSnapKey());
+    var res = Object.keys(TF.raw).filter(function (k) { return TF.raw[k].data; }).map(function (k) { return { key: k, data: TF.raw[k].data }; });
+    var v = JSON.stringify({ at: Date.now(), res: res });
+    if (v.length < 2500000) localStorage.setItem(tfSnapKey(), v); else localStorage.removeItem(tfSnapKey());
   } catch (e) {}
 }
 function tfRestoreSnapshot() {
   try {
     var v = JSON.parse(localStorage.getItem(tfSnapKey()) || 'null');
     if (!v || !v.res) return;
-    var res = tfConfiguredSources().map(function (s) {
+    var any = false;
+    tfConfiguredSources().forEach(function (s) {
       var hit = v.res.filter(function (x) { return x.key === s.key; })[0];
-      return hit ? { src: s, data: hit.data } : null;
-    }).filter(Boolean);
-    if (!res.length) return;
-    tfIngest(res); TF.loadedAt = v.at; TF.fromSnapshot = true;
+      if (hit) { TF.raw[s.key] = { src: s, data: hit.data }; any = true; }
+    });
+    if (!any) return;
+    tfIngest(tfRawList()); TF.loadedAt = v.at; TF.fromSnapshot = true;
   } catch (e) {}
 }
 
@@ -3695,28 +3703,75 @@ function tfJsonp(src, params) {
     document.head.appendChild(script);
   });
 }
+var tfFs = null;
+function tfFirestore() {
+  if (!tfFs) tfFs = Promise.all([import('/firebase-config.js'), import(FLOW_FIRESTORE_SDK)])
+    .then(function (m) { return { f: m[1], db: m[1].getFirestore(m[0].app) }; });
+  return tfFs;
+}
+function tfReadSnapshotDoc(src) {
+  return tfFirestore().then(function (x) { return x.f.getDoc(x.f.doc(x.db, 'ticketFlow', src.key)); }).then(function (snap) {
+    var v = snap.exists() ? snap.data() : null;
+    if (!v || !v.detail) throw new Error('no snapshot yet');
+    var builtAt = v.builtAt && v.builtAt.toDate ? v.builtAt.toDate() : null;
+    if (!builtAt || Date.now() - builtAt > FLOW_FIRESTORE_STALE_MS) throw new Error('snapshot older than 30 min');
+    var d = JSON.parse(v.detail);
+    d.history = v.history ? JSON.parse(v.history) : null;
+    d.via = 'Firestore';
+    return d;
+  });
+}
+
 function tfConfiguredSources() {
   return FLOW_SOURCES.filter(function (s) { return s.url && s.url.indexOf('PASTE_') !== 0; });
 }
+
+function tfRawList() {
+  return tfConfiguredSources().map(function (s) { return TF.raw[s.key] || { src: s }; });
+}
+function tfRebuild() { tfIngest(tfRawList()); tfFillFilters(); tfRender(true); }
 
 function tfLoad(fresh) {
   if (TF.loading) return TF.loading;
   var srcs = tfConfiguredSources();
   if (!srcs.length) { TF.sources = []; tfRender(); return Promise.resolve(); }
+  srcs.forEach(function (s) { TF.raw[s.key] = TF.raw[s.key] || { src: s }; TF.raw[s.key].loading = true; });
+  if (!TF.sources.length) TF.sources = tfRawList().map(function (r) { return { src: r.src, loading: true }; });
   tfStatus('load');
-  TF.loading = Promise.all(srcs.map(function (s) {
-    return tfJsonp(s, { action: 'data', fresh: fresh ? '1' : '' })
-      .then(function (d) { return { src: s, data: d }; }, function (e) { return { src: s, error: e.message || String(e) }; });
-  })).then(function (res) {
-    var ok = res.filter(function (r) { return r.data; });
-    // keep the previous data if every source failed
-    if (ok.length || !TF.loadedAt) { tfIngest(res); if (ok.length) tfSaveSnapshot(res); }
-    else TF.sources = res.map(function (r) { return { src: r.src, error: r.error }; });
-    TF.loadedAt = Date.now(); TF.fromSnapshot = false;
-  }).then(function () {
-    TF.loading = null; tfFillFilters(); tfRender();
+  TF.loading = Promise.all(srcs.map(function (s) { return tfLoadOne(s, fresh); })).then(function () {
+    TF.loading = null; TF.loadedAt = Date.now(); TF.fromSnapshot = false;
+    tfRebuild();
   });
   return TF.loading;
+}
+
+// One tracker: shown as soon as it answers (the other may still be loading),
+// retried once if slow, and its last good data kept if it still fails.
+function tfLoadOne(s, fresh) {
+  var prev = TF.raw[s.key] || { src: s };
+  var oldHist = prev.data && prev.data.history;
+  var histAt = oldHist && tfParse(oldHist.builtAt);
+  var needHist = !(histAt && Date.now() - histAt < TF_HISTORY_MAX_AGE_MS);
+  var attempt = function (left) {
+    return tfJsonp(s, { action: 'data', fresh: fresh ? '1' : '', history: needHist ? '' : '0' }).catch(function (e) {
+      if (left > 0) return new Promise(function (r) { setTimeout(r, 1500); }).then(function () { return attempt(left - 1); });
+      throw e;
+    });
+  };
+  var fsNote = '';
+  return tfReadSnapshotDoc(s).catch(function (e) {
+    fsNote = e && (e.code || e.message) || String(e);            // e.g. permission-denied, no snapshot yet
+    return attempt(1).then(function (d) { if (d) { d.via = 'Apps Script'; d.fsNote = fsNote; } return d; });
+  }).then(function (d) {
+    if (d && !d.history && oldHist) d.history = oldHist;       // history not re-sent: keep ours
+    TF.raw[s.key] = { src: s, data: d };
+    tfSaveSnapshot();
+  }, function (e) {
+    TF.raw[s.key] = { src: s, data: prev.data, error: e.message || String(e) };
+  }).then(function () {
+    TF.raw[s.key].loading = false;
+    tfRebuild();
+  });
 }
 
 // Sheet dates arrive as the wall-clock the sheet shows ("2026-08-03T14:05:00").
@@ -3731,7 +3786,7 @@ function tfParse(s, shiftMin) {
 function tfIngest(res) {
   var boards = [], tickets = [];
   TF.sources = res.map(function (r) {
-    if (!r.data) return { src: r.src, error: r.error };
+    if (!r.data) return { src: r.src, error: r.error, loading: r.loading };
     var d = r.data, st = d.settings || {};
     var shift = Number(st.stamp_shift_minutes) || 0;
     var atRisk = parseFloat(st.at_risk_pct); if (!(atRisk > 0)) atRisk = 75;
@@ -3764,7 +3819,8 @@ function tfIngest(res) {
       });
     });
     return { src: r.src, name: trackerName, lastEventAt: tfParse(d.lastEventAt), generatedAt: tfParse(d.generatedAt),
-             historyAt: d.history ? tfParse(d.history.builtAt) : null, sheetUrl: d.sheetUrl, settings: st, boards: d.boards || [] };
+             historyAt: d.history ? tfParse(d.history.builtAt) : null, sheetUrl: d.sheetUrl, settings: st, boards: d.boards || [],
+             error: r.error, loading: r.loading, via: d.via || 'Apps Script', fsNote: d.fsNote || '' };
   });
   TF.boards = boards; TF.tickets = tickets; TF.events = {};
 }
@@ -3864,7 +3920,7 @@ function tfBindTips(root, fn) {
 function tfFillFilters() {
   var srcEl = document.getElementById('tf-src'); if (!srcEl) return;
   var cur = srcEl.value;
-  var names = TF.sources.filter(function (s) { return !s.error; });
+  var names = TF.sources.filter(function (s) { return s.name; });
   srcEl.innerHTML = '<option value="">All trackers</option>' + names.map(function (s) { return '<option value="' + esc(s.src.key) + '">' + esc(s.name) + '</option>'; }).join('');
   if (names.some(function (s) { return s.src.key === cur; })) srcEl.value = cur;
   tfFillBoards();
@@ -3910,14 +3966,18 @@ function tfFiltered(ignoreBoard, ignoreBy) {
 // ── render ──
 function tfStatus(state) {
   var el = document.getElementById('tf-status-strip'); if (!el) return;
-  if (state === 'load' && !TF.loadedAt) { el.innerHTML = '<span class="tf-dot load"></span> Loading ticket data from the trackers…'; return; }
+  if (state === 'load' && !TF.sources.some(function (s) { return s.name; })) { el.innerHTML = '<span class="tf-dot load"></span> Loading ticket data from the trackers…'; return; }
   if (!tfConfiguredSources().length) {
     el.innerHTML = '<span class="tf-dot warn"></span> Ticket Flow is not connected yet. Set the Apps Script URLs in <b>FLOW_SOURCES</b> (smartgoal.js).';
     return;
   }
   var parts = TF.sources.map(function (s) {
-    if (s.error) return '<span><span class="tf-dot err"></span> <b>' + esc(s.src.label) + '</b>: could not load (' + esc(s.error) + ')</span>';
-    return '<span><span class="tf-dot"></span> <b>' + esc(s.name) + '</b> · last webhook ' + tfAgo(s.lastEventAt) + ' · data built ' + tfAgo(s.generatedAt) +
+    if (!s.name && s.loading) return '<span><span class="tf-dot load"></span> <b>' + esc(s.src.label) + '</b> · loading…</span>';
+    if (!s.name) return '<span><span class="tf-dot err"></span> <b>' + esc(s.src.label) + '</b>: could not load (' + esc(s.error || 'no data') + '). It will retry on the next ⟳ Refresh.</span>';
+    var dot = s.error ? 'warn' : (s.loading ? 'load' : '');
+    var note = s.error ? ' · <span style="color:var(--amber)">tracker slow, showing its last data</span>' : (s.loading ? ' · updating…' : '');
+    var via = '<span style="color:var(--text3)" title="' + esc(s.fsNote ? 'Firestore: ' + s.fsNote : 'Read from the Firestore snapshot') + '"> · via ' + esc(s.via) + '</span>';
+    return '<span><span class="tf-dot ' + dot + '"></span> <b>' + esc(s.name) + '</b>' + note + ' · last webhook ' + tfAgo(s.lastEventAt) + ' · data built ' + tfAgo(s.generatedAt) + via +
       (s.sheetUrl ? ' · <a href="' + esc(s.sheetUrl) + '" target="_blank" rel="noopener">Open sheet</a>' : '') + '</span>';
   });
   if (TF.fromSnapshot) parts.push('<span style="color:var(--text3)">Showing the copy saved ' + tfAgo(new Date(TF.loadedAt)) + '</span>');
@@ -4223,7 +4283,7 @@ function tfRenderConfig() {
   var el = document.getElementById('tf-config');
   var html = '<div class="tf-cfg-hint">The configuration lives in each tracker\'s Google Sheet, in the <code>Flow_Settings</code>, <code>Flow_Boards</code> and <code>Flow_Lanes</code> tabs. Anyone with edit access to the sheet can change it. ' +
     'Changes show here after the cache expires, or straight away with <b>⟳ Refresh</b>. <b>Sheet Column</b> tells the dashboard where each lane\'s date is. <b>Pauses SLA</b> = Yes leaves that lane\'s time out of TAT. <b>Stage Target Hours</b> is optional.</div>';
-  var ok = TF.sources.filter(function (s) { return !s.error; });
+  var ok = TF.sources.filter(function (s) { return s.name; });
   if (!ok.length) html += '<div class="tf-empty">No tracker is connected yet.</div>';
   ok.forEach(function (s) {
     var st = s.settings || {};
