@@ -3561,6 +3561,7 @@ function switchDashSubtab(which){
   if(r) r.style.display = which==='review' ? '' : 'none';
   if(f) f.style.display = which==='flow' ? '' : 'none';
   var fb=document.getElementById('dash-filter-bar'); if(fb) fb.style.display = which==='flow' ? 'none' : '';
+  var pd=document.getElementById('page-dashboard'); if(pd) pd.classList.toggle('tf-wide', which==='flow');
   if(which==='flow') tfShow();
   var btns=document.querySelectorAll('#page-dashboard .dash-subtab-btn');
   Array.prototype.forEach.call(btns, function(b){ b.classList.toggle('active', b.getAttribute('data-subtab')===which); });
