@@ -251,11 +251,13 @@
         no++;
         var end = calAdd(mon, 6), lockDate = calNextMonday(r.actual), past = today >= lockDate;
         CAL[no] = { label: calDM(mon) + " \u2013 " + calDM(end), reviewLabel: calWD(r.actual),
-                    moved: r.moved, locked: past && !isAdmin, adminUnlock: past && isAdmin };
+                    moved: r.moved, locked: false, adminUnlock: false };
       }
     }
   }
-  function weekLocked(weekNo) { return !!(CAL[weekNo] && CAL[weekNo].locked); }
+  /* Editing is decided by WHO you are, never by which week it is.
+     Owners (PO: A/B/G, PM: H) can always edit any week; everyone else views. */
+  function weekLocked() { return false; }
 
   function prIsAdmin() { return currentEmail() === ADMIN_EMAIL; }
   function canEditSelf() { var e = (VIEW && VIEW.header && VIEW.header.selfEmail) || ""; return prIsAdmin() || (!!currentEmail() && currentEmail() === e); }
@@ -358,7 +360,7 @@
     var bars = flags.map(function (f) { return '<span class="pr-bar ' + (f ? "on" : "off") + '"></span>'; }).join("");
     var state = filled === 4 ? " complete" : filled > 0 ? " partial" : "";
     var remark = filled === 4 ? "Completed" : filled > 0 ? "Partially completed" : "Not started yet";
-    var lock = c.locked ? '<span class="pr-lock" title="Locked">\uD83D\uDD12</span>' : (c.adminUnlock ? '<span class="pr-lock" title="Locked for others; you can edit">\uD83D\uDD13</span>' : "");
+    var lock = "";   // no time-based locking — owners can edit any week
     return '<div class="pr-card pr-wkcard' + state + '"><div class="pr-card-k"><span>Week ' + w.week + '</span>' + lock + '</div>'
       + '<div class="pr-bars">' + bars + '</div>'
       + '<div class="pr-wkcard-foot"><span>' + remark + '</span><span></span></div></div>';
@@ -429,7 +431,7 @@
     var totalCols = 1 + present.length + (mtd ? 1 : 0);
 
     var head = '<tr><th class="pr-item">Item</th>';
-    present.forEach(function (w) { head += '<th class="pr-num' + (weekLocked(w.week) ? ' pr-col-locked' : '') + '">Week ' + w.week + (weekLocked(w.week) ? ' \uD83D\uDD12' : '') + '</th>'; });
+    present.forEach(function (w) { head += '<th class="pr-num">Week ' + w.week + '</th>'; });
     if (mtd) head += '<th class="pr-num pr-mtd">MTD</th>';
     head += '</tr>';
 
@@ -501,7 +503,7 @@
   function renderCell(S, r, w, editable) {
     var sec = (w.sections || {})[S.k] || {};
     var stored = sec[r.id];
-    var ro = !editable || weekLocked(w.week);
+    var ro = !editable;                 // identity only — past weeks stay editable
     var wc = w.code, fid = r.id;
     if (r.type === "mood") {
       var mv = stored !== undefined ? stored : "";
