@@ -6,7 +6,7 @@
      innerHTML never execute, so all wiring lives in gr.js.
      ============================================================ -->
 <style>
-    #grPage { max-width: 1800px; }
+    #grPage { max-width: var(--page-max, 1680px); margin-left: auto; margin-right: auto; }
 
     /* ---- Compact density: sized so 100% browser zoom reads like the
        old 75% view, without touching the global page styles. ---- */

@@ -45,6 +45,7 @@
 /* Everything is scoped under #page-forms so no rule can leak into the
    other modules that share this shell. */
 #page-forms {
+  max-width: var(--page-max, 1680px); margin-left: auto; margin-right: auto;   /* page layout (index.html --page-max) */
   --ink:    #14203a;   /* headings and body */
   --soft:   #63708a;   /* secondary text */
   --rule:   #dfe5ee;   /* hairlines and field borders */
