@@ -819,6 +819,43 @@
 #sg-app .tf-dur { font-size:11px; color:var(--text2); background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:0 6px; margin-left:6px; font-weight:500; }
 #sg-app .tf-cfg-hint { font-size:12.5px; color:var(--text2); background:var(--amber-lt); border:1px solid var(--amber-bd); border-radius:var(--radius); padding:10px 12px; margin-bottom:16px; line-height:1.6; }
 #sg-app .tf-cfg-hint code { background:rgba(255,255,255,.7); padding:0 4px; border-radius:3px; }
+
+/* ── Ticket Flow: scale with the window ─────────────────────
+   One base size that follows the window WIDTH: 13px on a small or
+   150%-zoomed laptop, up to 17px on a large monitor. Everything below
+   is in em, so the whole tab grows and shrinks together. The tab may
+   also use more of a wide screen, and charts are capped at about a
+   third of the window HEIGHT so the tables stay in view.
+   Only the Ticket Flow tab (and its drawer) is affected. */
+#sg-app #page-dashboard.tf-wide { max-width: 2000px; }
+#sg-app #dash-subtab-flow, #sg-app .tf-drawer { font-size: clamp(13px, 0.42vw + 8px, 17px); }
+#sg-app #dash-subtab-flow .filter-bar select, #sg-app #dash-subtab-flow .filter-bar input { font-size: .9em; padding: .45em .75em; }
+#sg-app #dash-subtab-flow .filter-bar select { padding-right: 2.2em; background-position: right .75em center; }   /* room for the arrow */
+#sg-app #dash-subtab-flow .btn-sm { font-size: .86em; padding: .3em .75em; }
+#sg-app #dash-subtab-flow .metrics-row { grid-template-columns: repeat(auto-fit, minmax(9.5em, 1fr)); gap: .85em; margin-bottom: 1.2em; }
+#sg-app #dash-subtab-flow .metric-card { padding: .9em 1.1em; }
+#sg-app #dash-subtab-flow .metric-label, #sg-app #dash-subtab-flow .metric-sub { font-size: .78em; }
+#sg-app #dash-subtab-flow .metric-val { font-size: 1.85em; }
+#sg-app #dash-subtab-flow .card-header { padding: .8em 1.2em; }
+#sg-app #dash-subtab-flow .card-title { font-size: .95em; }
+#sg-app #dash-subtab-flow .card-body { padding: 1.1em 1.2em; }
+#sg-app #dash-subtab-flow .tf-grid2 { gap: 1.1em; margin-bottom: 1.3em; }
+#sg-app #dash-subtab-flow .tbl { font-size: .9em; }
+#sg-app #dash-subtab-flow .tbl th { font-size: .82em; padding: .75em 1em; }
+#sg-app #dash-subtab-flow .tbl td { padding: .55em .9em; }
+#sg-app #dash-subtab-flow .tf-status, #sg-app #dash-subtab-flow .tf-legend,
+#sg-app #dash-subtab-flow .tf-psize, #sg-app #dash-subtab-flow .tf-people button,
+#sg-app #dash-subtab-flow .tf-pager { font-size: .86em; }
+#sg-app #dash-subtab-flow .tf-tabs button { font-size: .9em; padding: .45em .9em; }
+#sg-app #dash-subtab-flow .tf-note, #sg-app #dash-subtab-flow .tf-empty { font-size: .8em; }
+#sg-app #dash-subtab-flow .tf-chip, #sg-app #dash-subtab-flow .tf-stage,
+#sg-app .tf-drawer .tf-chip { font-size: .78em; }
+#sg-app #dash-subtab-flow .tf-chart svg { max-height: 34vh; }
+#sg-app .tf-drawer { width: min(36em, 100%); }
+#sg-app .tf-drawer .tf-kv { font-size: .9em; grid-template-columns: 9em 1fr; }
+#sg-app .tf-drawer .tf-tl-item { font-size: .95em; }
+#sg-app .tf-drawer .tf-tl-sub { font-size: .82em; }
+#sg-app .tf-drawer .tf-dur { font-size: .8em; }
 </style>
 <nav class="app-nav">
   <div class="nav-brand">OLF <span>Tracker</span></div>
