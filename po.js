@@ -100,6 +100,10 @@
     if ($("prModalClose")) $("prModalClose").addEventListener("click", closeTextModal);
     if ($("prModalText")) $("prModalText").addEventListener("input", updateModalMsg);
     if ($("poExport")) $("poExport").addEventListener("click", exportAll);
+    if ($("poAddDistrict")) $("poAddDistrict").addEventListener("click", function () { openAddForm("district"); });
+    if ($("poAddMember")) $("poAddMember").addEventListener("click", function () { openAddForm("member"); });
+    if ($("poAddCancel")) $("poAddCancel").addEventListener("click", function () { $("poAddModal").hidden = true; });
+    if ($("poAddSave")) $("poAddSave").addEventListener("click", submitAddForm);
     loadBaseData();
   }
   function prBody(html) { var b = $("prBody"); if (b) b.innerHTML = html; }
@@ -611,9 +615,29 @@
 
   /* ---------- Manage: run JSONs ---------- */
   function wireSettings() {
-    var l = $("poRunLatest"), a = $("poRunAll");
+    var l = $("poRunLatest"), a = $("poRunAll"), rf = $("poRunRefresh");
     if (l) l.addEventListener("click", function () { runJson(false); });
     if (a) a.addEventListener("click", function () { runJson(true); });
+    if (rf) rf.addEventListener("click", refreshBase);
+  }
+  /* Re-read the Base File + folder list now (the folder list is already live;
+     this also picks up POs you added straight into the Base File in Drive). */
+  function refreshBase() {
+    var b = $("poRunRefresh"); if (b) { b.disabled = true; b.textContent = "Refreshing\u2026"; }
+    post({ action: "getBaseData", refresh: true }, { timeout: 60000 }).then(function (res) {
+      if (b) { b.disabled = false; b.innerHTML = "\u21BB Refresh"; }
+      if (!res.ok || !res.data) { toast("Refresh failed: " + ((res && res.error) || "no data")); return; }
+      state.base = res.data;
+      fillRunFolders();
+      populateValue($("prUnit").value);
+      var mo = $("prMonth"); if (mo) { var keep = mo.value; mo.innerHTML = ""; mo.appendChild(opt("", "Select\u2026"));
+        (res.data.months || []).forEach(function (m) { mo.appendChild(opt(m.code, m.label)); }); mo.value = keep; mo.disabled = false; }
+      var mm = $("prMoMonth"); if (mm) mm.dataset.filled = "";
+      toast("Refreshed \u2014 " + ((res.data.periods || []).length) + " folders, " + ((res.data.pos || []).length) + " POs.");
+    }).catch(function (e) {
+      if (b) { b.disabled = false; b.innerHTML = "\u21BB Refresh"; }
+      toast("Refresh error: " + e.message);
+    });
   }
   function fillRunFolders() {
     var sel = $("poRunFolder"); if (!sel) return;
@@ -840,6 +864,151 @@
       + '<div class="pr-tablewrap" style="border:0"><table class="pr-tbl"><thead><tr><th class="pr-item">Item</th><th class="pr-num">This month</th></tr></thead><tbody>' + crows + '</tbody></table></div></div>';
     html += '<div class="pr-panel"><div class="pr-po-line pr-mut">G1 (Academic, 40%) and G4 (Other, 10%) are not derived from the weekly review \u2014 they are entered on Sheet B.</div></div>';
     body.innerHTML = html;
+  }
+
+
+  /* ============ Manage: add a district / add a member to the Base File ============ */
+  var OPTS = null, ADD_MODE = null;
+
+  function openAddForm(mode) {
+    if (currentEmail() !== ADMIN_EMAIL) { toast("Only the IT admin can edit the base file."); return; }
+    ADD_MODE = mode;
+    $("poAddTitle").textContent = mode === "district" ? "Add a district" : "Add a member";
+    $("poAddMsg").textContent = ""; $("poAddMsg").className = "pr-modal-msg";
+    $("poAddForm").innerHTML = '<div class="pr-fld wide"><div class="pr-empty">Loading base file\u2026</div></div>';
+    $("poAddModal").hidden = false;
+    post({ action: "getBaseOptions" }, { timeout: 90000 }).then(function (res) {
+      if (!res.ok || !res.data) { $("poAddForm").innerHTML = '<div class="pr-fld wide"><div class="pr-empty">Couldn\'t read the base file: ' + esc((res && res.error) || "no data") + '</div></div>'; return; }
+      OPTS = res.data;
+      if (mode === "district") renderDistrictForm(); else renderMemberForm();
+    }).catch(function (e) { $("poAddForm").innerHTML = '<div class="pr-fld wide"><div class="pr-empty">Network error: ' + esc(e.message) + '</div></div>'; });
+  }
+  function fld(label, inner, wide) {
+    return '<div class="pr-fld' + (wide ? " wide" : "") + '"><label>' + esc(label) + '</label>' + inner + '</div>';
+  }
+  function selOf(id, items, placeholder) {
+    return '<select id="' + id + '">' + (placeholder ? '<option value="">' + esc(placeholder) + '</option>' : "")
+      + items.map(function (it) { return '<option value="' + esc(it.v) + '">' + esc(it.t) + '</option>'; }).join("") + '</select>';
+  }
+
+  function renderDistrictForm() {
+    var states = (OPTS.states || []).map(function (x) { return { v: x, t: x }; });
+    $("poAddForm").innerHTML =
+      fld("State", selOf("adState", states, "Select\u2026")) +
+      fld("Or type a new state", '<input id="adStateNew" type="text" placeholder="Leave blank to use the dropdown">') +
+      fld("District name", '<input id="adDistrict" type="text" placeholder="e.g. Dhule">') +
+      fld("Division (optional)", '<input id="adDivision" type="text" placeholder="e.g. Nashik division">') +
+      fld("Blocks — one per line", '<textarea id="adBlocks" placeholder="272601-AKOLE&#10;272602-JAMKHED"></textarea>', true) +
+      '<div class="pr-fld wide"><span class="pr-hint">Each block becomes one new row with PO / PM / DM / COO set to \u201CVacant\u201D. Existing rows are never changed.</span></div>';
+  }
+
+  function renderMemberForm() {
+    var roles = [{ v: "PO", t: "PO" }, { v: "PM", t: "PM" }, { v: "DM", t: "DM" }, { v: "COO", t: "COO" }];
+    $("poAddForm").innerHTML =
+      fld("Who are you adding?", selOf("amRole", roles)) +
+      fld("Employee ID", '<input id="amEmpId" type="text" placeholder="OLF-26-123">') +
+      fld("Full name", '<input id="amName" type="text" placeholder="Omkar S Sinare">') +
+      fld("Email", '<input id="amEmail" type="email" placeholder="name@openlinksfoundation.org">') +
+      fld("Designation (optional)", '<input id="amDesig" type="text" placeholder="Project Officer">') +
+      '<div class="pr-fld wide" id="amScope"></div>' +
+      '<div class="pr-fld wide" id="amMgr"></div>';
+    $("amRole").addEventListener("change", renderMemberScope);
+    renderMemberScope();
+  }
+  function renderMemberScope() {
+    var role = $("amRole").value, sc = $("amScope"), mg = $("amMgr");
+    var ds = OPTS.districts || [];
+    if (role === "PO") {
+      sc.innerHTML = '<label>District</label>' + selOf("amDistrict", ds.map(function (d) { return { v: d.name, t: d.name + " (" + d.blocks.length + " blocks)" }; }), "Select\u2026")
+        + '<div style="height:10px"></div><label>Blocks in that district (vacant only)</label><div class="pr-chkwrap" id="amBlocks"><span class="pr-hint">Pick a district first.</span></div>';
+      $("amDistrict").addEventListener("change", renderBlockChecks);
+      var pms = (OPTS.pms || []).map(function (x) { return { v: x.empId || x.name, t: x.name + (x.empId ? " (" + x.empId + ")" : "") }; });
+      var dms = (OPTS.dms || []).map(function (x) { return { v: x.empId || x.name, t: x.name + (x.empId ? " (" + x.empId + ")" : "") }; });
+      var coos = (OPTS.coos || []).map(function (x) { return { v: x.empId || x.name, t: x.name + (x.empId ? " (" + x.empId + ")" : "") }; });
+      mg.innerHTML = '<label>Reporting line (only filled where the row is still vacant)</label>'
+        + '<div class="pr-addform" style="grid-template-columns:1fr 1fr 1fr;padding:0;">'
+        + fld("PM", selOf("amPm", pms, "\u2014 none \u2014"))
+        + fld("DM", selOf("amDm", dms, "\u2014 none \u2014"))
+        + fld("COO", selOf("amCoo", coos, "\u2014 none \u2014")) + '</div>';
+      $("amPm").addEventListener("change", autofillFromPm);
+      renderBlockChecks();
+    } else {
+      var key = role === "PM" ? "pmVacant" : role === "DM" ? "dmVacant" : "cooVacant";
+      sc.innerHTML = '<label>Districts for this ' + esc(role) + '</label><div class="pr-chkwrap" id="amDistricts">'
+        + ds.map(function (d, i) {
+            var free = d[key], who = role === "PM" ? d.pm : role === "DM" ? d.dm : d.coo;
+            return '<label class="' + (free ? "" : "taken") + '"><input type="checkbox" class="amD" value="' + esc(d.name) + '"' + (free ? "" : " disabled") + '>'
+              + esc(d.name) + (free ? "" : " \u2014 already " + esc(who)) + '</label>';
+          }).join("") + '</div>';
+      mg.innerHTML = '<span class="pr-hint">This fills the ' + esc(role) + ' columns on every row of the districts you tick. Districts already filled are disabled.</span>';
+    }
+  }
+  function renderBlockChecks() {
+    var wrap = $("amBlocks"), dn = $("amDistrict").value;
+    var d = (OPTS.districts || []).filter(function (x) { return x.name === dn; })[0];
+    if (!d) { wrap.innerHTML = '<span class="pr-hint">Pick a district first.</span>'; return; }
+    wrap.innerHTML = d.blocks.map(function (b) {
+      return '<label class="' + (b.vacant ? "" : "taken") + '"><input type="checkbox" class="amB" value="' + esc(b.name) + '"' + (b.vacant ? "" : " disabled") + '>'
+        + esc(b.name) + (b.vacant ? "" : " \u2014 already " + esc(b.po)) + '</label>';
+    }).join("") || '<span class="pr-hint">No blocks in this district.</span>';
+  }
+  function autofillFromPm() {
+    var v = $("amPm").value;
+    var pm = (OPTS.pms || []).filter(function (x) { return (x.empId || x.name) === v; })[0];
+    if (!pm) return;
+    if (pm.dmId || pm.dm) { var dsel = $("amDm"); if (dsel) dsel.value = pm.dmId || pm.dm; }
+    if (pm.cooId || pm.coo) { var csel = $("amCoo"); if (csel) csel.value = pm.cooId || pm.coo; }
+  }
+  function personBy(list, v) { return (list || []).filter(function (x) { return (x.empId || x.name) === v; })[0] || null; }
+
+  function submitAddForm() {
+    var btn = $("poAddSave"), msg = $("poAddMsg");
+    var payload;
+    if (ADD_MODE === "district") {
+      var st = ($("adStateNew").value || "").trim() || $("adState").value;
+      var blocks = ($("adBlocks").value || "").split(/[\n,]/).map(function (x) { return x.trim(); }).filter(Boolean);
+      if (!st) { msg.textContent = "Pick or type a state."; msg.className = "pr-modal-msg is-over"; return; }
+      if (!($("adDistrict").value || "").trim()) { msg.textContent = "District name is required."; msg.className = "pr-modal-msg is-over"; return; }
+      if (!blocks.length) { msg.textContent = "Add at least one block."; msg.className = "pr-modal-msg is-over"; return; }
+      payload = { action: "addDistrict", email: currentEmail(), state: st, district: $("adDistrict").value.trim(),
+                  division: ($("adDivision").value || "").trim(), blocks: blocks };
+    } else {
+      var role = $("amRole").value;
+      payload = { action: "addMember", email: currentEmail(), role: role,
+                  empId: ($("amEmpId").value || "").trim(), name: ($("amName").value || "").trim(),
+                  memberEmail: ($("amEmail").value || "").trim(), designation: ($("amDesig").value || "").trim() };
+      if (!payload.name || !payload.empId) { msg.textContent = "Employee ID and name are required."; msg.className = "pr-modal-msg is-over"; return; }
+      if (role === "PO") {
+        payload.district = $("amDistrict").value;
+        payload.blocks = Array.prototype.slice.call(document.querySelectorAll("#amBlocks .amB:checked")).map(function (c) { return c.value; });
+        if (!payload.district) { msg.textContent = "Pick a district."; msg.className = "pr-modal-msg is-over"; return; }
+        if (!payload.blocks.length) { msg.textContent = "Tick at least one vacant block."; msg.className = "pr-modal-msg is-over"; return; }
+        var pm = personBy(OPTS.pms, $("amPm").value), dm = personBy(OPTS.dms, $("amDm").value), coo = personBy(OPTS.coos, $("amCoo").value);
+        if (pm) { payload.pmName = pm.name; payload.pmId = pm.empId; payload.pmEmail = pm.email; payload.pmDesignation = pm.designation; }
+        if (dm) { payload.dmName = dm.name; payload.dmId = dm.empId; payload.dmEmail = dm.email; payload.dmDesignation = dm.designation; }
+        if (coo) { payload.cooName = coo.name; payload.cooId = coo.empId; payload.cooEmail = coo.email; }
+      } else {
+        payload.districts = Array.prototype.slice.call(document.querySelectorAll("#amDistricts .amD:checked")).map(function (c) { return c.value; });
+        if (!payload.districts.length) { msg.textContent = "Tick at least one district."; msg.className = "pr-modal-msg is-over"; return; }
+      }
+    }
+    btn.disabled = true; btn.innerHTML = '<span class="pr-spin"></span>Saving\u2026';
+    msg.textContent = ""; msg.className = "pr-modal-msg";
+    post(payload, { retries: 0, timeout: 120000, warmRetries: 0 }).then(function (res) {
+      btn.disabled = false; btn.textContent = "Save to base file";
+      var box = $("poAddStatus"); box.hidden = false; box.classList.remove("is-error");
+      if (!res.ok) { msg.textContent = "Rejected — see the note below."; msg.className = "pr-modal-msg is-over";
+        box.classList.add("is-error"); box.textContent = res.error; return; }
+      $("poAddModal").hidden = true;
+      var d = res.data;
+      box.textContent = ADD_MODE === "district"
+        ? ("Added " + d.added + " block row(s) to " + d.district + ": " + d.blocks.join(", ") + "\nNow add the PO / PM / DM for it, then run Update JSONs.")
+        : (d.role + " " + d.name + " (" + d.empId + ") set on " + d.rows + " row(s).\nRun Update JSONs for the weeks you need so their JSONs are created.");
+      refreshBase();
+    }).catch(function (e) {
+      btn.disabled = false; btn.textContent = "Save to base file";
+      msg.textContent = "Network error: " + e.message; msg.className = "pr-modal-msg is-over";
+    });
   }
 
   window.POReview = { mount: mount };

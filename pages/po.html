@@ -71,6 +71,7 @@
       <div class="pr-actions">
         <label class="pr-hint" for="poRunFolder" style="font-weight:600;">Folder:</label>
         <select id="poRunFolder" class="pr-input" style="max-width:280px;"></select>
+        <button class="pr-btn" id="poRunRefresh" title="Re-read the Base File and folder list">↻ Refresh</button>
         <button class="pr-btn pr-btn-primary" id="poRunLatest">Update JSONs</button>
         <button class="pr-btn" id="poRunAll">Create all JSONs</button>
       </div>
@@ -86,6 +87,16 @@
         <span class="pr-hint">Run occasionally — open the sheet, then File → Download → Excel.</span>
       </div>
       <div id="poExportStatus" class="pr-run-status" hidden></div>
+
+      <hr class="pr-divider">
+
+      <h2 class="pr-h2">Add to base file</h2>
+      <p class="pr-sub">A row is State › District › Block. New districts append rows; a new member only fills a role that is currently Vacant.</p>
+      <div class="pr-actions">
+        <button class="pr-btn" id="poAddDistrict">+ Add district</button>
+        <button class="pr-btn pr-btn-primary" id="poAddMember">+ Add member</button>
+      </div>
+      <div id="poAddStatus" class="pr-run-status" hidden></div>
 
       <hr class="pr-divider">
 
@@ -105,6 +116,18 @@
 
   <div id="poToast" class="pr-toast" hidden></div>
 
+  <div id="poAddModal" class="pr-modal" hidden>
+    <div class="pr-modal-box pr-addbox">
+      <div class="pr-modal-title" id="poAddTitle">Add</div>
+      <div id="poAddForm" class="pr-addform"></div>
+      <div class="pr-modal-foot">
+        <span id="poAddMsg" class="pr-modal-msg"></span>
+        <span class="pr-modal-spacer"></span>
+        <button class="pr-btn" id="poAddCancel">Cancel</button>
+        <button class="pr-btn pr-btn-primary" id="poAddSave">Save to base file</button>
+      </div>
+    </div>
+  </div>
   <div id="prModal" class="pr-modal" hidden>
     <div class="pr-modal-box">
       <div class="pr-modal-title" id="prModalTitle">Edit</div>
@@ -258,4 +281,16 @@
   .pr-modal-spacer{flex:1;}
   .pr-modal-msg{font-size:12px;color:var(--mut);}
   .pr-modal-msg.is-over{color:var(--bad);font-weight:600;}
+  .pr-addbox{width:min(640px,94vw);}
+  .pr-addform{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-height:60vh;overflow:auto;padding:2px;}
+  .pr-addform .pr-fld{display:flex;flex-direction:column;gap:4px;}
+  .pr-addform .pr-fld.wide{grid-column:1 / -1;}
+  .pr-addform label{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;font-weight:600;}
+  .pr-addform input,.pr-addform select,.pr-addform textarea{padding:8px 10px;border:1px solid var(--l);border-radius:8px;font:inherit;background:#fff;}
+  .pr-addform select[multiple]{min-height:120px;}
+  .pr-addform textarea{min-height:70px;resize:vertical;}
+  .pr-chkwrap{border:1px solid var(--l);border-radius:8px;padding:8px;max-height:150px;overflow:auto;display:flex;flex-direction:column;gap:5px;}
+  .pr-chkwrap label{text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink);font-weight:500;display:flex;gap:7px;align-items:center;}
+  .pr-chkwrap .taken{color:var(--mut);}
+
 </style>
