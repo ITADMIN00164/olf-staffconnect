@@ -623,7 +623,7 @@
         /* ============================================================
            DATA DASHBOARDS PAGE STYLES
         ============================================================ */
-        .dd-page { max-width: 1280px; }
+        .dd-page { max-width: var(--page-max, 1680px); margin-left: auto; margin-right: auto; }
 
         .dd-hero {
             display: flex;
@@ -850,7 +850,7 @@
         /* ============================================================
            EXPENSE REPORT PAGE STYLES
         ============================================================ */
-        .er-page { max-width: 1280px; }
+        .er-page { max-width: var(--page-max, 1680px); margin-left: auto; margin-right: auto; }
 
         .er-hero {
             display: flex;
@@ -1018,7 +1018,7 @@
         /* ============================================================
            HOME PAGE STYLES
         ============================================================ */
-        .home-page { max-width: 1400px; }
+        .home-page { max-width: var(--page-max, 1680px); margin-left: auto; margin-right: auto; }
 
         .page-header {
             display: flex;
@@ -1144,7 +1144,7 @@
         /* ============================================================
            EMPLOYEES PAGE STYLES
         ============================================================ */
-        .employees-page { width: 100%; }
+        .employees-page { width: 100%; max-width: var(--page-max, 1680px); margin-left: auto; margin-right: auto; }
 
         .page-header-emp {
             display: flex;
@@ -1557,6 +1557,9 @@
            deliberately quiet.
         ========================================================== */
         :root {
+            /* Page layout: every page sits in a centred column up to this
+               width, like the HO Review Dashboard. Change it here only. */
+            --page-max:     1680px;
             --ink:          #0B1220;   /* sidebar / topbar base   */
             --ink-soft:     #131C2E;   /* raised navy             */
             --canvas:       #E4EAF3;   /* page canvas             */
