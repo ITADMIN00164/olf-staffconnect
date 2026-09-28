@@ -820,15 +820,15 @@
 #sg-app .tf-cfg-hint { font-size:12.5px; color:var(--text2); background:var(--amber-lt); border:1px solid var(--amber-bd); border-radius:var(--radius); padding:10px 12px; margin-bottom:16px; line-height:1.6; }
 #sg-app .tf-cfg-hint code { background:rgba(255,255,255,.7); padding:0 4px; border-radius:3px; }
 
-/* ── Ticket Flow: scale with the window ─────────────────────
-   One base size that follows the window WIDTH: 13px on a small or
-   150%-zoomed laptop, up to 17px on a large monitor. Everything below
-   is in em, so the whole tab grows and shrinks together. The tab may
-   also use more of a wide screen, and charts are capped at about a
-   third of the window HEIGHT so the tables stay in view.
+/* ── Ticket Flow: sizing ──────────────────────────────────
+   The whole app already scales with the window width (html zoom in
+   index.html), so this tab keeps one fixed base size and everything
+   below is in em, so it grows and shrinks together. The tab may also
+   use more of a wide screen, and charts are capped at about a third
+   of the window HEIGHT so the tables stay in view.
    Only the Ticket Flow tab (and its drawer) is affected. */
 #sg-app #page-dashboard.tf-wide { max-width: 2000px; }
-#sg-app #dash-subtab-flow, #sg-app .tf-drawer { font-size: clamp(13px, 0.42vw + 8px, 17px); }
+#sg-app #dash-subtab-flow, #sg-app .tf-drawer { font-size: 14.5px; }
 #sg-app #dash-subtab-flow .filter-bar select, #sg-app #dash-subtab-flow .filter-bar input { font-size: .9em; padding: .45em .75em; }
 #sg-app #dash-subtab-flow .filter-bar select { padding-right: 2.2em; background-position: right .75em center; }   /* room for the arrow */
 #sg-app #dash-subtab-flow .btn-sm { font-size: .86em; padding: .3em .75em; }
