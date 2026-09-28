@@ -22,14 +22,24 @@
            The app was designed a little large; this renders it at the
            size it used to have at 75-80% browser zoom, everywhere at
            once - including every page under pages/.
-           TO ADJUST: change this one number. 0.8 = slightly roomier,
-           0.75 = exactly the old 75% zoom view, 1 = original size.
+           The scale follows the window WIDTH, so a small or 150%-scaled
+           laptop gets a little less and a large monitor gets more,
+           instead of one fixed size that looks cramped on the first
+           and tiny on the second. Widths are the browser's own (a
+           1920px laptop at 150% Windows scaling is 1280px wide).
+           TO ADJUST: change the numbers below. 0.75 = the old 75%
+           zoom view, 0.8 = slightly roomier, 1 = original size.
            Note: heights below use % rather than vh because viewport
            units ignore zoom and would leave the shell short.        */
         html {
-            zoom: 0.8;
+            zoom: 0.8;              /* phones, tablets, 1440-1919px */
             height: 100%;
         }
+        @media (min-width: 769px) and (max-width: 1439px) { html { zoom: 0.75; } }  /* small / 150% laptops */
+        @media (min-width: 1920px) { html { zoom: 0.85; } }  /* 1920 monitors */
+        @media (min-width: 2240px) { html { zoom: 0.92; } }
+        @media (min-width: 2560px) { html { zoom: 1; } }     /* 2560 / QHD */
+        @media (min-width: 3200px) { html { zoom: 1.15; } }  /* 4K at 100% */
 
         body {
             font-family: 'Inter', Arial, sans-serif;
