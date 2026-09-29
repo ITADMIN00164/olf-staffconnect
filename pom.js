@@ -146,7 +146,19 @@ async function loadFilters() {
   try {
     const res = await fetch(`${API_URL}?action=getFilters`);
     const data = await res.json();
-    allMonths = data.months || [];
+    // Month order used by every page: labels that are not a month
+    // (e.g. "Pending 2025-26") come first, in name order; real months
+    // follow in calendar order.
+    allMonths = (data.months || []).slice().sort(function (a, b) {
+      function key(x) {
+        var p = String(x || "").split("-");
+        var mi = MONTHS[p[0]], yr = parseInt(p[1], 10);
+        return (mi == null || isNaN(yr)) ? -1 : yr * 12 + mi;
+      }
+      var ka = key(a), kb = key(b);
+      if (ka === -1 && kb === -1) return String(a).localeCompare(String(b));
+      return ka - kb;
+    });
     const dd = document.getElementById("pomDistrict");
     if (dd) {
       dd.innerHTML =
@@ -3074,6 +3086,8 @@ function pevAdoptSaved(echoed) {
     districtTeachers: pevStr(echoed.districtTeachers),
     suNsEvents: pevStr(echoed.suNsEvents),
     suNsTeachers: pevStr(echoed.suNsTeachers),
+    otherEvents: pevStr(echoed.otherEvents),
+    otherTeachers: pevStr(echoed.otherTeachers),
     updatedBy: pevStr(echoed.updatedBy),
     updatedAt: pevStr(echoed.updatedAt)
   };
