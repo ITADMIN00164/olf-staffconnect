@@ -126,6 +126,7 @@ logoutBtn.addEventListener("click", logout);
 closeNewsModalBtn.addEventListener("click",  () => newsModal.classList.remove("open"));
 closeNewsModalBtn2.addEventListener("click", () => newsModal.classList.remove("open"));
 saveNewsBtn.addEventListener("click", saveNews);
+wireNewsEditor();
 
 // Custom date & time picker + announcement detail modal (both static in index.html)
 wireDateTimePicker();
@@ -770,7 +771,7 @@ function openNewsDetail(items) {
             const startVal = n.startDateTime || n.startDate;
             const endVal   = n.endDateTime   || n.endDate;
             return `<div class="nd-item">
-                        <div class="nd-text">${escHtml(n.text || "")}</div>
+                        ${newsBody(n, "nd-text")}
                         <div class="nd-dates">\u{1F4C5} ${formatNewsDateTime(startVal, false)} \u2013 ${formatNewsDateTime(endVal, true)}</div>
                     </div>`;
         }).join("")
@@ -1852,8 +1853,154 @@ async function saveEmployee() {
    NEWS / ANNOUNCEMENTS
 ==================================== */
 
+/* ── Announcement rich text ──
+   The Add News box is a small rich-text editor (bold, italic, underline,
+   heading, lists, links). A post stores `html` next to the plain `text`;
+   the popup, the audit log and older posts keep using `text`. The HTML is
+   cleaned down to a short list of tags both when it is saved and when it
+   is shown, so nothing unsafe reaches the page even if a record is
+   written some other way. */
+const NEWS_TAGS   = new Set(["P", "DIV", "BR", "B", "STRONG", "I", "EM", "U", "H3", "UL", "OL", "LI", "A"]);
+const NEWS_DROP   = /^(SCRIPT|STYLE|IFRAME|FRAME|OBJECT|EMBED|TEMPLATE|NOSCRIPT|SVG|MATH|TITLE|HEAD|META|LINK|BASE|TEXTAREA|SELECT|BUTTON|INPUT|FORM|IMG|PICTURE|VIDEO|AUDIO|CANVAS)$/;
+const NEWS_AS_H3  = /^(H1|H2|H4|H5|H6)$/;
+const NEWS_AS_DIV = /^(SECTION|ARTICLE|HEADER|FOOTER|ASIDE|MAIN|BLOCKQUOTE|PRE|FIGURE|TABLE|TBODY|THEAD|TR|DL|DT|DD)$/;
+const NEWS_LINK   = /^(https?:\/\/|mailto:)/i;
+
+function newsCleanHtml(html) {
+    const tpl = document.createElement("template");      // inert: nothing in it runs or loads
+    tpl.innerHTML = String(html || "");
+    (function clean(node) {
+        [...node.childNodes].forEach(ch => {
+            if (ch.nodeType === Node.TEXT_NODE) return;
+            if (ch.nodeType !== Node.ELEMENT_NODE) { ch.remove(); return; }
+            const tag = ch.tagName.toUpperCase();
+            if (NEWS_DROP.test(tag)) { ch.remove(); return; }
+            clean(ch);
+            if (NEWS_AS_H3.test(tag) || NEWS_AS_DIV.test(tag)) {
+                const el = document.createElement(NEWS_AS_H3.test(tag) ? "h3" : "div");
+                el.append(...ch.childNodes);
+                ch.replaceWith(el);
+                return;
+            }
+            if (!NEWS_TAGS.has(tag)) { ch.replaceWith(...ch.childNodes); return; }
+            const href = tag === "A" ? (ch.getAttribute("href") || "").trim() : "";
+            [...ch.attributes].forEach(a => ch.removeAttribute(a.name));
+            if (tag === "A") {
+                if (!NEWS_LINK.test(href)) { ch.replaceWith(...ch.childNodes); return; }
+                ch.setAttribute("href", href);
+                ch.setAttribute("target", "_blank");
+                ch.setAttribute("rel", "noopener noreferrer");
+            }
+            // Empty blocks left behind by editing only add stray gaps
+            if (/^(P|DIV|H3|UL|OL)$/.test(tag) && !ch.textContent.trim() && !ch.querySelector("br")) ch.remove();
+        });
+    })(tpl.content);
+    return tpl.innerHTML.trim();
+}
+
+// The text of a post as HTML: rich posts cleaned, plain (older) posts escaped.
+function newsBody(n, cls) {
+    const html = n.html ? newsCleanHtml(n.html) : "";
+    return html
+        ? `<div class="${cls} news-rich">${html}</div>`
+        : `<div class="${cls} news-plain">${escHtml(n.text || "")}</div>`;
+}
+
+function newsEditorValue() {
+    const area = document.getElementById("newsEditor");
+    const text = (area?.innerText || "").replace(/\u00a0/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+    return { text, html: text ? newsCleanHtml(area.innerHTML) : "" };
+}
+
+function wireNewsEditor() {
+    const area      = document.getElementById("newsEditor");
+    const bar       = document.getElementById("newsEditorBar");
+    const linkRow   = document.getElementById("newsLinkRow");
+    const linkInput = document.getElementById("newsLinkUrl");
+    if (!area || !bar || !linkRow || !linkInput) return;
+
+    const exec = (cmd, value) => { try { return document.execCommand(cmd, false, value); } catch (e) { return false; } };
+    const isHeading = () => { try { return /^h3$/i.test(document.queryCommandValue("formatBlock")); } catch (e) { return false; } };
+    const inEditor = () => {
+        const sel = window.getSelection();
+        return sel && sel.rangeCount && area.contains(sel.getRangeAt(0).commonAncestorContainer);
+    };
+
+    // Highlight the toolbar buttons that apply where the cursor is
+    const refresh = () => {
+        bar.querySelectorAll("[data-cmd]").forEach(b => {
+            const cmd = b.dataset.cmd;
+            let on = false;
+            try {
+                on = cmd === "h3" ? isHeading()
+                   : /^(bold|italic|underline|insertUnorderedList|insertOrderedList)$/.test(cmd) && document.queryCommandState(cmd);
+            } catch (e) { /* not supported: leave it unlit */ }
+            b.classList.toggle("is-on", !!on);
+        });
+    };
+    document.addEventListener("selectionchange", () => { if (inEditor()) refresh(); });
+
+    area.addEventListener("focus", () => exec("defaultParagraphSeparator", "p"));
+    area.addEventListener("input", () => {
+        // Emptied by the person: clear the leftover <br> so the placeholder shows again
+        if (!area.textContent.trim() && !area.querySelector("li")) area.innerHTML = "";
+        refresh();
+    });
+
+    // Paste keeps the useful formatting (headings, lists, bold, links) and drops the rest
+    area.addEventListener("paste", e => {
+        const cd = e.clipboardData;
+        if (!cd) return;
+        e.preventDefault();
+        const html = cd.getData("text/html");
+        if (html) exec("insertHTML", newsCleanHtml(html));
+        else      exec("insertText", cd.getData("text/plain"));
+    });
+
+    // Toolbar: mousedown is cancelled so the text selection stays in the editor
+    let savedRange = null;
+    bar.addEventListener("mousedown", e => { if (e.target.closest("button")) e.preventDefault(); });
+    bar.addEventListener("click", e => {
+        const b = e.target.closest("button[data-cmd]");
+        if (!b) return;
+        const cmd = b.dataset.cmd;
+        area.focus();
+        if (cmd === "link") {
+            const sel = window.getSelection();
+            savedRange = inEditor() ? sel.getRangeAt(0).cloneRange() : null;
+            linkRow.classList.add("open");
+            linkInput.value = "https://";
+            linkInput.focus();
+            linkInput.select();
+            return;
+        }
+        if (cmd === "h3")         exec("formatBlock", isHeading() ? "<p>" : "<h3>");
+        else if (cmd === "clear") { exec("removeFormat"); exec("unlink"); if (isHeading()) exec("formatBlock", "<p>"); }
+        else                      exec(cmd);
+        refresh();
+    });
+
+    const closeLink = () => { linkRow.classList.remove("open"); area.focus(); };
+    const applyLink = () => {
+        let url = linkInput.value.trim();
+        if (url && !NEWS_LINK.test(url)) url = "https://" + url;
+        closeLink();
+        const sel = window.getSelection();
+        if (savedRange) { sel.removeAllRanges(); sel.addRange(savedRange); }
+        if (!url || url === "https://") return;
+        if (sel.isCollapsed) exec("insertHTML", `<a href="${escHtml(url)}">${escHtml(url)}</a>&nbsp;`);
+        else                 exec("createLink", url);
+    };
+    document.getElementById("newsLinkOk")?.addEventListener("click", applyLink);
+    document.getElementById("newsLinkCancel")?.addEventListener("click", closeLink);
+    linkInput.addEventListener("keydown", e => {
+        if (e.key === "Enter")  { e.preventDefault(); applyLink(); }
+        if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeLink(); }
+    });
+}
+
 async function saveNews() {
-    const text          = document.getElementById("newsText")?.value.trim();
+    const { text, html } = newsEditorValue();
     const startDateTime = document.getElementById("newsStartDate")?.value;
     const endDateTime   = document.getElementById("newsEndDate")?.value;
 
@@ -1870,6 +2017,7 @@ async function saveNews() {
     try {
         const newsRef = await addDoc(collection(db, "news"), {
             text,
+            html,
             startDateTime,
             endDateTime,
             createdAt: new Date().toISOString(),
@@ -1885,15 +2033,16 @@ async function saveNews() {
         });
 
         // Reset form and close modal
-        document.getElementById("newsText").value = "";
+        document.getElementById("newsEditor").innerHTML = "";
+        document.getElementById("newsLinkRow")?.classList.remove("open");
         document.getElementById("newsStartDate").value = "";
         document.getElementById("newsEndDate").value = "";
         dtpSyncField("newsStartDate");
         dtpSyncField("newsEndDate");
         newsModal.classList.remove("open");
 
-        // Refresh banners if still on home page
-        if (currentPage === "home") await renderNewsBanners();
+        // Refresh the announcements if still on home page
+        if (currentPage === "home") { await renderNewsCards(); await renderNewsBanners(); }
 
         notify("News posted successfully.", "success");
     } catch (err) {
@@ -1956,7 +2105,7 @@ async function renderNewsBanners() {
                 <div class="news-banner-icon">📢</div>
                 <div class="news-banner-body">
                     <div class="news-banner-label">Announcement</div>
-                    <div class="news-banner-text">${escHtml(n.text)}</div>
+                    ${newsBody(n, "news-banner-text")}
                     <div class="news-banner-dates">📅 ${formatNewsDateTime(startVal, false)} – ${formatNewsDateTime(endVal, true)}</div>
                 </div>
                 ${currentRole === "Admin" ? `
@@ -2067,7 +2216,8 @@ async function renderNewsCards() {
                     <button class="btn-delete-news" data-newsid="${n.id}">🗑 Delete</button>
                     ` : ""}
                 </div>
-                <div class="news-card-text">${escHtml(n.text)}</div>
+                ${newsBody(n, "news-card-text")}
+                <button class="news-card-more" type="button" data-newsid="${n.id}" hidden>Read more →</button>
                 <div class="news-card-footer">
                     <div class="news-card-dates">
                         📅 ${formatNewsDateTime(startVal, false)} – ${formatNewsDateTime(endVal, true)}
@@ -2075,6 +2225,21 @@ async function renderNewsCards() {
                 </div>
             </div>`;
         }).join("");
+
+        // Long posts: cut short on the card, "Read more" opens the whole announcement
+        const byId = new Map(allVisible.map(n => [n.id, n]));
+        grid.querySelectorAll(".news-card").forEach(card => {
+            const body = card.querySelector(".news-card-text");
+            const more = card.querySelector(".news-card-more");
+            if (!body || !more) return;
+            body.classList.add("is-clamped");
+            if (body.scrollHeight > body.clientHeight + 4) {
+                more.hidden = false;
+                more.addEventListener("click", () => openNewsDetail([byId.get(more.dataset.newsid)]));
+            } else {
+                body.classList.remove("is-clamped");
+            }
+        });
 
         // Wire delete buttons
         grid.querySelectorAll(".btn-delete-news").forEach(btn => {
