@@ -3791,6 +3791,7 @@ function tfIngest(res) {
   TF.sources = res.map(function (r) {
     if (!r.data) return { src: r.src, error: r.error, loading: r.loading };
     var d = r.data, st = d.settings || {};
+    var resp = d.responsible || {};                        // Flow_Responsible: creator -> member in charge
     var shift = Number(st.stamp_shift_minutes) || 0;
     var atRisk = parseFloat(st.at_risk_pct); if (!(atRisk > 0)) atRisk = 75;
     TF.refreshMinutes = Number(st.refresh_minutes) || 10;
@@ -3806,6 +3807,7 @@ function tfIngest(res) {
       ((d.tickets || {})[b.id] || []).forEach(function (row) {
         var t = { id: row[0], by: row[1] || '', created: tfParse(row[2], shift), name: row[3] || '', archived: !!row[4],
                   stamps: (row[5] || []).map(function (s) { return tfParse(s, shift); }), board: board, shift: shift };
+        t.responsible = resp[tfRespKey(t.by)] || '';
         tfApplyDetails(t, row[6]);
         if (t.deleted) return;
         tfCompute(t);
@@ -3817,6 +3819,7 @@ function tfIngest(res) {
         var base = h[1];
         var t = { id: '', by: people[h[0]] || '', created: tfMinDate(base, shift), name: '', archived: true, history: true,
                   stamps: h.slice(2).map(function (o) { return o == null ? null : tfMinDate(base + o, shift); }), board: board, shift: shift };
+        t.responsible = resp[tfRespKey(t.by)] || '';
         tfApplyDetails(t, null);
         tfCompute(t);
         tickets.push(t);
@@ -3825,7 +3828,7 @@ function tfIngest(res) {
     return { src: r.src, name: trackerName, lastEventAt: tfParse(d.lastEventAt), generatedAt: tfParse(d.generatedAt),
              historyAt: d.history ? tfParse(d.history.builtAt) : null, sheetUrl: d.sheetUrl, settings: st, boards: d.boards || [],
              error: r.error, loading: r.loading, via: d.via || 'Apps Script', fsNote: d.fsNote || '', excluded: Number(d.excluded) || 0,
-             clock: clock };
+             clock: clock, respCount: Object.keys(resp).length };
   });
   TF.boards = boards; TF.tickets = tickets; TF.events = {};
 }
@@ -3837,7 +3840,12 @@ function tfMinDate(m, shiftMin) {
   return shiftMin ? new Date(d.getTime() - shiftMin * 60000) : d;
 }
 
+// Same matching as the sheet script: ignore case and extra spaces.
+function tfRespKey(s) { return String(s == null ? '' : s).trim().replace(/\s+/g, ' ').toLowerCase(); }
+
 // NimbleWork fields from Flow_Details (owners, due date, priority, ...).
+// t.responsible (from Flow_Responsible) stands in for the creator wherever tickets are
+// grouped by member; the creator itself is still shown as "Created by".
 function tfApplyDetails(t, x) {
   x = x || {};
   t.owners = x.o || [];
@@ -3846,7 +3854,7 @@ function tfApplyDetails(t, x) {
   t.priority = x.p || ''; t.nwStatus = x.s || ''; t.nwClosed = x.c || '';
   t.blocked = x.br || x.f || ''; t.requestedBy = x.r || ''; t.category = x.k || '';
   t.changedBy = x.u || ''; t.changedAt = tfParse(x.at); t.deleted = !!x.x;
-  t.people = [t.by].concat(t.owners).filter(function (p, i, a) { return p && a.indexOf(p) === i; });
+  t.people = [t.responsible || t.by].concat(t.owners).filter(function (p, i, a) { return p && a.indexOf(p) === i; });
 }
 
 // ── Time: everything is IST wall-clock ──
@@ -4206,7 +4214,7 @@ function tfWhy(t) {
 }
 
 function tfOwnerCell(t) {
-  if (!t.owners.length) return '<span style="color:var(--text3)" title="Creator (no owner recorded yet)">' + esc(t.by) + '</span>';
+  if (!t.owners.length) return '<span style="color:var(--text3)" title="' + (t.responsible ? 'Responsible member for ' + esc(t.by) + ' (no owner recorded yet)' : 'Creator (no owner recorded yet)') + '">' + esc(t.responsible || t.by) + '</span>';
   return '<span title="' + esc(t.owners.join(', ')) + '">' + esc(t.owners[0]) + (t.owners.length > 1 ? ' <span style="color:var(--text3)">+' + (t.owners.length - 1) + '</span>' : '') + '</span>';
 }
 function tfListable(t) { return !t.history; }
@@ -4271,6 +4279,7 @@ function tfOpenDrawer(t) {
   var html = '<dl class="tf-kv">' +
     '<dt>Board</dt><dd>' + esc(t.board.label) + ' <span style="color:var(--text3)">(' + esc(t.board.tracker) + ')</span></dd>' +
     '<dt>Created by</dt><dd>' + esc(t.by || '—') + '</dd>' +
+    (t.responsible && t.responsible !== t.by ? '<dt>Responsible</dt><dd>' + esc(t.responsible) + '</dd>' : '') +
     (t.owners.length ? '<dt>Owners</dt><dd>' + esc(t.owners.join(', ')) + '</dd>' : '') +
     (t.priority ? '<dt>Priority</dt><dd>' + esc(t.priority) + '</dd>' : '') +
     (t.due ? '<dt>Due date</dt><dd>' + tfD(t.due) + (t.overdue ? ' <span class="tf-chip bad">⏰ ' + tfH(t.overdue) + ' overdue</span>' : '') + '</dd>' : '') +
@@ -4334,6 +4343,7 @@ function tfToggleConfig() {
 function tfRenderConfig() {
   var el = document.getElementById('tf-config');
   var html = '<div class="tf-cfg-hint">The configuration lives in each tracker\'s Google Sheet, in the <code>Flow_Settings</code>, <code>Flow_Boards</code> and <code>Flow_Lanes</code> tabs. Anyone with edit access to the sheet can change it. ' +
+    'Who is responsible for a creator\'s tickets is set in <code>Flow_Responsible</code> (Creator, Responsible Member). ' +
     'Changes show here after the cache expires, or straight away with <b>⟳ Refresh</b>. <b>Sheet Column</b> tells the dashboard where each lane\'s date is. <b>Pauses SLA</b> = Yes leaves that lane\'s time out of TAT. <b>Stage Target Hours</b> is optional.</div>';
   var ok = TF.sources.filter(function (s) { return s.name; });
   if (!ok.length) html += '<div class="tf-empty">No tracker is connected yet.</div>';
@@ -4342,7 +4352,8 @@ function tfRenderConfig() {
     html += '<div class="card" style="margin-bottom:16px"><div class="card-header"><span class="card-title">' + esc(s.name) + '</span>' +
       (s.sheetUrl ? '<a class="btn btn-secondary btn-sm" href="' + esc(s.sheetUrl) + '" target="_blank" rel="noopener">Open sheet to edit ↗</a>' : '') + '</div><div class="card-body">' +
       '<div style="font-size:12.5px;color:var(--text2);margin-bottom:12px">At risk at <b>' + esc(st.at_risk_pct != null ? st.at_risk_pct : 75) + '%</b> of SLA · needs attention after <b>' + esc(st.attention_hours || 72) + 'h</b> in one stage · lists cover <b>' + esc(st.detail_days || 45) + ' days</b> · history <b>' + esc(st.history_months || 24) + ' months</b> · events kept <b>' + esc(st.events_keep_days || 180) + ' days</b> · rebuilt every <b>' + esc(st.refresh_minutes || 10) + ' min</b>' +
-      (Number(st.stamp_shift_minutes) ? ' · time correction <b>−' + esc(st.stamp_shift_minutes) + ' min</b>' : '') + '</div>';
+      (Number(st.stamp_shift_minutes) ? ' · time correction <b>−' + esc(st.stamp_shift_minutes) + ' min</b>' : '') +
+      ' · responsible members set for <b>' + (s.respCount || 0) + '</b> creator' + (s.respCount === 1 ? '' : 's') + '</div>';
     s.boards.forEach(function (b) {
       html += '<div class="sub-hd" style="margin-top:14px">' + esc(b.label) + ' <span style="color:var(--text3);font-weight:500">· board ' + esc(b.id) + ' · sheet "' + esc(b.sheet) + '"' + (b.archiveSheet ? ' + "' + esc(b.archiveSheet) + '"' : '') + ' · SLA ' + (b.slaHours ? esc(b.slaHours) + 'h' : 'none') + '</span></div>' +
         '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>#</th><th>Lane key</th><th>Label</th><th class="tf-num">Sheet column</th><th>Type</th><th>Pauses SLA</th><th class="tf-num">Stage target</th></tr></thead><tbody>' +
@@ -4362,10 +4373,10 @@ async function tfExportExcel() {
   var XLSX;
   try { XLSX = await ensureXLSX(); } catch (e) { toast('Could not load the Excel library'); return; }
   var maxLanes = Math.max.apply(null, T.map(function (t) { return t.board.lanes.length; }));
-  var head = ['Ticket ID', 'Name', 'Tracker', 'Board', 'Created By', 'Owners', 'Priority', 'Due Date', 'Blocked', 'Created', 'Current Stage', 'Status', 'Completed', 'TAT / Age (hrs)', 'Paused (hrs)', 'SLA (hrs)', 'SLA Status', 'Archived'];
+  var head = ['Ticket ID', 'Name', 'Tracker', 'Board', 'Created By', 'Responsible', 'Owners', 'Priority', 'Due Date', 'Blocked', 'Created', 'Current Stage', 'Status', 'Completed', 'TAT / Age (hrs)', 'Paused (hrs)', 'SLA (hrs)', 'SLA Status', 'Archived'];
   for (var i = 1; i <= maxLanes; i++) head.push('Stage ' + i, 'Stage ' + i + ' Reached');
   var aoa = [head].concat(T.map(function (t) {
-    var r = [t.id, t.name, t.board.tracker, t.board.label, t.by, t.owners.join(', '), t.priority, t.due || '', t.blocked, t.created || '', t.cur, t.done ? 'Closed' : 'Open', t.closedAt || '',
+    var r = [t.id, t.name, t.board.tracker, t.board.label, t.by, t.responsible || t.by, t.owners.join(', '), t.priority, t.due || '', t.blocked, t.created || '', t.cur, t.done ? 'Closed' : 'Open', t.closedAt || '',
              t.hrs == null ? '' : Math.round(t.hrs * 100) / 100, Math.round(t.pausedHrs * 100) / 100, t.board.slaHours || '', t.sla, t.archived ? 'Yes' : ''];
     t.board.lanes.forEach(function (l, j) { r.push(l.label, t.stamps[j] || ''); });
     return r;
