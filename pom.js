@@ -166,11 +166,14 @@ async function loadFilters() {
         (data.districts || []).map(d => `<option value="${d}">${d}</option>`).join("");
       dd.disabled = false;
     }
+    // Event Management uses exactly this list (see pevSetDistrictList).
+    pevSetDistrictList(Array.isArray(data.districts) ? data.districts : null);
   } catch (e) {
     console.error(e);
     const dd = document.getElementById("pomDistrict");
     if (dd) { dd.innerHTML = '<option value="">Failed to load — reopen page</option>'; dd.disabled = false; }
     showToast("Failed to load districts.", "error");
+    pevSetDistrictList(null);
   }
 }
 
@@ -2458,7 +2461,8 @@ const PEV_COLUMNS = [
   { key: "otherEvents",      head: "Other<br>Events",                          scope: "district",
     tip: PEV_OTHER_MSG },
   { key: "otherTeachers",    head: "Teachers Felicitated<br>(Other Events)",   scope: "district",
-    tip: PEV_OTHER_MSG }
+    tip: PEV_OTHER_MSG },
+  { key: "clusterHeads",     head: "Total Cluster<br>Heads Recognised",       scope: "district" }
 ];
 
 const PEV_ROLLUP_MSG = "Select any block and fill these numbers \u2014 they are reconciled here automatically.";
@@ -2505,58 +2509,45 @@ function pevCurrentMonths() {
   return pevMonthsForYear(pevYear || PEV_DEFAULT_YEAR);
 }
 
-// ── District list (cached, refreshed in the background) ─────────────────────
-// The hardcoded block map is the baseline. Raw Data is folded in so a newly
-// added district still appears, and the saved event rows are folded in so a row
-// already in the sheet can never become unreachable. None of that blocks the
-// first paint: the cached list renders immediately.
-const PEV_DISTRICTS_KEY = "olfPomEventDistricts.v1";
-const PEV_DISTRICTS_TTL_MS = 12 * 60 * 60 * 1000;   // 12 hours
+// ── District list ────────────────────────────────────────────────────────────
+// Exactly the list Award Management shows: the districts in Raw Data, as the
+// backend returns them (getFilters). Award Management fetches it when the page
+// opens and hands it over through pevSetDistrictList, so both tabs always show
+// the same names, and a name corrected in Raw Data is corrected here too on the
+// next page load or Refresh. Nothing is hardcoded and nothing is cached in the
+// browser.
+//
+// Saved event rows under a name that is no longer in Raw Data are not added to
+// the dropdown; pevRenderNotes lists them instead, so they never disappear
+// unnoticed (they stay in the sheet and in the Excel download).
+let pevDistrictsState = "loading";          // "loading" | "ready" | "failed"
 
-function pevReadDistrictCache() {
-  try {
-    const raw = localStorage.getItem(PEV_DISTRICTS_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || !Array.isArray(parsed.districts)) return null;
-    return parsed;
-  } catch (e) { return null; }
+// The browser copy the previous version kept for 12 hours. Removed on start so
+// an old list can never come back.
+const PEV_OLD_DISTRICT_CACHE_KEY = "olfPomEventDistricts.v1";
+
+function pevSetDistrictList(list) {
+  if (Array.isArray(list)) {
+    pevDistricts = [...new Set(list.map(d => String(d || "").trim()).filter(Boolean))];
+    pevDistrictsState = "ready";
+  } else if (!pevDistricts.length) {
+    pevDistrictsState = "failed";          // keep a good list if we already have one
+  }
+  pevRenderDistrictOptions();
+  pevRenderNotes();
 }
 
-function pevWriteDistrictCache(districts) {
-  try {
-    localStorage.setItem(PEV_DISTRICTS_KEY,
-      JSON.stringify({ districts: districts, savedAt: Date.now() }));
-  } catch (e) { /* storage blocked - the in-memory list still works */ }
-}
-
-function pevDistrictsFromEvents() {
-  return [...new Set(pevEvents.map(r => String(r.districtName || "").trim()).filter(Boolean))];
-}
-
-function pevMergeDistricts(extra) {
-  const merged = [...new Set([
-    ...Object.keys(PEV_BLOCKS),
-    ...(extra || []),
-    ...pevDistrictsFromEvents()
-  ].map(d => String(d || "").trim()).filter(Boolean))];
-  merged.sort((a, b) => a.localeCompare(b));
-  return merged;
-}
-
+// Re-read the list from Raw Data (Refresh, or when the first load failed).
 async function pevRefreshDistrictsFromServer() {
   try {
     const res = await fetch(`${API_URL}?action=getFilters`);
     const data = await res.json();
-    const fromRaw = (data && Array.isArray(data.districts)) ? data.districts.filter(Boolean) : [];
-    if (!fromRaw.length) return false;
-    pevWriteDistrictCache(fromRaw);
-    const before = pevDistricts.join("|");
-    pevDistricts = pevMergeDistricts(fromRaw);
-    if (pevDistricts.join("|") !== before) pevRenderDistrictOptions();
+    if (!data || !Array.isArray(data.districts)) throw new Error("No district list returned");
+    pevSetDistrictList(data.districts);
     return true;
   } catch (e) {
     console.error("District list refresh failed:", e);
+    pevSetDistrictList(null);
     return false;
   }
 }
@@ -2584,8 +2575,24 @@ function pevDefaultBlock(district) {
   })[0];
 }
 
+// Raw Data is the source of district names, but the block list above was typed
+// separately, so one district can be spelled slightly differently in each
+// ("Raigarh - MH" vs "Raigarh MH"). Match the exact name first, then the same
+// name ignoring capitals, spaces and punctuation.
+function pevNameKey(name) {
+  return String(name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function pevLookup(map, district) {
+  if (Object.prototype.hasOwnProperty.call(map, district)) return map[district];
+  const want = pevNameKey(district);
+  if (!want) return undefined;
+  const hit = Object.keys(map).find(k => pevNameKey(k) === want);
+  return hit === undefined ? undefined : map[hit];
+}
+
 function pevBlocksFor(district) {
-  const list = PEV_BLOCKS[district];
+  const list = pevLookup(PEV_BLOCKS, district);
   return Array.isArray(list) ? list : [];
 }
 
@@ -2667,9 +2674,29 @@ function pevBuildRows() {
 function pevRenderNotes() {
   const el = document.getElementById("pevNote");
   if (!el) return;
-  if (!pevDistrict) { el.style.display = "none"; el.innerHTML = ""; return; }
-
   const notes = [];
+
+  // Saved event data under a district name that is no longer in Raw Data
+  // (for example after the name was corrected there). It is not in the
+  // dropdown, so say so here rather than let it vanish from view.
+  if (pevEventsLoaded && pevDistrictsState === "ready") {
+    const known = new Set(pevDistricts);
+    const orphan = [...new Set(pevEvents.map(r => pevStr(r.districtName))
+      .filter(d => d && !known.has(d)))];
+    if (orphan.length) {
+      notes.push(`Saved event data exists for ${orphan.join(", ")}, which `
+        + `${orphan.length === 1 ? "is" : "are"} not in the Raw Data district list `
+        + `(the name may have been corrected there). That data is untouched in the `
+        + `sheet and is included in the Excel download.`);
+    }
+  }
+
+  if (!pevDistrict) {
+    el.innerHTML = notes.map(n => `<div>${n}</div>`).join("");
+    el.style.display = notes.length ? "block" : "none";
+    return;
+  }
+
   const shown = new Set(pevCurrentMonths());
 
   // Saved months outside the selected academic year.
@@ -2879,10 +2906,7 @@ async function pevLoadEvents() {
     if (!Array.isArray(rows)) throw new Error("getEvents is not deployed yet");
     pevEvents = rows;
     pevEventsLoaded = true;
-    const before = pevDistricts.join("|");
-    pevDistricts = pevMergeDistricts(
-      (pevReadDistrictCache() || { districts: [] }).districts);
-    if (pevDistricts.join("|") !== before) pevRenderDistrictOptions();
+    pevRenderNotes();
     if (pevDistrict) pevBuildRows();
     return true;
   } catch (e) {
@@ -2900,6 +2924,14 @@ async function pevLoadEvents() {
 function pevRenderDistrictOptions() {
   const dd = document.getElementById("pevDistrict");
   if (!dd) return;
+  if (!pevDistricts.length) {
+    const msg = pevDistrictsState === "failed" ? "Couldn't load districts \u2014 click Refresh"
+      : pevDistrictsState === "ready" ? "No districts in Raw Data"
+      : "\u23f3 Loading districts\u2026";
+    dd.innerHTML = `<option value="">${msg}</option>`;
+    dd.disabled = true;
+    return;
+  }
   const keep = pevDistrict;
   dd.innerHTML = '<option value="">Select District</option>' +
     pevDistricts.map(d => `<option value="${d}">${d}</option>`).join("");
@@ -2907,20 +2939,12 @@ function pevRenderDistrictOptions() {
   if (keep && pevDistricts.indexOf(keep) >= 0) dd.value = keep;
 }
 
+// The list arrives from Award Management (pevSetDistrictList). If this tab is
+// opened before that has happened the dropdown says "Loading" and fills itself
+// in; if the first load failed, try once more now.
 function pevPopulateDistricts() {
-  const dd = document.getElementById("pevDistrict");
-  if (!dd) return;
-
-  // The hardcoded map alone is enough to paint immediately.
-  if (!pevDistricts.length) {
-    const cached = pevReadDistrictCache();
-    pevDistricts = pevMergeDistricts(cached ? cached.districts : []);
-  }
   pevRenderDistrictOptions();
-
-  const cached = pevReadDistrictCache();
-  const stale = !cached || (Date.now() - (cached.savedAt || 0)) > PEV_DISTRICTS_TTL_MS;
-  if (stale) pevRefreshDistrictsFromServer();
+  if (pevDistrictsState === "failed") pevRefreshDistrictsFromServer();
 }
 
 // Blocks are locked until a district is chosen, and always default to
@@ -3088,6 +3112,7 @@ function pevAdoptSaved(echoed) {
     suNsTeachers: pevStr(echoed.suNsTeachers),
     otherEvents: pevStr(echoed.otherEvents),
     otherTeachers: pevStr(echoed.otherTeachers),
+    clusterHeads: pevStr(echoed.clusterHeads),
     updatedBy: pevStr(echoed.updatedBy),
     updatedAt: pevStr(echoed.updatedAt)
   };
@@ -3228,8 +3253,14 @@ async function pevRefresh() {
     pevEventsLoaded = false;
     const ok = await pevLoadEvents();
     await pevRefreshDistrictsFromServer();
+    // A district that is no longer in Raw Data can't stay selected.
+    if (pevDistrict && pevDistricts.indexOf(pevDistrict) < 0) {
+      pevDistrict = ""; pevBlock = ""; pevRows = [];
+      pevMessage("Select a District to begin");
+    }
     pevRenderDistrictOptions();
     pevRenderBlockOptions();
+    pevRenderNotes();
     if (pevDistrict) pevBuildRows();
     showToast(ok ? "Event data refreshed." : "Couldn't refresh event data.", ok ? "success" : "error");
   } finally {
@@ -3249,7 +3280,8 @@ const PEV_EXPORT_HEADERS = [
   "Total  Block Events", "Total District Events",
   "Teachers Felicitated (Block Level)", "Teachers Felicitated (District Level)",
   "SU/NS Events", "Teachers Felicitated (SU/NS Events)",
-  "Other Events", "Teachers Felicitated (Other Events)"
+  "Other Events", "Teachers Felicitated (Other Events)",
+  "Total Cluster Heads Recognised"
 ];
 
 // "Jun-2026" -> 2026*12+5, so months sort chronologically rather than by name.
@@ -3288,7 +3320,7 @@ function pevBuildExportRows() {
   const out = [];
   Object.keys(byDistrict).sort((a, b) => a.localeCompare(b)).forEach(district => {
     const months = byDistrict[district];
-    const state = PEV_DISTRICT_STATE[district] || "";
+    const state = pevLookup(PEV_DISTRICT_STATE, district) || "";
     const mapped = pevBlocksFor(district);
     const fallback = pevDefaultBlock(district);
 
@@ -3332,7 +3364,8 @@ function pevBuildExportRows() {
             carriesDistrict ? pevNum(dRow.suNsEvents) : "",
             carriesDistrict ? pevNum(dRow.suNsTeachers) : "",
             carriesDistrict ? pevNum(dRow.otherEvents) : "",
-            carriesDistrict ? pevNum(dRow.otherTeachers) : ""
+            carriesDistrict ? pevNum(dRow.otherTeachers) : "",
+            carriesDistrict ? pevNum(dRow.clusterHeads) : ""
           ]);
         });
       });
@@ -3375,6 +3408,7 @@ function pevOnShow() {
 }
 
 function pevInit() {
+  try { localStorage.removeItem(PEV_OLD_DISTRICT_CACHE_KEY); } catch (e) { /* storage blocked */ }
   const rebind = (id, handler, event) => {
     const el = document.getElementById(id);
     if (!el) return;
