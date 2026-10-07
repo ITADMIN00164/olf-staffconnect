@@ -983,6 +983,43 @@ async function ensureFormsStaffList() {
     }
 }
 
+/* ====================================
+   STAFF DIRECTORY
+   The full Employees list, for pages that must pick a real person
+   rather than accept typed-in details - currently the Field Review
+   System's Assignments modal.
+
+   Kept separate from ensureFormsStaffList() above on purpose: that one
+   drops anyone without an email because they can't be a Forms recipient,
+   and forms.js reads its exact shape. This one carries the Firestore doc
+   id (which IS the employee ID) and never filters, so the caller can
+   decide what to do about a missing field.
+
+   Fetched once per page load and cached. Throws on failure - the caller
+   shows its own message.
+==================================== */
+
+let staffDirectory = null;
+
+window.olfStaffDirectory = async function () {
+    if (staffDirectory) return staffDirectory;
+    const snapshot = await getDocs(collection(db, "Employees"));
+    const list = [];
+    snapshot.forEach(d => {
+        const r = d.data();
+        list.push({
+            id:          String(d.id || "").trim(),            // doc id = employee ID (OLF-26-168)
+            name:        String(r.Name || "").trim(),
+            email:       String(r.Email || "").trim(),         // the Google account sign-in matches on
+            dept:        String(r.Dept || "").trim(),
+            designation: String(r.Designation || "").trim()    // job title, NOT the PO/PM/DM review role
+        });
+    });
+    list.sort((a, b) => a.name.localeCompare(b.name));
+    staffDirectory = list;
+    return list;
+};
+
 async function getPageHtml(page) {
     if (pageFragments.has(page)) return pageFragments.get(page);
     const res  = await fetch(`pages/${page}.html`);

@@ -106,6 +106,65 @@
         margin-top: 4px;
     }
 
+    /* ── Assignment modal: employee typeahead (reads the Employees directory) ──
+         A menu, not a list: hidden until you type, never scrollable, and it
+         floats over the fields below instead of pushing them down. ── */
+    .pos-emp-ac { position: relative; }
+    .pos-emp-ac > input {
+        width: 100%;
+        padding: 9px 12px;
+        border: 1px solid #e5e7eb;
+        border-radius: 7px;
+        font-size: 13.5px;
+        font-family: inherit;
+        outline: none;
+        transition: border-color .15s, box-shadow .15s;
+    }
+    .pos-emp-ac > input:focus {
+        border-color: #4f8ef7;
+        box-shadow: 0 0 0 3px rgba(79,142,247,0.12);
+    }
+    .pos-emp-menu {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0; right: 0;
+        z-index: 20;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(16,24,40,0.14);
+        overflow: hidden;
+    }
+    .pos-emp-menu[hidden] { display: none; }
+    .pos-emp-row {
+        display: flex;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 4px 8px;
+        padding: 8px 12px;
+        cursor: pointer;
+        user-select: none;
+        border-bottom: 1px solid #f3f4f6;
+        line-height: 1.35;
+    }
+    .pos-emp-row:last-child { border-bottom: none; }
+    .pos-emp-row:hover { background: #f0f4ff; }
+    .pos-emp-row.is-active { background: #e8f0fe; box-shadow: inset 3px 0 0 #4f8ef7; }
+    .pos-emp-row.is-taken { opacity: 0.62; }
+    .pos-emp-name { font-size: 13px; font-weight: 600; color: #1a1d23; }
+    .pos-emp-meta { font-size: 11.5px; color: #9ca3af; }
+    .pos-emp-taken {
+        font-size: 10.5px; font-weight: 600;
+        color: #b45309; background: #fef3c7;
+        border-radius: 4px; padding: 1px 6px;
+    }
+    /* Fields filled from the directory — visibly not yours to type in */
+    .pos-ro {
+        background: #f9fafb !important;
+        color: #4b5563 !important;
+        cursor: default;
+    }
+
     /* ── Data tab: source cards ── */
     .pos-src-card {
         background: #fff;
@@ -967,10 +1026,26 @@
             <button class="modal-close" onclick="window.POSAdmin.closeAssignmentModal()">✕</button>
         </div>
         <div class="modal-body">
+            <!-- The person is picked from the Staff Connect Employees directory, never
+                 typed. The email stored here has to be the exact Google account they
+                 sign in with, and Employees is already the source of truth for that —
+                 typing it by hand is how an assignment ends up on the wrong person. -->
+            <div class="form-group" id="posAssignPickWrap">
+                <label>Employee <span class="req">*</span></label>
+                <div class="pos-emp-ac">
+                    <input type="text" id="posAssignEmpSearch" autocomplete="off"
+                           placeholder="Type a few letters of the name, ID or email…"
+                           oninput="window.POSAdmin.onEmpSearch(this.value)"
+                           onkeydown="window.POSAdmin.onEmpKey(event)"
+                           onblur="window.POSAdmin.onEmpBlur()">
+                    <div class="pos-emp-menu" id="posAssignEmpList" hidden></div>
+                </div>
+                <div class="pos-checklist-count" id="posAssignEmpCount"></div>
+            </div>
             <div class="form-row">
                 <div class="form-group">
                     <label>Employee ID <span class="req">*</span></label>
-                    <input type="text" id="posAssignEmpId" placeholder="e.g. OLF-26-168">
+                    <input type="text" id="posAssignEmpId" class="pos-ro" readonly placeholder="Pick an employee above">
                 </div>
                 <div class="form-group">
                     <label>Designation <span class="req">*</span></label>
@@ -985,15 +1060,15 @@
             <div class="form-row">
                 <div class="form-group">
                     <label>Name <span class="req">*</span></label>
-                    <input type="text" id="posAssignName" placeholder="Full name">
+                    <input type="text" id="posAssignName" class="pos-ro" readonly placeholder="From Employees">
                 </div>
                 <div class="form-group">
                     <label>Email <span class="req">*</span></label>
-                    <input type="email" id="posAssignEmail" placeholder="name@openlinksfoundation.org">
+                    <input type="email" id="posAssignEmail" class="pos-ro" readonly placeholder="From Employees">
                 </div>
             </div>
             <p style="font-size:11.5px;color:#9ca3af;margin-top:-8px;">
-                Must match the Google account this person signs into Staff Connect with — it's how the PO Review page recognizes who's logged in.
+                ID, name and email come from the Employees page — if any of them is wrong, fix it there. Designation here is the review role, which is separate from their job title.
             </p>
             <div class="form-group">
                 <label>Assigned Districts</label>

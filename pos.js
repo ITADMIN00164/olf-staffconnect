@@ -465,16 +465,206 @@ async function deleteBlock(id) {
 let posModalDistricts = new Set();
 let posModalBlocks = new Set();
 
-function openAssignmentModal(editId = null) {
+/* ------------------------------------
+   EMPLOYEE PICKER
+   Employees live in Firestore and are owned by the Employees page;
+   assignments live in Supabase. app.js exposes the directory as
+   window.olfStaffDirectory(). Picking from it is the ONLY way to set
+   emp_id / name / email, so what we store always matches what sign-in
+   looks the person up by - a typo here used to mean a PO whose targets
+   never resolve to their assignment.
+
+   It behaves as a typeahead, not a browsable list: nothing shows until
+   you type, and only the few best matches ever appear. Scrolling 166
+   people to find one is how you pick the wrong Akash.
+------------------------------------ */
+
+const EMP_MIN_CHARS  = 2;   // below this the menu stays shut
+const EMP_MAX_RESULTS = 3;  // only ever offer the best few
+
+let posStaff = [];           // [{ id, name, email, dept, designation }]
+let posStaffError = "";      // non-empty => show this instead of the list
+let posPickedEmp = null;     // the directory row chosen in this modal session
+let posEmpMatches = [];      // what the menu is currently showing
+let posEmpActive = -1;       // highlighted row in posEmpMatches, for ↑ ↓ Enter
+
+async function loadStaffDirectory() {
+    if (posStaff.length) return;
+    try {
+        posStaff = await window.olfStaffDirectory();
+        posStaffError = posStaff.length ? "" : "No employees found in the directory.";
+    } catch (err) {
+        console.error("Employee directory load failed:", err);
+        posStaff = [];
+        posStaffError = "Couldn't load the Employees directory. Check your connection, then close and reopen this window.";
+    }
+}
+
+// emp_id (upper-cased) -> the name already holding that assignment.
+// Matches how the Dashboard compares IDs, so the two never disagree.
+function assignedEmpIds() {
+    const taken = {};
+    posData.assignments.forEach(a => {
+        const k = String(a.emp_id || "").trim().toUpperCase();
+        if (k) taken[k] = a.name || a.emp_id;
+    });
+    return taken;
+}
+
+/* Rank matches so the obvious answer is row 1 and Enter alone is usually
+   right: a name that starts with what you typed beats one that merely
+   contains it, "yog" beats a stray hit inside an email address. */
+function empMatches(q) {
+    const needle = q.trim().toLowerCase();
+    if (needle.length < EMP_MIN_CHARS) return [];
+
+    const scored = [];
+    posStaff.forEach(e => {
+        const name = String(e.name || "").toLowerCase();
+        const id   = String(e.id || "").toLowerCase();
+        const mail = String(e.email || "").toLowerCase();
+
+        let score = -1;
+        if (name.startsWith(needle)) score = 0;                                       // "yoge" -> Yogesh
+        else if (name.split(/\s+/).some(w => w.startsWith(needle))) score = 1;        // "jag"  -> Yogesh V Jagtap
+        else if (id.startsWith(needle)) score = 2;
+        else if (mail.startsWith(needle)) score = 3;
+        else if (name.includes(needle)) score = 4;
+        else if (id.includes(needle) || mail.includes(needle)) score = 5;
+        if (score < 0) return;
+
+        scored.push({ e, score });
+    });
+
+    scored.sort((a, b) => a.score - b.score || String(a.e.name).localeCompare(String(b.e.name)));
+    return scored.slice(0, EMP_MAX_RESULTS).map(s => s.e);
+}
+
+function closeEmpMenu() {
+    posEmpMatches = [];
+    posEmpActive = -1;
+    const menu = document.getElementById("posAssignEmpList");
+    if (menu) { menu.hidden = true; menu.innerHTML = ""; }
+}
+
+function renderEmpMenu() {
+    const menu = document.getElementById("posAssignEmpList");
+    if (!menu) return;
+
+    if (!posEmpMatches.length) { menu.hidden = true; menu.innerHTML = ""; return; }
+
+    const taken = assignedEmpIds();
+    menu.innerHTML = posEmpMatches.map((e, i) => {
+        const heldBy = taken[e.id.toUpperCase()];
+        return `<div class="pos-emp-row${i === posEmpActive ? " is-active" : ""}${heldBy ? " is-taken" : ""}"
+                     onmousedown="event.preventDefault(); window.POSAdmin.onEmpPicked(${i})">
+            <span class="pos-emp-name">${escHtml(e.name || "(no name on record)")}</span>
+            <span class="pos-emp-meta">${escHtml(e.id)}${e.email ? " · " + escHtml(e.email) : " · no email"}</span>
+            ${heldBy ? `<span class="pos-emp-taken">already assigned</span>` : ""}
+        </div>`;
+    }).join("");
+    menu.hidden = false;
+}
+
+function setEmpHint(text) {
+    const hint = document.getElementById("posAssignEmpCount");
+    if (hint) hint.textContent = text;
+}
+
+function onEmpSearch(value) {
+    // Typing after a pick clears it - otherwise you could select Yogesh Ubale,
+    // edit the box to read "Jagtap", and still save Ubale.
+    if (posPickedEmp) {
+        posPickedEmp = null;
+        document.getElementById("posAssignEmpId").value = "";
+        document.getElementById("posAssignName").value = "";
+        document.getElementById("posAssignEmail").value = "";
+    }
+
+    if (posStaffError) { closeEmpMenu(); setEmpHint(posStaffError); return; }
+
+    const q = String(value || "");
+    if (q.trim().length < EMP_MIN_CHARS) {
+        closeEmpMenu();
+        setEmpHint(`Type at least ${EMP_MIN_CHARS} letters of a name, ID or email.`);
+        return;
+    }
+
+    posEmpMatches = empMatches(q);
+    posEmpActive = posEmpMatches.length ? 0 : -1;   // first hit pre-armed for Enter
+    renderEmpMenu();
+    setEmpHint(posEmpMatches.length
+        ? "↑ ↓ to move, Enter to select."
+        : "No employee matches that. Check the Employees page.");
+}
+
+// ↑ ↓ move, Enter selects, Esc closes. Enter is swallowed while the menu is
+// open so it can never reach the modal and fire a save.
+function onEmpKey(ev) {
+    if (!posEmpMatches.length) return;
+
+    if (ev.key === "ArrowDown") {
+        ev.preventDefault();
+        posEmpActive = Math.min(posEmpActive + 1, posEmpMatches.length - 1);
+        renderEmpMenu();
+    } else if (ev.key === "ArrowUp") {
+        ev.preventDefault();
+        posEmpActive = Math.max(posEmpActive - 1, 0);
+        renderEmpMenu();
+    } else if (ev.key === "Enter") {
+        ev.preventDefault();
+        if (posEmpActive >= 0) onEmpPicked(posEmpActive);
+    } else if (ev.key === "Escape") {
+        ev.preventDefault();
+        closeEmpMenu();
+        setEmpHint("");
+    }
+}
+
+function onEmpBlur() {
+    // Let a mousedown on a row land first; that handler closes the menu itself.
+    setTimeout(() => { if (!posPickedEmp) closeEmpMenu(); }, 120);
+}
+
+function onEmpPicked(idx) {
+    const e = posEmpMatches[idx];
+    if (!e) return;
+
+    posPickedEmp = e;
+    document.getElementById("posAssignEmpId").value = e.id;
+    document.getElementById("posAssignName").value  = e.name;
+    document.getElementById("posAssignEmail").value = e.email;
+
+    const search = document.getElementById("posAssignEmpSearch");
+    if (search) search.value = e.name;
+
+    closeEmpMenu();
+
+    const heldBy = assignedEmpIds()[e.id.toUpperCase()];
+    setEmpHint(heldBy
+        ? `${e.name} already has an assignment — edit that row instead.`
+        : `Selected ${e.name} · ${e.id}`);
+}
+
+async function openAssignmentModal(editId = null) {
     posEditingAssignmentId = editId;
 
     const title = document.getElementById("posAssignModalTitle");
     const existing = editId ? posData.assignments.find(a => a.id === editId) : null;
+    const pickWrap = document.getElementById("posAssignPickWrap");
+    const search = document.getElementById("posAssignEmpSearch");
+
+    posPickedEmp = null;
+    if (search) search.value = "";
+    closeEmpMenu();
+    setEmpHint("");
 
     if (existing) {
         title.textContent = "Edit Assignment";
+        // emp_id is the stable key - hide the picker entirely so identity can't
+        // drift on an edit. Change who covers what, never who the row IS.
+        if (pickWrap) pickWrap.style.display = "none";
         document.getElementById("posAssignEmpId").value = existing.emp_id;
-        document.getElementById("posAssignEmpId").disabled = true; // emp_id is the stable key - don't change it via edit
         document.getElementById("posAssignName").value = existing.name;
         document.getElementById("posAssignEmail").value = existing.email || "";
         document.getElementById("posAssignDesignation").value = existing.designation;
@@ -482,8 +672,8 @@ function openAssignmentModal(editId = null) {
         posModalBlocks = new Set(existing.assigned_blocks || []);
     } else {
         title.textContent = "Add Assignment";
+        if (pickWrap) pickWrap.style.display = "";
         document.getElementById("posAssignEmpId").value = "";
-        document.getElementById("posAssignEmpId").disabled = false;
         document.getElementById("posAssignName").value = "";
         document.getElementById("posAssignEmail").value = "";
         document.getElementById("posAssignDesignation").value = "PO";
@@ -494,6 +684,15 @@ function openAssignmentModal(editId = null) {
     renderDistrictChecklist();
     refreshAssignModalUI();
     document.getElementById("posAssignModal").classList.add("open");
+
+    // Only an add needs the directory. Fetched after the modal is up so the
+    // Firestore round-trip never delays it, and focus lands in the search box.
+    if (!existing) {
+        setEmpHint("Loading employees…");
+        await loadStaffDirectory();
+        setEmpHint(posStaffError || `Type at least ${EMP_MIN_CHARS} letters of a name, ID or email.`);
+        if (search) search.focus();
+    }
 }
 
 function renderDistrictChecklist(filterText) {
@@ -633,7 +832,8 @@ function blocksForDistrictNames(districtNames) {
 
 function closeAssignmentModal() {
     document.getElementById("posAssignModal").classList.remove("open");
-    document.getElementById("posAssignEmpId").disabled = false;
+    posPickedEmp = null;
+    closeEmpMenu();
 }
 
 async function saveAssignment() {
@@ -650,6 +850,26 @@ async function saveAssignment() {
     const assignedBlocks = designation === "PO"
         ? [...posModalBlocks].filter(name => blocksForDistrictNames(assignedDistricts).includes(name))
         : blocksForDistrictNames(assignedDistricts);
+
+    // On an add, identity must have come from the directory - these three
+    // fields are read-only and only onEmpPicked() ever writes them.
+    if (!posEditingAssignmentId) {
+        if (!posPickedEmp) {
+            window.notify("Pick an employee from the list - ID, name and email come from the Employees page.", "warning");
+            return;
+        }
+        const dup = posData.assignments.find(
+            a => String(a.emp_id || "").trim().toUpperCase() === posPickedEmp.id.toUpperCase()
+        );
+        if (dup) {
+            window.notify(`${dup.name} (${dup.emp_id}) already has an assignment - edit that row instead of adding a second one.`, "warning");
+            return;
+        }
+        if (!posPickedEmp.email) {
+            window.notify(`${posPickedEmp.name} has no email in Employees. Add it there first - it's how Staff Connect matches them at login.`, "warning");
+            return;
+        }
+    }
 
     if (!empId) { window.notify("Employee ID is required.", "warning"); return; }
     if (!name) { window.notify("Name is required.", "warning"); return; }
@@ -2698,6 +2918,7 @@ window.POSAdmin = {
     openBlockModal, openEditBlockModal, closeBlockModal, saveBlock, refreshBlockDistrictOptions,
     deleteBlock,
     openAssignmentModal, closeAssignmentModal, saveAssignment,
+    onEmpSearch, onEmpPicked, onEmpKey, onEmpBlur,
     refreshAssignModalUI, onDistrictCheckToggle, onBlockCheckToggle,
     onDistrictSearch, onBlockSearch,
     markResigned,
