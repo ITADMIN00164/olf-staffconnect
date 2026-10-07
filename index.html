@@ -2426,7 +2426,7 @@
 
     <!-- ── Announcement detail (opened from the popup or a card) ── -->
     <div id="newsDetailModal" class="modal-overlay">
-        <div class="modal-box" style="width:680px;">
+        <div class="modal-box" style="width:560px;">
             <div class="modal-header">
                 <h2>📢 Announcements</h2>
                 <button class="modal-close" id="closeNewsDetailBtn" type="button">✕</button>
@@ -2505,8 +2505,11 @@
             <button class="nav-item" data-page="forms" onclick="navigate('forms')" title="OLF Forms">
                 <span class="icon">📝</span><span class="label">OLF Forms</span>
             </button>
-            <button class="nav-item" data-page="po" onclick="navigate('po')" title="PO Review">
-                <span class="icon">📈</span><span class="label">PO Review</span>
+            <!-- ARCHIVED 2026-10-07: the old PO Review page (pages/po.html + po.js) is
+                 retired. Its files are still in the repo for reference but nothing links
+                 to them any more - the Field Review System below replaces it. -->
+            <button class="nav-item" data-page="pos" id="posNavBtn" onclick="navigate('pos')" title="Field Review System" hidden>
+                <span class="icon">🗂️</span><span class="label">Field Review System</span>
             </button>
             </div><!-- /.sidebar-nav -->
 
@@ -2615,6 +2618,9 @@
 <script src="smartgoal.js"></script>
 <script src="gr.js"></script>
 <script src="forms.js"></script>
-<script src="po.js"></script>
+<!-- ARCHIVED 2026-10-07: <script src="po.js"></script> - old PO Review page, no longer loaded. -->
+<script src="pos-supabase.js"></script>
+<script src="pos.js"></script>
+<script src="pos-review.js"></script>
 </body>
 </html>

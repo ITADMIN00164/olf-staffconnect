@@ -50,6 +50,12 @@ const auth     = getAuth(app);
 const db       = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
+// Only this account sees/can use the Org Admin (states/districts/blocks +
+// assignments) page. This is a UI convenience only - pos.js re-checks the
+// same email itself before rendering anything, exactly like po.js does for
+// PO Review, because a hidden button is not real access control.
+const ORG_ADMIN_EMAIL = "itadmin@openlinksfoundation.org";
+
 let currentRole      = "User";
 let employees        = [];
 let schemaFields     = [];
@@ -525,6 +531,11 @@ function updateTopbar(user) {
     if (topbarAvatar) topbarAvatar.textContent = initialsFrom(user.displayName);
     // Expose user globally so pages can read email
     window.__olfUser = { email: user.email, displayName: user.displayName, role: currentRole };
+
+    // Field Review System nav item: every signed-in user can open it (their Dashboard).
+    // Only the Admin button inside the page is restricted to ORG_ADMIN_EMAIL (pos.js checks it).
+    const posNavBtn = document.getElementById("posNavBtn");
+    if (posNavBtn) posNavBtn.hidden = false;
 }
 
 /* ====================================
@@ -1137,10 +1148,14 @@ window.navigate = async function (page) {
         });
     }
 
-    else if (page === "po") {
-        // po.js reads window.__olfUser itself (admin gate + run auth).
-        if (window.POReview && typeof window.POReview.mount === "function") {
-            window.POReview.mount();
+    // ARCHIVED 2026-10-07: the "po" branch (old PO Review, window.POReview) was
+    // removed here. pages/po.html and po.js are still in the repo but are never
+    // fetched or loaded - the "pos" page below replaces them.
+
+    else if (page === "pos") {
+        // pos.js reads window.__olfUser itself (admin gate + run auth).
+        if (window.POSAdmin && typeof window.POSAdmin.mount === "function") {
+            window.POSAdmin.mount();
         }
     }
 
