@@ -2496,20 +2496,21 @@
             <button class="nav-item" data-page="calendar" onclick="navigate('calendar')" title="Program Calendar">
                 <span class="icon">📅</span><span class="label">Program Calendar</span>
             </button>
-            <button class="nav-item" data-page="smart-goals" onclick="navigate('smart-goals')" title="HO Review System">
+            <!-- The two review modules sit together: HO (head office) above, Field below. -->
+            <button class="nav-item" data-page="smart-goals" onclick="navigate('smart-goals')" title="HO Plan & Review">
                 <span class="icon">🎯</span><span class="label">HO Plan & Review</span>
+            </button>
+            <!-- ARCHIVED 2026-10-07: the old PO Review page (pages/po.html + po.js) is
+                 retired. Its files are still in the repo for reference but nothing links
+                 to them any more - the Field Review System replaces it. -->
+            <button class="nav-item" data-page="pos" id="posNavBtn" onclick="navigate('pos')" title="Field Review System" hidden>
+                <span class="icon">📍</span><span class="label">Field Review System</span>
             </button>
             <button class="nav-item" data-page="gr" onclick="navigate('gr')" title="GR's & Circulars">
                 <span class="icon">📜</span><span class="label">GR's & Circulars</span>
             </button>
             <button class="nav-item" data-page="forms" onclick="navigate('forms')" title="OLF Forms">
                 <span class="icon">📝</span><span class="label">OLF Forms</span>
-            </button>
-            <!-- ARCHIVED 2026-10-07: the old PO Review page (pages/po.html + po.js) is
-                 retired. Its files are still in the repo for reference but nothing links
-                 to them any more - the Field Review System below replaces it. -->
-            <button class="nav-item" data-page="pos" id="posNavBtn" onclick="navigate('pos')" title="Field Review System" hidden>
-                <span class="icon">🗂️</span><span class="label">Field Review System</span>
             </button>
             </div><!-- /.sidebar-nav -->
 
