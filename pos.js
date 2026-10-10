@@ -130,13 +130,16 @@ function showTab(tab) {
     const dat = document.getElementById("posTabData");
     const acd = document.getElementById("posTabAcademic");
     const tgt = document.getElementById("posTabTargets");
+    const als = document.getElementById("posTabAliases");
     if (loc) loc.style.display = tab === "locations" ? "" : "none";
     if (asg) asg.style.display = tab === "assignments" ? "" : "none";
     if (dat) dat.style.display = tab === "data" ? "" : "none";
     if (acd) acd.style.display = tab === "academic" ? "" : "none";
     if (tgt) tgt.style.display = tab === "targets" ? "" : "none";
+    if (als) als.style.display = tab === "aliases" ? "" : "none";
     if (tab === "academic") initAcademicTab();
     if (tab === "targets") initTargetsTab();
+    if (tab === "aliases") initAliasTab();
     if (tab === "data") { initDataTab(); initErTab(); initKekaTab(); initScTab(); initNimbleTab(); initVaTab(); }
 }
 
@@ -1763,10 +1766,46 @@ async function loadAliases() {
 
 function invalidateAliasCache() { aliasCache = null; }
 
+/* Name normalisation used for SUGGESTIONS only - never for storage. */
+function aliasTokens(s) {
+    return String(s || "").toLowerCase().replace(/[^a-z\s]/g, " ").split(/\s+/).filter(Boolean);
+}
+function aliasSquash(s) { return String(s || "").toLowerCase().replace(/[^a-z]/g, ""); }
+
+/* Suggest an assignment for a source name, but ONLY on strong evidence.
+   A single shared token is deliberately NOT enough: "Abhishek Kumar" and
+   "Abhishek Bansal" share exactly one, and guessing between those two is
+   what put HO tickets onto a PO's review in the first place. */
+function suggestAssignment(sourceName) {
+    const st = aliasTokens(sourceName), sq = aliasSquash(sourceName);
+    if (!st.length) return null;
+    const live = posData.assignments.filter(a => a.status !== "resigned");
+
+    for (const a of live) {                                   // exact, ignoring case/punctuation
+        if (aliasTokens(a.name).join(" ") === st.join(" ")) return a;
+    }
+    for (const a of live) {
+        const at = aliasTokens(a.name);
+        const smaller = st.length <= at.length ? st : at;
+        const bigger  = st.length <= at.length ? at : st;
+        // every word of the shorter name appears in the longer one, and the
+        // shorter is at least two words: "Raghunath Wankhade" vs
+        // "Raghunath R Wankhade" passes, one shared first name does not
+        if (smaller.length >= 2 && smaller.every(t => bigger.includes(t))) return a;
+        if (st.filter(t => at.includes(t)).length >= 2) return a;
+    }
+    for (const a of live) {                                   // run-together logins: "Sachinkhobragade Olf"
+        const asq = aliasSquash(a.name);
+        if (asq.length >= 8 && (sq.includes(asq) || asq.includes(sq))) return a;
+    }
+    return null;
+}
+
 // Returns a map {source_name → emp_id} for all names in `names`,
 // opening the modal for any that are unmapped. Returns null if the
-// admin cancels.
-async function resolveNames(source, names) {
+// admin cancels. `counts` is {name → rows in this file}, shown in the
+// modal so a name with 7 rows gets more attention than one with 1.
+async function resolveNames(source, names, counts) {
     const aliases = await loadAliases();
     const sourceMap = aliases[source] || {};
 
@@ -1783,16 +1822,19 @@ async function resolveNames(source, names) {
     if (unmatched.length === 0) return resolved;
 
     // Open modal for unmatched names — returns the new mappings or null
-    const newMappings = await openAliasModal(source, unmatched);
+    const newMappings = await openAliasModal(source, unmatched, counts || {});
     if (!newMappings) return null; // cancelled
 
-    // Save new aliases to DB
+    // upsert, not insert: (source, source_name) is unique, so re-mapping a
+    // name CORRECTS the existing row instead of stacking a second one that
+    // loadAliases() would then pick between arbitrarily.
     const inserts = Object.entries(newMappings)
         .filter(([, empId]) => empId && empId !== "__skip__")
         .map(([name, empId]) => ({ source, source_name: name, emp_id: empId }));
 
     if (inserts.length > 0) {
-        const { error } = await posSupabase.from("name_aliases").insert(inserts);
+        const { error } = await posSupabase.from("name_aliases")
+            .upsert(inserts, { onConflict: "source,source_name" });
         if (error) { window.notify(friendlyDbError(error), "error"); return null; }
         invalidateAliasCache();
     }
@@ -1806,34 +1848,72 @@ async function resolveNames(source, names) {
     return resolved;
 }
 
-function openAliasModal(source, unmatchedNames) {
+function aliasEmpOptions() {
+    return posData.assignments
+        .filter(a => a.status !== "resigned")
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(a => `<option value="${escHtml(a.emp_id)}">${escHtml(a.name)} (${escHtml(a.emp_id)})</option>`)
+        .join("");
+}
+
+function openAliasModal(source, unmatchedNames, counts) {
     return new Promise(resolve => {
         pendingAliasResolve = resolve;
-        const title = document.getElementById("posAliasModalTitle");
-        title.textContent = `Map ${unmatchedNames.length} Unmatched Name${unmatchedNames.length === 1 ? "" : "s"} (${source})`;
+        document.getElementById("posAliasModalTitle").textContent =
+            `${unmatchedNames.length} name${unmatchedNames.length === 1 ? "" : "s"} in this file (${source})`;
 
-        const container = document.getElementById("posAliasRows");
-        const empOptions = posData.assignments
-            .filter(a => a.status !== "resigned")
-            .sort((a, b) => a.name.localeCompare(b.name))
-            .map(a => `<option value="${escHtml(a.emp_id)}">${escHtml(a.name)} (${escHtml(a.emp_id)})</option>`)
-            .join("");
+        const empOptions = aliasEmpOptions();
+        // Busiest names first - a name with 7 rows is worth more care than one with 1.
+        const ordered = unmatchedNames.slice().sort(
+            (a, b) => (counts[b] || 0) - (counts[a] || 0) || a.localeCompare(b)
+        );
 
-        container.innerHTML = unmatchedNames.map((name, i) => `
-            <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #f3f4f6;">
-                <div style="flex:1;font-size:13.5px;font-weight:500;color:#1a1d23;">"${escHtml(name)}"</div>
-                <div style="flex:1;">
-                    <select id="posAlias_${i}" data-srcname="${escHtml(name)}" style="width:100%;padding:8px 10px;border:1px solid #e5e7eb;border-radius:7px;font-size:13px;font-family:inherit;">
-                        <option value="">— Pick employee —</option>
-                        <option value="__skip__">Skip (ignore this name)</option>
-                        ${empOptions}
-                    </select>
+        document.getElementById("posAliasRows").innerHTML = ordered.map((name, i) => {
+            const n = counts[name] || 0;
+            const hit = suggestAssignment(name);
+            // Default is SKIP, never a neighbouring name. Only a confident
+            // match is pre-selected, and it says so.
+            return `<div class="pos-al-row${hit ? " has-sug" : ""}">
+                <div class="pos-al-name">
+                    ${escHtml(name)}
+                    ${n ? `<span class="pos-al-n">${n} row${n === 1 ? "" : "s"}</span>` : ""}
+                    ${hit ? `<span class="pos-al-sug">suggested: ${escHtml(hit.name)}</span>` : ""}
                 </div>
-            </div>
-        `).join("");
+                <select class="pos-al-sel" id="posAlias_${i}" data-srcname="${escHtml(name)}"
+                        onchange="window.POSAdmin.onAliasPick()">
+                    <option value="__skip__"${hit ? "" : " selected"}>Skip — not a field person</option>
+                    ${empOptions}
+                </select>
+            </div>`;
+        }).join("");
 
+        // Apply the suggestions after the markup exists, so the <select>
+        // value is set by value rather than by hand-written `selected`.
+        ordered.forEach((name, i) => {
+            const hit = suggestAssignment(name);
+            if (hit) {
+                const sel = document.getElementById("posAlias_" + i);
+                if (sel) sel.value = hit.emp_id;
+            }
+        });
+
+        onAliasPick();
         document.getElementById("posAliasModal").classList.add("open");
     });
+}
+
+// Live tally so you can see what you're about to commit before saving.
+function onAliasPick() {
+    const rows = document.querySelectorAll("#posAliasRows select");
+    let mapped = 0, skipped = 0;
+    rows.forEach(sel => { if (sel.value === "__skip__") skipped++; else mapped++; });
+    const el = document.getElementById("posAliasTally");
+    if (el) el.textContent = `${mapped} mapped · ${skipped} skipped`;
+}
+
+function aliasSkipAll() {
+    document.querySelectorAll("#posAliasRows select").forEach(sel => { sel.value = "__skip__"; });
+    onAliasPick();
 }
 
 function cancelAliasModal() {
@@ -1841,22 +1921,163 @@ function cancelAliasModal() {
     if (pendingAliasResolve) { pendingAliasResolve(null); pendingAliasResolve = null; }
 }
 
-function saveAliases() {
+async function saveAliases() {
     const rows = document.querySelectorAll("#posAliasRows select");
     const mappings = {};
-    let anyEmpty = false;
-    rows.forEach(sel => {
-        const name = sel.dataset.srcname;
-        const val = sel.value;
-        if (!val) { anyEmpty = true; return; }
-        mappings[name] = val;
+    rows.forEach(sel => { mappings[sel.dataset.srcname] = sel.value || "__skip__"; });
+
+    // Two source names landing on one person has TWO opposite meanings:
+    //   legitimate - the file spells one human several ways
+    //                ("Somnath Swami" / "Somnath R Swami (interim charge)")
+    //   a mistake  - two different humans picked off an alphabetical list
+    //                ("Abhishek Kumar" and "Abhishek Bansal")
+    // Only a person can tell those apart, so ask rather than refuse.
+    const byEmp = {};
+    Object.entries(mappings).forEach(([name, emp]) => {
+        if (emp === "__skip__") return;
+        (byEmp[emp] = byEmp[emp] || []).push(name);
     });
-    if (anyEmpty) {
-        window.notify("Pick an employee or 'Skip' for every name before saving.", "warning");
-        return;
+    const clashes = Object.entries(byEmp).filter(([, names]) => names.length > 1);
+
+    if (clashes.length) {
+        const byId = {};
+        posData.assignments.forEach(a => { byId[String(a.emp_id || "").trim().toUpperCase()] = a.name; });
+        const detail = clashes.map(([emp, names]) =>
+            `${byId[String(emp).trim().toUpperCase()] || emp} (${emp})\n    ${names.join("\n    ")}`
+        ).join("\n\n");
+
+        const ok = await window.showAppConfirm({
+            title: "Same person picked more than once",
+            message: "These employees are mapped from more than one name:\n\n" + detail
+                + "\n\nThat's correct if a name is just spelled differently in the file. "
+                + "It's a mistake if these are different people. Continue?",
+            type: "warning", confirmText: "Yes, same person", cancelText: "Let me fix it"
+        });
+        if (!ok) return;
     }
+
     document.getElementById("posAliasModal").classList.remove("open");
     if (pendingAliasResolve) { pendingAliasResolve(mappings); pendingAliasResolve = null; }
+}
+
+/* ====================================
+   ADMIN TAB — NAME ALIASES
+   Every saved mapping, visible and correctable. Without this the only
+   way to find a wrong alias is a manual SQL query against the table.
+==================================== */
+
+let aliasRows = [];
+let aliasTabLoaded = false;
+
+async function initAliasTab() {
+    if (aliasTabLoaded) return;
+    aliasTabLoaded = true;
+    await loadAliasRows();
+}
+
+async function loadAliasRows() {
+    setMeta("posAliasMeta", "Loading…");
+    const { data, error } = await posSupabase.from("name_aliases").select("*").range(0, 4999);
+    if (error) { window.notify(friendlyDbError(error), "error"); setMeta("posAliasMeta", "Failed to load."); return; }
+    aliasRows = data || [];
+    renderAliasTable();
+}
+
+function renderAliasTable() {
+    const tbody = document.getElementById("posAliasTbody");
+    if (!tbody) return;
+
+    const q = (document.getElementById("posAliasSearch")?.value || "").trim().toLowerCase();
+    const src = document.getElementById("posAliasSource")?.value || "";
+    const rows = aliasRows.filter(r =>
+        (!src || r.source === src) &&
+        (!q || [r.source_name, r.emp_id, r.source].some(v => String(v || "").toLowerCase().includes(q)))
+    );
+
+    // Flag every emp_id claimed by more than one source name within a source.
+    const dupe = {};
+    aliasRows.forEach(r => {
+        const k = r.source + "|" + r.emp_id;
+        (dupe[k] = dupe[k] || []).push(r.source_name);
+    });
+
+    const byId = {};
+    posData.assignments.forEach(a => { byId[String(a.emp_id || "").trim().toUpperCase()] = a.name; });
+
+    const bad = Object.values(dupe).filter(v => v.length > 1).length;
+    setMeta("posAliasMeta", `${aliasRows.length} mapping${aliasRows.length === 1 ? "" : "s"}`
+        + (bad ? ` · ${bad} employee${bad === 1 ? "" : "s"} mapped from more than one name `
+               + "— fine when it's one person spelled several ways, wrong when they're different people" : ""));
+
+    if (!rows.length) {
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-state"><div class="empty-icon">\u{1F517}</div>`
+            + (aliasRows.length ? "No mapping matches." : "No name mappings saved yet.") + "</td></tr>";
+        return;
+    }
+
+    tbody.innerHTML = rows.sort((a, b) =>
+        a.source.localeCompare(b.source) || a.source_name.localeCompare(b.source_name)
+    ).map(r => {
+        const shared = (dupe[r.source + "|" + r.emp_id] || []).filter(n => n !== r.source_name);
+        const who = byId[String(r.emp_id || "").trim().toUpperCase()];
+        return `<tr${shared.length ? ' style="background:#fffdf5;"' : ""}>
+            <td>${escHtml(r.source)}</td>
+            <td>${escHtml(r.source_name)}</td>
+            <td>${escHtml(r.emp_id)}${who ? ` <span style="color:#9ca3af;">${escHtml(who)}</span>` : ` <span style="color:#b45309;">not in assignments</span>`}</td>
+            <td>${shared.length ? `<span style="color:#b45309;font-size:11.5px;">also mapped from: ${escHtml(shared.join(", "))}</span>` : ""}</td>
+            <td class="pos-col-actions">
+                <button class="pos-icon-btn edit" title="Re-map" onclick="window.POSAdmin.editAlias('${escHtml(String(r.id))}')">✏️</button>
+                <button class="pos-icon-btn delete" title="Delete" onclick="window.POSAdmin.deleteAlias('${escHtml(String(r.id))}')">\u{1F5D1}️</button>
+            </td>
+        </tr>`;
+    }).join("");
+}
+
+// id is handled as a string throughout: the table's primary key may be a
+// bigint or a uuid, and String() comparison is correct either way.
+async function editAlias(id) {
+    const r = aliasRows.find(x => String(x.id) === String(id));
+    if (!r) return;
+    document.getElementById("posAliasEditName").textContent = `"${r.source_name}" (${r.source})`;
+    document.getElementById("posAliasEditSel").innerHTML =
+        `<option value="__skip__">Skip — not a field person</option>` + aliasEmpOptions();
+    document.getElementById("posAliasEditSel").value = r.emp_id;
+    document.getElementById("posAliasEditSel").dataset.aliasId = String(id);
+    document.getElementById("posAliasEditModal").classList.add("open");
+}
+
+function closeAliasEdit() { document.getElementById("posAliasEditModal").classList.remove("open"); }
+
+async function saveAliasEdit() {
+    const sel = document.getElementById("posAliasEditSel");
+    const id = sel.dataset.aliasId;
+    const val = sel.value;
+    // "Skip" means this name maps to nobody, which is a deletion, not an update.
+    const res = val === "__skip__"
+        ? await posSupabase.from("name_aliases").delete().eq("id", id)
+        : await posSupabase.from("name_aliases").update({ emp_id: val }).eq("id", id);
+    if (res.error) { window.notify(friendlyDbError(res.error), "error"); return; }
+    closeAliasEdit();
+    invalidateAliasCache();
+    window.notify("Mapping updated. Re-upload that period to apply it to existing rows.", "success");
+    await loadAliasRows();
+}
+
+async function deleteAlias(id) {
+    const r = aliasRows.find(x => String(x.id) === String(id));
+    if (!r) return;
+    const ok = await window.showAppConfirm({
+        title: "Delete this mapping?",
+        message: `"${r.source_name}" will be asked about again on the next ${r.source} upload. `
+               + `Rows already uploaded keep the emp_id they were given - re-upload that period to change them.`,
+        type: "warning", confirmText: "Delete", cancelText: "Cancel"
+    });
+    if (!ok) return;
+    const { error } = await posSupabase.from("name_aliases").delete().eq("id", id);
+    if (error) { window.notify(friendlyDbError(error), "error"); return; }
+    invalidateAliasCache();
+    window.notify("Mapping deleted.", "success");
+    await loadAliasRows();
 }
 
 /* ====================================
@@ -1949,7 +2170,12 @@ async function uploadNimble() {
 
         // Alias resolution
         const uniqueNames = [...new Set(validRows.map(r => String(r[NIMBLE_NAME_COL]).trim()))];
-        const nameMap = await resolveNames("nimble", uniqueNames);
+        const nameCounts = {};
+        validRows.forEach(r => {
+            const n = String(r[NIMBLE_NAME_COL]).trim();
+            nameCounts[n] = (nameCounts[n] || 0) + 1;
+        });
+        const nameMap = await resolveNames("nimble", uniqueNames, nameCounts);
         if (!nameMap) { resetNimbleBtn(); return; } // cancelled
 
         // Duplicate check
@@ -2100,7 +2326,12 @@ async function uploadVa() {
 
         // Alias resolution
         const uniqueNames = [...new Set(validRows.map(r => String(r[VA_NAME_COL]).trim()))];
-        const nameMap = await resolveNames("visitandactivity", uniqueNames);
+        const nameCounts = {};
+        validRows.forEach(r => {
+            const n = String(r[VA_NAME_COL]).trim();
+            nameCounts[n] = (nameCounts[n] || 0) + 1;
+        });
+        const nameMap = await resolveNames("visitandactivity", uniqueNames, nameCounts);
         if (!nameMap) { resetVaBtn(); return; }
 
         // Duplicate check
@@ -2928,7 +3159,8 @@ window.POSAdmin = {
     downloadScTempl, uploadSc, deleteScUpload,
     downloadNimbleTempl, uploadNimble, deleteNimbleUpload,
     downloadVaTempl, uploadVa, deleteVaUpload,
-    cancelAliasModal, saveAliases,
+    cancelAliasModal, saveAliases, onAliasPick, aliasSkipAll,
+    renderAliasTable, loadAliasRows, editAlias, deleteAlias, closeAliasEdit, saveAliasEdit,
     onFilePicked,
     renderAcademicTable, downloadAcadSample, downloadAcadCurrent, uploadAcademic,
     openAcadModal, onAcadPoIdChange, closeAcadModal, saveAcadRow, deleteAcadRow,

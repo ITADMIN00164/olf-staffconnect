@@ -106,6 +106,28 @@
         margin-top: 4px;
     }
 
+    /* ── Alias mapping modal ── */
+    .pos-al-bar {
+        display: flex; align-items: center; gap: 10px;
+        padding: 8px 0 10px; border-bottom: 1px solid #f3f4f6; margin-bottom: 4px;
+    }
+    .pos-al-tally { flex: 1; font-size: 12.5px; font-weight: 600; color: #4b5563; }
+    .pos-al-row {
+        display: flex; align-items: center; gap: 12px;
+        padding: 9px 0; border-bottom: 1px solid #f3f4f6;
+    }
+    .pos-al-row.has-sug { background: #f7fbff; }
+    .pos-al-name { flex: 1; font-size: 13.5px; font-weight: 500; color: #1a1d23; min-width: 0; }
+    .pos-al-n {
+        margin-left: 7px; font-size: 11px; font-weight: 700;
+        color: #4f8ef7; background: #eef3fe; border-radius: 8px; padding: 1px 7px;
+    }
+    .pos-al-sug { display: block; font-size: 11px; color: #0369a1; margin-top: 2px; }
+    .pos-al-sel {
+        flex: 1; padding: 8px 10px; border: 1px solid #e5e7eb;
+        border-radius: 7px; font-size: 13px; font-family: inherit;
+    }
+
     /* ── Assignment modal: employee typeahead (reads the Employees directory) ──
          A menu, not a list: hidden until you type, never scrollable, and it
          floats over the fields below instead of pushing them down. ── */
@@ -607,6 +629,7 @@
             <button class="pos-top-tab" data-postab="data" onclick="window.POSAdmin.showTab('data')">Data</button>
             <button class="pos-top-tab" data-postab="academic" onclick="window.POSAdmin.showTab('academic')">Academic Plan</button>
             <button class="pos-top-tab" data-postab="targets" onclick="window.POSAdmin.showTab('targets')">G2 · G3 · G5 Targets</button>
+            <button class="pos-top-tab" data-postab="aliases" onclick="window.POSAdmin.showTab('aliases')">Name Aliases</button>
         </div>
 
         <!-- LOCATIONS TAB -->
@@ -727,6 +750,38 @@
             </div>
             <div class="pos-scroll-wrap pos-tgt-wrap" style="max-height:560px;">
                 <table><thead id="posTgtThead"></thead><tbody id="posTgtTbody"></tbody></table>
+            </div>
+        </div>
+
+        <!-- ───────── NAME ALIASES TAB ─────────
+             Nimble and V&A files carry no employee ID, only a typed name, so
+             every upload leans on this table. It used to be invisible: a wrong
+             mapping was silent and permanent. This is where you see and fix it. -->
+        <div id="posTabAliases" class="pos-tab" style="display:none;">
+            <div class="pos-src-card">
+                <div class="pos-src-head">
+                    <div class="pos-src-tile" style="background:#f5f3ff;">🔗</div>
+                    <div class="pos-src-titles">
+                        <div class="pos-src-title">Name Aliases</div>
+                        <div class="pos-src-sub">How names in Nimble and Visit &amp; Activity files resolve to an employee. Rows highlighted amber share one employee with another name — usually a wrong mapping.</div>
+                    </div>
+                    <button type="button" class="pos-btn pos-btn-ghost" onclick="window.POSAdmin.loadAliasRows()">Refresh</button>
+                </div>
+                <div class="table-meta" id="posAliasMeta">Loading…</div>
+                <div class="pos-acad-toolbar">
+                    <select id="posAliasSource" class="pos-sel" onchange="window.POSAdmin.renderAliasTable()">
+                        <option value="">All sources</option>
+                        <option value="nimble">nimble</option>
+                        <option value="visitandactivity">visitandactivity</option>
+                    </select>
+                    <input type="search" id="posAliasSearch" class="pos-acad-search" placeholder="Search a name or employee ID…" oninput="window.POSAdmin.renderAliasTable()">
+                </div>
+                <div class="pos-scroll-wrap" style="max-height:520px;">
+                    <table>
+                        <thead><tr><th>Source</th><th>Name in file</th><th>Maps to</th><th>Warning</th><th class="pos-col-actions">Actions</th></tr></thead>
+                        <tbody id="posAliasTbody"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -1158,17 +1213,49 @@
             <h2 id="posAliasModalTitle">Map Unmatched Names</h2>
             <button class="modal-close" onclick="window.POSAdmin.cancelAliasModal()">✕</button>
         </div>
-        <div class="modal-body" style="max-height:55vh;">
-            <p style="font-size:13px;color:#6b7280;margin-bottom:12px;" id="posAliasModalDesc">
-                These names from the uploaded file couldn't be matched to any employee.
-                Pick the correct employee for each, or choose "Skip" to ignore that name.
-                This mapping is saved permanently — you won't be asked again for the same name.
+        <div class="modal-body" style="max-height:58vh;">
+            <p style="font-size:13px;color:#6b7280;margin-bottom:10px;" id="posAliasModalDesc">
+                Every name found in the file is listed below, busiest first. Map the ones who are
+                <b>field staff</b>; leave everyone else on <b>Skip</b> — HO and service accounts must not
+                attach to a PO's review. Saved mappings are reused on every future upload and can be
+                corrected later under <b>Admin → Name Aliases</b>.
             </p>
+            <div class="pos-al-bar">
+                <span class="pos-al-tally" id="posAliasTally"></span>
+                <button type="button" class="pos-btn" onclick="window.POSAdmin.aliasSkipAll()">Skip all</button>
+            </div>
             <div id="posAliasRows"></div>
         </div>
         <div class="modal-footer">
             <button class="btn-cancel" onclick="window.POSAdmin.cancelAliasModal()">Cancel Upload</button>
             <button class="btn-save" onclick="window.POSAdmin.saveAliases()">Save Mappings & Continue Upload</button>
+        </div>
+    </div>
+</div>
+
+<!-- ───────── MODAL: RE-MAP ONE SAVED ALIAS ───────── -->
+<div id="posAliasEditModal" class="modal-overlay">
+    <div class="modal-box" style="width:520px;">
+        <div class="modal-header">
+            <h2>Re-map name</h2>
+            <button class="modal-close" onclick="window.POSAdmin.closeAliasEdit()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Name in file</label>
+                <div id="posAliasEditName" style="font-size:13.5px;font-weight:600;color:#1a1d23;"></div>
+            </div>
+            <div class="form-group">
+                <label>Maps to</label>
+                <select id="posAliasEditSel" style="width:100%;padding:9px 12px;border:1px solid #e5e7eb;border-radius:7px;font-size:13.5px;font-family:inherit;"></select>
+            </div>
+            <p style="font-size:11.5px;color:#9ca3af;">
+                This changes future uploads. Rows already in the database keep the employee ID they were given — re-upload that week to correct them.
+            </p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" onclick="window.POSAdmin.closeAliasEdit()">Cancel</button>
+            <button class="btn-save" onclick="window.POSAdmin.saveAliasEdit()">Save</button>
         </div>
     </div>
 </div>
