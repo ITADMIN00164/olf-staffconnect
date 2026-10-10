@@ -4073,6 +4073,7 @@ function tfRender(keepPage) {
     return '<div class="metric-card"><div class="metric-label">' + k[0] + '</div><div class="metric-val">' + k[1] + '</div><div class="metric-sub">' + k[2] + '</div></div>';
   }).join('');
   tfRenderTrend(T); tfRenderDwell(T); tfRenderBoards(tfFiltered(true)); tfRenderTickets(T);
+  if (TF.reportOpen) tfRenderReport();
 }
 
 function tfRenderTrend(T) {
@@ -4366,6 +4367,165 @@ function tfRenderConfig() {
   el.innerHTML = html;
 }
 
+// ── Summary report: the task list table (Total / Closed / SLA Met) for a date range ──
+// Each row of the table is one or more boards, as "<tracker key>:<board id>". Rows with no board
+// are left blank for filling in by hand. To change what a row counts, edit boards here.
+var TF_REPORT_ROWS = [
+  { no: '1',   task: 'Issues and Rectification',                             boards: ['issues:67670'] },     // Issues Tracker
+  { no: '2',   task: 'Requirement for Forms, Reports from Field',            boards: ['work:74957'] },       // Custom Requirements
+  { no: '3',   task: 'Forms and Notifications',                              boards: ['work:70704'] },       // Forms and Notification
+  { no: '4',   task: 'OMR Sheet Creation',                                   boards: ['work:70705'] },
+  { no: '5.1', task: 'OMR Sheet Analysis within 3 days of first collection', boards: [] },
+  { no: '6',   task: 'Release Testing (Reports)',                            boards: ['work:70707'] },       // Release Testing - Only IT Ops
+  { no: '7',   task: 'Preload Setup',                                        boards: ['work:70706'] },
+  { no: '8',   task: 'District Setup',                                       boards: ['work:70697'] },
+  { no: '9',   task: 'User Registration and Confirmation',                   boards: ['work:74690'] },       // Auto Verification Requests
+  { no: '10',  task: 'Adhoc requirements for data',                          boards: ['work:70708'] },       // Adhoc Requirements
+  { no: '11',  task: 'Whatsapp',                                             boards: [], note: 'Slow' }
+];
+
+function tfDayStr(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+function tfDayParse(s, endOfDay) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ''); if (!m) return null;
+  return endOfDay ? new Date(+m[1], m[2] - 1, +m[3], 23, 59, 59, 999) : new Date(+m[1], m[2] - 1, +m[3]);
+}
+function tfToggleReport() {
+  TF.reportOpen = !TF.reportOpen;
+  var el = document.getElementById('tf-report'); if (!el) return;
+  el.style.display = TF.reportOpen ? '' : 'none';
+  if (TF.reportOpen) {
+    if (!document.getElementById('tf-rep-from').value) tfReportPreset('this'); else tfRenderReport();
+  }
+}
+function tfReportPreset(which) {
+  var now = tfNow(), from, to;
+  if (which === 'last') { from = new Date(now.getFullYear(), now.getMonth() - 1, 1); to = new Date(now.getFullYear(), now.getMonth(), 0); }
+  else if (which === '30') { from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29); to = now; }
+  else { from = new Date(now.getFullYear(), now.getMonth(), 1); to = now; }
+  document.getElementById('tf-rep-from').value = tfDayStr(from);
+  document.getElementById('tf-rep-to').value = tfDayStr(to);
+  tfRenderReport();
+}
+
+// Tickets created from the From date to the end of the To date, counted per task row.
+// Closed = reached a Completed lane (as of now); SLA Met = closed within the board's SLA hours.
+function tfReportCompute() {
+  var from = tfDayParse(tfVal('tf-rep-from'), false), to = tfDayParse(tfVal('tf-rep-to'), true);
+  if (!from || !to) return { error: 'Pick a From and a To date.' };
+  if (from > to) return { error: 'The From date must be on or before the To date.' };
+  var known = {}; TF.boards.forEach(function (b) { known[b.uid] = b; });
+  var missing = [];
+  var rows = TF_REPORT_ROWS.map(function (r) {
+    var out = { no: r.no, task: r.task, note: r.note || '', boards: [], total: null, closed: null, met: null };
+    if (!r.boards.length) return out;
+    var uids = {};
+    r.boards.forEach(function (u) { uids[u] = 1; if (known[u]) out.boards.push(known[u].label + ' (' + known[u].tracker + ')'); else missing.push(r.task); });
+    out.total = out.closed = out.met = 0;
+    TF.tickets.forEach(function (t) {
+      if (!uids[t.board.uid]) return;
+      var c = t.created || t.closedAt;
+      if (!c || c < from || c > to) return;
+      out.total++;
+      if (t.done) { out.closed++; if (t.sla === 'Within SLA') out.met++; }
+    });
+    return out;
+  });
+  var months = Math.min.apply(null, TF.sources.filter(function (s) { return s.settings; }).map(function (s) { return Number(s.settings.history_months) || 24; }).concat([24]));
+  var tooOld = from < new Date(tfNow().getTime() - months * 30.44 * 24 * TF_H);
+  return { from: from, to: to, rows: rows, missing: missing.filter(function (x, i, a) { return a.indexOf(x) === i; }), tooOld: tooOld, months: months };
+}
+
+function tfRenderReport() {
+  var body = document.getElementById('tf-rep-body'), note = document.getElementById('tf-rep-note');
+  if (!body) return;
+  if (!TF.tickets || !TF.tickets.length && !TF.sources.some(function (s) { return s.name; })) {
+    body.innerHTML = ''; note.textContent = 'Ticket data is still loading…'; return;
+  }
+  var r = tfReportCompute();
+  if (r.error) { body.innerHTML = ''; note.textContent = r.error; return; }
+  body.innerHTML = r.rows.map(function (x) {
+    if (x.note && x.total == null) return '<tr style="cursor:default"><td><b>' + esc(x.no) + '</b></td><td>' + esc(x.task) + '</td><td colspan="3" class="tf-rep-slow">' + esc(x.note) + '</td></tr>';
+    var n = function (v) { return '<td class="tf-num">' + (v == null ? '' : v) + '</td>'; };
+    return '<tr style="cursor:default"><td><b>' + esc(x.no) + '</b></td><td>' + esc(x.task) + '</td>' + n(x.total) + n(x.closed) + n(x.met) + '</tr>';
+  }).join('');
+  note.innerHTML = 'Counts tickets <b>created</b> between the two dates. <b>Closed</b> = reached a Completed lane (as of now). <b>SLA Met</b> = closed within the board\'s SLA hours' +
+    (TF.sources.some(function (s) { return s.clock && s.clock.mode !== 'calendar'; }) ? ' (working days)' : '') + '. Rows with no board are blank to fill in by hand.' +
+    (r.missing.length ? ' <span style="color:var(--red)">Board not loaded for: ' + esc(r.missing.join(', ')) + '.</span>' : '') +
+    (r.tooOld ? ' <span style="color:var(--amber)">The From date is older than the ' + r.months + ' months of history kept, so counts may be incomplete.</span>' : '');
+}
+
+var _exceljsLoading = null;
+function ensureExcelJS() {
+  if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
+  if (_exceljsLoading) return _exceljsLoading;
+  _exceljsLoading = new Promise(function (resolve, reject) {
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+    s.onload = function () { window.ExcelJS ? resolve(window.ExcelJS) : reject(new Error('Excel library did not initialise')); };
+    s.onerror = function () { _exceljsLoading = null; reject(new Error('Could not load the Excel library')); };
+    document.head.appendChild(s);
+  });
+  return _exceljsLoading;
+}
+
+async function tfDownloadReport() {
+  var r = tfReportCompute();
+  if (r.error) { toast(r.error); return; }
+  var aoa = [['S.no', 'Task List', 'Total', 'Closed', 'SLA Met']].concat(r.rows.map(function (x) {
+    return x.note && x.total == null ? [x.no, x.task, x.note, '', ''] : [x.no, x.task, x.total == null ? '' : x.total, x.closed == null ? '' : x.closed, x.met == null ? '' : x.met];
+  }));
+  var period = 'Period: tickets created ' + tfDayStr(r.from) + ' to ' + tfDayStr(r.to);
+  var defs = 'Total = tickets created in the period. Closed = reached a Completed lane (as of ' + tfDayStr(tfNow()) + '). SLA Met = closed within the board SLA hours.';
+  var mapRows = [['S.no', 'Task List', 'Board(s) counted']].concat(r.rows.map(function (x) { return [x.no, x.task, x.boards.length ? x.boards.join('; ') : (x.note ? '' : '(none, fill in by hand)')]; }));
+  var file = 'Ticket_Flow_Summary_' + tfDayStr(r.from) + '_to_' + tfDayStr(r.to) + '.xlsx';
+  var slowRow = aoa.findIndex(function (a) { return a[0] === '11'; }) + 1;       // 1-based row of the merged "Slow" row
+
+  try {
+    var EJ = await ensureExcelJS();
+    var wb = new EJ.Workbook(), ws = wb.addWorksheet('Summary');
+    ws.addRows(aoa);
+    ws.columns = [{ width: 8 }, { width: 58 }, { width: 14 }, { width: 14 }, { width: 14 }];
+    var thin = { style: 'thin', color: { argb: 'FF000000' } }, border = { top: thin, left: thin, bottom: thin, right: thin };
+    ws.eachRow(function (row, i) {
+      row.height = i === 1 ? 30 : 24;
+      row.eachCell({ includeEmpty: true }, function (c, j) {
+        c.border = border;
+        c.alignment = { vertical: 'middle', horizontal: j === 2 && i > 1 ? 'left' : 'center', wrapText: true, indent: j === 2 && i > 1 ? 1 : 0 };
+        if (i === 1) { c.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF002060' } }; }
+        else if (j === 1) c.font = { bold: true };
+      });
+    });
+    if (r.rows.some(function (x) { return x.note && x.total == null; })) {
+      ws.mergeCells(slowRow, 3, slowRow, 5);
+      ws.getCell(slowRow, 3).font = { italic: true, size: 12 };
+    }
+    ws.getCell(aoa.length + 2, 1).value = period;
+    ws.getCell(aoa.length + 3, 1).value = defs;
+    ws.getCell(aoa.length + 2, 1).font = { bold: true };
+    ws.getCell(aoa.length + 3, 1).font = { color: { argb: 'FF595959' } };
+    var ws2 = wb.addWorksheet('Boards used');
+    ws2.addRows(mapRows); ws2.columns = [{ width: 8 }, { width: 58 }, { width: 70 }];
+    ws2.getRow(1).font = { bold: true };
+    var buf = await wb.xlsx.writeBuffer();
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    a.download = file; document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    return;
+  } catch (e) { /* no styled workbook: fall back to the plain one below */ }
+
+  try {
+    var XLSX = await ensureXLSX();
+    var ws3 = XLSX.utils.aoa_to_sheet(aoa.concat([[], [period], [defs]]));
+    ws3['!cols'] = [{ wch: 8 }, { wch: 58 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
+    ws3['!merges'] = [{ s: { r: slowRow - 1, c: 2 }, e: { r: slowRow - 1, c: 4 } }];
+    var wb3 = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb3, ws3, 'Summary');
+    XLSX.utils.book_append_sheet(wb3, XLSX.utils.aoa_to_sheet(mapRows), 'Boards used');
+    XLSX.writeFile(wb3, file);
+  } catch (e) { toast('Could not load the Excel library'); }
+}
+
 // ── Excel export of the current ticket view ──
 async function tfExportExcel() {
   var T = (TF_TABS[TF.tab] || TF_TABS.all).pick(tfFiltered().filter(tfListable));
@@ -4395,6 +4555,7 @@ try { window.tfPage = tfPage; } catch(e){}
 try { window.tfPickBy = tfPickBy; } catch(e){}
 try { window.tfCloseDrawer = tfCloseDrawer; } catch(e){}
 try { window.tfExportExcel = tfExportExcel; } catch(e){}
+try { window.tfToggleReport = tfToggleReport; window.tfReportPreset = tfReportPreset; window.tfRenderReport = tfRenderReport; window.tfDownloadReport = tfDownloadReport; } catch(e){}
 
 // auto-mount if the fragment is already present
 (function () {
