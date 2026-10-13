@@ -42,7 +42,7 @@
   #pcal-app .pcal-shell { display: flex; align-items: flex-start; gap: 0; min-height: 0; }
 
   /* ── sidebar ── */
-  #pcal-app .sidebar {
+  #pcal-app .pcal-side {
     width: var(--sidebar-w);
     background: var(--white);
     border: 1px solid var(--border);
@@ -52,22 +52,22 @@
     position: sticky; top: 12px; align-self: flex-start;
     max-height: calc(100vh - 24px); overflow-y: auto;
   }
-  #pcal-app .sidebar-nav { padding: 12px 0 8px; border-bottom: 1px solid var(--border); }
-  #pcal-app .nav-item {
+  #pcal-app .pcal-side-nav { padding: 12px 0 8px; border-bottom: 1px solid var(--border); }
+  #pcal-app .pcal-nav-item {
     display: flex; align-items: center; gap: 10px;
     padding: 10px 18px; font-size: 0.875rem; font-weight: 500;
     color: var(--text-mid); cursor: pointer; border: none; background: none;
     width: 100%; text-align: left; border-left: 3px solid transparent;
     transition: background 0.15s, color 0.15s, border-color 0.15s;
   }
-  #pcal-app .nav-item .nav-icon { font-size: 1rem; width: 20px; text-align: center; }
-  #pcal-app .nav-item:hover { background: var(--primary-pale); color: var(--primary); }
-  #pcal-app .nav-item.active {
+  #pcal-app .pcal-nav-item .nav-icon { font-size: 1rem; width: 20px; text-align: center; }
+  #pcal-app .pcal-nav-item:hover { background: var(--primary-pale); color: var(--primary); }
+  #pcal-app .pcal-nav-item.active {
     background: var(--primary-pale); color: var(--primary);
     font-weight: 700; border-left-color: var(--primary);
   }
 
-  #pcal-app .sidebar-section { padding: 16px 14px 12px; border-bottom: 1px solid var(--border); }
+  #pcal-app .pcal-side-section { padding: 16px 14px 12px; border-bottom: 1px solid var(--border); }
   #pcal-app .sidebar-section-title {
     font-size: 0.68rem; font-weight: 700; color: var(--text-light);
     text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; padding-left: 4px;
@@ -118,6 +118,36 @@
   }
   #pcal-app .legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; color: var(--text-mid); margin-bottom: 6px; }
   #pcal-app .legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ── program filter (sidebar legend) ── */
+  #pcal-app .pcal-filter-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  #pcal-app .pcal-filter-badge {
+    display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 10px;
+    background: var(--accent); color: var(--white); font-size: 0.62rem; letter-spacing: 0;
+  }
+  #pcal-app .pcal-filter-actions { display: flex; gap: 2px; }
+  #pcal-app .pcal-filter-actions button {
+    background: none; border: none; padding: 2px 4px; cursor: pointer; font: inherit;
+    font-size: 0.66rem; color: var(--primary-light); text-transform: none; letter-spacing: 0; border-radius: 4px;
+  }
+  #pcal-app .pcal-filter-actions button:hover { background: var(--primary-pale); }
+  #pcal-app .pcal-filter-item {
+    cursor: pointer; padding: 3px 4px; margin: 0 -4px 2px; border-radius: 6px; user-select: none;
+  }
+  #pcal-app .pcal-filter-item:hover { background: var(--primary-pale); }
+  #pcal-app .pcal-filter-item input { margin: 0; width: 13px; height: 13px; accent-color: var(--primary); flex-shrink: 0; cursor: pointer; }
+  #pcal-app .pcal-filter-item.off .pcal-filter-name { color: var(--text-light); text-decoration: line-through; }
+  #pcal-app .pcal-filter-item.off .legend-dot { opacity: 0.35; }
+  #pcal-app .pcal-filter-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #pcal-app .pcal-filter-count { font-size: 0.68rem; color: var(--text-light); }
+  #pcal-app .pcal-filter-only {
+    display: none; background: none; border: none; padding: 0 2px; cursor: pointer;
+    font-size: 0.66rem; color: var(--primary-light);
+  }
+  #pcal-app .pcal-filter-item:hover .pcal-filter-only { display: inline; }
+  #pcal-app .pcal-filter-item:hover .pcal-filter-count { display: none; }
+  #pcal-app .pcal-filter-note { font-size: 0.75rem; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--text-light); margin-left: 6px; }
+  #pcal-app .pcal-filter-note a { color: var(--primary-light); }
 
   /* ── content ── */
   #pcal-app .content { flex: 1; padding: 0 0 24px 24px; min-width: 0; }
@@ -385,55 +415,324 @@
   }
   @media (max-width: 620px) {
     #pcal-app .pcal-shell { flex-direction: column; }
-    #pcal-app .sidebar { width: 100%; position: static; max-height: none; }
+    #pcal-app .pcal-side { width: 100%; position: static; max-height: none; }
     #pcal-app .content { padding: 16px 0 24px; }
     #pcal-app .settings-grid { grid-template-columns: 1fr; }
     #pcal-app .form-row.thirds { grid-template-columns: 1fr 1fr; }
   }
+
+  /* ═════════════ VISUAL REFRESH ═════════════ */
+  #pcal-app {
+    --primary: #1a4f7a; --primary-light: #2f6fae; --primary-pale: #eef4fb;
+    --accent: #f07c2b; --accent-dark: #d9661a;
+    --text-dark: #15212e; --text-mid: #4b5b6c; --text-light: #8796a6;
+    --border: #e3e9f0; --line: #edf1f6; --bg: transparent;
+    --surface: #ffffff; --off: #f6f8fb;
+    --radius: 10px; --radius-lg: 16px;
+    --shadow-sm: 0 1px 2px rgba(16,40,70,.05), 0 1px 6px rgba(16,40,70,.05);
+    --shadow-md: 0 6px 20px rgba(16,40,70,.10);
+    --shadow-lg: 0 14px 40px rgba(16,40,70,.18);
+    --sidebar-w: 236px;
+    font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+  #pcal-app .pcal-shell { gap: 22px; }
+  #pcal-app .content { padding: 0 0 28px 0; }
+
+  /* sidebar */
+  #pcal-app .pcal-side {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm); top: 0; max-height: calc(100vh - 130px);
+    overflow-y: auto; scrollbar-width: thin; scrollbar-color: #d5dde7 transparent; padding-bottom: 6px;
+  }
+  #pcal-app .pcal-side-nav { padding: 10px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
+  #pcal-app .pcal-nav-item {
+    border-left: none; border-radius: 9px; padding: 9px 12px; font-size: 0.86rem; color: var(--text-mid);
+  }
+  #pcal-app .pcal-nav-item:hover { background: var(--off); color: var(--text-dark); }
+  #pcal-app .pcal-nav-item.active { background: var(--primary-pale); color: var(--primary); font-weight: 700; box-shadow: inset 3px 0 0 var(--primary); }
+  #pcal-app .pcal-side-section { padding: 14px 14px 12px; border-bottom: none; }
+  #pcal-app .sidebar-section-title { padding-left: 2px; margin-bottom: 8px; letter-spacing: .09em; }
+  #pcal-app .pcal-jump { display: grid; grid-template-columns: 1.4fr 1fr; gap: 6px; }
+  #pcal-app select { background-color: var(--off); border-color: var(--border); border-radius: 9px; padding: 8px 26px 8px 10px; }
+  #pcal-app .sidebar-add-btn {
+    margin: 4px 14px 0; width: calc(100% - 28px); border-radius: 10px; padding: 10px 14px;
+    background: linear-gradient(180deg, #f68a3e, var(--accent-dark));
+    box-shadow: 0 4px 12px rgba(240,124,43,.28); font-weight: 700;
+  }
+  #pcal-app .sidebar-add-btn:hover { background: linear-gradient(180deg, #f07c2b, #c95b13); box-shadow: 0 6px 16px rgba(240,124,43,.35); }
+  #pcal-app #pcal-past-btn {
+    background: var(--surface) !important; color: var(--text-dark); border: 1px solid var(--border);
+    box-shadow: none; font-weight: 600; margin-top: 8px !important;
+  }
+  #pcal-app #pcal-past-btn:hover { background: var(--off) !important; border-color: #cfd8e3; }
+  #pcal-app .sidebar-legend { padding: 16px 14px 10px; margin-top: 14px; border-top: 1px solid var(--line); }
+  #pcal-app .pcal-filter-item { padding: 6px 6px; margin: 0 -6px 1px; border-radius: 8px; font-size: 0.82rem; color: var(--text-dark); }
+  #pcal-app .pcal-filter-count {
+    font-size: 0.68rem; font-weight: 600; color: var(--text-mid); background: var(--off);
+    border-radius: 10px; padding: 1px 7px; min-width: 22px; text-align: center;
+  }
+
+  /* calendar card + toolbar */
+  #pcal-app .calendar-card { border-color: var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+  #pcal-app .pcal-toolbar {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+    padding: 14px 18px; border-bottom: 1px solid var(--line);
+  }
+  #pcal-app .pcal-tb-left { display: flex; align-items: center; gap: 12px; }
+  #pcal-app .pcal-tb-navs { display: flex; gap: 4px; }
+  #pcal-app .pcal-tb-nav {
+    width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface);
+    color: var(--text-mid); font-size: 1.25rem; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background .15s, color .15s, border-color .15s;
+  }
+  #pcal-app .pcal-tb-nav:hover { background: var(--primary-pale); color: var(--primary); border-color: #c9d9ec; }
+  #pcal-app .pcal-tb-title { margin: 0; font-size: 1.3rem; font-weight: 750; color: var(--text-dark); letter-spacing: -.01em; min-width: 170px; }
+  #pcal-app .pcal-tb-today {
+    border: 1px solid var(--border); background: var(--surface); color: var(--primary); font-weight: 600;
+    font-size: .8rem; padding: 6px 12px; border-radius: 20px; cursor: pointer;
+  }
+  #pcal-app .pcal-tb-today:hover { background: var(--primary-pale); }
+  #pcal-app .pcal-tb-right { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  #pcal-app .pcal-stats { display: flex; gap: 6px; }
+  #pcal-app .pcal-stat {
+    display: flex; align-items: baseline; gap: 5px; background: var(--off); border: 1px solid var(--line);
+    border-radius: 20px; padding: 4px 11px; font-size: .76rem; color: var(--text-mid);
+  }
+  #pcal-app .pcal-stat b { color: var(--text-dark); font-size: .86rem; }
+  #pcal-app .pcal-key { display: flex; align-items: center; gap: 6px; font-size: .74rem; color: var(--text-light); }
+  #pcal-app .pcal-key-off { width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--border);
+    background: repeating-linear-gradient(135deg, var(--off) 0 4px, #eaeff5 4px 5px); }
+
+  /* grid */
+  #pcal-app .cal-day-header {
+    background: var(--surface); color: var(--text-light); font-size: .7rem; padding: 10px 6px 8px;
+    border-bottom: 1px solid var(--line); letter-spacing: .1em;
+  }
+  #pcal-app #pcal-cal-header .cal-day-header:first-child,
+  #pcal-app #pcal-cal-header .cal-day-header:last-child { border-radius: 0; }
+  #pcal-app .cal-cell {
+    min-height: 104px; padding: 6px 7px 7px; border-color: var(--line); background: var(--surface);
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  #pcal-app .cal-cell.in-month { background: var(--surface); cursor: pointer; }
+  #pcal-app .cal-cell.off-day { background: repeating-linear-gradient(135deg, var(--off) 0 8px, #f1f4f8 8px 9px); }
+  #pcal-app .cal-cell.other-month { background: #fbfcfd; }
+  #pcal-app .cal-cell.other-month .pcal-day-events { opacity: .45; }
+  #pcal-app .cal-cell:not(.other-month):hover { background: #f5f9fe; box-shadow: inset 0 0 0 1px #d6e4f3; }
+  #pcal-app .cal-cell.selected, #pcal-app .cal-cell.selected:hover { background: #eef5fd; box-shadow: inset 0 0 0 2px var(--primary-light); }
+  #pcal-app .day-num { font-size: .8rem; font-weight: 650; color: var(--text-dark); width: 26px; height: 26px; margin: 0; }
+  #pcal-app .cal-cell.off-day .day-num { color: var(--text-light); }
+  #pcal-app .cal-cell.other-month .day-num { color: #c3ceda; }
+  #pcal-app .cal-cell.today .day-num { background: var(--accent); color: #fff; box-shadow: 0 3px 8px rgba(240,124,43,.35); }
+
+  #pcal-app .pcal-day-events { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  #pcal-app .pcal-chip {
+    --c: #64748b; position: relative; display: flex; align-items: center; gap: 5px; min-width: 0;
+    padding: 2px 6px 2px 5px; border-radius: 6px; font-size: .7rem; font-weight: 600; line-height: 1.45;
+    background: color-mix(in srgb, var(--c) 13%, #fff);
+    color: color-mix(in srgb, var(--c) 62%, #0b1622);
+    box-shadow: inset 3px 0 0 var(--c); padding-left: 8px; transition: box-shadow .12s;
+  }
+  #pcal-app .pcal-chip:hover { box-shadow: inset 3px 0 0 var(--c), 0 2px 8px rgba(16,40,70,.14); z-index: 20; }
+  #pcal-app .pcal-chip-dot { display: none; width: 7px; height: 7px; border-radius: 50%; background: var(--c); flex-shrink: 0; }
+  #pcal-app .pcal-chip-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #pcal-app .pcal-chip-n {
+    flex-shrink: 0; font-size: .64rem; font-weight: 700; color: #fff; background: var(--c);
+    border-radius: 8px; padding: 0 6px; line-height: 1.5;
+  }
+  #pcal-app .pcal-chip-more { background: transparent; box-shadow: none !important; color: var(--text-mid); font-weight: 600; padding-left: 8px; }
+  #pcal-app .pcal-chip:hover .tooltip { display: block; }
+  #pcal-app .tooltip { width: 230px; border-radius: 10px; background: #15212e; font-weight: 400; padding: 10px 12px; }
+  #pcal-app .tooltip strong { color: #ffc58f; margin-bottom: 5px; }
+  #pcal-app .pcal-tip-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #pcal-app .pcal-tip-muted { opacity: .65; }
+
+  /* event list */
+  #pcal-app .section-heading {
+    margin: 26px 0 14px; font-size: .78rem; color: var(--text-mid); flex-wrap: wrap;
+  }
+  #pcal-app #pcal-events-list { display: block; }
+  #pcal-app .pcal-filter-note a { cursor: pointer; }
+  #pcal-app .pcal-day-group {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm); padding: 14px 16px 16px; margin-bottom: 12px;
+  }
+  #pcal-app .pcal-day-group.is-past { opacity: .82; }
+  #pcal-app .pcal-day-group.is-today { border-color: #f7c49d; box-shadow: 0 0 0 3px rgba(240,124,43,.10), var(--shadow-sm); }
+  #pcal-app .pcal-day-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  #pcal-app .pcal-day-badge {
+    width: 46px; height: 50px; border-radius: 12px; background: var(--primary-pale); color: var(--primary);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  #pcal-app .pcal-day-badge span { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; opacity: .8; }
+  #pcal-app .pcal-day-badge b { font-size: 1.2rem; line-height: 1.1; }
+  #pcal-app .is-today .pcal-day-badge { background: var(--accent); color: #fff; }
+  #pcal-app .pcal-day-headtxt { min-width: 0; }
+  #pcal-app .pcal-day-title { font-size: .95rem; font-weight: 700; color: var(--text-dark); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  #pcal-app .pcal-day-count { font-size: .72rem; font-weight: 600; color: var(--text-light); }
+  #pcal-app .pcal-today-tag { font-size: .64rem; font-weight: 800; color: #fff; background: var(--accent); padding: 2px 8px; border-radius: 10px; text-transform: uppercase; letter-spacing: .05em; }
+  #pcal-app .pcal-day-mix { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 3px; }
+  #pcal-app .pcal-mix { display: inline-flex; align-items: center; gap: 5px; font-size: .74rem; color: var(--text-mid); }
+  #pcal-app .pcal-mix i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  #pcal-app .pcal-day-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; }
+  #pcal-app .event-list-item {
+    --c: #64748b; height: auto; min-height: 0; padding: 10px 10px 10px 13px; border-radius: 11px;
+    border: 1px solid var(--line); background: #fbfcfe; position: relative; overflow: hidden; align-items: flex-start;
+    transition: box-shadow .15s, border-color .15s, transform .15s, background .15s;
+  }
+  #pcal-app .event-list-item::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--c); }
+  #pcal-app .event-list-item:hover { background: #fff; border-color: color-mix(in srgb, var(--c) 35%, #fff); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+  #pcal-app .evt-title { font-size: .86rem; font-weight: 650; }
+  #pcal-app .evt-meta { display: flex; gap: 12px; margin-top: 4px; font-size: .75rem; color: var(--text-mid); }
+  #pcal-app .evt-meta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #pcal-app .evt-prog {
+    display: inline-block; margin-top: 7px; font-size: .67rem; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+    background: color-mix(in srgb, var(--c) 13%, #fff); color: color-mix(in srgb, var(--c) 62%, #0b1622);
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  #pcal-app .event-list-item .btn-icon-del { opacity: 0; transition: opacity .15s; }
+  #pcal-app .event-list-item:hover .btn-icon-del { opacity: 1; }
+  @media (hover: none) { #pcal-app .event-list-item .btn-icon-del { opacity: 1; } }
+  #pcal-app .empty-state { background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius-lg); }
+
+  @media (max-width: 1100px) {
+    #pcal-app .pcal-chip-label { display: none; }
+    #pcal-app .pcal-chip-dot { display: inline-block; }
+    #pcal-app .pcal-chip { box-shadow: none; justify-content: flex-start; padding: 2px 5px; }
+    #pcal-app .cal-cell { min-height: 84px; }
+    #pcal-app .pcal-key { display: none; }
+  }
+  @media (max-width: 620px) {
+    #pcal-app .cal-cell { min-height: 64px; padding: 4px; }
+    #pcal-app .pcal-chip-n { padding: 0 4px; }
+    #pcal-app .pcal-tb-title { font-size: 1.1rem; min-width: 0; }
+    #pcal-app .pcal-stats { display: none; }
+    #pcal-app .pcal-day-cards { grid-template-columns: 1fr; }
+  }
+
+  /* ═════════════ FIT MONTH IN ONE SCREEN ═════════════ */
+  #pcal-app .cal-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  #pcal-app .calendar-card { display: flex; flex-direction: column; }
+  #pcal-app #pcal-cal-body { flex: 1 1 auto; min-height: 0; grid-auto-rows: minmax(0, 1fr); }
+  #pcal-app .pcal-toolbar { padding: 10px 16px; }
+  #pcal-app .pcal-tb-title { font-size: 1.2rem; }
+  #pcal-app .pcal-tb-nav { width: 30px; height: 30px; }
+  #pcal-app .cal-day-header { padding: 7px 6px 6px; }
+  #pcal-app .cal-cell { min-height: 0; padding: 4px 6px 5px; gap: 3px; overflow: visible; }
+  #pcal-app .day-num { width: 24px; height: 24px; font-size: .78rem; flex-shrink: 0; }
+  #pcal-app .pcal-chip { line-height: 1.35; padding-top: 1px; padding-bottom: 1px; font-size: .69rem; }
+  #pcal-app .pcal-chip-n { line-height: 1.45; }
+  #pcal-app .section-heading { margin-top: 20px; }
+  #pcal-app .pcal-mini-row { display: flex; flex-wrap: wrap; gap: 4px; }
+  #pcal-app .pcal-mini-chip {
+    --c: #64748b; position: relative; display: inline-flex; align-items: center; gap: 4px;
+    font-size: .68rem; font-weight: 700; padding: 1px 7px 1px 5px; border-radius: 10px; line-height: 1.4;
+    background: color-mix(in srgb, var(--c) 13%, #fff); color: color-mix(in srgb, var(--c) 62%, #0b1622);
+  }
+  #pcal-app .pcal-mini-chip .pcal-chip-dot { display: inline-block; }
+  #pcal-app .pcal-mini-chip:hover { z-index: 20; box-shadow: 0 2px 8px rgba(16,40,70,.14); }
+  #pcal-app .pcal-mini-chip:hover .tooltip { display: block; }
+  @media (max-width: 1100px) { #pcal-app .cal-cell { min-height: 0; } }
+  @media (max-width: 620px) {
+    #pcal-app .calendar-card { height: auto !important; }
+    #pcal-app #pcal-cal-body { grid-auto-rows: minmax(64px, auto); }
+  }
+
+  /* ═════════════ PROGRAM FILTER DROPDOWN ═════════════ */
+  #pcal-app .pcal-pf-wrap { margin-top: 12px; }
+  #pcal-app .pcal-pf-wrap .ctrl-label { font-size: .68rem; font-weight: 700; color: var(--text-light); letter-spacing: .09em; margin: 0 0 6px 2px; }
+  #pcal-app .pcal-pf-trigger {
+    width: 100%; display: flex; align-items: center; gap: 8px; text-align: left; cursor: pointer;
+    background: var(--off); border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px;
+    font-size: .85rem; color: var(--text-dark); font-family: inherit; transition: border-color .15s, box-shadow .15s, background .15s;
+  }
+  #pcal-app .pcal-pf-trigger:hover { border-color: #b9c9db; background: #fff; }
+  #pcal-app .pcal-pf-trigger[aria-expanded="true"] { border-color: var(--primary); background: #fff; box-shadow: 0 0 0 3px rgba(26,79,122,.12); }
+  #pcal-app .pcal-pf-trigger.is-filtered { border-color: #f3b98d; background: #fff8f2; }
+  #pcal-app .pcal-pf-trigger:disabled { opacity: .6; cursor: default; }
+  #pcal-app .pcal-pf-dots { display: inline-flex; flex-shrink: 0; }
+  #pcal-app .pcal-pf-dots i { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid #fff; margin-left: -3px; }
+  #pcal-app .pcal-pf-dots i:first-child { margin-left: 0; }
+  #pcal-app .pcal-pf-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #pcal-app .pcal-pf-badge { flex-shrink: 0; font-size: .66rem; font-weight: 700; color: #fff; background: var(--accent); border-radius: 10px; padding: 1px 7px; }
+  #pcal-app .pcal-pf-chev { flex-shrink: 0; color: var(--text-mid); transition: transform .15s; }
+  #pcal-app .pcal-pf-trigger[aria-expanded="true"] .pcal-pf-chev { transform: rotate(180deg); }
+  #pcal-app .pcal-pf-reset { margin: 5px 0 0 2px; background: none; border: none; padding: 0; cursor: pointer; font-size: .72rem; font-weight: 600; color: var(--primary-light); font-family: inherit; }
+  #pcal-app .pcal-pf-reset:hover { text-decoration: underline; }
+
+  #pcal-app .pcal-pf-pop {
+    display: none; position: fixed; z-index: 5500; flex-direction: column;
+    background: #fff; border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-lg);
+    animation: pcalSlideUp .15s ease;
+  }
+  #pcal-app .pcal-pf-pop.open { display: flex; }
+  #pcal-app .pcal-pf-head { padding: 10px 10px 8px; border-bottom: 1px solid var(--line); }
+  #pcal-app .pcal-pf-head input[type="text"] { padding: 7px 10px; font-size: .82rem; border-radius: 8px; background: var(--off); }
+  #pcal-app .pcal-pf-quick { display: flex; gap: 12px; margin-top: 7px; padding-left: 2px; }
+  #pcal-app .pcal-pf-quick button { background: none; border: none; padding: 0; cursor: pointer; font-size: .74rem; font-weight: 600; color: var(--primary-light); font-family: inherit; }
+  #pcal-app .pcal-pf-quick button:hover { text-decoration: underline; }
+  #pcal-app .pcal-pf-list { flex: 1 1 auto; min-height: 60px; overflow-y: auto; padding: 6px; scrollbar-width: thin; }
+  #pcal-app .pcal-pf-item {
+    display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 8px; cursor: pointer;
+    font-size: .83rem; color: var(--text-dark); user-select: none;
+  }
+  #pcal-app .pcal-pf-item:hover { background: var(--primary-pale); }
+  #pcal-app .pcal-pf-item input { margin: 0; width: 15px; height: 15px; accent-color: var(--primary); cursor: pointer; flex-shrink: 0; }
+  #pcal-app .pcal-pf-item.off .pcal-pf-name { color: var(--text-light); }
+  #pcal-app .pcal-pf-item.off .legend-dot { opacity: .35; }
+  #pcal-app .pcal-pf-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #pcal-app .pcal-pf-n { font-size: .68rem; font-weight: 600; color: var(--text-mid); background: var(--off); border-radius: 10px; padding: 1px 7px; min-width: 22px; text-align: center; }
+  #pcal-app .pcal-pf-only { display: none; background: none; border: none; cursor: pointer; font-size: .7rem; font-weight: 600; color: var(--primary-light); padding: 0 2px; font-family: inherit; }
+  #pcal-app .pcal-pf-item:hover .pcal-pf-only { display: inline; }
+  #pcal-app .pcal-pf-item:hover .pcal-pf-n { display: none; }
+  #pcal-app .pcal-pf-empty { padding: 16px; text-align: center; font-size: .8rem; color: var(--text-light); }
+  #pcal-app .pcal-pf-foot { display: flex; align-items: center; gap: 8px; padding: 10px; border-top: 1px solid var(--line); }
+  #pcal-app .pcal-pf-count { flex: 1; font-size: .74rem; color: var(--text-mid); }
+
+  /* ═════════════ WEEKLY OFFS IN LIGHT RED ═════════════ */
+  #pcal-app .cal-cell.off-day { background: repeating-linear-gradient(135deg, #fdf0f0 0 8px, #fae6e6 8px 9px); }
+  #pcal-app .cal-cell.off-day:hover { background: #fbe4e4; box-shadow: inset 0 0 0 1px #f2c4c4; }
+  #pcal-app .cal-cell.off-day .day-num { color: #c2413b; }
+  #pcal-app .cal-cell.off-day.selected { background: #fbe4e4; }
+  #pcal-app .pcal-key-off { border-color: #f2c4c4; background: repeating-linear-gradient(135deg, #fdf0f0 0 4px, #f6d6d6 4px 5px); }
+  #pcal-app .pcal-key { color: #b4534e; }
+  #pcal-app .cal-cell.today .day-num { color: #fff; }
 </style>
 
   <div class="pcal-shell">
 
     <!-- ══════════ SIDEBAR ══════════ -->
-    <aside class="sidebar">
-      <nav class="sidebar-nav">
-        <button class="nav-item active" data-pcal-tab="calendar">
+    <aside class="pcal-side">
+      <nav class="pcal-side-nav">
+        <button class="pcal-nav-item active" data-pcal-tab="calendar">
           <span class="nav-icon">📅</span> Calendar
         </button>
-        <button class="nav-item pcal-admin-only" data-pcal-tab="settings">
+        <button class="pcal-nav-item pcal-admin-only" data-pcal-tab="settings">
           <span class="nav-icon">⚙️</span> Settings
         </button>
-        <button class="nav-item pcal-admin-only" data-pcal-tab="past">
+        <button class="pcal-nav-item pcal-admin-only" data-pcal-tab="past">
           <span class="nav-icon">🗂</span> Past Events
         </button>
-        <button class="nav-item pcal-admin-only" data-pcal-tab="bulk">
+        <button class="pcal-nav-item pcal-admin-only" data-pcal-tab="bulk">
           <span class="nav-icon">📥</span> Bulk Import
         </button>
       </nav>
 
       <div id="pcal-sidebar-cal-controls">
-        <div class="sidebar-section">
-          <div class="sidebar-section-title">Navigate</div>
-          <div class="ctrl-row">
-            <span class="ctrl-label">Year</span>
-            <select id="pcal-sel-year"></select>
+        <div class="pcal-side-section">
+          <div class="sidebar-section-title">Jump to</div>
+          <div class="pcal-jump">
+            <select id="pcal-sel-month" aria-label="Month">
+              <option value="0">January</option><option value="1">February</option>
+              <option value="2">March</option><option value="3">April</option>
+              <option value="4">May</option><option value="5">June</option>
+              <option value="6">July</option><option value="7">August</option>
+              <option value="8">September</option><option value="9">October</option>
+              <option value="10">November</option><option value="11">December</option>
+            </select>
+            <select id="pcal-sel-year" aria-label="Year"></select>
           </div>
-          <div class="ctrl-row">
-            <span class="ctrl-label">Month</span>
-            <div class="month-nav">
-              <button class="nav-btn" data-pcal-nav="-1" title="Previous">&#8592;</button>
-              <select id="pcal-sel-month" style="min-width:0">
-                <option value="0">Jan</option><option value="1">Feb</option>
-                <option value="2">Mar</option><option value="3">Apr</option>
-                <option value="4">May</option><option value="5">Jun</option>
-                <option value="6">Jul</option><option value="7">Aug</option>
-                <option value="8">Sep</option><option value="9">Oct</option>
-                <option value="10">Nov</option><option value="11">Dec</option>
-              </select>
-              <button class="nav-btn" data-pcal-nav="1" title="Next">&#8594;</button>
-            </div>
-          </div>
-          <div class="current-month-display" id="pcal-cal-month-label"></div>
+          <div class="pcal-pf-wrap" id="pcal-sidebar-legend"></div>
         </div>
 
         <button class="sidebar-add-btn pcal-admin-only" id="pcal-add-btn">
@@ -445,7 +744,6 @@
         <button class="sidebar-add-btn pcal-admin-only" id="pcal-past-btn"
           style="background:#475569;margin-top:8px">🗂 View Past Events</button>
 
-        <div class="sidebar-legend" id="pcal-sidebar-legend"></div>
       </div>
     </aside>
 
@@ -455,6 +753,20 @@
       <!-- CALENDAR TAB -->
       <div id="pcal-tab-calendar" class="tab-panel active">
         <div class="calendar-card">
+          <div class="pcal-toolbar">
+            <div class="pcal-tb-left">
+              <div class="pcal-tb-navs">
+                <button class="pcal-tb-nav" data-pcal-nav="-1" title="Previous month" aria-label="Previous month">&#8249;</button>
+                <button class="pcal-tb-nav" data-pcal-nav="1" title="Next month" aria-label="Next month">&#8250;</button>
+              </div>
+              <h2 class="pcal-tb-title" id="pcal-cal-month-label"></h2>
+              <button class="pcal-tb-today" id="pcal-today-btn">Today</button>
+            </div>
+            <div class="pcal-tb-right">
+              <div class="pcal-stats" id="pcal-month-stats"></div>
+              <div class="pcal-key"><i class="pcal-key-off"></i>Weekly off</div>
+            </div>
+          </div>
           <div class="cal-grid" id="pcal-cal-header"></div>
           <div class="cal-grid" id="pcal-cal-body"></div>
         </div>

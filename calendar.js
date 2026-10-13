@@ -128,6 +128,16 @@
   var mounted = false;
   var busy = false;
   var loadedOnce = false;   // true after the first successful data load
+  var selectedDay = null;   // 'y-m-d' of a clicked day; the event list shows only that day
+
+  // The list below the calendar never shows a whole month: it shows the
+  // clicked day, else today (when today is in the month being viewed).
+  function todayKeyStr() { return now.getFullYear() + '-' + now.getMonth() + '-' + now.getDate(); }
+  function activeDay() {
+    if (selectedDay) return selectedDay;
+    if (now.getFullYear() === viewYear && now.getMonth() === viewMonth) return todayKeyStr();
+    return null;
+  }
 
   // ── DOM HELPERS ───────────────────────────────────────────────────
   function root() { return document.getElementById('pcal-app'); }
@@ -310,6 +320,83 @@
   // so the last payload is kept in localStorage. A cold load paints from
   // it at once and the server call happens in the background; only a
   // genuinely first-ever visit has to wait.
+  // ── PROGRAM FILTER ────────────────────────────────────────────────
+  // Stores the programs the viewer has switched OFF (not the ones on), so a
+  // newly added program type shows up by default. Per-browser preference.
+  var LS_FILTER_KEY  = 'olf_pcal_hidden_programs_v1';
+  var NO_TYPE_LABEL  = '(No program)';
+  var hiddenPrograms = {};
+  try {
+    var hp = JSON.parse(localStorage.getItem(LS_FILTER_KEY) || '[]');
+    if (Array.isArray(hp)) hp.forEach(function (p) { hiddenPrograms[p] = true; });
+  } catch (e) { hiddenPrograms = {}; }
+
+  // Every event is filed under one of the configured program types (Settings
+  // → Event Types). eventType is the real field; `type` is often just the
+  // event's title (e.g. "Nagpur - ATC Class 10 Exam Test 2"), so it is only
+  // used as a fallback, and names are matched ignoring case/spacing. Anything
+  // that still doesn't match goes under "Other".
+  var OTHER_LABEL = 'Other';
+  function normName(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ''); }
+  function matchProgram(s) {
+    var n = normName(s);
+    if (!n) return null;
+    for (var i = 0; i < programs.length; i++) if (normName(programs[i]) === n) return programs[i];
+    return null;
+  }
+  function containsProgram(s) {
+    var n = normName(s);
+    if (!n) return null;
+    for (var i = 0; i < programs.length; i++) {
+      var p = normName(programs[i]);
+      if (p && n.indexOf(p) !== -1) return programs[i];
+    }
+    return null;
+  }
+  function programOf(e) {
+    if (!e) return OTHER_LABEL;
+    if (e._prog && e._progKey === programs.join('|')) return e._prog;
+    var p = matchProgram(e.eventType) || matchProgram(e.type) ||
+            containsProgram(e.eventType) || containsProgram(e.type) || containsProgram(e.eventName) ||
+            OTHER_LABEL;
+    try { Object.defineProperty(e, '_prog', { value: p, writable: true, configurable: true, enumerable: false });
+          Object.defineProperty(e, '_progKey', { value: programs.join('|'), writable: true, configurable: true, enumerable: false }); } catch (x) {}
+    return p;
+  }
+  function isProgramVisible(name) { return !hiddenPrograms[name]; }
+  function eventVisible(e) { return isProgramVisible(programOf(e)); }
+  function visibleEvents() { return events.filter(eventVisible); }
+  function saveProgramFilter() {
+    try { localStorage.setItem(LS_FILTER_KEY, JSON.stringify(Object.keys(hiddenPrograms))); } catch (e) {}
+  }
+  // Every program worth offering: the configured list first, then any type
+  // that only exists on events (e.g. a type removed from Settings later).
+  function filterablePrograms() {
+    var list = programs.slice();
+    if (events.some(function (e) { return programOf(e) === OTHER_LABEL; })) list.push(OTHER_LABEL);
+    return list;
+  }
+  function activeFilterCount() {
+    return filterablePrograms().filter(function (p) { return hiddenPrograms[p]; }).length;
+  }
+  function setProgramVisible(name, on) {
+    if (on) delete hiddenPrograms[name]; else hiddenPrograms[name] = true;
+    saveProgramFilter();
+    renderCalendar();
+  }
+  function setAllPrograms(on) {
+    hiddenPrograms = {};
+    if (!on) filterablePrograms().forEach(function (p) { hiddenPrograms[p] = true; });
+    saveProgramFilter();
+    renderCalendar();
+  }
+  function showOnlyProgram(name) {
+    hiddenPrograms = {};
+    filterablePrograms().forEach(function (p) { if (p !== name) hiddenPrograms[p] = true; });
+    saveProgramFilter();
+    renderCalendar();
+  }
+
   var LS_KEY     = 'olf_pcal_cache_v1';
   var LS_MAX_AGE = 7 * 24 * 60 * 60 * 1000;   // a week-old copy is still fine as a first paint
 
@@ -447,90 +534,448 @@
         cell.classList.add('in-month');
         if (isWeeklyOff(year, month, day)) cell.classList.add('off-day');
       }
-      if (year + '-' + month + '-' + day === todayStr) cell.classList.add('today');
+      var key = year + '-' + month + '-' + day;
+      if (key === todayStr) cell.classList.add('today');
+      if (!isOther && key === activeDay()) cell.classList.add('selected');
+      if (!isOther) cell.setAttribute('data-pcal-day', key);
       cell.innerHTML = '<div class="day-num">' + day + '</div>' +
-        '<div class="event-dots" id="pcal-dots-' + year + '-' + month + '-' + day + '"' +
+        '<div class="pcal-day-events" id="pcal-dots-' + key + '"' +
         ' data-tipx="' + tipx + '" data-tipy="' + tipy + '"></div>';
       body.appendChild(cell);
     }
 
+    fitCalendar();
     renderEventDots();
     renderEventList();
+    renderMonthStats();
     renderSidebarLegend();
     var pastModal = $('pcal-modal-past');
     if (pastModal && pastModal.classList.contains('open')) renderPastTable();
   }
 
+  // ── DAY CELLS ─────────────────────────────────────────────────────
+  // A busy day can hold dozens of events, so each cell shows one chip per
+  // program (colour + count) instead of one dot per event. A program with a
+  // single event shows that event's name. Hover a chip for the list.
+  // The month grid is sized to the visible window so the whole month is
+  // readable without scrolling at 100% zoom; each day then shows as many
+  // chips as its row height allows and folds the rest into "+N more".
+  var MAX_CHIPS = 3;
+  var fitBound = false;
+  function scrollParent(el) {
+    for (var p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+      var oy = getComputedStyle(p).overflowY;
+      if (oy === 'auto' || oy === 'scroll') return p;
+    }
+    return null;
+  }
+  function fitCalendar() {
+    var card = root() && root().querySelector('.calendar-card');
+    var body = $('pcal-cal-body');
+    if (!card || !body) return;
+    if (!fitBound) {
+      fitBound = true;
+      var t = null;
+      window.addEventListener('resize', function () {
+        clearTimeout(t);
+        t = setTimeout(function () { if (root() && mounted) renderCalendar(); }, 120);
+      });
+    }
+    if (window.innerWidth <= 620 || !card.offsetParent) { card.style.height = ''; MAX_CHIPS = 3; return; }
+    var sp = scrollParent(card);
+    var rect = card.getBoundingClientRect();
+    var bottomGap = 18, h;
+    if (sp) {
+      var spRect = sp.getBoundingClientRect();
+      var topInSp = rect.top - spRect.top + sp.scrollTop;   // card's top when scrolled to the very top
+      h = sp.clientHeight - topInSp - bottomGap;
+    } else {
+      h = window.innerHeight - (rect.top + window.scrollY) - bottomGap;
+    }
+    h = Math.max(470, Math.round(h));
+    card.style.height = h + 'px';
+    var rows = Math.max(1, body.children.length / 7);
+    var rowH = body.clientHeight / rows;
+    MAX_CHIPS = Math.max(1, Math.floor((rowH - 36) / 21));
+  }
+  function programRank(p) { var i = programs.indexOf(p); return i === -1 ? 999 : i; }
+  function groupByProgram(list) {
+    var map = {}, order = [];
+    list.forEach(function (e) {
+      var p = programOf(e);
+      if (!map[p]) { map[p] = []; order.push(p); }
+      map[p].push(e);
+    });
+    order.sort(function (a, b) { return (map[b].length - map[a].length) || (programRank(a) - programRank(b)); });
+    return order.map(function (p) { return { name: p, list: map[p] }; });
+  }
+  function evtLabel(e) { return e.eventName || e.desc || e.district || programOf(e); }
+
   function renderEventDots() {
-    qsa('.event-dots').forEach(function (el) { el.innerHTML = ''; });
-    events.forEach(function (evt) {
-      var container = $('pcal-dots-' + evt.year + '-' + evt.month + '-' + evt.day);
+    qsa('.pcal-day-events').forEach(function (el) { el.innerHTML = ''; });
+    var byDay = {};
+    visibleEvents().forEach(function (evt) {
+      var k = evt.year + '-' + evt.month + '-' + evt.day;
+      (byDay[k] = byDay[k] || []).push(evt);
+    });
+    Object.keys(byDay).forEach(function (k) {
+      var container = $('pcal-dots-' + k);
       if (!container) return;
-      var dot = document.createElement('div');
-      dot.className = 'event-dot';
-      dot.style.background = getProgramColor(evt.type);
-      var tip = document.createElement('div');
-      tip.className = 'tooltip';
+      var groups = groupByProgram(byDay[k]);
+      var shown = groups.length > MAX_CHIPS ? groups.slice(0, MAX_CHIPS - 1) : groups;
+      var dayTotal = byDay[k].length;
       var tx = container.getAttribute('data-tipx');
       var ty = container.getAttribute('data-tipy');
-      if (tx && tx !== 'center') tip.classList.add('tip-' + tx);
-      if (ty === 'up') tip.classList.add('tip-up');
-      tip.innerHTML = '<strong>' + esc(evt.type) + '</strong>📍 ' + esc(evt.district) +
-        (evt.desc ? '<br><span style="opacity:.75;font-style:italic">' + esc(evt.desc) + '</span>' : '');
-      dot.appendChild(tip);
-      container.appendChild(dot);
+      var tipCls = 'tooltip' + (tx && tx !== 'center' ? ' tip-' + tx : '') + (ty === 'up' ? ' tip-up' : '');
+
+      // Too little room for even two rows: one line of compact colour+count pills.
+      var compact = groups.length > MAX_CHIPS && MAX_CHIPS <= 1;
+      if (compact) shown = groups;
+      var html = shown.map(function (g) {
+        var n = g.list.length;
+        var label = n === 1 ? evtLabel(g.list[0]) : g.name;
+        var lines = g.list.slice(0, 6).map(function (ev) {
+          return '<div class="pcal-tip-line">📍 ' + esc(ev.district || '—') +
+            (ev.eventName ? ' <span class="pcal-tip-muted">· ' + esc(ev.eventName) + '</span>' : '') + '</div>';
+        }).join('');
+        if (n > 6) lines += '<div class="pcal-tip-muted">+' + (n - 6) + ' more — click the day</div>';
+        if (compact) {
+          return '<div class="pcal-mini-chip" style="--c:' + getProgramColor(g.name) + '">' +
+              '<span class="pcal-chip-dot"></span>' + n +
+              '<div class="' + tipCls + '"><strong>' + esc(g.name) + ' \u00B7 ' + n + (n === 1 ? ' event' : ' events') + '</strong>' + lines + '</div>' +
+            '</div>';
+        }
+        return '<div class="pcal-chip" style="--c:' + getProgramColor(g.name) + '">' +
+            '<span class="pcal-chip-dot"></span>' +
+            '<span class="pcal-chip-label">' + esc(label) + '</span>' +
+            (n > 1 ? '<span class="pcal-chip-n">' + n + '</span>' : '') +
+            '<div class="' + tipCls + '"><strong>' + esc(g.name) + ' · ' + n + (n === 1 ? ' event' : ' events') + '</strong>' + lines + '</div>' +
+          '</div>';
+      }).join('');
+      if (compact) html = '<div class="pcal-mini-row">' + html + '</div>';
+      else if (shown.length < groups.length) {
+        var rest = groups.slice(shown.length).reduce(function (s, g) { return s + g.list.length; }, 0);
+        html += '<div class="pcal-chip pcal-chip-more">' +
+          (shown.length ? '+' + rest + ' more' : dayTotal + ' events') + '</div>';
+      }
+      container.innerHTML = html;
+      var cell = container.parentNode;
+      if (cell) cell.classList.add('has-events');
     });
   }
 
+  // ── MONTH SUMMARY (toolbar) ───────────────────────────────────────
+  function renderMonthStats() {
+    var el = $('pcal-month-stats');
+    if (!el) return;
+    var list = events.filter(function (e) { return e.year === viewYear && e.month === viewMonth && eventVisible(e); });
+    var progs = {}, dists = {};
+    list.forEach(function (e) { progs[programOf(e)] = 1; if (e.district) dists[e.district] = 1; });
+    function stat(n, label) { return '<div class="pcal-stat"><b>' + n + '</b><span>' + label + '</span></div>'; }
+    el.innerHTML = stat(list.length, list.length === 1 ? 'event' : 'events') +
+      stat(Object.keys(progs).length, Object.keys(progs).length === 1 ? 'program' : 'programs') +
+      stat(Object.keys(dists).length, Object.keys(dists).length === 1 ? 'district' : 'districts');
+  }
+
+  // ── EVENT LIST (grouped by day) ───────────────────────────────────
+  var DOW_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  var DOW_LONG  = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  var MONTH_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+                    'August', 'September', 'October', 'November', 'December'];
+  function evtTime(e) {
+    if (e.allDay) return 'All day';
+    var d = new Date(e.start);
+    if (!e.start || isNaN(d)) return '';
+    return d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+  }
+  function dayKeyOf(e) { return e.year + '-' + e.month + '-' + e.day; }
+  function longDate(y, m, d) { return DOW_LONG[new Date(y, m, d).getDay()] + ', ' + d + ' ' + MONTH_LONG[m]; }
+
   function renderEventList() {
     var list = $('pcal-events-list');
-    var monthEvents = events
-      .filter(function (e) { return e.year === viewYear && e.month === viewMonth; })
-      .sort(function (a, b) { return a.day - b.day; });
+    var title = $('pcal-events-list-title');
+    var selParts = selectedDay ? selectedDay.split('-').map(Number) : null;
+    if (selParts && (selParts[0] !== viewYear || selParts[1] !== viewMonth)) selectedDay = null;
+    var day = activeDay();
 
-    if (!monthEvents.length) {
-      list.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div>No events this month.' +
-        (isAdmin ? '<br>Click <strong>Add Event</strong> to get started.' : '') + '</div>';
+    if (!day) {
+      if (title) title.innerHTML = '<span>' + esc('Events \u2014 ' + MONTHS[viewMonth] + ' ' + viewYear) + '</span>';
+      list.innerHTML = '<div class="empty-state"><div class="empty-icon">\uD83D\uDC46</div>' +
+        'Click any day on the calendar to see its events.</div>';
+      return;
+    }
+
+    var dp = day.split('-').map(Number);
+    var isTodayView = day === todayKeyStr();
+    var scope = events.filter(function (e) { return dayKeyOf(e) === day; });
+    var shown = scope.filter(eventVisible)
+      .sort(function (a, b) { return new Date(a.start) - new Date(b.start); });
+    var hiddenCount = scope.length - shown.length;
+
+    if (title) {
+      var head = (isTodayView ? 'Today \u2014 ' : 'Events \u2014 ') + longDate(dp[0], dp[1], dp[2]);
+      var notes = [];
+      var todayInView = now.getFullYear() === viewYear && now.getMonth() === viewMonth;
+      if (!isTodayView && todayInView) notes.push('<a href="#" data-pcal-clear-day="1">back to today</a>');
+      if (hiddenCount > 0) notes.push(hiddenCount + ' hidden by program filter \u00B7 <a href="#" data-pcal-filter-all="1">show all</a>');
+      title.innerHTML = '<span>' + esc(head) + '</span>' +
+        (notes.length ? '<span class="pcal-filter-note">' + notes.join(' &nbsp;|&nbsp; ') + '</span>' : '');
+    }
+
+    if (!shown.length) {
+      list.innerHTML = hiddenCount > 0
+        ? '<div class="empty-state"><div class="empty-icon">\uD83D\uDD0D</div>No events for the selected programs ' + (isTodayView ? 'today.' : 'on this day.') + '</div>'
+        : '<div class="empty-state"><div class="empty-icon">\uD83D\uDCED</div>No events ' + (isTodayView ? 'today.' : 'on this day.') +
+          '<br><span style="font-size:.78rem">Click another day on the calendar to see its events.</span></div>';
       return;
     }
 
     var trashTpl = $('pcal-icon-trash').innerHTML;
-    list.innerHTML = monthEvents.map(function (e) {
-      var delBtn = isAdmin
-        ? '<button class="btn-icon-del" data-pcal-del-event="' + esc(e.id) + '" title="Delete event">' + trashTpl + '</button>'
-        : '';
-      return '<div class="event-list-item" data-pcal-view-event="' + esc(e.id) + '" title="Click to view details">' +
-          '<div class="event-dot-big" style="background:' + getProgramColor(e.type) + '"></div>' +
-          '<div class="event-info">' +
-            '<div class="evt-title">' + MONTHS[e.month] + ' ' + e.day + ', ' + e.year + '</div>' +
-            '<div class="evt-meta">📍 ' + esc(e.district) + ' &nbsp;•&nbsp; 🎯 ' + esc(e.type) + '</div>' +
-            (e.desc ? '<div class="evt-desc">' + esc(e.desc) + '</div>' : '') +
-          '</div>' + delBtn +
-        '</div>';
+    var todayKey = now.getFullYear() + '-' + now.getMonth() + '-' + now.getDate();
+    var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+    var days = [], byDay = {};
+    shown.forEach(function (e) {
+      var k = dayKeyOf(e);
+      if (!byDay[k]) { byDay[k] = []; days.push(k); }
+      byDay[k].push(e);
+    });
+
+    list.innerHTML = days.map(function (k) {
+      var evs = byDay[k], e0 = evs[0];
+      var dow = new Date(e0.year, e0.month, e0.day).getDay();
+      var isToday = k === todayKey;
+      var isPast = new Date(e0.year, e0.month, e0.day).getTime() < todayStart;
+      var mix = groupByProgram(evs).map(function (g) {
+        return '<span class="pcal-mix"><i style="background:' + getProgramColor(g.name) + '"></i>' + esc(g.name) + ' ' + g.list.length + '</span>';
+      }).join('');
+      var cards = evs.map(function (e) {
+        var delBtn = isAdmin
+          ? '<button class="btn-icon-del" data-pcal-del-event="' + esc(e.id) + '" title="Delete event">' + trashTpl + '</button>'
+          : '';
+        var t = evtTime(e);
+        return '<div class="event-list-item" style="--c:' + getProgramColor(programOf(e)) + '" data-pcal-view-event="' + esc(e.id) + '" title="Click to view details">' +
+            '<div class="event-info">' +
+              '<div class="evt-title">' + esc(e.eventName || programOf(e)) + '</div>' +
+              '<div class="evt-meta"><span>📍 ' + esc(e.district || '—') + '</span>' +
+                (t ? '<span>🕒 ' + esc(t) + '</span>' : '') + '</div>' +
+              '<span class="evt-prog">' + esc(programOf(e)) + '</span>' +
+            '</div>' + delBtn +
+          '</div>';
+      }).join('');
+      return '<section class="pcal-day-group' + (isToday ? ' is-today' : '') + (isPast ? ' is-past' : '') + '">' +
+          '<div class="pcal-day-head">' +
+            '<div class="pcal-day-badge"><span>' + DOW_SHORT[dow] + '</span><b>' + e0.day + '</b></div>' +
+            '<div class="pcal-day-headtxt">' +
+              '<div class="pcal-day-title">' + esc(longDate(e0.year, e0.month, e0.day)) +
+                (isToday ? ' <span class="pcal-today-tag">Today</span>' : '') +
+                ' <span class="pcal-day-count">' + evs.length + (evs.length === 1 ? ' event' : ' events') + '</span></div>' +
+              '<div class="pcal-day-mix">' + mix + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="pcal-day-cards">' + cards + '</div>' +
+        '</section>';
     }).join('');
   }
 
+  function selectDay(key) {
+    selectedDay = key;
+    renderCalendar();
+    if (selectedDay) {
+      var t = $('pcal-events-list-title');
+      if (t && t.scrollIntoView) {
+        var r = t.getBoundingClientRect();
+        if (r.top > window.innerHeight - 120 || r.top < 0) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  }
+
+  function goToday() {
+    now = new Date();
+    viewYear = now.getFullYear(); viewMonth = now.getMonth();
+    selectedDay = null;
+    renderCalendar();
+  }
+
+  // ── PROGRAM FILTER DROPDOWN ───────────────────────────────────────
+  // A select-style button in the sidebar opens a checklist. Ticks are a
+  // draft until the user presses Save, so it reads as a real form control.
+  var pfDraft = null;   // copy of hiddenPrograms while the dropdown is open
+
+  function pfSummary() {
+    var list = filterablePrograms();
+    var on = list.filter(isProgramVisible);
+    if (!list.length) return { text: 'No programs yet', on: on, total: 0 };
+    if (on.length === list.length) return { text: 'All programs', on: on, total: list.length };
+    if (!on.length) return { text: 'None selected', on: on, total: list.length };
+    if (on.length === 1) return { text: on[0], on: on, total: list.length };
+    return { text: on.length + ' programs selected', on: on, total: list.length };
+  }
+
   function renderSidebarLegend() {
-    var used = [];
-    events.forEach(function (e) { if (used.indexOf(e.type) === -1) used.push(e.type); });
     var el = $('pcal-sidebar-legend');
-    if (!used.length) { el.innerHTML = ''; return; }
-    el.innerHTML = '<div class="sidebar-legend-title">Legend</div>' +
-      used.map(function (t) {
-        return '<div class="legend-item"><div class="legend-dot" style="background:' +
-          getProgramColor(t) + '"></div>' + esc(t) + '</div>';
-      }).join('');
+    if (!el) return;
+    var s = pfSummary();
+    var filtered = s.total && s.on.length !== s.total;
+    var dots = s.on.slice(0, 4).map(function (p) {
+      return '<i style="background:' + getProgramColor(p) + '"></i>';
+    }).join('');
+    el.innerHTML =
+      '<label class="ctrl-label" for="pcal-pf-trigger">Filter by program</label>' +
+      '<button type="button" class="pcal-pf-trigger' + (filtered ? ' is-filtered' : '') + '" id="pcal-pf-trigger" aria-haspopup="listbox"' +
+        (pfDraft ? ' aria-expanded="true"' : ' aria-expanded="false"') + (s.total ? '' : ' disabled') + '>' +
+        (dots ? '<span class="pcal-pf-dots">' + dots + '</span>' : '') +
+        '<span class="pcal-pf-text">' + esc(s.text) + '</span>' +
+        (filtered ? '<span class="pcal-pf-badge">' + s.on.length + '/' + s.total + '</span>' : '') +
+        '<svg class="pcal-pf-chev" width="10" height="7" viewBox="0 0 10 7"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>' +
+      '</button>' +
+      (filtered ? '<button type="button" class="pcal-pf-reset" data-pcal-filter-all="1">Clear filter</button>' : '');
+  }
+
+  function pfPop() {
+    var pop = $('pcal-pf-pop');
+    if (pop) return pop;
+    pop = document.createElement('div');
+    pop.id = 'pcal-pf-pop';
+    pop.className = 'pcal-pf-pop';
+    pop.setAttribute('role', 'dialog');
+    pop.innerHTML =
+      '<div class="pcal-pf-head">' +
+        '<input type="text" id="pcal-pf-search" placeholder="Search programs…" autocomplete="off">' +
+        '<div class="pcal-pf-quick"><button type="button" data-pf-all="1">Select all</button><button type="button" data-pf-none="1">Clear</button></div>' +
+      '</div>' +
+      '<div class="pcal-pf-list" id="pcal-pf-list"></div>' +
+      '<div class="pcal-pf-foot">' +
+        '<span class="pcal-pf-count" id="pcal-pf-count"></span>' +
+        '<button type="button" class="btn-secondary small" data-pf-cancel="1">Cancel</button>' +
+        '<button type="button" class="btn-primary small" data-pf-save="1">Save</button>' +
+      '</div>';
+    root().appendChild(pop);
+
+    pop.addEventListener('change', function (e) {
+      var cb = e.target;
+      if (!pfDraft || !cb || !cb.hasAttribute('data-pf-prog')) return;
+      var p = cb.getAttribute('data-pf-prog');
+      if (cb.checked) delete pfDraft[p]; else pfDraft[p] = true;
+      var row = cb.closest('.pcal-pf-item'); if (row) row.classList.toggle('off', !cb.checked);
+      pfUpdateCount();
+    });
+    pop.addEventListener('click', function (e) {
+      var t = e.target && e.target.closest ? e.target : null;
+      if (!t || !pfDraft) return;
+      if (t.closest('[data-pf-all]'))  { pfVisibleNames().forEach(function (p) { delete pfDraft[p]; }); renderPfList(); }
+      else if (t.closest('[data-pf-none]')) { pfVisibleNames().forEach(function (p) { pfDraft[p] = true; }); renderPfList(); }
+      else if (t.closest('[data-pf-only]')) {
+        var only = t.closest('[data-pf-only]').getAttribute('data-pf-only');
+        pfDraft = {}; filterablePrograms().forEach(function (p) { if (p !== only) pfDraft[p] = true; });
+        renderPfList();
+      }
+      else if (t.closest('[data-pf-cancel]')) closePf();
+      else if (t.closest('[data-pf-save]')) savePf();
+    });
+    pop.addEventListener('input', function (e) { if (e.target && e.target.id === 'pcal-pf-search') renderPfList(); });
+    pop.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closePf();
+      if (e.key === 'Enter' && e.target && e.target.id === 'pcal-pf-search') { e.preventDefault(); savePf(); }
+    });
+    document.addEventListener('mousedown', function (e) {
+      if (!pfDraft) return;
+      var trig = $('pcal-pf-trigger');
+      if (pop.contains(e.target) || (trig && trig.contains(e.target))) return;
+      closePf();
+    }, true);
+    window.addEventListener('resize', function () { if (pfDraft) placePf(); });
+    document.addEventListener('scroll', function (e) {
+      if (pfDraft && !pop.contains(e.target)) placePf();
+    }, true);
+    return pop;
+  }
+
+  function pfVisibleNames() {
+    var q = (($('pcal-pf-search') || {}).value || '').trim().toLowerCase();
+    return filterablePrograms().filter(function (p) { return !q || p.toLowerCase().indexOf(q) !== -1; });
+  }
+
+  function pfUpdateCount() {
+    var list = filterablePrograms();
+    var on = list.filter(function (p) { return !pfDraft[p]; }).length;
+    var c = $('pcal-pf-count'); if (c) c.textContent = on + ' of ' + list.length + ' selected';
+  }
+
+  function renderPfList() {
+    var box = $('pcal-pf-list'); if (!box || !pfDraft) return;
+    var monthCount = {};
+    events.forEach(function (e) {
+      if (e.year !== viewYear || e.month !== viewMonth) return;
+      var p = programOf(e); monthCount[p] = (monthCount[p] || 0) + 1;
+    });
+    var names = pfVisibleNames();
+    box.innerHTML = names.length ? names.map(function (p) {
+      var on = !pfDraft[p];
+      return '<label class="pcal-pf-item' + (on ? '' : ' off') + '">' +
+          '<input type="checkbox" data-pf-prog="' + esc(p) + '"' + (on ? ' checked' : '') + '>' +
+          '<span class="legend-dot" style="background:' + getProgramColor(p) + '"></span>' +
+          '<span class="pcal-pf-name" title="' + esc(p) + '">' + esc(p) + '</span>' +
+          '<span class="pcal-pf-n" title="Events this month">' + (monthCount[p] || 0) + '</span>' +
+          '<button type="button" class="pcal-pf-only" data-pf-only="' + esc(p) + '">only</button>' +
+        '</label>';
+    }).join('') : '<div class="pcal-pf-empty">No program matches.</div>';
+    pfUpdateCount();
+  }
+
+  function placePf() {
+    var pop = $('pcal-pf-pop'), trig = $('pcal-pf-trigger');
+    if (!pop || !trig) return;
+    var r = trig.getBoundingClientRect();
+    var w = Math.max(r.width, 300);
+    var left = Math.min(r.left, window.innerWidth - w - 12);
+    var spaceBelow = window.innerHeight - r.bottom - 16;
+    var spaceAbove = r.top - 16;
+    var below = spaceBelow >= 260 || spaceBelow >= spaceAbove;
+    var maxH = Math.max(200, Math.min(460, below ? spaceBelow : spaceAbove));
+    pop.style.width = w + 'px';
+    pop.style.left = Math.max(12, left) + 'px';
+    pop.style.maxHeight = maxH + 'px';
+    if (below) { pop.style.top = (r.bottom + 6) + 'px'; pop.style.bottom = 'auto'; }
+    else { pop.style.top = 'auto'; pop.style.bottom = (window.innerHeight - r.top + 6) + 'px'; }
+  }
+
+  function openPf() {
+    var pop = pfPop();
+    pfDraft = {};
+    Object.keys(hiddenPrograms).forEach(function (p) { pfDraft[p] = true; });
+    var s = $('pcal-pf-search'); if (s) s.value = '';
+    renderPfList();
+    pop.classList.add('open');
+    placePf();
+    var trig = $('pcal-pf-trigger'); if (trig) trig.setAttribute('aria-expanded', 'true');
+    if (s && filterablePrograms().length > 6) s.focus();
+  }
+  function closePf() {
+    pfDraft = null;
+    var pop = $('pcal-pf-pop'); if (pop) pop.classList.remove('open');
+    var trig = $('pcal-pf-trigger'); if (trig) trig.setAttribute('aria-expanded', 'false');
+  }
+  function savePf() {
+    if (!pfDraft) return;
+    hiddenPrograms = pfDraft;
+    saveProgramFilter();
+    closePf();
+    renderCalendar();
+    var s = pfSummary();
+    showToast(s.on.length === s.total ? 'Showing all programs' : 'Showing ' + s.on.length + ' of ' + s.total + ' programs');
   }
 
   // ── NAVIGATION / TABS ─────────────────────────────────────────────
   function switchTab(name) {
+    closePf();
     if ((name === 'settings' || name === 'bulk') && !isAdmin) return;
     qsa('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
-    qsa('.nav-item').forEach(function (b) { b.classList.remove('active'); });
+    qsa('.pcal-nav-item').forEach(function (b) { b.classList.remove('active'); });
     var panel = $('pcal-tab-' + name);
     if (panel) panel.classList.add('active');
     var r = root();
-    var btn = r ? r.querySelector('.nav-item[data-pcal-tab="' + name + '"]') : null;
+    var btn = r ? r.querySelector('.pcal-nav-item[data-pcal-tab="' + name + '"]') : null;
     if (btn) btn.classList.add('active');
     var controls = $('pcal-sidebar-cal-controls');
     if (controls) controls.style.display = (name === 'calendar') ? '' : 'none';
@@ -540,6 +985,7 @@
   }
 
   function navigateMonth(dir) {
+    selectedDay = null;
     viewMonth += dir;
     if (viewMonth > 11) { viewMonth = 0; viewYear++; }
     if (viewMonth < 0) { viewMonth = 11; viewYear--; }
@@ -868,7 +1314,7 @@
                 : '<button class="pcal-mini pcal-mini-edit" data-pcal-edit="' + esc(e.id) + '">Edit</button>' + copyBtn + '<button class="pcal-mini pcal-mini-del" data-pcal-del="' + esc(e.id) + '">Delete</button>');
       return '<tr>' +
         '<td>' + esc(e.eventName || '\u2014') + '</td>' +
-        '<td>' + esc(e.eventType || e.type || '\u2014') + '</td>' +
+        '<td>' + esc(programOf(e)) + '</td>' +
         '<td>' + esc(e.district) + '</td>' +
         '<td>' + esc(when) + '</td>' +
         '<td>' + esc(e.host || '\u2014') + '</td>' +
@@ -922,7 +1368,7 @@
     if (!evt) return;
     var body = $('pcal-details-body');
     if (!body) return;
-    var color = getProgramColor(evt.type);
+    var color = getProgramColor(programOf(evt));
     function row(label, val) { return '<div class="pcal-detail-row"><span class="pcal-detail-label">' + label + '</span><span class="pcal-detail-val">' + val + '</span></div>'; }
     var when = evt.allDay
       ? (fmtDateOnly(evt.start) + (sameDay(evt.start, evt.end) ? '' : ' \u2192 ' + fmtDateOnly(evt.end)) + ' (all day)')
@@ -1986,15 +2432,21 @@
     var r = root();
     if (!r) return;
 
-    r.querySelectorAll('.nav-item[data-pcal-tab]').forEach(function (btn) {
+    r.querySelectorAll('.pcal-nav-item[data-pcal-tab]').forEach(function (btn) {
       btn.addEventListener('click', function () { switchTab(btn.getAttribute('data-pcal-tab')); });
     });
     r.querySelectorAll('[data-pcal-nav]').forEach(function (btn) {
       btn.addEventListener('click', function () { navigateMonth(parseInt(btn.getAttribute('data-pcal-nav'), 10)); });
     });
 
-    on('pcal-sel-year', 'change', function () { viewYear = +this.value; renderCalendar(); });
-    on('pcal-sel-month', 'change', function () { viewMonth = +this.value; renderCalendar(); });
+    on('pcal-sel-year', 'change', function () { viewYear = +this.value; selectedDay = null; renderCalendar(); });
+    on('pcal-sel-month', 'change', function () { viewMonth = +this.value; selectedDay = null; renderCalendar(); });
+    on('pcal-today-btn', 'click', goToday);
+    var calBody = $('pcal-cal-body');
+    if (calBody) calBody.addEventListener('click', function (e) {
+      var cell = e.target && e.target.closest ? e.target.closest('[data-pcal-day]') : null;
+      if (cell) selectDay(cell.getAttribute('data-pcal-day'));
+    });
     on('pcal-add-btn', 'click', openAddEvent);
 
     on('pcal-evt-state', 'change', onStateChange);
@@ -2043,6 +2495,21 @@
     delegate('pcal-program-list', '[data-pcal-del-program]', function (btn) {
       removeProgram(btn.getAttribute('data-pcal-del-program'));
     });
+
+    // Program filter dropdown (sidebar)
+    var legendEl = $('pcal-sidebar-legend');
+    if (legendEl) legendEl.addEventListener('click', function (e) {
+      var t = e.target && e.target.closest ? e.target : null;
+      if (!t) return;
+      if (t.closest('#pcal-pf-trigger')) { e.preventDefault(); if (pfDraft) closePf(); else openPf(); return; }
+      if (t.closest('[data-pcal-filter-all]')) { e.preventDefault(); setAllPrograms(true); }
+    });
+    var titleEl = $('pcal-events-list-title');
+    if (titleEl) titleEl.addEventListener('click', function (e) {
+      if (!e.target || !e.target.closest) return;
+      if (e.target.closest('[data-pcal-filter-all]')) { e.preventDefault(); setAllPrograms(true); }
+      else if (e.target.closest('[data-pcal-clear-day]')) { e.preventDefault(); selectedDay = null; renderCalendar(); }
+    });
   }
 
   function delegate(containerId, selector, handler) {
@@ -2068,6 +2535,7 @@
 
     // The page fragment is re-injected on every visit, so DOM nodes are always
     // fresh — listeners must be (re)bound on every mount, not just the first.
+    pfDraft = null;
     bindEvents();
     mounted = true;
 
