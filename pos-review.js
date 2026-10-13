@@ -482,7 +482,7 @@
     var root = $("ftrRoot"); if (!root || root.dataset.mounted === "1") return;
     root.dataset.mounted = "1";
     if (!window.posSupabase) { prBody('<div class="pr-empty">Supabase client not loaded — check that pos-supabase.js is included.</div>'); return; }
-    wireNav(); wireFilters(); wireMonthly();
+    wireNav(); wireFilters(); wireMonthly(); sumWire();
     if ($("prModalSave")) $("prModalSave").addEventListener("click", saveTextModal);
     if ($("prModalClose")) $("prModalClose").addEventListener("click", closeTextModal);
     if ($("prModalText")) $("prModalText").addEventListener("input", updateModalMsg);
@@ -533,6 +533,7 @@
       mo.disabled = false;
       populateValue($("prUnit").value);
       moFillFromBase();
+      sumFillFromBase();
       prBody('<div class="pr-empty">Choose a review unit, a value and a month, then open the review.</div>');
     }).catch(function (e) {
       prBody('<div class="pr-empty">Couldn\'t load base data: ' + esc(e.message || String(e)) + '</div>');
@@ -1911,6 +1912,501 @@
       }
     }
     $("prListBody").innerHTML = body; $("prListNote").textContent = note; $("prListModal").hidden = false;
+  }
+
+  /* =====================================================================
+     SUMMARY VIEW
+     "Did the weekly review happen?" across people, instead of one person
+     at a time. Two multi-select filters (review unit, then member), a
+     month and a week, and a search box.
+
+     Shape of the answer changes with the filters:
+       no members ticked  -> one row per review unit, three COUNTS
+       members ticked     -> one row per member, three YES/NO columns
+
+     District is deliberately not a review unit here: a district has no
+     review_responses rows of its own, only the people in it do.
+     ===================================================================== */
+
+  var SUM_UNITS = [
+    { code: "PO", label: "PO" },
+    { code: "PM", label: "PM" },
+    { code: "DM", label: "DM" }
+  ];
+
+  var SUM = {
+    units: [],        // ticked unit codes; [] means all of SUM_UNITS
+    members: [],      // ticked emp_ids
+    q: "",            // search box, filters table rows only
+    data: null,       // last loaded payload
+    open: null,       // id of the open dropdown panel, so only one is open
+    drill: null       // { unit, st, people } behind the open drill-down modal
+  };
+
+  /* ---------- tiny multi-select dropdown ----------
+     Shared by both filters. Draft ticks live on the panel until Apply, so
+     half-made selections never reload the table. */
+  function sumMsRender(panelId, items, selected, allLabel) {
+    var p = $(panelId); if (!p) return;
+    var all = items.length && selected.length === 0;
+    p.innerHTML =
+      '<label class="pr-ms-row pr-ms-all"><input type="checkbox" class="pr-ms-selall"' + (all ? " checked" : "") + ">"
+      + "<b>Select All</b></label>"
+      + '<div class="pr-ms-list">'
+      + (items.length
+          ? items.map(function (it) {
+              return '<label class="pr-ms-row"><input type="checkbox" class="pr-ms-cb" value="' + esc(it.value) + '"'
+                + (selected.indexOf(it.value) >= 0 ? " checked" : "") + ">"
+                + "<span>" + esc(it.label) + "</span>"
+                + (it.hint ? '<span class="pr-ms-hint">' + esc(it.hint) + "</span>" : "")
+                + "</label>";
+            }).join("")
+          : '<div class="pr-ms-empty">Nothing to choose.</div>')
+      + "</div>"
+      + '<div class="pr-ms-foot"><span class="pr-ms-note">Nothing ticked = ' + esc(allLabel) + "</span>"
+      + '<button type="button" class="pr-btn pr-ms-clear">Clear</button>'
+      + '<button type="button" class="pr-btn pr-btn-primary pr-ms-apply">Apply</button></div>';
+  }
+
+  function sumMsTicked(panelId) {
+    return Array.prototype.slice.call(document.querySelectorAll("#" + panelId + " .pr-ms-cb:checked"))
+      .map(function (c) { return c.value; });
+  }
+
+  function sumMsOpen(panelId) {
+    if (SUM.open && SUM.open !== panelId) { var o = $(SUM.open); if (o) o.hidden = true; }
+    var p = $(panelId); if (!p) return;
+    p.hidden = !p.hidden;
+    SUM.open = p.hidden ? null : panelId;
+  }
+
+  function sumCloseAll() {
+    ["prSumUnitPanel", "prSumMemberPanel"].forEach(function (id) { var p = $(id); if (p) p.hidden = true; });
+    SUM.open = null;
+  }
+
+  /* ---------- filter labels ---------- */
+  function sumUnitBtnLabel() {
+    if (!SUM.units.length) return "All review units";
+    if (SUM.units.length === 1) return SUM.units[0];
+    return SUM.units.join(" · ");
+  }
+  function sumMemberBtnLabel() {
+    if (!SUM.units.length) return "Select a review unit first";
+    if (!SUM.members.length) return "All members";
+    if (SUM.members.length === 1) {
+      var m = sumAllMembers().filter(function (x) { return x.id === SUM.members[0]; })[0];
+      return m ? m.name : "1 selected";
+    }
+    return SUM.members.length + " selected";
+  }
+
+  // Everyone belonging to the ticked units (or to every unit when none are ticked).
+  function sumAllMembers() {
+    if (!ORG) return [];
+    var units = SUM.units.length ? SUM.units : SUM_UNITS.map(function (u) { return u.code; });
+    var out = [];
+    units.forEach(function (u) {
+      ORG.people.filter(function (p) { return p.designation === u; })
+        .sort(byNameSort)
+        .forEach(function (p) { out.push({ id: p.emp_id, name: p.name, unit: u }); });
+    });
+    return out;
+  }
+
+  function sumSyncFilterUI() {
+    var ub = $("prSumUnitBtn"), mb = $("prSumMemberBtn");
+    if (ub) ub.textContent = sumUnitBtnLabel();
+    if (mb) {
+      mb.textContent = sumMemberBtnLabel();
+      // Member list is meaningless until you've said which kind of person.
+      mb.disabled = !SUM.units.length;
+      mb.classList.toggle("is-muted", !SUM.units.length);
+    }
+  }
+
+  function sumFillFromBase() {
+    var mo = $("prSumMonth");
+    if (mo && state.base) {
+      mo.innerHTML = "";
+      if (!state.base.months.length) { mo.innerHTML = '<option value="">No months</option>'; }
+      else {
+        state.base.months.forEach(function (m) { mo.appendChild(opt(m.code, m.label)); });
+        // Default to the newest month that actually has data.
+        var pick = state.base.months[Math.max(0, state.base.months.length - 2)];
+        if (pick) mo.value = pick.code;
+      }
+      mo.disabled = false;
+    }
+    sumMsRender("prSumUnitPanel", SUM_UNITS.map(function (u) { return { value: u.code, label: u.label }; }),
+                SUM.units, "all review units");
+    sumSyncFilterUI();
+  }
+
+  function sumWire() {
+    var ub = $("prSumUnitBtn"), mb = $("prSumMemberBtn");
+    if (ub) ub.addEventListener("click", function (e) { e.stopPropagation(); sumMsOpen("prSumUnitPanel"); });
+    if (mb) mb.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (!SUM.units.length) return;
+      sumMsRender("prSumMemberPanel",
+        sumAllMembers().map(function (m) { return { value: m.id, label: m.name, hint: m.unit }; }),
+        SUM.members, "all members of the ticked units");
+      sumMsOpen("prSumMemberPanel");
+    });
+
+    // One delegated handler for both panels - they share the same markup.
+    ["prSumUnitPanel", "prSumMemberPanel"].forEach(function (id) {
+      var p = $(id); if (!p) return;
+      p.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var t = e.target;
+        if (t.classList.contains("pr-ms-selall")) {
+          p.querySelectorAll(".pr-ms-cb").forEach(function (c) { c.checked = t.checked; });
+          return;
+        }
+        if (t.classList.contains("pr-ms-cb")) {
+          var sa = p.querySelector(".pr-ms-selall");
+          if (sa) sa.checked = p.querySelectorAll(".pr-ms-cb:not(:checked)").length === 0;
+          return;
+        }
+        if (t.classList.contains("pr-ms-clear")) {
+          p.querySelectorAll(".pr-ms-cb, .pr-ms-selall").forEach(function (c) { c.checked = false; });
+          return;
+        }
+        if (t.classList.contains("pr-ms-apply")) {
+          var ticked = sumMsTicked(id);
+          // "Everything ticked" and "nothing ticked" both mean all, so store
+          // the empty form - it keeps the button label honest.
+          var total = p.querySelectorAll(".pr-ms-cb").length;
+          if (ticked.length === total) ticked = [];
+          if (id === "prSumUnitPanel") {
+            SUM.units = ticked;
+            SUM.members = [];                 // unit change invalidates the member picks
+          } else {
+            SUM.members = ticked;
+          }
+          sumCloseAll();
+          sumSyncFilterUI();
+          sumLoad();
+        }
+      });
+    });
+
+    document.addEventListener("click", function () { sumCloseAll(); });
+
+    // Delegated: the table is re-rendered on every change, so binding to the
+    // container survives re-renders where binding to the buttons would not.
+    var body = $("prSumBody");
+    if (body) body.addEventListener("click", function (e) {
+      var dl = e.target.closest ? e.target.closest("#prSumDl") : null;
+      if (dl) { sumDownload(); return; }
+      var btn = e.target.closest ? e.target.closest("[data-sumdrill]") : null;
+      if (btn) {
+        var parts = String(btn.dataset.sumdrill).split("|");
+        sumDrill(parts[0], parts[1]);
+      }
+    });
+
+    var mClose = $("prSumModalClose"), mDl = $("prSumModalDl"), mBack = $("prSumModal");
+    if (mClose) mClose.addEventListener("click", function () { $("prSumModal").hidden = true; });
+    if (mDl) mDl.addEventListener("click", sumDrillDownload);
+    if (mBack) mBack.addEventListener("click", function (e) { if (e.target === mBack) mBack.hidden = true; });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && $("prSumModal") && !$("prSumModal").hidden) $("prSumModal").hidden = true;
+    });
+
+    var s = $("prSumSearch");
+    if (s) s.addEventListener("input", function () { SUM.q = s.value || ""; sumRender(); });
+    ["prSumMonth", "prSumWeek"].forEach(function (id) {
+      var el = $(id); if (el) el.addEventListener("change", sumLoad);
+    });
+    var b = $("prSumLoad"); if (b) b.addEventListener("click", sumLoad);
+  }
+
+  /* ---------- data ----------
+     One query for the whole table: every selected person's responses for
+     the chosen month+week, keyed by emp_id. Same pattern the weekly
+     roster already uses, so no new load on the database. */
+  async function sbGetSummary(units, code) {
+    await loadOrg();
+    var byUnit = {}, all = [];
+    units.forEach(function (u) {
+      byUnit[u] = ORG.people.filter(function (p) { return p.designation === u; })
+        .sort(byNameSort)
+        .map(function (p) {
+          return { id: p.emp_id, name: p.name, unit: u, email: p.email || "",
+                   districts: (p.assigned_districts || []).join(", ") };
+        });
+      all = all.concat(byUnit[u]);
+    });
+
+    var ids = all.map(function (x) { return x.id; });
+    var rows = ids.length
+      ? await fetchAll(function () {
+          return db().from("review_responses")
+            .select("emp_id,period_code,section,field,value,updated_at,updated_by")
+            .in("emp_id", ids).eq("period_code", code);
+        })
+      : [];
+
+    var byEmp = {};
+    rows.forEach(function (r) { (byEmp[r.emp_id] = byEmp[r.emp_id] || []).push(r); });
+
+    var status = {};
+    all.forEach(function (m) {
+      status[m.id] = reviewStatusOf(sectionsByCode(byEmp[m.id] || [])[code]);
+    });
+    return { units: units, byUnit: byUnit, members: all, status: status, code: code };
+  }
+
+  function sumBody(html) { var b = $("prSumBody"); if (b) b.innerHTML = html; }
+
+  function sumLoad() {
+    var month = ($("prSumMonth") || {}).value, week = ($("prSumWeek") || {}).value;
+    if (!month) { sumBody('<div class="pr-empty">Pick a month.</div>'); return; }
+    var units = SUM.units.length ? SUM.units : SUM_UNITS.map(function (u) { return u.code; });
+    var code = month + pad2(Number(week || 1));
+
+    sumBody('<div class="pr-empty">Loading…</div>');
+    sbGetSummary(units, code).then(function (d) {
+      SUM.data = d; sumRender();
+    }).catch(function (e) {
+      sumBody('<div class="pr-empty">Couldn\'t load: ' + esc(e.message || String(e)) + "</div>");
+    });
+  }
+
+  /* ---------- render ---------- */
+  var SUM_ST = {
+    done:    { label: "Review Done",   cls: "pr-rev-yes" },
+    partial: { label: "Partially Done", cls: "pr-rev-part" },
+    none:    { label: "Not Done",      cls: "pr-rev-no" }
+  };
+
+  function sumPeriodLabel() {
+    var mo = $("prSumMonth"), wk = $("prSumWeek");
+    var ml = mo && mo.selectedOptions[0] ? mo.selectedOptions[0].textContent : "";
+    var wl = wk && wk.selectedOptions[0] ? wk.selectedOptions[0].textContent : "";
+    return (ml ? ml : "") + (wl ? " · " + wl : "");
+  }
+
+  function sumRender() {
+    var d = SUM.data;
+    if (!d) { sumBody('<div class="pr-empty">Pick a review unit and a month, then Show.</div>'); return; }
+
+    var q = SUM.q.trim().toLowerCase();
+    var html = '<div class="pr-panel"><div class="pr-sum-head">'
+      + '<div class="pr-blocks-h">Weekly review status '
+      + '<span class="pr-sum-period">' + esc(sumPeriodLabel()) + "</span></div>"
+      + '<button type="button" class="pr-btn pr-sum-dl" id="prSumDl">Download Excel</button>'
+      + "</div>";
+
+    if (!SUM.members.length) {
+      // ---- counts, one row per review unit ----
+      // Every count is a button into the list behind it. A zero is not -
+      // there is nothing to show, and a clickable 0 just wastes a click.
+      var cell = function (unit, st, n, cls) {
+        if (!n) return '<td class="pr-num"><span class="pr-sum-zero">0</span></td>';
+        return '<td class="pr-num"><button type="button" class="pr-sum-drill ' + cls
+          + '" data-sumdrill="' + esc(unit) + "|" + st + '">' + n + "</button></td>";
+      };
+
+      var tot = { done: 0, partial: 0, none: 0 };
+      var rows = d.units.map(function (u) {
+        var c = { done: 0, partial: 0, none: 0 };
+        (d.byUnit[u] || []).forEach(function (m) { c[d.status[m.id] || "none"]++; });
+        tot.done += c.done; tot.partial += c.partial; tot.none += c.none;
+        var n = (d.byUnit[u] || []).length;
+        return '<tr class="pr-row"><td class="pr-item"><b>' + esc(u) + "</b>"
+          + '<span class="pr-sum-sub">' + n + " " + (n === 1 ? "person" : "people") + "</span></td>"
+          + cell(u, "done", c.done, "pr-rev-yes")
+          + cell(u, "partial", c.partial, "pr-rev-part")
+          + cell(u, "none", c.none, "pr-rev-no")
+          + "</tr>";
+      }).join("");
+
+      html += '<div class="pr-tablewrap"><table class="pr-tbl pr-sum-tbl"><thead><tr>'
+        + "<th>Review unit</th><th class=\"pr-num\">Review Done</th>"
+        + '<th class="pr-num">Partially Done</th><th class="pr-num">Not Done</th></tr></thead><tbody>'
+        + rows
+        + (d.units.length > 1
+            ? '<tr class="pr-row pr-sum-total"><td class="pr-item"><b>Total</b></td>'
+              + cell("*", "done", tot.done, "")
+              + cell("*", "partial", tot.partial, "")
+              + cell("*", "none", tot.none, "")
+              + "</tr>"
+            : "")
+        + "</tbody></table></div>"
+        + '<p class="pr-sum-hint">Click any number to see and download that list. '
+        + "Tick one or more members above to see them listed individually.</p>";
+
+    } else {
+      // ---- yes / no, one row per ticked member ----
+      var picked = d.members.filter(function (m) { return SUM.members.indexOf(m.id) >= 0; });
+      var shown = picked.filter(function (m) {
+        return !q || m.name.toLowerCase().indexOf(q) >= 0 || String(m.id).toLowerCase().indexOf(q) >= 0;
+      });
+
+      if (!shown.length) {
+        html += '<div class="pr-empty">'
+          + (picked.length ? "No selected member matches that search." : "No members selected.")
+          + "</div>";
+      } else {
+        var yn = function (on, cls) {
+          return '<td class="pr-num"><span class="' + (on ? cls : "pr-sum-no") + '">' + (on ? "Yes" : "No") + "</span></td>";
+        };
+        html += '<div class="pr-tablewrap"><table class="pr-tbl pr-sum-tbl"><thead><tr>'
+          + "<th>Member</th><th class=\"pr-num\">Review Done</th>"
+          + '<th class="pr-num">Partially Done</th><th class="pr-num">Not Done</th></tr></thead><tbody>'
+          + shown.map(function (m) {
+              var st = d.status[m.id] || "none";
+              return '<tr class="pr-row"><td class="pr-item">' + esc(m.name)
+                + '<span class="pr-sum-sub">' + esc(m.id) + " · " + esc(m.unit) + "</span></td>"
+                + yn(st === "done", "pr-rev-yes")
+                + yn(st === "partial", "pr-rev-part")
+                + yn(st === "none", "pr-rev-no")
+                + "</tr>";
+            }).join("")
+          + "</tbody></table></div>";
+        if (q && shown.length < picked.length) {
+          html += '<p class="pr-sum-hint">' + shown.length + " of " + picked.length + " selected members shown.</p>";
+        }
+      }
+    }
+
+    sumBody(html + "</div>");
+  }
+
+  /* ---------- drill-down + Excel ----------
+     SheetJS is loaded on first use. app.js and pos.js each keep their own
+     copy of this loader; a third here keeps pos-review.js self-contained,
+     and the browser caches the script so only one fetch ever happens. */
+  var _sumXlsx = null;
+  function sumLoadXLSX() {
+    if (_sumXlsx) return _sumXlsx;
+    _sumXlsx = new Promise(function (resolve, reject) {
+      if (window.XLSX) { resolve(window.XLSX); return; }
+      var s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+      s.onload = function () { resolve(window.XLSX); };
+      s.onerror = function () { reject(new Error("Couldn't load the Excel library. Check your connection.")); };
+      document.head.appendChild(s);
+    });
+    return _sumXlsx;
+  }
+
+  function sumFileStem() {
+    var mo = $("prSumMonth"), wk = $("prSumWeek");
+    return "Weekly_Review_Status_" + ((mo && mo.value) || "") + "_W" + ((wk && wk.value) || "");
+  }
+
+  // aoa -> sheet, with column widths from the longest cell in each column.
+  function sumSheet(XLSX, aoa) {
+    var ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = (aoa[0] || []).map(function (_, i) {
+      var w = 10;
+      aoa.forEach(function (r) { w = Math.max(w, String(r[i] == null ? "" : r[i]).length + 2); });
+      return { wch: Math.min(w, 46) };
+    });
+    return ws;
+  }
+
+  function sumSave(XLSX, sheets, filename) {
+    var wb = XLSX.utils.book_new();
+    sheets.forEach(function (s) { XLSX.utils.book_append_sheet(wb, sumSheet(XLSX, s.rows), s.name); });
+    XLSX.writeFile(wb, filename + ".xlsx");
+  }
+
+  var SUM_LBL = { done: "Review Done", partial: "Partially Done", none: "Not Done" };
+
+  // Everyone matching a unit ("*" = all ticked units) and a status.
+  function sumPeopleFor(unit, st) {
+    var d = SUM.data; if (!d) return [];
+    var pool = unit === "*" ? d.members : (d.byUnit[unit] || []);
+    return pool.filter(function (m) { return (d.status[m.id] || "none") === st; });
+  }
+
+  function sumDrill(unit, st) {
+    var people = sumPeopleFor(unit, st);
+    SUM.drill = { unit: unit, st: st, people: people };
+
+    $("prSumModalTitle").textContent =
+      SUM_LBL[st] + " — " + (unit === "*" ? "all review units" : unit)
+      + " · " + sumPeriodLabel();
+
+    $("prSumModalBody").innerHTML = people.length
+      ? '<table class="pr-tbl pr-sum-tbl"><thead><tr><th>#</th><th>Name</th><th>Employee ID</th>'
+        + "<th>Unit</th><th>Districts</th></tr></thead><tbody>"
+        + people.map(function (m, i) {
+            return '<tr class="pr-row"><td class="pr-sum-ix">' + (i + 1) + "</td>"
+              + '<td class="pr-item">' + esc(m.name) + "</td>"
+              + "<td>" + esc(m.id) + "</td><td>" + esc(m.unit) + "</td>"
+              + "<td>" + esc(m.districts || "—") + "</td></tr>";
+          }).join("")
+        + "</tbody></table>"
+      : '<div class="pr-empty">Nobody in this group.</div>';
+
+    $("prSumModalNote").textContent = people.length
+      ? people.length + (people.length === 1 ? " person" : " people")
+      : "";
+    $("prSumModal").hidden = false;
+  }
+
+  function sumDrillDownload() {
+    var dr = SUM.drill; if (!dr) return;
+    sumLoadXLSX().then(function (XLSX) {
+      var rows = [["Name", "Employee ID", "Unit", "Districts", "Status", "Period"]];
+      dr.people.forEach(function (m) {
+        rows.push([m.name, m.id, m.unit, m.districts || "", SUM_LBL[dr.st], sumPeriodLabel()]);
+      });
+      sumSave(XLSX, [{ name: SUM_LBL[dr.st].slice(0, 28), rows: rows }],
+        sumFileStem() + "_" + (dr.unit === "*" ? "All" : dr.unit) + "_" + SUM_LBL[dr.st].replace(/\s+/g, ""));
+    }).catch(function (e) { toast(e.message || String(e)); });
+  }
+
+  // The whole table as it stands. The counts view also gets a People sheet,
+  // because a sheet of three numbers on its own is rarely what you wanted.
+  function sumDownload() {
+    var d = SUM.data; if (!d) return;
+    sumLoadXLSX().then(function (XLSX) {
+      var period = sumPeriodLabel();
+      var sheets = [];
+
+      if (!SUM.members.length) {
+        var head = [["Review unit", "People", "Review Done", "Partially Done", "Not Done", "Period"]];
+        var tot = { done: 0, partial: 0, none: 0 };
+        d.units.forEach(function (u) {
+          var c = { done: 0, partial: 0, none: 0 };
+          (d.byUnit[u] || []).forEach(function (m) { c[d.status[m.id] || "none"]++; });
+          tot.done += c.done; tot.partial += c.partial; tot.none += c.none;
+          head.push([u, (d.byUnit[u] || []).length, c.done, c.partial, c.none, period]);
+        });
+        if (d.units.length > 1) head.push(["Total", d.members.length, tot.done, tot.partial, tot.none, period]);
+        sheets.push({ name: "Summary", rows: head });
+
+        var detail = [["Name", "Employee ID", "Unit", "Districts", "Status", "Period"]];
+        d.members.forEach(function (m) {
+          detail.push([m.name, m.id, m.unit, m.districts || "", SUM_LBL[d.status[m.id] || "none"], period]);
+        });
+        sheets.push({ name: "People", rows: detail });
+
+      } else {
+        var q = SUM.q.trim().toLowerCase();
+        var picked = d.members.filter(function (m) { return SUM.members.indexOf(m.id) >= 0; })
+          .filter(function (m) {
+            return !q || m.name.toLowerCase().indexOf(q) >= 0 || String(m.id).toLowerCase().indexOf(q) >= 0;
+          });
+        var mr = [["Member", "Employee ID", "Unit", "Districts", "Review Done", "Partially Done", "Not Done", "Period"]];
+        picked.forEach(function (m) {
+          var st = d.status[m.id] || "none";
+          mr.push([m.name, m.id, m.unit, m.districts || "",
+                   st === "done" ? "Yes" : "No", st === "partial" ? "Yes" : "No", st === "none" ? "Yes" : "No", period]);
+        });
+        sheets.push({ name: "Members", rows: mr });
+      }
+
+      sumSave(XLSX, sheets, sumFileStem());
+    }).catch(function (e) { toast(e.message || String(e)); });
   }
 
   window.FTRDashboard = { mount: mount };

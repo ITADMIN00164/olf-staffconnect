@@ -349,8 +349,38 @@
           </div>
         </section>
 
+        <!-- SUMMARY — did the weekly review happen, across people.
+             Filters cascade: review unit first, then members of those units.
+             Nothing ticked means all, which is why both panels say so. -->
         <section class="pr-view" id="prSummary" hidden>
-          <div class="pr-panel"><div class="pr-placeholder">Summary — in process.</div></div>
+          <div class="pr-panel pr-filters">
+            <div class="pr-field pr-ms">
+              <span>Review unit</span>
+              <button type="button" class="pr-ms-btn" id="prSumUnitBtn">All review units</button>
+              <div class="pr-ms-panel" id="prSumUnitPanel" hidden></div>
+            </div>
+            <div class="pr-field pr-ms">
+              <span>Member</span>
+              <button type="button" class="pr-ms-btn is-muted" id="prSumMemberBtn" disabled>Select a review unit first</button>
+              <div class="pr-ms-panel" id="prSumMemberPanel" hidden></div>
+            </div>
+            <label class="pr-field"><span>Month</span>
+              <select id="prSumMonth" disabled><option value="">—</option></select></label>
+            <label class="pr-field"><span>Week</span>
+              <select id="prSumWeek">
+                <option value="1">Week 1</option>
+                <option value="2">Week 2</option>
+                <option value="3">Week 3</option>
+                <option value="4">Week 4</option>
+                <option value="5">Week 5</option>
+              </select></label>
+            <label class="pr-field pr-sum-search-field"><span>Search</span>
+              <input type="search" id="prSumSearch" class="pr-sum-search" placeholder="Search a name or employee ID…"></label>
+            <button class="pr-btn pr-btn-primary" id="prSumLoad">Show</button>
+          </div>
+          <div id="prSumBody">
+            <div class="pr-empty">Pick a review unit and a month, then Show.</div>
+          </div>
         </section>
         <section class="pr-view" id="prMonthly" hidden>
           <div class="pr-panel pr-filters">
@@ -378,6 +408,20 @@
             <div class="pr-modal-title" id="prListTitle">Exams planned</div>
             <div id="prListBody" class="pr-list-body"></div>
             <div class="pr-modal-foot"><span id="prListNote" class="pr-modal-msg"></span><span class="pr-modal-spacer"></span><button class="pr-btn" id="prListClose">Close</button></div>
+          </div>
+        </div>
+
+        <!-- Summary drill-down: the people behind a clicked count -->
+        <div id="prSumModal" class="pr-modal" hidden>
+          <div class="pr-modal-box pr-list-box">
+            <div class="pr-modal-title" id="prSumModalTitle">Review status</div>
+            <div id="prSumModalBody" class="pr-list-body pr-sum-modal-body"></div>
+            <div class="pr-modal-foot">
+              <span id="prSumModalNote" class="pr-modal-msg"></span>
+              <span class="pr-modal-spacer"></span>
+              <button class="pr-btn pr-btn-primary" id="prSumModalDl">Download Excel</button>
+              <button class="pr-btn" id="prSumModalClose">Close</button>
+            </div>
           </div>
         </div>
   <div id="prModal" class="pr-modal" hidden>
@@ -415,6 +459,53 @@
         .pr-btn-primary{background:var(--acc);border-color:var(--acc);color:#fff;}
         .pr-btn-primary:hover:not(:disabled){background:var(--acc2);}
         .pr-empty,.pr-placeholder{color:var(--mut);padding:30px 8px;text-align:center;}
+
+        /* ── Summary: multi-select filter dropdowns ── */
+        .pr-ms{position:relative;}
+        .pr-ms-btn{width:100%;padding:8px 26px 8px 10px;border:1px solid var(--l);border-radius:8px;background:#fff;
+                   font:inherit;text-align:left;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+                   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23667085' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+                   background-repeat:no-repeat;background-position:right 10px center;}
+        .pr-ms-btn:hover:not(:disabled){border-color:#c3c9d2;}
+        .pr-ms-btn:disabled,.pr-ms-btn.is-muted{color:var(--mut);background-color:#f8f9fb;cursor:not-allowed;}
+        .pr-ms-panel{position:absolute;top:calc(100% + 6px);left:0;min-width:260px;z-index:40;background:#fff;
+                     border:1px solid var(--l);border-radius:10px;box-shadow:0 10px 28px rgba(16,24,40,.14);overflow:hidden;}
+        .pr-ms-panel[hidden]{display:none;}
+        .pr-ms-list{max-height:230px;overflow-y:auto;}
+        .pr-ms-row{display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;font-size:13.5px;}
+        .pr-ms-row:hover{background:#f4f7fb;}
+        .pr-ms-row input{width:16px;height:16px;accent-color:var(--acc);cursor:pointer;flex-shrink:0;}
+        .pr-ms-all{border-bottom:1px solid var(--l);padding:11px 14px;}
+        .pr-ms-hint{margin-left:auto;font-size:11px;color:var(--mut);}
+        .pr-ms-empty{padding:16px 14px;font-size:12.5px;color:var(--mut);text-align:center;}
+        .pr-ms-foot{display:flex;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid var(--l);background:#fcfcfd;}
+        .pr-ms-note{flex:1;font-size:11px;color:var(--mut);}
+        .pr-ms-foot .pr-btn{padding:6px 14px;font-size:13px;}
+
+        /* ── Summary: table ── */
+        .pr-sum-search-field{flex:1;min-width:220px;}
+        .pr-sum-search{padding:8px 10px;border:1px solid var(--l);border-radius:8px;font:inherit;background:#fff;width:100%;}
+        .pr-sum-search:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px rgba(47,109,179,.12);}
+        .pr-sum-period{font-weight:400;color:var(--mut);margin-left:8px;font-size:12.5px;}
+        .pr-sum-tbl td.pr-num,.pr-sum-tbl th.pr-num{text-align:center;width:150px;}
+        .pr-sum-sub{display:block;font-size:11px;color:var(--mut);font-weight:400;margin-top:1px;}
+        .pr-sum-total td{background:#f4f7fb;font-weight:700;}
+        .pr-sum-no{color:var(--mut);}
+        .pr-sum-hint{margin:10px 2px 0;font-size:12px;color:var(--mut);}
+        .pr-sum-head{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+        .pr-sum-head .pr-blocks-h{flex:1;margin:0;}
+        .pr-sum-dl{padding:7px 14px;font-size:13px;white-space:nowrap;}
+        /* counts are buttons into the list behind them */
+        .pr-sum-drill{border:none;background:none;font:inherit;font-weight:600;cursor:pointer;
+                      padding:2px 8px;border-radius:6px;color:inherit;}
+        .pr-sum-drill:hover{background:#eef4fc;text-decoration:underline;}
+        .pr-sum-drill.pr-rev-yes{color:var(--good);}
+        .pr-sum-drill.pr-rev-part{color:var(--warn);}
+        .pr-sum-drill.pr-rev-no{color:var(--mut);}
+        .pr-sum-zero{color:#c3c9d2;}
+        .pr-sum-modal-body{max-height:56vh;overflow:auto;}
+        .pr-sum-modal-body td,.pr-sum-modal-body th{text-align:left;}
+        .pr-sum-ix{color:var(--mut);width:44px;}
         .pr-hint,.pr-base-count{color:var(--mut);font-size:12px;}
       
         /* ----- PO header block ----- */
