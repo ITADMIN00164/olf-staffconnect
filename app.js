@@ -1352,16 +1352,26 @@ async function initEmployeesPage() {
     const closeBtn2 = document.getElementById("closeModalBtn2");
     const excelBtn  = document.getElementById("downloadExcelBtn");
 
-    const orgBtn      = document.getElementById("orgChartBtn");
-    const closeOrg     = document.getElementById("closeOrgBtn");
-    const orgExpandAll = document.getElementById("orgExpandAll");
-    const orgCollapse  = document.getElementById("orgCollapseAll");
+    const orgBtn   = document.getElementById("orgChartBtn");
+    const closeOrg = document.getElementById("closeOrgBtn");
 
-    if (orgBtn)      orgBtn.addEventListener("click", openOrgChart);
+    if (orgBtn)   orgBtn.addEventListener("click", openOrgChart);
+    if (closeOrg) closeOrg.addEventListener("click", closeOrgChart);
     bindOrgEscape();
-    if (closeOrg)    closeOrg.addEventListener("click", closeOrgChart);
-    if (orgExpandAll)  orgExpandAll.addEventListener("click", () => { setOrgDepth(Infinity); centreOrgOnRoot(); });
-    if (orgCollapse)   orgCollapse.addEventListener("click", () => { setOrgDepth(1); centreOrgOnRoot(); });
+
+    const branchBack  = document.getElementById("orgBranchBack");
+    const branchClose = document.getElementById("orgBranchClose");
+    const branchBody  = document.getElementById("orgBranchBody");
+    if (branchBack)  branchBack.addEventListener("click", orgBranchBack);
+    if (branchClose) branchClose.addEventListener("click", closeOrgBranch);
+    if (branchBody) {
+        branchBody.addEventListener("click", (e) => {
+            const open = e.target.closest("button[data-org-toggle]");
+            if (open) { openOrgBranch(open.dataset.orgToggle); return; }
+            const card = e.target.closest(".org-node[data-emp]");
+            if (card) openOrgPerson(card.dataset.emp);
+        });
+    }
 
     const zoomIn    = document.getElementById("orgZoomIn");
     const zoomOut   = document.getElementById("orgZoomOut");
@@ -1374,7 +1384,7 @@ async function initEmployeesPage() {
     if (orgBody) {
         orgBody.addEventListener("click", (e) => {
             const btn = e.target.closest("button[data-org-toggle]");
-            if (btn) { toggleOrgNode(btn.dataset.orgToggle); return; }
+            if (btn) { openOrgBranch(btn.dataset.orgToggle); return; }
 
             const card = e.target.closest(".org-node[data-emp]");
             if (card) openOrgPerson(card.dataset.emp);
@@ -1745,12 +1755,6 @@ function setOrgDepth(depth) {
     renderOrgChart();
 }
 
-function toggleOrgNode(id) {
-    if (orgCollapsed.has(id)) orgCollapsed.delete(id);
-    else orgCollapsed.add(id);
-    renderOrgChart();
-}
-
 /* The tree is far wider than any screen, so put the top of the house in the
    middle of the view instead of opening on whichever branch sorts first. */
 function centreOrgOnRoot() {
@@ -1773,6 +1777,13 @@ function setOrgZoom(next) {
 /* Shrink until the tree fits the window, so opening the chart shows the whole
    top of the house instead of a slice of it. Never below 30% - past that the
    names stop being readable and a picture of boxes is no use. */
+/* clientWidth counts the padding, which the tree cannot actually occupy, so
+   fitting against it leaves a few pixels of overflow and a stray scrollbar. */
+function orgContentWidth(el) {
+    const cs = getComputedStyle(el);
+    return el.clientWidth - parseFloat(cs.paddingLeft || 0) - parseFloat(cs.paddingRight || 0);
+}
+
 function fitOrgToWidth(tries = 0) {
     const body   = document.getElementById("orgBody");
     const canvas = body && body.querySelector(".org-canvas");
@@ -1781,14 +1792,14 @@ function fitOrgToWidth(tries = 0) {
     // Called straight after the modal is shown, so the first measurement can
     // land before layout: clientWidth reads 0, the ratio works out as 0 and the
     // chart snaps to the 30% floor for no reason. Wait a frame instead.
-    const avail = body.clientWidth;
-    if (!avail) {
+    const avail = orgContentWidth(body);
+    if (avail <= 0) {
         if (tries < 10) requestAnimationFrame(() => fitOrgToWidth(tries + 1));
         return;
     }
 
     canvas.style.zoom = 1;              // measure at full size, not the current zoom
-    const full = body.scrollWidth;
+    const full = canvas.scrollWidth;
     canvas.style.zoom = orgZoom;        // put it back before deciding
 
     setOrgZoom(full > avail ? Math.floor((avail / full) * 100) / 100 : 1);
@@ -1799,6 +1810,7 @@ function openOrgChart() {
     // to ten thousand pixels before you have clicked anything. Branches open on
     // demand.
     orgZoom = 1;
+    orgBranchStack = [];
     setOrgDepth(1);
     document.getElementById("orgModal")?.classList.add("open");
     fitOrgToWidth();     // after .open, or the modal has no width to measure
@@ -1863,6 +1875,110 @@ function openOrgPerson(id) {
     document.getElementById("orgPersonModal")?.classList.add("open");
 }
 
+/* ---- drilling into one team ----
+
+   Expanding in place pushed every sibling sideways and the chart stopped being
+   readable after a click or two. Each team gets its own view instead: the
+   manager, their direct reports, and a way back up. The stack is the trail of
+   managers drilled through, so Back always returns one level. */
+
+let orgBranchStack = [];
+
+function orgBranchHtml(id, tree) {
+    const { byId, childrenOf } = tree;
+    const emp = byId.get(id);
+    if (!emp) return "";
+
+    const kids = childrenOf.get(id) || [];
+
+    const card = (eid, isHead) => {
+        const e = byId.get(eid);
+        if (!e) return "";
+        const role     = e["Designation"] || e["Name"] || eid;
+        const showName = e["Designation"] ? e["Name"] : "";
+        const below    = countDescendants(eid, childrenOf);
+        const mine     = (childrenOf.get(eid) || []).length;
+        return `<li>
+            <div class="org-node${isHead ? " is-root" : ""}"
+                data-emp="${escHtml(eid)}" title="${escHtml(eid)} \u2014 click for details">
+                <div class="org-role">${escHtml(role)}</div>
+                ${showName ? `<div class="org-name">${escHtml(showName)}</div>` : ""}
+                ${e["Dept"] ? `<div class="org-dept">${escHtml(e["Dept"])}</div>` : ""}
+            </div>
+            ${!isHead && mine ? `<button class="org-toggle" data-org-toggle="${escHtml(eid)}"
+                    title="Open this team">+${below}</button>` : ""}
+        </li>`;
+    };
+
+    return `<ul class="org-tree">${card(id, true).replace("</li>",
+        (kids.length ? `<ul>${kids.map(k => card(k, false)).join("")}</ul>` : "") + "</li>")}</ul>`;
+}
+
+function renderOrgBranch() {
+    const body  = document.getElementById("orgBranchBody");
+    const title = document.getElementById("orgBranchTitle");
+    const crumb = document.getElementById("orgBranchCrumbs");
+    if (!body || !orgBranchStack.length) return;
+
+    const tree = buildOrgTree();
+    const id   = orgBranchStack[orgBranchStack.length - 1];
+    const emp  = tree.byId.get(id);
+    if (!emp) { closeOrgBranch(); return; }
+
+    const kids  = (tree.childrenOf.get(id) || []).length;
+    const below = countDescendants(id, tree.childrenOf);
+
+    if (title) {
+        title.textContent = `${emp["Name"] || id}` +
+            (emp["Designation"] ? ` \u00b7 ${emp["Designation"]}` : "");
+    }
+    if (crumb) {
+        crumb.textContent = `${kids} direct` + (below !== kids ? ` \u00b7 ${below} in total` : "");
+    }
+
+    body.innerHTML = `<div class="org-canvas" style="zoom:${orgZoom}">${orgBranchHtml(id, tree)}</div>`;
+    body.scrollLeft = 0;
+    fitOrgBranchToWidth();
+}
+
+function fitOrgBranchToWidth(tries = 0) {
+    const body   = document.getElementById("orgBranchBody");
+    const canvas = body && body.querySelector(".org-canvas");
+    if (!body || !canvas) return;
+
+    const avail = orgContentWidth(body);
+    if (avail <= 0) {
+        if (tries < 10) requestAnimationFrame(() => fitOrgBranchToWidth(tries + 1));
+        return;
+    }
+    canvas.style.zoom = 1;
+    const full = canvas.scrollWidth;
+    const fit  = full > avail ? Math.max(0.3, Math.floor((avail / full) * 100) / 100) : 1;
+    canvas.style.zoom = fit;
+    body.scrollLeft = Math.max(0, (body.scrollWidth - body.clientWidth) / 2);
+}
+
+function openOrgBranch(id) {
+    orgBranchStack.push(id);
+    document.getElementById("orgBranchModal")?.classList.add("open");
+    renderOrgBranch();
+    const back = document.getElementById("orgBranchBack");
+    if (back) back.textContent = orgBranchStack.length > 1 ? "\u2190 Back" : "\u2190 Chart";
+}
+
+function orgBranchBack() {
+    orgBranchStack.pop();
+    if (!orgBranchStack.length) { closeOrgBranch(); return; }
+    renderOrgBranch();
+    const back = document.getElementById("orgBranchBack");
+    if (back) back.textContent = orgBranchStack.length > 1 ? "\u2190 Back" : "\u2190 Chart";
+}
+
+function closeOrgBranch() {
+    orgBranchStack = [];
+    document.getElementById("orgBranchModal")?.classList.remove("open");
+}
+
 function closeOrgPerson() {
     document.getElementById("orgPersonModal")?.classList.remove("open");
 }
@@ -1879,6 +1995,8 @@ function bindOrgEscape() {
         if (e.key !== "Escape") return;
         if (document.getElementById("orgPersonModal")?.classList.contains("open")) {
             closeOrgPerson();
+        } else if (document.getElementById("orgBranchModal")?.classList.contains("open")) {
+            orgBranchBack();
         } else if (document.getElementById("orgModal")?.classList.contains("open")) {
             closeOrgChart();
         }
