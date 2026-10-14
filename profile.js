@@ -22,7 +22,8 @@
 
     /* Preferred order; anything else the directory holds (Blood Group,
        Date of Joining, whatever gets added later) is appended after. */
-    const FIELD_ORDER = ["Dept", "Location", "Mobile", "Email", "Reporting manager"];
+    const FIELD_ORDER = ["Dept", "Location", "State", "Division", "District",
+                         "Block", "Mobile", "Email", "Reporting manager"];
 
     /* Directory keys are terse; the card is read by people. */
     const LABELS = {
@@ -49,6 +50,19 @@
     }
 
     function labelFor(key) { return LABELS[key] || key; }
+
+    /* District, Division and Block are many-valued: one person can cover
+       several divisions, dozens of districts and hundreds of blocks, each
+       stored as one ";"-separated string
+       that would fill the whole card. Show the first couple and a count; the
+       full list lives in the Employee Directory. */
+    const MULTI_KEYS = ["Division", "District", "Block"];
+
+    function summariseList(value) {
+        const list = String(value).split(/[;\r\n]/).map(s => s.trim()).filter(Boolean);
+        if (list.length <= 2) return list.join("; ");
+        return list.slice(0, 2).join("; ") + " +" + (list.length - 2) + " more";
+    }
 
     /* ---------- render ---------- */
 
@@ -102,8 +116,9 @@
 
         let html = row("Employee Number", rec.id);
         keys.forEach(k => {
-            const v = rec[k];
+            let v = rec[k];
             if (v === undefined || v === null || String(v).trim() === "") return;
+            if (MULTI_KEYS.indexOf(k) >= 0) v = summariseList(v);
             html += row(labelFor(k), v);
         });
         box.innerHTML = html;

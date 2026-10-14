@@ -10,7 +10,8 @@
             <div class="admin-btn-group">
                 <button class="btn-add" id="addEmployeeBtn">+ Add Employee</button>
                 <button class="btn-sample-excel" id="downloadSampleExcelBtn">⬇ Sample Format</button>
-                <label class="btn-upload-excel" id="uploadExcelLabel" title="Upload employees from Excel">
+                <label class="btn-upload-excel" id="uploadExcelLabel"
+                       title="Add new employees, or update existing ones, from Excel">
                     📤 Upload via Excel
                     <input type="file" id="uploadExcelInput" accept=".xlsx,.xlsm" style="display:none;">
                 </label>
@@ -265,6 +266,31 @@ tbody tr:hover { background: #fafbff; }
     font-weight: 500;
 }
 
+/* State is the one geography column that holds a single value, so it can sit
+   at its natural width. */
+.col-geo { max-width: 200px; }
+
+/* A district, division or block list can run to thousands of characters, so
+   the cell shows a count that opens the full list instead of stretching the
+   row off the page. */
+.col-multi { max-width: 180px; }
+
+.badge-multi {
+    background: #fff7ed;
+    color: #c2652a;
+    border: 1px solid #fed7aa;
+    border-radius: 5px;
+    padding: 2px 9px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s;
+}
+
+.badge-multi:hover { background: #ffedd5; border-color: #fdba74; }
+
 .btn-edit, .btn-delete {
     border: none;
     border-radius: 6px;
@@ -376,7 +402,8 @@ tbody tr:hover { background: #fafbff; }
 
 .req { color: #ef4444; }
 
-.form-group input {
+.form-group input,
+.form-group textarea {
     width: 100%;
     padding: 9px 12px;
     border: 1px solid #e5e7eb;
@@ -387,9 +414,26 @@ tbody tr:hover { background: #fafbff; }
     transition: border 0.2s;
 }
 
-.form-group input:focus {
+.form-group textarea {
+    resize: vertical;
+    min-height: 76px;
+    line-height: 1.55;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
     border-color: #4f8ef7;
     box-shadow: 0 0 0 3px rgba(79,142,247,0.1);
+}
+
+/* Multiline fields (Block) take a whole row rather than half of one. */
+.form-row-full { grid-template-columns: 1fr; }
+
+.field-hint {
+    margin-top: 5px;
+    font-size: 11.5px;
+    color: #9ca3af;
+    line-height: 1.45;
 }
 
 /* Highlight dynamically added (non-core) fields */

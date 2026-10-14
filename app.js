@@ -14,6 +14,7 @@ import {
     getDocs,
     getDoc,
     setDoc,
+    updateDoc,
     addDoc,
     deleteDoc,
     doc,
@@ -100,10 +101,47 @@ const CORE_FIELDS = [
     { key: "Location",          label: "Location",         placeholder: "Office location" },
     { key: "Email",             label: "Email",            placeholder: "Work email",  type: "email" },
     { key: "Mobile",            label: "Mobile",           placeholder: "Phone number"    },
-    { key: "Reporting manager", label: "Reporting Manager",placeholder: "Manager's name"  }
+    { key: "Reporting manager", label: "Reporting Manager",placeholder: "Manager's name"  },
+
+    // Geography, widest area first: State > Division > District > Block. These
+    // arrived after the directory was already live, so every one of them is
+    // optional - an Excel file prepared before they existed still validates,
+    // and a record with no geography simply shows "—". All but State are
+    // many-valued (see MULTI_VALUE_FIELDS): one person can cover several
+    // divisions, dozens of districts and hundreds of blocks, each stored as a
+    // single ";"-separated string.
+    { key: "State",             label: "State",            placeholder: "e.g. Maharashtra", optional: true },
+    { key: "Division",          label: "Division",         placeholder: "Divisions covered, separated by ;",
+                                optional: true, multiline: true },
+    { key: "District",          label: "District",         placeholder: "Districts covered, separated by ;",
+                                optional: true, multiline: true },
+    { key: "Block",             label: "Block",            placeholder: "Blocks covered, separated by ;",
+                                optional: true, multiline: true }
 ];
 
 const CORE_KEYS = CORE_FIELDS.map(f => f.key);
+
+// Columns an uploaded file is allowed to leave out entirely (see above).
+const OPTIONAL_KEYS = new Set(CORE_FIELDS.filter(f => f.optional).map(f => f.key));
+
+/* A blank cell never erases anything, which is what keeps an upload from
+   wiping columns it simply does not carry. Clearing a value therefore has to be
+   asked for out loud: a cell holding exactly this token empties that field. */
+const CLEAR_TOKEN = "#CLEAR";
+
+function isClearToken(value) {
+    return String(value).trim().toUpperCase() === CLEAR_TOKEN;
+}
+
+/* Fields that hold several values in one ";"-separated string. District and
+   Block mirror the assignment data the Field Review System keeps
+   (assigned_districts and assigned_blocks); Division follows the same shape
+   because one person can work across more than one. */
+const MULTI_VALUE_FIELDS = {
+    "Division": { one: "division", many: "divisions" },
+    "District": { one: "district", many: "districts" },
+    "Block":    { one: "block",    many: "blocks"    }
+};
 
 /* ====================================
    DOM REFS
@@ -1336,6 +1374,7 @@ async function initEmployeesPage() {
             if (!btn) return;
             if (btn.dataset.action === "edit")   editEmployee(btn.dataset.id);
             if (btn.dataset.action === "delete") deleteEmployeeRecord(btn.dataset.id);
+            if (btn.dataset.action === "multi")  showMultiFor(btn.dataset.id, btn.dataset.key);
         });
     }
 
@@ -1371,9 +1410,51 @@ function colClass(key) {
     const map = {
         "Name": "col-name", "Designation": "col-desig", "Dept": "col-dept",
         "Email": "col-email", "Location": "col-location",
-        "Mobile": "col-extra", "Reporting manager": "col-extra"
+        "Mobile": "col-extra", "Reporting manager": "col-extra",
+        "State": "col-geo",
+        "Division": "col-multi", "District": "col-multi", "Block": "col-multi"
     };
     return map[key] || "col-extra";
+}
+
+/* ====================================
+   MANY-VALUED FIELDS (District, Block)
+
+   One person can cover dozens of districts and hundreds of blocks, so the
+   stored value is a single ";"-separated string that routinely runs to
+   thousands of characters. Printing that straight into a nowrap <td> would
+   stretch the row off the page, so the cell shows a count the admin can click
+   to read the full list.
+==================================== */
+
+function splitMulti(value) {
+    return String(value || "")
+        .split(/[;\r\n]/)
+        .map(s => s.trim())
+        .filter(Boolean);
+}
+
+function multiCellHtml(value, empId, key) {
+    const list = splitMulti(value);
+    if (list.length === 0) return "—";
+    if (list.length === 1) return escHtml(list[0]);
+    const noun = MULTI_VALUE_FIELDS[key].many;
+    return `<button class="badge-multi" data-action="multi"
+                data-id="${escHtml(empId)}" data-key="${escHtml(key)}"
+                title="Click to see all ${list.length} ${noun}">${list.length} ${noun}</button>`;
+}
+
+function showMultiFor(empId, key) {
+    const emp   = employees.find(e => e.id === empId);
+    const nouns = MULTI_VALUE_FIELDS[key];
+    if (!emp || !nouns) return;
+    const list = splitMulti(emp[key]);
+    showAppAlert({
+        title:   `${key} — ${emp["Name"] || empId}`,
+        message: `${list.length} ${list.length === 1 ? nouns.one : nouns.many} assigned.`,
+        type:    "info",
+        list
+    });
 }
 
 function renderEmployees() {
@@ -1420,16 +1501,17 @@ function renderEmployees() {
         <tr>
             ${currentRole === "Admin" ? `
             <td class="col-actions">
-                <button class="btn-edit"   data-action="edit"   data-id="${emp.id}" title="Edit" aria-label="Edit">✏️</button>
-                <button class="btn-delete" data-action="delete" data-id="${emp.id}" title="Delete" aria-label="Delete">🗑️</button>
+                <button class="btn-edit"   data-action="edit"   data-id="${escHtml(emp.id)}" title="Edit" aria-label="Edit">✏️</button>
+                <button class="btn-delete" data-action="delete" data-id="${escHtml(emp.id)}" title="Delete" aria-label="Delete">🗑️</button>
             </td>` : ""}
-            <td class="col-id"><code style="font-size:12px;color:#6b7280;">${emp.id}</code></td>
+            <td class="col-id"><code style="font-size:12px;color:#6b7280;">${escHtml(emp.id)}</code></td>
             ${tableCols.map(key => {
                 const val = emp[key] || "";
                 const cls = colClass(key);
-                if (key === "Dept") return `<td class="${cls}"><span class="badge-dept">${val || "—"}</span></td>`;
-                if (key === "Email" && val) return `<td class="${cls}"><a href="mailto:${val}" style="color:#4f8ef7;text-decoration:none;">${val}</a></td>`;
-                return `<td class="${cls}">${val || "—"}</td>`;
+                if (MULTI_VALUE_FIELDS[key]) return `<td class="${cls}">${multiCellHtml(val, emp.id, key)}</td>`;
+                if (key === "Dept") return `<td class="${cls}"><span class="badge-dept">${escHtml(val) || "—"}</span></td>`;
+                if (key === "Email" && val) return `<td class="${cls}"><a href="mailto:${escHtml(val)}" style="color:#4f8ef7;text-decoration:none;">${escHtml(val)}</a></td>`;
+                return `<td class="${cls}">${escHtml(val) || "—"}</td>`;
             }).join("")}
         </tr>
     `).join("");
@@ -1462,15 +1544,28 @@ function buildModalForm(empData = {}, isEdit = false) {
         </div>
     `;
 
+    // Single-line fields go two to a row; a multiline field (Block) takes a
+    // whole row to itself, so `pending` holds a field waiting for its partner.
     const remaining = schemaFields.filter(f => f.key !== "Name");
-    for (let i = 0; i < remaining.length; i += 2) {
-        const f1 = remaining[i];
-        const f2 = remaining[i + 1];
-        html += `<div class="form-row">`;
-        html += fieldHtml(f1, empData);
-        if (f2) html += fieldHtml(f2, empData);
-        html += `</div>`;
+    let pending = null;
+
+    for (const field of remaining) {
+        if (field.multiline) {
+            if (pending) {
+                html += `<div class="form-row">${fieldHtml(pending, empData)}</div>`;
+                pending = null;
+            }
+            html += `<div class="form-row form-row-full">${fieldHtml(field, empData)}</div>`;
+            continue;
+        }
+        if (pending) {
+            html += `<div class="form-row">${fieldHtml(pending, empData)}${fieldHtml(field, empData)}</div>`;
+            pending = null;
+        } else {
+            pending = field;
+        }
     }
+    if (pending) html += `<div class="form-row">${fieldHtml(pending, empData)}</div>`;
 
     modalBody.innerHTML = html;
 
@@ -1482,16 +1577,33 @@ function buildModalForm(empData = {}, isEdit = false) {
 }
 
 function fieldHtml(field, empData) {
-    const val       = empData[field.key] !== undefined ? empData[field.key] : "";
+    const val     = empData[field.key] !== undefined ? empData[field.key] : "";
+    const inputId = `field__${field.key.replace(/\s+/g, "_")}`;
+    const ph      = escHtml(field.placeholder || field.label);
+
+    if (field.multiline) {
+        const count = splitMulti(val).length;
+        return `
+        <div class="form-group">
+            <label>${field.label}</label>
+            <textarea id="${inputId}"
+                data-fieldkey="${field.key}"
+                rows="4"
+                placeholder="${ph}">${escHtml(String(val))}</textarea>
+            <div class="field-hint">Separate each entry with a semicolon ( ; ).${count > 1 ? ` Currently ${count} entries.` : ""}</div>
+        </div>
+    `;
+    }
+
     const inputType = field.type || "text";
     return `
         <div class="form-group">
             <label>${field.label}</label>
-            <input id="field__${field.key.replace(/\s+/g, "_")}"
+            <input id="${inputId}"
                 data-fieldkey="${field.key}"
                 type="${inputType}"
                 value="${escHtml(String(val))}"
-                placeholder="${field.placeholder || field.label}">
+                placeholder="${ph}">
         </div>
     `;
 }
@@ -1610,6 +1722,8 @@ async function downloadSampleExcel() {
             const extraKeys = Object.keys(refData)
                 .filter(k => !coreKeys.includes(k))
                 .sort();
+            // coreKeys is used rather than the reference record's own keys so
+            // that columns added after OLF-24-001 was written still appear.
             sampleColumns = ["Employee ID", ...coreKeys, ...extraKeys];
         } else {
             // Fallback: use current schemaFields if OLF-24-001 not found
@@ -1626,7 +1740,11 @@ async function downloadSampleExcel() {
                 "Location":           "Mumbai",
                 "Email":              "john.doe@openlinksfoundation.org",
                 "Mobile":             "9876543210",
-                "Reporting manager":  "Jane Smith"
+                "Reporting manager":  "Jane Smith",
+                "State":              "Maharashtra",
+                "District":           "Pune",
+                "Division":           "Pune",
+                "Block":              "272501-AMBEGAON; 272502-BARAMATI"
             };
             return placeholders[col] || "";
         });
@@ -1646,6 +1764,30 @@ async function downloadSampleExcel() {
 /* ====================================
    EXCEL / CSV UPLOAD
 ==================================== */
+
+/**
+ * Translate one spreadsheet header into the Firestore field name it refers to.
+ *
+ * A column may be written either as the stored key ("Dept", "Reporting manager")
+ * or as the label the directory displays and exports ("Department", "Reporting
+ * Manager"), in any case. "ID" and "Employee ID" both mean the document id.
+ * Anything unrecognised is returned unchanged so it is reported to the admin as
+ * an ignored column rather than silently becoming a new field.
+ */
+function canonicalColumn(header, expectedCols) {
+    const raw   = String(header).trim();
+    const lower = raw.toLowerCase();
+
+    if (lower === "id" || lower === "employee id") return "Employee ID";
+
+    const byKey = expectedCols.find(c => c.toLowerCase() === lower);
+    if (byKey) return byKey;
+
+    const byLabel = schemaFields.find(f => String(f.label).toLowerCase() === lower);
+    if (byLabel && expectedCols.includes(byLabel.key)) return byLabel.key;
+
+    return raw;
+}
 
 async function handleExcelUpload(e) {
     const file = e.target.files[0];
@@ -1679,8 +1821,6 @@ async function handleExcelUpload(e) {
             return;
         }
 
-        const headers = rows[0].map(h => String(h).trim());
-
         // ── Column validation ──
         // Fetch OLF-24-001 to get expected columns
         const refSnap = await getDoc(doc(db, "Employees", "OLF-24-001"));
@@ -1694,7 +1834,32 @@ async function handleExcelUpload(e) {
             expectedCols = ["Employee ID", ...schemaFields.map(f => f.key)];
         }
 
-        const missing = expectedCols.filter(col => !headers.includes(col));
+        // Download Excel writes human-readable headers ("Full Name", "Department")
+        // while the records are keyed tersely ("Name", "Dept"), so a file that came
+        // straight out of Download Excel would not line up with the upload format.
+        // Either spelling is accepted, which makes download → edit → re-upload work.
+        const headers = rows[0].map(h => canonicalColumn(h, expectedCols));
+
+        // Two headers that mean the same column would make the result depend on
+        // which one happened to be read last, so that is rejected outright.
+        const duplicateHeaders = headers.filter((h, i) =>
+            expectedCols.includes(h) && headers.indexOf(h) !== i);
+
+        if (duplicateHeaders.length > 0) {
+            await showAppAlert({
+                title:   "Upload failed — duplicate columns",
+                message: "These columns appear more than once in your file (a terse and a " +
+                         "readable spelling of the same column both count). Keep one of each and try again.",
+                type:    "error",
+                list:    [...new Set(duplicateHeaders)]
+            });
+            return;
+        }
+
+        // Optional columns (the geography block) may be left out entirely, so a
+        // file prepared before they existed still uploads cleanly.
+        const missing = expectedCols.filter(col =>
+            !headers.includes(col) && !OPTIONAL_KEYS.has(col));
         const extra   = headers.filter(col => !expectedCols.includes(col));
 
         if (missing.length > 0) {
@@ -1720,14 +1885,17 @@ async function handleExcelUpload(e) {
         }
 
         // ── Row validation ──
-        // Build a lookup of Employee IDs that already exist in the directory,
-        // so we can reject the whole file up front rather than silently overwriting.
-        const existingIds = new Set(employees.map(emp => emp.id));
+        // An Employee ID that is already in the directory updates that record;
+        // one that is not adds a new record. Nothing is written until the whole
+        // file has validated and the admin has confirmed the summary.
+        const existing = new Map(employees.map(emp => [emp.id, emp]));
 
         const dataRows   = rows.slice(1).filter(r => r.some(c => String(c).trim() !== ""));
         const errors     = [];
         const seenInFile = new Set();
-        const validRows  = [];
+        const toAdd      = [];
+        const toUpdate   = [];
+        let unchangedCount = 0;
 
         dataRows.forEach((row, idx) => {
             const rowNum = idx + 2; // +2 because header is row 1
@@ -1741,85 +1909,179 @@ async function handleExcelUpload(e) {
                 return;
             }
 
-            // 1) Employee ID must not already exist in the directory
-            if (existingIds.has(empId)) {
-                errors.push(`Row ${rowNum}: Employee ID "${empId}" already exists.`);
-                return;
-            }
-
-            // ...and must not be repeated within the file itself
+            // An ID may appear once per file - two rows for one person would
+            // make the result depend on which row happened to be written last.
             if (seenInFile.has(empId)) {
                 errors.push(`Row ${rowNum}: Employee ID "${empId}" is duplicated within this file.`);
                 return;
             }
             seenInFile.add(empId);
 
-            // 2) Mobile number must be exactly 10 digits
+            // Mobile number must be exactly 10 digits
             const mobile = obj["Mobile"];
             if (mobile && !validateMobile(mobile)) {
                 errors.push(`Row ${rowNum} (${empId}): Mobile number must be exactly 10 digits.`);
                 return;
             }
 
-            validRows.push({ empId, obj });
+            // Only recognised columns are written; anything else in the file is
+            // ignored (the admin was warned about those above).
+            const fields = {};
+            expectedCols.forEach(col => {
+                if (col === "Employee ID") return;
+                if (!headers.includes(col)) return;
+                fields[col] = obj[col];
+            });
+
+            const current = existing.get(empId);
+
+            if (!current) {
+                // Nothing to erase on a record that does not exist yet, so the
+                // token simply means "leave this empty".
+                Object.keys(fields).forEach(col => {
+                    if (isClearToken(fields[col])) fields[col] = "";
+                });
+                toAdd.push({ empId, fields });
+                return;
+            }
+
+            // For an existing record only the cells that actually carry a value
+            // and differ from what is stored are written. A blank cell means
+            // "no opinion", never "erase this": a sheet that simply leaves a
+            // column empty must not wipe a value somebody typed in by hand.
+            const changed = {};
+            const cleared = [];
+            Object.keys(fields).forEach(col => {
+                const next = fields[col];
+                const cur  = String(current[col] === undefined ? "" : current[col]);
+
+                if (isClearToken(next)) {
+                    if (cur !== "") { changed[col] = ""; cleared.push(col); }
+                    return;
+                }
+                if (next === "") return;
+                if (cur === next) return;
+                changed[col] = next;
+            });
+
+            if (Object.keys(changed).length === 0) { unchangedCount++; return; }
+
+            toUpdate.push({ empId, name: current["Name"] || empId, changed, cleared });
         });
 
         // Any validation failure cancels the whole upload — nothing is written.
         if (errors.length > 0) {
             await showAppAlert({
                 title:   "Upload cancelled",
-                message: `${errors.length} row(s) failed validation. Fix these in your file and re-upload — no records were added.`,
+                message: `${errors.length} row(s) failed validation. Fix these in your file and re-upload — nothing was written to the directory.`,
                 type:    "error",
                 list:    errors.slice(0, 12).concat(errors.length > 12 ? [`…and ${errors.length - 12} more.`] : [])
             });
             return;
         }
 
-        if (validRows.length === 0) {
+        if (toAdd.length === 0 && toUpdate.length === 0) {
             await showAppAlert({
-                title:   "Nothing to upload",
-                message: "No valid data rows were found in the file.",
-                type:    "error"
+                title:   "Nothing to change",
+                message: unchangedCount > 0
+                    ? `All ${unchangedCount} row(s) already match the directory, so there is nothing to write.`
+                    : "No valid data rows were found in the file.",
+                type:    unchangedCount > 0 ? "info" : "error"
             });
             return;
         }
 
+        // ── Confirm before writing ──
+        // This is the live directory, so the admin sees exactly what the file
+        // will do - which records, and which columns on each - before a single
+        // document is touched.
+        const preview = [
+            ...toAdd.map(r => `ADD ${r.empId} — ${r.fields["Name"] || "(no name)"}`),
+            ...toUpdate.map(r => {
+                const cols = Object.keys(r.changed)
+                    .map(c => r.cleared.indexOf(c) >= 0 ? `${c} (cleared)` : c);
+                return `UPDATE ${r.empId} (${r.name}): ${cols.join(", ")}`;
+            })
+        ];
+
+        const summary = [];
+        if (toAdd.length)      summary.push(`${toAdd.length} new record(s) will be added`);
+        if (toUpdate.length)   summary.push(`${toUpdate.length} existing record(s) will be updated`);
+        if (unchangedCount)    summary.push(`${unchangedCount} row(s) already match and will be skipped`);
+
+        const proceed = await showAppConfirm({
+            title:       "Review before uploading",
+            message:     `${summary.join(", ")}.\n\n` +
+                         `Only the columns listed below change. ` +
+                         `Blank cells in your file are left alone — they never erase a value ` +
+                         `that is already in the directory. A cell holding ${CLEAR_TOKEN} empties ` +
+                         `that field on purpose.`,
+            type:        "warning",
+            list:        preview.slice(0, 40)
+                             .concat(preview.length > 40 ? [`…and ${preview.length - 40} more.`] : []),
+            confirmText: `Write ${toAdd.length + toUpdate.length} record(s)`,
+            cancelText:  "Cancel"
+        });
+        if (!proceed) return;
+
         // ── Write to Firestore ──
-        // All rows here are guaranteed to be new Employee IDs — duplicates were already rejected above.
-        let successCount = 0;
+        let addedCount   = 0;
+        let updatedCount = 0;
         const uploadErrors = [];
 
-        for (const { empId, obj } of validRows) {
+        for (const { empId, fields } of toAdd) {
             try {
-                // Build Firestore document — strip "Employee ID" key, keep rest
-                const firestoreData = {};
-                Object.keys(obj).forEach(h => {
-                    if (h !== "Employee ID") firestoreData[h] = obj[h];
-                });
-
-                await setDoc(doc(db, "Employees", empId), firestoreData);
+                await setDoc(doc(db, "Employees", empId), fields);
                 await logAudit("employee-added", {
                     employeeId:   empId,
-                    employeeName: firestoreData["Name"] || empId,
+                    employeeName: fields["Name"] || empId,
                     source:       "excel-upload"
                 });
-                successCount++;
+                addedCount++;
             } catch (err) {
                 uploadErrors.push(`${empId}: ${err.message}`);
             }
         }
 
+        for (const { empId, name, changed } of toUpdate) {
+            try {
+                const before = existing.get(empId) || {};
+
+                // merge:true — columns the file does not carry are left exactly
+                // as they are rather than being dropped from the document.
+                await setDoc(doc(db, "Employees", empId), changed, { merge: true });
+
+                await logAudit("employee-edited", {
+                    employeeId:   empId,
+                    employeeName: name,
+                    changedFields: Object.keys(changed).map(k => ({
+                        field: k,
+                        from:  String(before[k] === undefined ? "" : before[k]),
+                        to:    changed[k]
+                    })),
+                    source: "excel-upload"
+                });
+                updatedCount++;
+            } catch (err) {
+                uploadErrors.push(`${empId}: ${err.message}`);
+            }
+        }
+
+        const done = [];
+        if (addedCount)   done.push(`${addedCount} record(s) added`);
+        if (updatedCount) done.push(`${updatedCount} record(s) updated`);
+
         if (uploadErrors.length > 0) {
             await showAppAlert({
                 title:   "Upload finished with errors",
-                message: `${successCount} record(s) uploaded successfully. ${uploadErrors.length} record(s) failed to save:`,
+                message: `${done.join(", ") || "Nothing was written"}. ${uploadErrors.length} record(s) failed to save:`,
                 type:    "warning",
                 list:    uploadErrors.slice(0, 8)
             });
         } else {
             await showAppAlert({
                 title:   "File uploaded successfully",
-                message: `${successCount} new employee record(s) were added to the directory.`,
+                message: `${done.join(" and ")}.`,
                 type:    "success"
             });
         }
@@ -1841,7 +2103,7 @@ async function saveEmployee() {
         if (!empId) { notify("Employee ID is required.", "error"); return; }
 
         const employeeData = {};
-        document.querySelectorAll("#modalBody input[data-fieldkey]").forEach(input => {
+        document.querySelectorAll("#modalBody input[data-fieldkey], #modalBody textarea[data-fieldkey]").forEach(input => {
             employeeData[input.getAttribute("data-fieldkey")] = input.value;
         });
 
