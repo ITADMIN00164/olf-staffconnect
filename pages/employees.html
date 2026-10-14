@@ -15,12 +15,6 @@
                     📤 Upload via Excel
                     <input type="file" id="uploadExcelInput" accept=".xlsx,.xlsm" style="display:none;">
                 </label>
-                <!-- One-time cleanup. app.js hides this the moment no record
-                     carries a legacy "Dist" field any more. -->
-                <button class="btn-merge-dist" id="mergeDistBtn" style="display:none;"
-                        title="Copy Dist into District and remove the old Dist field">
-                    Merge Dist → District
-                </button>
             </div>
         </div>
     </div>
@@ -145,26 +139,6 @@
 }
 
 .btn-upload-excel:hover { background: #dcfce7; border-color: #86efac; }
-
-/* One-time Dist → District cleanup; hidden once the directory is clean. */
-.btn-merge-dist {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: #fff7ed;
-    color: #c2652a;
-    border: 1px solid #fed7aa;
-    border-radius: 8px;
-    padding: 10px 18px;
-    font-size: 13.5px;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
-    transition: all 0.2s;
-    white-space: nowrap;
-}
-
-.btn-merge-dist:hover { background: #ffedd5; border-color: #fdba74; }
 
 .table-toolbar {
     display: flex;

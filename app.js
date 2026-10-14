@@ -17,7 +17,6 @@ import {
     updateDoc,
     addDoc,
     deleteDoc,
-    deleteField,
     doc,
     query,
     where,
@@ -1366,9 +1365,6 @@ async function initEmployeesPage() {
 
         if (sampleBtn)   sampleBtn.addEventListener("click", downloadSampleExcel);
         if (uploadInput) uploadInput.addEventListener("change", handleExcelUpload);
-
-        const mergeDistBtn = document.getElementById("mergeDistBtn");
-        if (mergeDistBtn) mergeDistBtn.addEventListener("click", mergeDistIntoDistrict);
     }
 
     const table = document.getElementById("employeeTable");
@@ -1396,7 +1392,6 @@ async function loadEmployees() {
         const snapshot = await getDocs(collection(db, "Employees"));
         snapshot.forEach(d => employees.push({ id: d.id, ...d.data() }));
         renderEmployees();
-        refreshMergeDistButton();
     } catch (err) {
         console.error(err);
         notify(err.message, "error");
@@ -1506,10 +1501,10 @@ function renderEmployees() {
         <tr>
             ${currentRole === "Admin" ? `
             <td class="col-actions">
-                <button class="btn-edit"   data-action="edit"   data-id="${emp.id}" title="Edit" aria-label="Edit">✏️</button>
-                <button class="btn-delete" data-action="delete" data-id="${emp.id}" title="Delete" aria-label="Delete">🗑️</button>
+                <button class="btn-edit"   data-action="edit"   data-id="${escHtml(emp.id)}" title="Edit" aria-label="Edit">✏️</button>
+                <button class="btn-delete" data-action="delete" data-id="${escHtml(emp.id)}" title="Delete" aria-label="Delete">🗑️</button>
             </td>` : ""}
-            <td class="col-id"><code style="font-size:12px;color:#6b7280;">${emp.id}</code></td>
+            <td class="col-id"><code style="font-size:12px;color:#6b7280;">${escHtml(emp.id)}</code></td>
             ${tableCols.map(key => {
                 const val = emp[key] || "";
                 const cls = colClass(key);
@@ -1763,138 +1758,6 @@ async function downloadSampleExcel() {
     } catch (err) {
         console.error("Sample download failed:", err);
         notify("Failed to generate sample format: " + err.message, "error");
-    }
-}
-
-/* ====================================
-   ONE-TIME MIGRATION: Dist -> District
-
-   "Dist" predates the State/District/Division/Block columns and means the same
-   thing as "District". This copies each record's Dist value into District and
-   then removes the Dist field, after showing the admin exactly what it is about
-   to do. The button only exists while at least one record still carries a Dist
-   field, so once the directory is clean it disappears by itself.
-
-   An existing District value is never overwritten: if the two disagree the
-   admin is shown both and District is kept.
-==================================== */
-
-const LEGACY_DIST_KEY = "Dist";
-
-function recordsWithDist() {
-    return employees.filter(emp => Object.prototype.hasOwnProperty.call(emp, LEGACY_DIST_KEY));
-}
-
-function refreshMergeDistButton() {
-    const btn = document.getElementById("mergeDistBtn");
-    if (!btn) return;
-    const pending = currentRole === "Admin" ? recordsWithDist().length : 0;
-    btn.style.display = pending > 0 ? "inline-flex" : "none";
-    btn.textContent   = `Merge Dist → District (${pending})`;
-}
-
-async function mergeDistIntoDistrict() {
-    const affected = recordsWithDist();
-
-    if (affected.length === 0) {
-        await showAppAlert({
-            title:   "Nothing to merge",
-            message: "No record carries a Dist field any more.",
-            type:    "info"
-        });
-        refreshMergeDistButton();
-        return;
-    }
-
-    // Work out what each record needs before touching anything.
-    const plan      = [];
-    const conflicts = [];
-
-    affected.forEach(emp => {
-        const distVal     = String(emp[LEGACY_DIST_KEY] === undefined ? "" : emp[LEGACY_DIST_KEY]).trim();
-        const districtVal = String(emp["District"] === undefined ? "" : emp["District"]).trim();
-        const name        = emp["Name"] || emp.id;
-
-        if (distVal === "" || distVal === districtVal) {
-            // Nothing worth keeping - just drop the stale field.
-            plan.push({ emp, name, copy: null });
-            return;
-        }
-
-        if (districtVal === "") {
-            plan.push({ emp, name, copy: distVal });
-            return;
-        }
-
-        // Both filled and different: keep District, report the discrepancy.
-        conflicts.push(`${emp.id} (${name}): District "${districtVal}" kept, Dist "${distVal}" discarded`);
-        plan.push({ emp, name, copy: null });
-    });
-
-    const copies = plan.filter(p => p.copy !== null);
-
-    const preview = [
-        ...copies.map(p => `${p.emp.id} (${p.name}): District ← "${p.copy}"`),
-        ...conflicts
-    ];
-
-    const proceed = await showAppConfirm({
-        title:   "Merge Dist into District?",
-        message: `${copies.length} record(s) will have District filled in from Dist` +
-                 `${conflicts.length ? `, ${conflicts.length} already have a different District and will keep it` : ""}. ` +
-                 `The Dist field is then removed from all ${plan.length} record(s).\n\n` +
-                 `This changes the live directory and cannot be undone.`,
-        type:        "warning",
-        list:        preview.length
-                         ? preview.slice(0, 40).concat(preview.length > 40 ? [`…and ${preview.length - 40} more.`] : [])
-                         : ["Every Dist value is empty or already matches District — only the stale field is removed."],
-        confirmText: `Merge ${plan.length} record(s)`,
-        cancelText:  "Cancel"
-    });
-    if (!proceed) return;
-
-    let doneCount = 0;
-    const failures = [];
-
-    for (const { emp, name, copy } of plan) {
-        try {
-            const patch = { [LEGACY_DIST_KEY]: deleteField() };
-            if (copy !== null) patch["District"] = copy;
-
-            await updateDoc(doc(db, "Employees", emp.id), patch);
-
-            const changedFields = [{ field: LEGACY_DIST_KEY, from: String(emp[LEGACY_DIST_KEY] === undefined ? "" : emp[LEGACY_DIST_KEY]), to: "" }];
-            if (copy !== null) {
-                changedFields.push({ field: "District", from: "", to: copy });
-            }
-
-            await logAudit("employee-edited", {
-                employeeId:   emp.id,
-                employeeName: name,
-                changedFields,
-                source:       "dist-to-district-migration"
-            });
-            doneCount++;
-        } catch (err) {
-            failures.push(`${emp.id}: ${err.message}`);
-        }
-    }
-
-    await loadEmployees();
-
-    if (failures.length) {
-        await showAppAlert({
-            title:   "Merge finished with errors",
-            message: `${doneCount} record(s) merged. ${failures.length} failed:`,
-            type:    "warning",
-            list:    failures.slice(0, 8)
-        });
-    } else {
-        await showAppAlert({
-            title:   "Merge complete",
-            message: `${doneCount} record(s) updated. The Dist column is gone from the directory.`,
-            type:    "success"
-        });
     }
 }
 
