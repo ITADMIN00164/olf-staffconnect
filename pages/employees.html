@@ -310,7 +310,9 @@
     padding: 20px 10px 0;
 }
 
-/* the horizontal bar joining siblings */
+/* Each child draws half the horizontal bar plus the drop into its own card:
+   ::before is the left half, ::after the right half and - through border-left -
+   the vertical line down into the card. */
 .org-tree li::before,
 .org-tree li::after {
     content: "";
@@ -322,17 +324,28 @@
 }
 
 .org-tree li::before { right: 50%; }
-.org-tree li::after  { left: 50%; }
 
-/* a lone child needs only the stem, not a bar */
+.org-tree li::after {
+    left: 50%;
+    border-left: 1.5px solid #b0c4d4;   /* the drop into this child */
+}
+
+/* a lone child sits under the stem, so it needs neither half of a bar */
 .org-tree li:only-child::before,
 .org-tree li:only-child::after { display: none; }
 .org-tree li:only-child { padding-top: 20px; }
 
-/* square off the ends so the bar does not overhang */
+/* the bar must stop at the outermost children rather than overhang them */
 .org-tree li:first-child::before { border: 0; }
 .org-tree li:last-child::after   { border: 0; }
-.org-tree li:last-child::before  { border-right: 1.5px solid #b0c4d4; }
+
+/* clearing ::after took the last child's drop with it, so ::before provides it */
+.org-tree li:last-child::before {
+    border-right: 1.5px solid #b0c4d4;
+    border-radius: 0 6px 0 0;
+}
+
+.org-tree li:first-child::after { border-radius: 6px 0 0 0; }
 
 /* the root sits alone, with no incoming line */
 .org-tree > li { padding-top: 0; }
