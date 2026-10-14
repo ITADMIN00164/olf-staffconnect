@@ -439,6 +439,72 @@
 
 .org-empty { text-align: center; color: #8a9aaa; padding: 40px; font-size: 13px; }
 
+/* ── a team, stacked ──
+
+   Ten reports side by side ran the full width and forced the text down to an
+   unreadable size, with the whole lower half of the window empty. Stacked, the
+   cards stay full size and the list simply scrolls. */
+.org-vtree {
+    width: max-content;
+    min-width: min(100%, 520px);
+    margin: 0 auto;
+}
+
+.org-vhead { margin-bottom: 18px; }
+
+.org-vlist {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 0 44px;
+    position: relative;
+}
+
+.org-vlist li { position: relative; padding: 6px 0; }
+
+/* the rail each child hangs off */
+.org-vlist li::after {
+    content: "";
+    position: absolute;
+    left: -24px;
+    top: 0;
+    bottom: 0;
+    border-left: 1.5px solid #b0c4d4;
+}
+
+/* reach up into the manager's card, and stop at the last child rather than
+   running past it */
+.org-vlist li:first-child::after { top: -18px; }
+.org-vlist li:last-child::after  { bottom: calc(100% - 50% - 1px); }
+
+/* the stub from the rail across to the card */
+.org-vlist li::before {
+    content: "";
+    position: absolute;
+    left: -24px;
+    top: 50%;
+    width: 24px;
+    border-top: 1.5px solid #b0c4d4;
+}
+
+/* card and its open-team button sit on one line */
+.org-vrow { display: flex; align-items: center; gap: 10px; }
+
+.org-vrow .org-node {
+    width: 340px;
+    text-align: left;
+    padding: 10px 14px;
+}
+
+.org-vrow .org-toggle { margin-top: 0; flex: 0 0 auto; }
+
+.org-vhead .org-node { width: 340px; text-align: left; padding: 11px 14px; }
+
+.org-vnone {
+    color: #8a9aaa;
+    font-size: 12.5px;
+    padding: 6px 0 0 4px;
+}
+
 /* ── one team, drilled into ── */
 .org-bar {
     display: flex;

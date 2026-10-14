@@ -1927,20 +1927,24 @@ function orgBranchHtml(id, tree) {
         const showName = e["Designation"] ? e["Name"] : "";
         const below    = countDescendants(eid, childrenOf);
         const mine     = (childrenOf.get(eid) || []).length;
-        return `<li>
-            <div class="org-node${isHead ? " is-root" : ""}"
+        return `<div class="org-node${isHead ? " is-root" : ""}"
                 data-emp="${escHtml(eid)}" title="${escHtml(eid)} \u2014 click for details">
                 <div class="org-role">${escHtml(role)}</div>
                 ${showName ? `<div class="org-name">${escHtml(showName)}</div>` : ""}
                 ${e["Dept"] ? `<div class="org-dept">${escHtml(e["Dept"])}</div>` : ""}
             </div>
             ${!isHead && mine ? `<button class="org-toggle" data-org-toggle="${escHtml(eid)}"
-                    title="Open this team">+${below}</button>` : ""}
-        </li>`;
+                    title="Open this team">+${below}</button>` : ""}`;
     };
 
-    return `<ul class="org-tree">${card(id, true).replace("</li>",
-        (kids.length ? `<ul>${kids.map(k => card(k, false)).join("")}</ul>` : "") + "</li>")}</ul>`;
+    return `<div class="org-vtree">
+        <div class="org-vhead">${card(id, true)}</div>
+        ${kids.length
+            ? `<ul class="org-vlist">${
+                kids.map(k => `<li><div class="org-vrow">${card(k, false)}</div></li>`).join("")
+              }</ul>`
+            : `<div class="org-vnone">No one reports to them.</div>`}
+    </div>`;
 }
 
 function renderOrgBranch() {
@@ -1970,6 +1974,8 @@ function renderOrgBranch() {
     fitOrgBranchToWidth();
 }
 
+/* The stacked layout is narrow by design, so this only has to step in when a
+   card is unusually wide. Height is left to scroll. */
 function fitOrgBranchToWidth(tries = 0) {
     const body   = document.getElementById("orgBranchBody");
     const canvas = body && body.querySelector(".org-canvas");
@@ -1982,9 +1988,11 @@ function fitOrgBranchToWidth(tries = 0) {
     }
     canvas.style.zoom = 1;
     const full = canvas.scrollWidth;
-    const fit  = full > avail ? Math.max(0.3, Math.floor((avail / full) * 100) / 100) : 1;
-    canvas.style.zoom = fit;
-    body.scrollLeft = Math.max(0, (body.scrollWidth - body.clientWidth) / 2);
+    canvas.style.zoom = full > avail
+        ? Math.max(0.3, Math.floor((avail / full) * 100) / 100)
+        : 1;
+    body.scrollLeft = 0;
+    body.scrollTop  = 0;
 }
 
 function openOrgBranch(id) {
