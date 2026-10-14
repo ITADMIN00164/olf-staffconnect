@@ -103,6 +103,12 @@ const CORE_FIELDS = [
     { key: "Mobile",            label: "Mobile",           placeholder: "Phone number"    },
     { key: "Reporting manager", label: "Reporting Manager",placeholder: "Manager's name"  },
 
+    // Someone who leaves is marked Inactive rather than deleted, so their
+    // record survives for history. Absent counts as Active: the directory
+    // predates this field and nobody should have to backfill 166 rows.
+    { key: "Status",            label: "Status",           placeholder: "Active",
+                                optional: true, choices: ["Active", "Inactive"] },
+
     // Geography, widest area first: State > Division > District > Block. These
     // arrived after the directory was already live, so every one of them is
     // optional - an Excel file prepared before they existed still validates,
@@ -123,6 +129,14 @@ const CORE_KEYS = CORE_FIELDS.map(f => f.key);
 
 // Columns an uploaded file is allowed to leave out entirely (see above).
 const OPTIONAL_KEYS = new Set(CORE_FIELDS.filter(f => f.optional).map(f => f.key));
+
+const STATUS_VALUES = ["Active", "Inactive"];
+
+/* A record with no Status is Active - the field arrived after the directory
+   did, so absence means "nobody has said otherwise". */
+function isActiveEmployee(emp) {
+    return String((emp || {})["Status"] || "").trim().toLowerCase() !== "inactive";
+}
 
 /* A blank cell never erases anything, which is what keeps an upload from
    wiping columns it simply does not carry. Clearing a value therefore has to be
@@ -1352,6 +1366,52 @@ async function initEmployeesPage() {
     const closeBtn2 = document.getElementById("closeModalBtn2");
     const excelBtn  = document.getElementById("downloadExcelBtn");
 
+    const orgBtn   = document.getElementById("orgChartBtn");
+    const closeOrg = document.getElementById("closeOrgBtn");
+
+    if (orgBtn)   orgBtn.addEventListener("click", openOrgChart);
+    if (closeOrg) closeOrg.addEventListener("click", closeOrgChart);
+    bindOrgEscape();
+
+    const branchBack  = document.getElementById("orgBranchBack");
+    const branchClose = document.getElementById("orgBranchClose");
+    const branchBody  = document.getElementById("orgBranchBody");
+    if (branchBack)  branchBack.addEventListener("click", orgBranchBack);
+    if (branchClose) branchClose.addEventListener("click", closeOrgBranch);
+    if (branchBody) {
+        branchBody.addEventListener("click", (e) => {
+            const open = e.target.closest("button[data-org-toggle]");
+            if (open) { openOrgBranch(open.dataset.orgToggle); return; }
+            const card = e.target.closest(".org-node[data-emp]");
+            if (card) openOrgPerson(card.dataset.emp);
+        });
+    }
+
+    const zoomIn    = document.getElementById("orgZoomIn");
+    const zoomOut   = document.getElementById("orgZoomOut");
+    const zoomReset = document.getElementById("orgZoomReset");
+    if (zoomIn)    zoomIn.addEventListener("click", () => setOrgZoom(orgZoom + 0.1));
+    if (zoomOut)   zoomOut.addEventListener("click", () => setOrgZoom(orgZoom - 0.1));
+    if (zoomReset) zoomReset.addEventListener("click", () => setOrgZoom(1));
+
+    const orgBody = document.getElementById("orgBody");
+    if (orgBody) {
+        orgBody.addEventListener("click", (e) => {
+            const btn = e.target.closest("button[data-org-toggle]");
+            if (btn) { openOrgBranch(btn.dataset.orgToggle); return; }
+
+            const card = e.target.closest(".org-node[data-emp]");
+            if (card) openOrgPerson(card.dataset.emp);
+        });
+
+    const personClose = document.getElementById("orgPersonClose");
+    const personModal = document.getElementById("orgPersonModal");
+    if (personClose) personClose.addEventListener("click", closeOrgPerson);
+    if (personModal) personModal.addEventListener("click", (e) => {
+        if (e.target === personModal) closeOrgPerson();   // click the backdrop
+    });
+    }
+
     if (addBtn)    addBtn.addEventListener("click", openAddModal);
     if (searchBox) searchBox.addEventListener("input", renderEmployees);
     if (closeBtn)  closeBtn.addEventListener("click", closeModal);
@@ -1411,7 +1471,7 @@ function colClass(key) {
         "Name": "col-name", "Designation": "col-desig", "Dept": "col-dept",
         "Email": "col-email", "Location": "col-location",
         "Mobile": "col-extra", "Reporting manager": "col-extra",
-        "State": "col-geo",
+        "Status": "col-status", "State": "col-geo",
         "Division": "col-multi", "District": "col-multi", "Block": "col-multi"
     };
     return map[key] || "col-extra";
@@ -1498,7 +1558,7 @@ function renderEmployees() {
     }
 
     tableEl.innerHTML = filtered.map(emp => `
-        <tr>
+        <tr class="${isActiveEmployee(emp) ? "" : "row-inactive"}">
             ${currentRole === "Admin" ? `
             <td class="col-actions">
                 <button class="btn-edit"   data-action="edit"   data-id="${escHtml(emp.id)}" title="Edit" aria-label="Edit">✏️</button>
@@ -1508,6 +1568,11 @@ function renderEmployees() {
             ${tableCols.map(key => {
                 const val = emp[key] || "";
                 const cls = colClass(key);
+                if (key === "Status") {
+                    const active = isActiveEmployee(emp);
+                    return `<td class="${cls}"><span class="badge-status${active ? "" : " is-inactive"}">${
+                        active ? "Active" : "Inactive"}</span></td>`;
+                }
                 if (MULTI_VALUE_FIELDS[key]) return `<td class="${cls}">${multiCellHtml(val, emp.id, key)}</td>`;
                 if (key === "Dept") return `<td class="${cls}"><span class="badge-dept">${escHtml(val) || "—"}</span></td>`;
                 if (key === "Email" && val) return `<td class="${cls}"><a href="mailto:${escHtml(val)}" style="color:#4f8ef7;text-decoration:none;">${escHtml(val)}</a></td>`;
@@ -1515,6 +1580,468 @@ function renderEmployees() {
             }).join("")}
         </tr>
     `).join("");
+}
+
+/* ====================================
+   ORGANISATION CHART
+
+   The hierarchy already exists in the data: every record carries a
+   "Reporting manager" holding that manager's email, so matching it against
+   Email gives parent -> child. Nothing is hardcoded, so the chart follows the
+   directory as it changes.
+
+   Two things the data cannot be trusted to guarantee, both handled below:
+   a manager email that matches nobody (those people are shown separately
+   rather than dropped), and a reporting loop created by an edit, which would
+   otherwise recurse until the page died.
+==================================== */
+
+function allActiveEmployees() {
+    return employees.filter(isActiveEmployee);
+}
+
+let orgCollapsed = new Set();   // ids whose children are hidden
+let orgZoom      = 1;           // 0.3 .. 1, applied to the tree canvas
+
+function buildOrgTree() {
+    // The chart is who is here now, so people who have left are left out.
+    const active = allActiveEmployees();
+
+    const byEmail = new Map();
+    active.forEach(emp => {
+        const mail = String(emp["Email"] || "").trim().toLowerCase();
+        if (mail && !byEmail.has(mail)) byEmail.set(mail, emp.id);
+    });
+
+    const childrenOf = new Map();
+    const roots      = [];
+    const orphans    = [];
+
+    active.forEach(emp => {
+        const mgrMail = String(emp["Reporting manager"] || "").trim().toLowerCase();
+        if (!mgrMail) { roots.push(emp.id); return; }
+
+        const mgrId = byEmail.get(mgrMail);
+        if (!mgrId || mgrId === emp.id) { orphans.push({ id: emp.id, mgrMail }); return; }
+
+        if (!childrenOf.has(mgrId)) childrenOf.set(mgrId, []);
+        childrenOf.get(mgrId).push(emp.id);
+    });
+
+    const byId = new Map(active.map(emp => [emp.id, emp]));
+    const name = id => String((byId.get(id) || {})["Name"] || id).toLowerCase();
+    childrenOf.forEach(list => list.sort((a, b) => name(a).localeCompare(name(b))));
+
+    return { byId, childrenOf, roots, orphans };
+}
+
+function countDescendants(id, childrenOf, seen = new Set()) {
+    if (seen.has(id)) return 0;
+    seen.add(id);
+    return (childrenOf.get(id) || [])
+        .reduce((n, kid) => n + 1 + countDescendants(kid, childrenOf, seen), 0);
+}
+
+function orgNodeHtml(id, tree, depth, seen) {
+    const { byId, childrenOf } = tree;
+    const emp = byId.get(id);
+    if (!emp) return "";
+
+    // A reporting loop would recurse forever; stop and say so instead.
+    if (seen.has(id)) {
+        return `<li><div class="org-node is-orphan">
+            <div class="org-role">${escHtml(emp["Name"] || id)}</div>
+            <div class="org-name">Reporting loop \u2014 not expanded</div>
+        </div></li>`;
+    }
+    const nextSeen = new Set(seen).add(id);
+
+    const kids      = childrenOf.get(id) || [];
+    const collapsed = orgCollapsed.has(id);
+    const role      = emp["Designation"] || emp["Name"] || id;
+    const showName  = emp["Designation"] ? emp["Name"] : "";
+
+    let html = `<li><div class="org-node${depth === 0 ? " is-root" : ""}"
+        data-emp="${escHtml(id)}" title="${escHtml(emp.id)} — click for details">
+        <div class="org-role">${escHtml(role)}</div>
+        ${showName ? `<div class="org-name">${escHtml(showName)}</div>` : ""}
+        ${emp["Dept"] ? `<div class="org-dept">${escHtml(emp["Dept"])}</div>` : ""}
+    </div>`;
+
+    if (kids.length) {
+        const total = countDescendants(id, childrenOf);
+        html += `<button class="org-toggle" data-org-toggle="${escHtml(id)}"
+                    title="${collapsed ? "Show" : "Hide"} reports">${
+            collapsed ? `+${total}` : "\u2212"
+        }</button>`;
+        if (!collapsed) {
+            html += `<ul>${kids.map(k => orgNodeHtml(k, tree, depth + 1, nextSeen)).join("")}</ul>`;
+        }
+    }
+
+    return html + `</li>`;
+}
+
+function renderOrgChart() {
+    const body = document.getElementById("orgBody");
+    const meta = document.getElementById("orgMeta");
+    if (!body) return;
+
+    const keepLeft = body.scrollLeft;
+    const keepTop  = body.scrollTop;
+
+    const tree = buildOrgTree();
+    const { byId, childrenOf, roots, orphans } = tree;
+    const active   = allActiveEmployees();
+    const inactive = employees.length - active.length;
+
+    if (!active.length) {
+        body.innerHTML = `<div class="org-empty">No employees loaded yet.</div>`;
+        if (meta) meta.textContent = "";
+        return;
+    }
+
+    // Track who actually made it onto the page, so nobody is silently lost.
+    const drawn = new Set();
+    const mark = (id, seen) => {
+        if (seen.has(id)) return;
+        const next = new Set(seen).add(id);
+        drawn.add(id);
+        (childrenOf.get(id) || []).forEach(kid => mark(kid, next));
+    };
+
+    let html = "";
+
+    roots.forEach(r => mark(r, new Set()));
+    html += roots.map(r => `<ul class="org-tree">${orgNodeHtml(r, tree, 0, new Set())}</ul>`).join("");
+
+    // A manager email matching nobody would drop that person and everyone under
+    // them, so they are shown here instead. The chart only ever draws people
+    // who are in this directory, so the manager who could not be found is
+    // deliberately not named - only the staff who are actually employees.
+    if (orphans.length) {
+        const ids = orphans.map(o => o.id);
+        ids.forEach(id => mark(id, new Set()));
+
+        html += `<div class="org-group-title">Not linked to the chart</div>
+                 <div class="org-group-note">Their Reporting manager is not an active employee in this
+                 directory, so they have no place in the tree above.</div>
+                 <ul class="org-tree">${
+                     ids.map(id => orgNodeHtml(id, tree, 1, new Set())).join("")
+                 }</ul>`;
+    }
+
+    // Whatever is left can only be a reporting loop that no root leads into.
+    const stranded = active.map(e => e.id).filter(id => !drawn.has(id));
+    if (stranded.length) {
+        html += `<div class="org-group-title">In a reporting loop</div>
+                 <div class="org-group-note">These records report to each other in a circle, so they have no path to the top. Fix a Reporting manager to place them.</div>`;
+        stranded.forEach(id => {
+            if (drawn.has(id)) return;   // already covered by an earlier loop
+            mark(id, new Set());
+            html += `<ul class="org-tree">${orgNodeHtml(id, tree, 1, new Set())}</ul>`;
+        });
+    }
+
+    body.innerHTML = `<div class="org-canvas" style="zoom:${orgZoom}">${html}</div>`;
+    body.scrollLeft = keepLeft;
+    body.scrollTop  = keepTop;
+
+    if (meta) {
+        const bits = [`${active.length} people`];
+        if (roots.length)     bits.push(`${roots.length === 1 ? "1 top" : roots.length + " tops"}`);
+        if (orphans.length)   bits.push(`${orphans.length} unlinked`);
+        if (stranded.length)  bits.push(`${stranded.length} in a loop`);
+        if (inactive)         bits.push(`${inactive} inactive hidden`);
+        meta.textContent = bits.join(" \u00b7 ");
+    }
+}
+
+/* Collapse everything below `depth`, counting the root as depth 0. */
+function setOrgDepth(depth) {
+    const { childrenOf, roots, orphans } = buildOrgTree();
+    orgCollapsed = new Set();
+
+    if (depth !== Infinity) {
+        const visited = new Set();
+        const walk = (id, d, seen) => {
+            if (seen.has(id)) return;
+            const next = new Set(seen).add(id);
+            visited.add(id);
+            const kids = childrenOf.get(id) || [];
+            if (!kids.length) return;
+            if (d >= depth) orgCollapsed.add(id);
+            kids.forEach(k => walk(k, d + 1, next));
+        };
+
+        roots.forEach(r => walk(r, 0, new Set()));
+        // the unlinked and looping groups are drawn one level in, so they start
+        // from depth 1 - and only the ones no root already reached, or the root
+        // itself would be treated as a depth-1 node and collapsed.
+        orphans.forEach(o => walk(o.id, 1, new Set()));
+        employees.forEach(e => { if (!visited.has(e.id)) walk(e.id, 1, new Set()); });
+    }
+    renderOrgChart();
+}
+
+/* The tree is far wider than any screen, so put the top of the house in the
+   middle of the view instead of opening on whichever branch sorts first. */
+function centreOrgOnRoot() {
+    const body = document.getElementById("orgBody");
+    const root = body && body.querySelector(".org-node.is-root");
+    if (!body || !root) return;
+    const r = root.getBoundingClientRect();
+    const b = body.getBoundingClientRect();
+    body.scrollLeft += (r.left + r.width / 2) - (b.left + b.width / 2);
+}
+
+function setOrgZoom(next) {
+    orgZoom = Math.min(1, Math.max(0.3, Math.round(next * 100) / 100));
+    const label = document.getElementById("orgZoomReset");
+    if (label) label.textContent = `${Math.round(orgZoom * 100)}%`;
+    renderOrgChart();
+    centreOrgOnRoot();
+}
+
+/* Shrink until the tree fits the window, so opening the chart shows the whole
+   top of the house instead of a slice of it. Never below 30% - past that the
+   names stop being readable and a picture of boxes is no use. */
+/* clientWidth counts the padding, which the tree cannot actually occupy, so
+   fitting against it leaves a few pixels of overflow and a stray scrollbar. */
+function orgContentWidth(el) {
+    const cs = getComputedStyle(el);
+    return el.clientWidth - parseFloat(cs.paddingLeft || 0) - parseFloat(cs.paddingRight || 0);
+}
+
+function fitOrgToWidth(tries = 0) {
+    const body   = document.getElementById("orgBody");
+    const canvas = body && body.querySelector(".org-canvas");
+    if (!body || !canvas) return;
+
+    // Called straight after the modal is shown, so the first measurement can
+    // land before layout: clientWidth reads 0, the ratio works out as 0 and the
+    // chart snaps to the 30% floor for no reason. Wait a frame instead.
+    const avail = orgContentWidth(body);
+    if (avail <= 0) {
+        if (tries < 10) requestAnimationFrame(() => fitOrgToWidth(tries + 1));
+        return;
+    }
+
+    canvas.style.zoom = 1;              // measure at full size, not the current zoom
+    const full = canvas.scrollWidth;
+    canvas.style.zoom = orgZoom;        // put it back before deciding
+
+    setOrgZoom(full > avail ? Math.floor((avail / full) * 100) / 100 : 1);
+}
+
+function openOrgChart() {
+    // One level deep is the whole leadership team; going deeper by default runs
+    // to ten thousand pixels before you have clicked anything. Branches open on
+    // demand.
+    orgZoom = 1;
+    orgBranchStack = [];
+    setOrgDepth(1);
+    document.getElementById("orgModal")?.classList.add("open");
+    fitOrgToWidth();     // after .open, or the modal has no width to measure
+}
+
+/* One person's details, opened from their card in the chart. Every value comes
+   from that employee's own record. The manager is named only when they are an
+   employee here too - the chart never puts a name to someone outside the
+   directory. */
+function openOrgPerson(id) {
+    const emp = employees.find(e => e.id === id);
+    if (!emp) return;
+
+    const nameEl = document.getElementById("orgPersonName");
+    const roleEl = document.getElementById("orgPersonRole");
+    const bodyEl = document.getElementById("orgPersonBody");
+    if (!nameEl || !bodyEl) return;
+
+    nameEl.textContent = emp["Name"] || emp.id;
+    roleEl.textContent = [emp["Designation"], emp["Dept"]].filter(Boolean).join(" \u00b7 ");
+
+    const row = (label, valueHtml) =>
+        `<div class="org-person-row">
+            <div class="org-person-key">${escHtml(label)}</div>
+            <div class="org-person-val">${valueHtml}</div>
+        </div>`;
+
+    const plain = (label, value) =>
+        value ? row(label, escHtml(value)) : "";
+
+    // Division, District and Block hold lists; show how many and let them scroll.
+    const listRow = (label, value) => {
+        const items = splitMulti(value);
+        if (!items.length) return "";
+        if (items.length === 1) return row(label, escHtml(items[0]));
+        const nouns = MULTI_VALUE_FIELDS[label];
+        return row(label,
+            `<span class="org-person-count">${items.length} ${nouns ? nouns.many : "entries"}</span>
+             <div class="org-person-list">${items.map(escHtml).join("<br>")}</div>`);
+    };
+
+    const { byId, childrenOf } = buildOrgTree();
+    const reports = (childrenOf.get(id) || []).length;
+    const mgrMail = String(emp["Reporting manager"] || "").trim().toLowerCase();
+    const mgr     = mgrMail
+        ? employees.find(e => String(e["Email"] || "").trim().toLowerCase() === mgrMail && e.id !== id)
+        : null;
+
+    bodyEl.innerHTML = [
+        plain("Employee ID", emp.id),
+        emp["Email"]  ? row("Email", `<a href="mailto:${escHtml(emp["Email"])}">${escHtml(emp["Email"])}</a>`) : "",
+        emp["Mobile"] ? row("Mobile", `<a href="tel:${escHtml(emp["Mobile"])}">${escHtml(emp["Mobile"])}</a>`) : "",
+        plain("Location", emp["Location"]),
+        plain("State", emp["State"]),
+        listRow("Division", emp["Division"]),
+        listRow("District", emp["District"]),
+        listRow("Block", emp["Block"]),
+        mgr ? plain("Reports to", mgr["Name"] || mgr.id) : "",
+        reports ? row("Direct reports", `<span class="org-person-count">${reports}</span>`) : ""
+    ].join("");
+
+    document.getElementById("orgPersonModal")?.classList.add("open");
+}
+
+/* ---- drilling into one team ----
+
+   Expanding in place pushed every sibling sideways and the chart stopped being
+   readable after a click or two. Each team gets its own view instead: the
+   manager, their direct reports, and a way back up. The stack is the trail of
+   managers drilled through, so Back always returns one level. */
+
+let orgBranchStack = [];
+
+function orgBranchHtml(id, tree) {
+    const { byId, childrenOf } = tree;
+    const emp = byId.get(id);
+    if (!emp) return "";
+
+    const kids = childrenOf.get(id) || [];
+
+    const card = (eid, isHead) => {
+        const e = byId.get(eid);
+        if (!e) return "";
+        const role     = e["Designation"] || e["Name"] || eid;
+        const showName = e["Designation"] ? e["Name"] : "";
+        const below    = countDescendants(eid, childrenOf);
+        const mine     = (childrenOf.get(eid) || []).length;
+        return `<div class="org-node${isHead ? " is-root" : ""}"
+                data-emp="${escHtml(eid)}" title="${escHtml(eid)} \u2014 click for details">
+                <div class="org-role">${escHtml(role)}</div>
+                ${showName ? `<div class="org-name">${escHtml(showName)}</div>` : ""}
+                ${e["Dept"] ? `<div class="org-dept">${escHtml(e["Dept"])}</div>` : ""}
+            </div>
+            ${!isHead && mine ? `<button class="org-toggle" data-org-toggle="${escHtml(eid)}"
+                    title="Open this team">+${below}</button>` : ""}`;
+    };
+
+    return `<div class="org-vtree">
+        <div class="org-vhead">${card(id, true)}</div>
+        ${kids.length
+            ? `<ul class="org-vlist">${
+                kids.map(k => `<li><div class="org-vrow">${card(k, false)}</div></li>`).join("")
+              }</ul>`
+            : `<div class="org-vnone">No one reports to them.</div>`}
+    </div>`;
+}
+
+function renderOrgBranch() {
+    const body  = document.getElementById("orgBranchBody");
+    const title = document.getElementById("orgBranchTitle");
+    const crumb = document.getElementById("orgBranchCrumbs");
+    if (!body || !orgBranchStack.length) return;
+
+    const tree = buildOrgTree();
+    const id   = orgBranchStack[orgBranchStack.length - 1];
+    const emp  = tree.byId.get(id);
+    if (!emp) { closeOrgBranch(); return; }
+
+    const kids  = (tree.childrenOf.get(id) || []).length;
+    const below = countDescendants(id, tree.childrenOf);
+
+    if (title) {
+        title.textContent = `${emp["Name"] || id}` +
+            (emp["Designation"] ? ` \u00b7 ${emp["Designation"]}` : "");
+    }
+    if (crumb) {
+        crumb.textContent = `${kids} direct` + (below !== kids ? ` \u00b7 ${below} in total` : "");
+    }
+
+    body.innerHTML = `<div class="org-canvas" style="zoom:${orgZoom}">${orgBranchHtml(id, tree)}</div>`;
+    body.scrollLeft = 0;
+    fitOrgBranchToWidth();
+}
+
+/* The stacked layout is narrow by design, so this only has to step in when a
+   card is unusually wide. Height is left to scroll. */
+function fitOrgBranchToWidth(tries = 0) {
+    const body   = document.getElementById("orgBranchBody");
+    const canvas = body && body.querySelector(".org-canvas");
+    if (!body || !canvas) return;
+
+    const avail = orgContentWidth(body);
+    if (avail <= 0) {
+        if (tries < 10) requestAnimationFrame(() => fitOrgBranchToWidth(tries + 1));
+        return;
+    }
+    canvas.style.zoom = 1;
+    const full = canvas.scrollWidth;
+    canvas.style.zoom = full > avail
+        ? Math.max(0.3, Math.floor((avail / full) * 100) / 100)
+        : 1;
+    body.scrollLeft = 0;
+    body.scrollTop  = 0;
+}
+
+function openOrgBranch(id) {
+    orgBranchStack.push(id);
+    document.getElementById("orgBranchModal")?.classList.add("open");
+    renderOrgBranch();
+    const back = document.getElementById("orgBranchBack");
+    if (back) back.textContent = orgBranchStack.length > 1 ? "\u2190 Back" : "\u2190 Chart";
+}
+
+function orgBranchBack() {
+    orgBranchStack.pop();
+    if (!orgBranchStack.length) { closeOrgBranch(); return; }
+    renderOrgBranch();
+    const back = document.getElementById("orgBranchBack");
+    if (back) back.textContent = orgBranchStack.length > 1 ? "\u2190 Back" : "\u2190 Chart";
+}
+
+function closeOrgBranch() {
+    orgBranchStack = [];
+    document.getElementById("orgBranchModal")?.classList.remove("open");
+}
+
+function closeOrgPerson() {
+    document.getElementById("orgPersonModal")?.classList.remove("open");
+}
+
+/* Escape closes the details popup first, then the chart. Bound once: this page
+   is re-entered every time the user navigates back to it, and a listener on
+   document would otherwise stack up one copy per visit. */
+let orgEscBound = false;
+
+function bindOrgEscape() {
+    if (orgEscBound) return;
+    orgEscBound = true;
+    document.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape") return;
+        if (document.getElementById("orgPersonModal")?.classList.contains("open")) {
+            closeOrgPerson();
+        } else if (document.getElementById("orgBranchModal")?.classList.contains("open")) {
+            orgBranchBack();
+        } else if (document.getElementById("orgModal")?.classList.contains("open")) {
+            closeOrgChart();
+        }
+    });
+}
+
+function closeOrgChart() {
+    document.getElementById("orgModal")?.classList.remove("open");
 }
 
 /* ====================================
@@ -1595,6 +2122,21 @@ function fieldHtml(field, empData) {
     `;
     }
 
+    if (field.choices) {
+        // default a brand-new record to the first choice rather than to blank
+        const current = String(val || field.choices[0]);
+        return `
+        <div class="form-group">
+            <label>${field.label}</label>
+            <select id="${inputId}" data-fieldkey="${field.key}">
+                ${field.choices.map(c =>
+                    `<option value="${escHtml(c)}"${c === current ? " selected" : ""}>${escHtml(c)}</option>`
+                ).join("")}
+            </select>
+        </div>
+    `;
+    }
+
     const inputType = field.type || "text";
     return `
         <div class="form-group">
@@ -1653,7 +2195,8 @@ async function editEmployee(empId) {
 async function deleteEmployeeRecord(empId) {
     const confirmed = await showAppConfirm({
         title: "Delete employee?",
-        message: `Delete employee ${empId}? This cannot be undone.`,
+        message: `Delete employee ${empId}? This cannot be undone.\n\n` +
+                 `To keep the record for history, set Status to Inactive instead.`,
         type: "error",
         confirmText: "Delete",
         cancelText: "Cancel"
@@ -1741,6 +2284,7 @@ async function downloadSampleExcel() {
                 "Email":              "john.doe@openlinksfoundation.org",
                 "Mobile":             "9876543210",
                 "Reporting manager":  "Jane Smith",
+                "Status":             "Active",
                 "State":              "Maharashtra",
                 "District":           "Pune",
                 "Division":           "Pune",
@@ -1924,6 +2468,18 @@ async function handleExcelUpload(e) {
                 return;
             }
 
+            // Status drives whether someone shows in the chart, so a typo here
+            // would quietly take them out of it.
+            const status = obj["Status"];
+            if (status && !isClearToken(status) &&
+                !STATUS_VALUES.some(v => v.toLowerCase() === status.toLowerCase())) {
+                errors.push(`Row ${rowNum} (${empId}): Status must be Active or Inactive.`);
+                return;
+            }
+            if (status && !isClearToken(status)) {
+                obj["Status"] = STATUS_VALUES.find(v => v.toLowerCase() === status.toLowerCase());
+            }
+
             // Only recognised columns are written; anything else in the file is
             // ignored (the admin was warned about those above).
             const fields = {};
@@ -2103,7 +2659,7 @@ async function saveEmployee() {
         if (!empId) { notify("Employee ID is required.", "error"); return; }
 
         const employeeData = {};
-        document.querySelectorAll("#modalBody input[data-fieldkey], #modalBody textarea[data-fieldkey]").forEach(input => {
+        document.querySelectorAll("#modalBody input[data-fieldkey], #modalBody textarea[data-fieldkey], #modalBody select[data-fieldkey]").forEach(input => {
             employeeData[input.getAttribute("data-fieldkey")] = input.value;
         });
 
