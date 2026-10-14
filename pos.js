@@ -109,7 +109,7 @@ function showTopTab(tab) {
         else {
             // Never fail silently: a missing script used to leave the form frozen.
             const body = document.getElementById("prBody");
-            if (body) body.innerHTML = '<div class="pr-empty">The dashboard script is not loaded. Make sure ' +
+            if (body) body.innerHTML = '<div class="pr-empty pr-error">The dashboard script is not loaded. Make sure ' +
                 '<b>pos-review.js</b> is in the project root and index.html has ' +
                 '<code>&lt;script src="pos-review.js"&gt;&lt;/script&gt;</code> after pos.js.</div>';
         }
@@ -3166,4 +3166,4 @@ window.POSAdmin = {
     openAcadModal, onAcadPoIdChange, closeAcadModal, saveAcadRow, deleteAcadRow,
     loadTargetRows, renderTargetsTable, downloadTgtSample, downloadTgtCurrent, uploadTargets,
     openTgtModal, onTgtPoIdChange, closeTgtModal, saveTgtRow, deleteTgtRow
-};
+};

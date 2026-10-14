@@ -481,7 +481,7 @@
   function mount() {
     var root = $("ftrRoot"); if (!root || root.dataset.mounted === "1") return;
     root.dataset.mounted = "1";
-    if (!window.posSupabase) { prBody('<div class="pr-empty">Supabase client not loaded — check that pos-supabase.js is included.</div>'); return; }
+    if (!window.posSupabase) { prBody('<div class="pr-empty pr-error">Supabase client not loaded — check that pos-supabase.js is included.</div>'); return; }
     wireNav(); wireFilters(); wireMonthly(); sumWire();
     if ($("prModalSave")) $("prModalSave").addEventListener("click", saveTextModal);
     if ($("prModalClose")) $("prModalClose").addEventListener("click", closeTextModal);
@@ -524,7 +524,7 @@
   }
   function loadBaseData() {
     setLoadingDropdowns();
-    prBody('<div class="pr-empty">Loading base data\u2026</div>');
+    prBody('<div class="pr-empty pr-loading">Loading base data\u2026</div>');
     sbGetBaseData().then(function (data) {
       state.base = data;
       var mo = $("prMonth"); mo.innerHTML = "";
@@ -536,7 +536,7 @@
       sumFillFromBase();
       prBody('<div class="pr-empty">Choose a review unit, a value and a month, then open the review.</div>');
     }).catch(function (e) {
-      prBody('<div class="pr-empty">Couldn\'t load base data: ' + esc(e.message || String(e)) + '</div>');
+      prBody('<div class="pr-empty pr-error">Couldn\'t load base data: ' + esc(e.message || String(e)) + '</div>');
       resetDropdowns();
     });
   }
@@ -567,10 +567,10 @@
     if (!unit || !value || !month) return;
     DIRTY = {};
     SELWK = { 1: true, 2: true, 3: true, 4: true, 5: true };
-    prBody('<div class="pr-empty">Loading review…</div>');
+    prBody('<div class="pr-empty pr-loading">Loading review…</div>');
     sbGetWeeklyView(unit, value, month).then(function (data) {
       VIEW = data; renderWeeklyView();
-    }).catch(function (e) { prBody('<div class="pr-empty">Couldn\'t load: ' + esc(e.message || String(e)) + "</div>"); });
+    }).catch(function (e) { prBody('<div class="pr-empty pr-error">Couldn\'t load: ' + esc(e.message || String(e)) + "</div>"); });
   }
 
   function hasData(wk) {
@@ -651,6 +651,17 @@
     if (canEdit && $("prSave")) $("prSave").addEventListener("click", saveAll);
   }
 
+  // Display only: up to two initials for the avatar in the header card.
+  function initials(s) {
+    var p = String(s || "").replace(/[^A-Za-zऀ-ॿ\s]+/g, " ").trim().split(/\s+/).filter(Boolean);
+    if (!p.length) return "?";
+    return (p[0].charAt(0) + (p.length > 1 ? p[p.length - 1].charAt(0) : "")).toUpperCase();
+  }
+  function headCard(name, inner, role) {
+    return '<div class="pr-panel pr-po"><span class="pr-avatar" aria-hidden="true">' + esc(initials(name)) + '</span>'
+      + '<div class="pr-po-main">' + inner + '</div>'
+      + '<span class="pr-role pr-role-' + esc(String(role || "PO").toLowerCase()) + '">' + esc(role || "PO") + '</span></div>';
+  }
   function renderHeader(h) {
     if (h.po) {
       var line = [];
@@ -661,9 +672,9 @@
       else line.push("PM vacant");
       if (h.dm && h.dm.name) line.push("DM " + esc(h.dm.name));
       if (h.coo && h.coo.name) line.push("COO " + esc(h.coo.name));
-      return '<div class="pr-panel pr-po"><div class="pr-po-name">' + esc(h.po.name)
+      return headCard(h.po.name, '<div class="pr-po-name">' + esc(h.po.name)
         + '<small>' + esc(h.po.empId) + (h.po.designation ? " · " + esc(h.po.designation) : "") + '</small></div>'
-        + '<div class="pr-po-line">' + line.join('<span class="sep">·</span>') + '</div></div>';
+        + '<div class="pr-po-line">' + line.join('<span class="sep">·</span>') + '</div>', "PO");
     }
     // aggregate (PM / DM / District)
     var line = [], title, sub;
@@ -679,9 +690,9 @@
     } else {
       title = h.district || "District"; sub = (h.poCount || 0) + " POs" + (h.division ? " · " + esc(h.division) + " division" : "");
     }
-    return '<div class="pr-panel pr-po"><div class="pr-po-name">' + esc(title) + '<small>' + esc(sub) + '</small></div>'
+    return headCard(title, '<div class="pr-po-name">' + esc(title) + '<small>' + esc(sub) + '</small></div>'
       + '<div class="pr-po-line">' + (line.length ? line.join('<span class="sep">·</span>') + '<span class="sep">·</span>' : "")
-      + '<span class="pr-mut">view only</span></div></div>';
+      + '<span class="pr-mut">view only</span></div>', h.unit || "District");
   }
 
   function renderBlocks(h, v) {
@@ -691,7 +702,7 @@
       var mc = v.roster.members.map(function (m) {
         return '<span class="pr-chip">' + esc(m.name) + (m.total ? ' <code>' + m.total + ' PO' + (m.total > 1 ? "s" : "") + '</code>' : "") + '</span>';
       }).join("");
-      return '<div class="pr-panel"><div class="pr-blocks-h">Team — ' + kind + '<b>' + v.roster.members.length + '</b></div><div class="pr-chips">' + mc + '</div></div>';
+      return '<div class="pr-panel pr-blocks"><div class="pr-blocks-h">Team — ' + kind + '<b>' + v.roster.members.length + '</b></div><div class="pr-chips">' + mc + '</div></div>';
     }
     var blocks = h.blocks || []; if (!blocks.length) return "";
     var chips = blocks.map(function (b) {
@@ -700,7 +711,7 @@
       if (m) { code = m[1].replace(/\s/g, ""); name = m[2]; }
       return '<span class="pr-chip">' + (code ? '<code>' + esc(code) + '</code>' : "") + esc(name) + '</span>';
     }).join("");
-    return '<div class="pr-panel"><div class="pr-blocks-h">Blocks reviewed<b>' + blocks.length + '</b></div>'
+    return '<div class="pr-panel pr-blocks"><div class="pr-blocks-h">Blocks reviewed<b>' + blocks.length + '</b></div>'
       + '<div class="pr-chips">' + chips + '</div></div>';
   }
 
@@ -762,7 +773,8 @@
     var c = CAL[w.week] || {};
     var flags = ["A", "B", "G", "H"].map(function (k) { return secFilled(w, k); });   // bar 1=A, 2=B, 3=G, 4=H
     var filled = flags.filter(Boolean).length;
-    var bars = flags.map(function (f) { return '<span class="pr-bar ' + (f ? "on" : "off") + '"></span>'; }).join("");
+    var BAR_K = ["A", "B", "G", "H"], BAR_T = ["Check-in", "Last week's actions", "Next week", "Review record"];
+    var bars = flags.map(function (f, i) { return '<span class="pr-bar ' + (f ? "on" : "off") + '" data-k="' + BAR_K[i] + '" title="' + BAR_K[i] + ". " + BAR_T[i] + (f ? " — filled" : " — not filled") + '"></span>'; }).join("");
     var state = filled === 4 ? " complete" : filled > 0 ? " partial" : "";
     var remark = filled === 4 ? "Completed" : filled > 0 ? "Partially completed" : "Not started yet";
     var lock = "";   // no time-based locking — owners can edit any week
@@ -852,7 +864,7 @@
       var rows = sectionRows(S);
       var editable = S.write ? ((S.k === "H") ? canEditManager() : canEditSelf()) : false;
       var who = sectionWho(S, uUnit);
-      body += '<tr class="pr-grp" data-grp="' + S.k + '"><td colspan="' + totalCols + '"><span class="pr-caret">\u25B8</span>' + S.k + '. ' + esc(S.title) + ' <span class="pr-who-tag pr-who-' + whoClassOf(who) + '">' + who + '</span></td></tr>';
+      body += '<tr class="pr-grp" data-grp="' + S.k + '"><td colspan="' + totalCols + '"><span class="pr-caret">\u25B8</span><span class="pr-grp-k">' + S.k + '</span>' + esc(S.title) + ' <span class="pr-who-tag pr-who-' + whoClassOf(who) + '">' + who + '</span></td></tr>';
       if (!S.write && !rows.length) {
         body += '<tr class="pr-row pr-hidden" data-secrow="' + S.k + '"><td class="pr-item pr-mut">No data uploaded for this month yet</td>';
         present.forEach(function (w) { body += '<td class="pr-num pr-wkc" data-wk="' + w.week + '"><span class="pr-mut">\u2014</span></td>'; });
@@ -1198,13 +1210,13 @@
     var unit = $("prMoUnit").value, value = $("prMoValue").value, month = $("prMoMonth").value;
     if (!unit || !value || !month) return;
     MDIRTY = {};
-    $("prMoBody").innerHTML = '<div class="pr-empty">Loading monthly review\u2026</div>';
+    $("prMoBody").innerHTML = '<div class="pr-empty pr-loading">Loading monthly review\u2026</div>';
     Promise.all([
       sbGetWeeklyView(unit, value, month),
       sbGetAcademic(unit, value, month).catch(function (e) { console.warn("Academic plan not loaded:", e); return null; }),
       sbGetTargets(unit, value, month).catch(function (e) { console.warn("Targets not loaded:", e); return null; })
     ]).then(function (res) { MVIEW = res[0]; MVIEW.academic = res[1]; MVIEW.targets = res[2]; renderMonthlyView(); })
-      .catch(function (e) { $("prMoBody").innerHTML = '<div class="pr-empty">Couldn\'t load: ' + esc(e.message || String(e)) + "</div>"; });
+      .catch(function (e) { $("prMoBody").innerHTML = '<div class="pr-empty pr-error">Couldn\'t load: ' + esc(e.message || String(e)) + "</div>"; });
   }
 
   /* ---------- scoring ---------- */
@@ -1332,7 +1344,7 @@
 
   function moG4Section(g) {
     var e = moG4Eval(), all = moG4Items(), editable = canEditSelf(MVIEW), code = moW0().code;
-    var out = moGroupHead(g.key, g.key + " \u00B7 " + esc(g.title), "Goal", "auto", '<span class="pr-grpcount">Weight ' + g.weight + "</span>");
+    var out = moGroupHead(g.key, '<span class="pr-grp-k">' + g.key + "</span>" + esc(g.title), "Goal", "auto", '<span class="pr-grpcount">Weight ' + g.weight + "</span>");
     out += '<tr class="pr-row pr-hidden pr-mo-l0" data-secrow="mG4" data-g4sum="1"><td class="pr-item">Other activities'
       + '<div class="pr-mo-sub">Up to 3 activities chosen by the PO. Their weights must add up to 10.</div></td>'
       + moCell(moG4WsumHtml(e)) + moCell("") + moCell("") + moCell("") + moCell(e.score != null ? fmtNum(r2(e.score)) : moDash()) + "</tr>";
@@ -1518,7 +1530,7 @@
   }
   function moWriteSection(S, w0, editable, unit) {
     var who = sectionWho(S, unit || "PO");
-    var out = moGroupHead(S.k, S.k + ". " + esc(S.title), who, whoClassOf(who));
+    var out = moGroupHead(S.k, '<span class="pr-grp-k">' + S.k + "</span>" + esc(S.title), who, whoClassOf(who));
     S.rows.forEach(function (r) {
       out += '<tr class="pr-row pr-hidden" data-secrow="m' + S.k + '"><td class="pr-item">' + esc(r.label) + '</td><td colspan="5">'
         + renderCell(S, r, w0, editable) + "</td></tr>";
@@ -1527,7 +1539,7 @@
   }
   function moGoalSection(g, rp) {
     if (g.key === "G4") return moG4Section(g);
-    var out = moGroupHead(g.key, g.key + " \u00B7 " + esc(g.title), "Goal", "auto", '<span class="pr-grpcount">Weight ' + g.weight + "</span>");
+    var out = moGroupHead(g.key, '<span class="pr-grp-k">' + g.key + "</span>" + esc(g.title), "Goal", "auto", '<span class="pr-grpcount">Weight ' + g.weight + "</span>");
     g.rows.forEach(function (r) {
       var cls = "pr-row pr-hidden pr-mo-l" + r.lvl + (r.head ? " pr-mo-head" : "");
       var ev = (r.head || r.academic || r.compliance) ? null : moEval(g, r, rp);
@@ -2168,11 +2180,11 @@
     var units = SUM.units.length ? SUM.units : SUM_UNITS.map(function (u) { return u.code; });
     var code = month + pad2(Number(week || 1));
 
-    sumBody('<div class="pr-empty">Loading…</div>');
+    sumBody('<div class="pr-empty pr-loading">Loading…</div>');
     sbGetSummary(units, code).then(function (d) {
       SUM.data = d; sumRender();
     }).catch(function (e) {
-      sumBody('<div class="pr-empty">Couldn\'t load: ' + esc(e.message || String(e)) + "</div>");
+      sumBody('<div class="pr-empty pr-error">Couldn\'t load: ' + esc(e.message || String(e)) + "</div>");
     });
   }
 
@@ -2410,4 +2422,4 @@
   }
 
   window.FTRDashboard = { mount: mount };
-})();
+})();
