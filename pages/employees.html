@@ -24,18 +24,26 @@
         </div>
     </div>
 
-    <!-- The curated chart, framed from pages/orgchart.html -->
+    <!-- Org chart — built from each record's Reporting manager -->
     <div id="orgModal" class="modal-overlay">
         <div class="modal-box org-box">
-            <div class="org-bar">
-                <span class="org-bar-title">Organisation Chart</span>
-                <span class="org-bar-actions">
-                    <a class="org-btn-mini" id="orgOpenTab" href="pages/orgchart.html"
-                       target="_blank" rel="noopener">Open in new tab</a>
-                    <button class="modal-close" id="closeOrgBtn" title="Close">✕</button>
-                </span>
+            <div class="modal-header">
+                <div>
+                    <h2>Organisation Chart</h2>
+                    <p class="org-sub" id="orgMeta"></p>
+                </div>
+                <div class="org-head-actions">
+                    <span class="org-zoom">
+                        <button class="org-btn-mini" id="orgZoomOut" title="Zoom out">−</button>
+                        <button class="org-btn-mini org-zoom-level" id="orgZoomReset" title="Reset zoom">100%</button>
+                        <button class="org-btn-mini" id="orgZoomIn" title="Zoom in">+</button>
+                    </span>
+                    <button class="org-btn-mini" id="orgExpandAll">Expand all</button>
+                    <button class="org-btn-mini" id="orgCollapseAll">Collapse</button>
+                    <button class="modal-close" id="closeOrgBtn">✕</button>
+                </div>
             </div>
-            <iframe id="orgFrame" class="org-frame" title="Organisation Chart"></iframe>
+            <div class="org-body" id="orgBody"></div>
         </div>
     </div>
 
@@ -184,8 +192,9 @@
 
 .btn-org:hover { background: #084d44; }
 
-/* The chart needs the whole window. Qualified with .modal-box so it wins on
-   specificity rather than on which rule happens to come later in the file. */
+/* A 166-person tree has nothing to spare, so this one takes the whole window.
+   Qualified with .modal-box so it beats that rule on specificity rather than
+   relying on which declaration happens to come later in the file. */
 #orgModal { padding: 0; align-items: stretch; }
 
 .modal-box.org-box {
@@ -199,19 +208,12 @@
     flex-direction: column;
 }
 
-.org-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 9px 16px;
-    border-bottom: 1px solid #e5e7eb;
-    background: #fff;
-    flex: 0 0 auto;
-}
+.org-zoom { display: inline-flex; align-items: center; gap: 4px; margin-right: 6px; }
+.org-zoom-level { min-width: 52px; font-variant-numeric: tabular-nums; }
 
-.org-bar-title { font-size: 14px; font-weight: 700; color: #1a1d23; }
+.org-sub { font-size: 12px; color: #6b7280; margin-top: 3px; }
 
-.org-bar-actions { display: flex; align-items: center; gap: 10px; }
+.org-head-actions { display: flex; align-items: center; gap: 8px; }
 
 .org-btn-mini {
     background: #fff;
@@ -223,18 +225,177 @@
     font-weight: 600;
     cursor: pointer;
     font-family: inherit;
-    text-decoration: none;
 }
 
 .org-btn-mini:hover { background: #f2faf9; border-color: #1a8577; color: #0d6b5e; }
 
-/* The chart brings its own stylesheet, so it is framed rather than inlined. */
-.org-frame {
-    flex: 1 1 auto;
-    width: 100%;
-    border: 0;
-    display: block;
+/* Both axes scroll: a wide org is wider than any screen. */
+.org-body {
+    overflow: auto;
+    padding: 28px 24px 32px;
+    background: #f4f7fa;
+    flex: 1;
 }
+
+/* zoom (rather than transform) so the scroll area resizes with the content */
+.org-canvas { width: max-content; min-width: 100%; }
+
+.org-tree, .org-tree ul { list-style: none; margin: 0; padding: 0; }
+
+/* A centred flex row that overflows spills off BOTH sides, and the left side
+   cannot be scrolled to - scrollLeft stops at 0, so those cards would exist but
+   be unreachable. Sizing the tree to its content keeps every node inside the
+   scrollable area; margin:auto still centres it while it fits. */
+.org-tree {
+    width: max-content;
+    min-width: 100%;
+    margin: 0 auto;
+    /* the unlinked group puts several unparented people at this level */
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.org-tree ul {
+    display: flex;
+    justify-content: center;
+    padding-top: 20px;
+    position: relative;
+}
+
+/* the stem dropping from a parent to its children's bar */
+.org-tree ul::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 50%;
+    height: 20px;
+    border-left: 1.5px solid #b0c4d4;
+}
+
+.org-tree li {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 10px 0;
+}
+
+/* the horizontal bar joining siblings */
+.org-tree li::before,
+.org-tree li::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    width: 50%;
+    height: 20px;
+    border-top: 1.5px solid #b0c4d4;
+}
+
+.org-tree li::before { right: 50%; }
+.org-tree li::after  { left: 50%; }
+
+/* a lone child needs only the stem, not a bar */
+.org-tree li:only-child::before,
+.org-tree li:only-child::after { display: none; }
+.org-tree li:only-child { padding-top: 20px; }
+
+/* square off the ends so the bar does not overhang */
+.org-tree li:first-child::before { border: 0; }
+.org-tree li:last-child::after   { border: 0; }
+.org-tree li:last-child::before  { border-right: 1.5px solid #b0c4d4; }
+
+/* the root sits alone, with no incoming line */
+.org-tree > li { padding-top: 0; }
+.org-tree > li::before,
+.org-tree > li::after { display: none; }
+
+.org-node {
+    width: 196px;
+    border-radius: 10px;
+    border: 1.5px solid #d8e4ec;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    padding: 9px 12px;
+    text-align: center;
+    position: relative;
+    transition: transform .14s, box-shadow .14s, border-color .14s;
+}
+
+.org-node:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+    border-color: #1a8577;
+}
+
+.org-node .org-role {
+    font-size: 12px;
+    font-weight: 700;
+    color: #1a2533;
+    line-height: 1.35;
+}
+
+.org-node .org-name {
+    font-size: 10.5px;
+    color: #5a6b7a;
+    margin-top: 3px;
+    line-height: 1.3;
+}
+
+.org-node .org-dept {
+    font-size: 9.5px;
+    color: #8a9aaa;
+    margin-top: 2px;
+}
+
+/* the top of the house */
+.org-node.is-root {
+    background: #0d6b5e;
+    border-color: #0d6b5e;
+    box-shadow: 0 4px 20px rgba(13,107,94,0.3);
+}
+
+.org-node.is-root .org-role { color: #fff; font-size: 13.5px; }
+.org-node.is-root .org-name { color: rgba(255,255,255,0.86); }
+.org-node.is-root .org-dept { color: rgba(255,255,255,0.65); }
+
+/* a record whose manager is not in the directory */
+.org-node.is-orphan { border-style: dashed; border-color: #f0d28a; background: #fdf3e2; }
+
+.org-toggle {
+    margin-top: 7px;
+    background: #fff;
+    border: 1.5px solid #b0c4d4;
+    color: #0d6b5e;
+    border-radius: 999px;
+    min-width: 46px;
+    padding: 2px 9px;
+    font-size: 10.5px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    line-height: 1.5;
+    z-index: 1;
+}
+
+.org-toggle:hover { background: #e8f5f3; border-color: #1a8577; }
+
+.org-group-title {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #475569;
+    margin: 34px 0 2px;
+    text-align: center;
+}
+
+.org-group-note {
+    font-size: 11.5px;
+    color: #8a9aaa;
+    text-align: center;
+    margin-bottom: 4px;
+}
+
+.org-empty { text-align: center; color: #8a9aaa; padding: 40px; font-size: 13px; }
 
 .table-toolbar {
     display: flex;
