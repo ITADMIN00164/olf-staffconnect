@@ -1362,6 +1362,13 @@ async function initEmployeesPage() {
     if (orgExpandAll)  orgExpandAll.addEventListener("click", () => { setOrgDepth(Infinity); centreOrgOnRoot(); });
     if (orgCollapse)   orgCollapse.addEventListener("click", () => { setOrgDepth(1); centreOrgOnRoot(); });
 
+    const zoomIn    = document.getElementById("orgZoomIn");
+    const zoomOut   = document.getElementById("orgZoomOut");
+    const zoomReset = document.getElementById("orgZoomReset");
+    if (zoomIn)    zoomIn.addEventListener("click", () => setOrgZoom(orgZoom + 0.1));
+    if (zoomOut)   zoomOut.addEventListener("click", () => setOrgZoom(orgZoom - 0.1));
+    if (zoomReset) zoomReset.addEventListener("click", () => setOrgZoom(1));
+
     const orgBody = document.getElementById("orgBody");
     if (orgBody) {
         orgBody.addEventListener("click", (e) => {
@@ -1550,6 +1557,7 @@ function renderEmployees() {
 ==================================== */
 
 let orgCollapsed = new Set();   // ids whose children are hidden
+let orgZoom      = 1;           // 0.3 .. 1, applied to the tree canvas
 
 function buildOrgTree() {
     const byEmail = new Map();
@@ -1693,7 +1701,7 @@ function renderOrgChart() {
         });
     }
 
-    body.innerHTML = html;
+    body.innerHTML = `<div class="org-canvas" style="zoom:${orgZoom}">${html}</div>`;
     body.scrollLeft = keepLeft;
     body.scrollTop  = keepTop;
 
@@ -1750,10 +1758,38 @@ function centreOrgOnRoot() {
     body.scrollLeft += (r.left + r.width / 2) - (b.left + b.width / 2);
 }
 
+function setOrgZoom(next) {
+    orgZoom = Math.min(1, Math.max(0.3, Math.round(next * 100) / 100));
+    const label = document.getElementById("orgZoomReset");
+    if (label) label.textContent = `${Math.round(orgZoom * 100)}%`;
+    renderOrgChart();
+    centreOrgOnRoot();
+}
+
+/* Shrink until the tree fits the window, so opening the chart shows the whole
+   top of the house instead of a slice of it. Never below 30% - past that the
+   names stop being readable and a picture of boxes is no use. */
+function fitOrgToWidth() {
+    const body   = document.getElementById("orgBody");
+    const canvas = body && body.querySelector(".org-canvas");
+    if (!body || !canvas) return;
+
+    canvas.style.zoom = 1;              // measure at full size, not the current zoom
+    const full  = body.scrollWidth;
+    const avail = body.clientWidth;
+    canvas.style.zoom = orgZoom;        // put it back before deciding
+
+    setOrgZoom(full > avail ? Math.floor((avail / full) * 100) / 100 : 1);
+}
+
 function openOrgChart() {
-    setOrgDepth(2);   // the top few levels fit on screen; deeper branches open on demand
+    // One level deep is the whole leadership team; going deeper by default runs
+    // to ten thousand pixels before you have clicked anything. Branches open on
+    // demand.
+    orgZoom = 1;
+    setOrgDepth(1);
     document.getElementById("orgModal")?.classList.add("open");
-    centreOrgOnRoot();   // after .open, or the modal has no width to measure
+    fitOrgToWidth();     // after .open, or the modal has no width to measure
 }
 
 function closeOrgChart() {
