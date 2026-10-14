@@ -1352,30 +1352,10 @@ async function initEmployeesPage() {
     const closeBtn2 = document.getElementById("closeModalBtn2");
     const excelBtn  = document.getElementById("downloadExcelBtn");
 
-    const orgBtn      = document.getElementById("orgChartBtn");
-    const closeOrg     = document.getElementById("closeOrgBtn");
-    const orgExpandAll = document.getElementById("orgExpandAll");
-    const orgCollapse  = document.getElementById("orgCollapseAll");
-
-    if (orgBtn)      orgBtn.addEventListener("click", openOrgChart);
-    if (closeOrg)    closeOrg.addEventListener("click", closeOrgChart);
-    if (orgExpandAll)  orgExpandAll.addEventListener("click", () => { setOrgDepth(Infinity); centreOrgOnRoot(); });
-    if (orgCollapse)   orgCollapse.addEventListener("click", () => { setOrgDepth(1); centreOrgOnRoot(); });
-
-    const zoomIn    = document.getElementById("orgZoomIn");
-    const zoomOut   = document.getElementById("orgZoomOut");
-    const zoomReset = document.getElementById("orgZoomReset");
-    if (zoomIn)    zoomIn.addEventListener("click", () => setOrgZoom(orgZoom + 0.1));
-    if (zoomOut)   zoomOut.addEventListener("click", () => setOrgZoom(orgZoom - 0.1));
-    if (zoomReset) zoomReset.addEventListener("click", () => setOrgZoom(1));
-
-    const orgBody = document.getElementById("orgBody");
-    if (orgBody) {
-        orgBody.addEventListener("click", (e) => {
-            const btn = e.target.closest("button[data-org-toggle]");
-            if (btn) toggleOrgNode(btn.dataset.orgToggle);
-        });
-    }
+    const orgBtn   = document.getElementById("orgChartBtn");
+    const closeOrg = document.getElementById("closeOrgBtn");
+    if (orgBtn)   orgBtn.addEventListener("click", openOrgChart);
+    if (closeOrg) closeOrg.addEventListener("click", closeOrgChart);
 
     if (addBtn)    addBtn.addEventListener("click", openAddModal);
     if (searchBox) searchBox.addEventListener("input", renderEmployees);
@@ -1545,251 +1525,28 @@ function renderEmployees() {
 /* ====================================
    ORGANISATION CHART
 
-   The hierarchy already exists in the data: every record carries a
-   "Reporting manager" holding that manager's email, so matching it against
-   Email gives parent -> child. Nothing is hardcoded, so the chart follows the
-   directory as it changes.
+   The chart is a curated artifact: it carries function names, vacant posts,
+   division counts and its own drill-down pages, none of which the Employees
+   collection holds, so it cannot be generated from the directory. It lives at
+   pages/orgchart.html and is framed here, which also stops its stylesheet
+   fighting with the app's.
 
-   Two things the data cannot be trusted to guarantee, both handled below:
-   a manager email that matches nobody (those people are shown separately
-   rather than dropped), and a reporting loop created by an edit, which would
-   otherwise recurse until the page died.
+   Regenerating that file is how the chart gets updated - it does not follow
+   the directory on its own.
 ==================================== */
 
-let orgCollapsed = new Set();   // ids whose children are hidden
-let orgZoom      = 1;           // 0.3 .. 1, applied to the tree canvas
-
-function buildOrgTree() {
-    const byEmail = new Map();
-    employees.forEach(emp => {
-        const mail = String(emp["Email"] || "").trim().toLowerCase();
-        if (mail && !byEmail.has(mail)) byEmail.set(mail, emp.id);
-    });
-
-    const childrenOf = new Map();
-    const roots      = [];
-    const orphans    = [];
-
-    employees.forEach(emp => {
-        const mgrMail = String(emp["Reporting manager"] || "").trim().toLowerCase();
-        if (!mgrMail) { roots.push(emp.id); return; }
-
-        const mgrId = byEmail.get(mgrMail);
-        if (!mgrId || mgrId === emp.id) { orphans.push({ id: emp.id, mgrMail }); return; }
-
-        if (!childrenOf.has(mgrId)) childrenOf.set(mgrId, []);
-        childrenOf.get(mgrId).push(emp.id);
-    });
-
-    const byId = new Map(employees.map(emp => [emp.id, emp]));
-    const name = id => String((byId.get(id) || {})["Name"] || id).toLowerCase();
-    childrenOf.forEach(list => list.sort((a, b) => name(a).localeCompare(name(b))));
-
-    return { byId, childrenOf, roots, orphans };
-}
-
-function countDescendants(id, childrenOf, seen = new Set()) {
-    if (seen.has(id)) return 0;
-    seen.add(id);
-    return (childrenOf.get(id) || [])
-        .reduce((n, kid) => n + 1 + countDescendants(kid, childrenOf, seen), 0);
-}
-
-function orgNodeHtml(id, tree, depth, seen) {
-    const { byId, childrenOf } = tree;
-    const emp = byId.get(id);
-    if (!emp) return "";
-
-    // A reporting loop would recurse forever; stop and say so instead.
-    if (seen.has(id)) {
-        return `<li><div class="org-node is-orphan">
-            <div class="org-role">${escHtml(emp["Name"] || id)}</div>
-            <div class="org-name">Reporting loop \u2014 not expanded</div>
-        </div></li>`;
-    }
-    const nextSeen = new Set(seen).add(id);
-
-    const kids      = childrenOf.get(id) || [];
-    const collapsed = orgCollapsed.has(id);
-    const role      = emp["Designation"] || emp["Name"] || id;
-    const showName  = emp["Designation"] ? emp["Name"] : "";
-
-    let html = `<li><div class="org-node${depth === 0 ? " is-root" : ""}" title="${escHtml(emp.id)}">
-        <div class="org-role">${escHtml(role)}</div>
-        ${showName ? `<div class="org-name">${escHtml(showName)}</div>` : ""}
-        ${emp["Dept"] ? `<div class="org-dept">${escHtml(emp["Dept"])}</div>` : ""}
-    </div>`;
-
-    if (kids.length) {
-        const total = countDescendants(id, childrenOf);
-        html += `<button class="org-toggle" data-org-toggle="${escHtml(id)}"
-                    title="${collapsed ? "Show" : "Hide"} reports">${
-            collapsed ? `+${total}` : "\u2212"
-        }</button>`;
-        if (!collapsed) {
-            html += `<ul>${kids.map(k => orgNodeHtml(k, tree, depth + 1, nextSeen)).join("")}</ul>`;
-        }
-    }
-
-    return html + `</li>`;
-}
-
-function renderOrgChart() {
-    const body = document.getElementById("orgBody");
-    const meta = document.getElementById("orgMeta");
-    if (!body) return;
-
-    const keepLeft = body.scrollLeft;
-    const keepTop  = body.scrollTop;
-
-    const tree = buildOrgTree();
-    const { byId, childrenOf, roots, orphans } = tree;
-
-    if (!employees.length) {
-        body.innerHTML = `<div class="org-empty">No employees loaded yet.</div>`;
-        if (meta) meta.textContent = "";
-        return;
-    }
-
-    // Track who actually made it onto the page, so nobody is silently lost.
-    const drawn = new Set();
-    const mark = (id, seen) => {
-        if (seen.has(id)) return;
-        const next = new Set(seen).add(id);
-        drawn.add(id);
-        (childrenOf.get(id) || []).forEach(kid => mark(kid, next));
-    };
-
-    let html = "";
-
-    roots.forEach(r => mark(r, new Set()));
-    html += roots.map(r => `<ul class="org-tree">${orgNodeHtml(r, tree, 0, new Set())}</ul>`).join("");
-
-    // A manager email matching nobody would drop that person and everyone under
-    // them, so they get their own group with their reports intact.
-    if (orphans.length) {
-        const groups = new Map();
-        orphans.forEach(o => {
-            if (!groups.has(o.mgrMail)) groups.set(o.mgrMail, []);
-            groups.get(o.mgrMail).push(o.id);
-        });
-
-        html += `<div class="org-group-title">Not linked to the chart</div>
-                 <div class="org-group-note">Their Reporting manager does not match anyone in the directory.</div>`;
-
-        groups.forEach((ids, mail) => {
-            ids.forEach(id => mark(id, new Set()));
-            html += `<ul class="org-tree"><li>
-                <div class="org-node is-orphan">
-                    <div class="org-role">${escHtml(mail)}</div>
-                    <div class="org-name">not in the directory</div>
-                </div>
-                <ul>${ids.map(id => orgNodeHtml(id, tree, 1, new Set())).join("")}</ul>
-            </li></ul>`;
-        });
-    }
-
-    // Whatever is left can only be a reporting loop that no root leads into.
-    const stranded = employees.map(e => e.id).filter(id => !drawn.has(id));
-    if (stranded.length) {
-        html += `<div class="org-group-title">In a reporting loop</div>
-                 <div class="org-group-note">These records report to each other in a circle, so they have no path to the top. Fix a Reporting manager to place them.</div>`;
-        stranded.forEach(id => {
-            if (drawn.has(id)) return;   // already covered by an earlier loop
-            mark(id, new Set());
-            html += `<ul class="org-tree">${orgNodeHtml(id, tree, 1, new Set())}</ul>`;
-        });
-    }
-
-    body.innerHTML = `<div class="org-canvas" style="zoom:${orgZoom}">${html}</div>`;
-    body.scrollLeft = keepLeft;
-    body.scrollTop  = keepTop;
-
-    if (meta) {
-        const bits = [`${employees.length} people`];
-        if (roots.length)     bits.push(`${roots.length === 1 ? "1 top" : roots.length + " tops"}`);
-        if (orphans.length)   bits.push(`${orphans.length} unlinked`);
-        if (stranded.length)  bits.push(`${stranded.length} in a loop`);
-        meta.textContent = bits.join(" \u00b7 ");
-    }
-}
-
-/* Collapse everything below `depth`, counting the root as depth 0. */
-function setOrgDepth(depth) {
-    const { childrenOf, roots, orphans } = buildOrgTree();
-    orgCollapsed = new Set();
-
-    if (depth !== Infinity) {
-        const visited = new Set();
-        const walk = (id, d, seen) => {
-            if (seen.has(id)) return;
-            const next = new Set(seen).add(id);
-            visited.add(id);
-            const kids = childrenOf.get(id) || [];
-            if (!kids.length) return;
-            if (d >= depth) orgCollapsed.add(id);
-            kids.forEach(k => walk(k, d + 1, next));
-        };
-
-        roots.forEach(r => walk(r, 0, new Set()));
-        // the unlinked and looping groups are drawn one level in, so they start
-        // from depth 1 - and only the ones no root already reached, or the root
-        // itself would be treated as a depth-1 node and collapsed.
-        orphans.forEach(o => walk(o.id, 1, new Set()));
-        employees.forEach(e => { if (!visited.has(e.id)) walk(e.id, 1, new Set()); });
-    }
-    renderOrgChart();
-}
-
-function toggleOrgNode(id) {
-    if (orgCollapsed.has(id)) orgCollapsed.delete(id);
-    else orgCollapsed.add(id);
-    renderOrgChart();
-}
-
-/* The tree is far wider than any screen, so put the top of the house in the
-   middle of the view instead of opening on whichever branch sorts first. */
-function centreOrgOnRoot() {
-    const body = document.getElementById("orgBody");
-    const root = body && body.querySelector(".org-node.is-root");
-    if (!body || !root) return;
-    const r = root.getBoundingClientRect();
-    const b = body.getBoundingClientRect();
-    body.scrollLeft += (r.left + r.width / 2) - (b.left + b.width / 2);
-}
-
-function setOrgZoom(next) {
-    orgZoom = Math.min(1, Math.max(0.3, Math.round(next * 100) / 100));
-    const label = document.getElementById("orgZoomReset");
-    if (label) label.textContent = `${Math.round(orgZoom * 100)}%`;
-    renderOrgChart();
-    centreOrgOnRoot();
-}
-
-/* Shrink until the tree fits the window, so opening the chart shows the whole
-   top of the house instead of a slice of it. Never below 30% - past that the
-   names stop being readable and a picture of boxes is no use. */
-function fitOrgToWidth() {
-    const body   = document.getElementById("orgBody");
-    const canvas = body && body.querySelector(".org-canvas");
-    if (!body || !canvas) return;
-
-    canvas.style.zoom = 1;              // measure at full size, not the current zoom
-    const full  = body.scrollWidth;
-    const avail = body.clientWidth;
-    canvas.style.zoom = orgZoom;        // put it back before deciding
-
-    setOrgZoom(full > avail ? Math.floor((avail / full) * 100) / 100 : 1);
-}
+const ORG_CHART_SRC = "pages/orgchart.html";
 
 function openOrgChart() {
-    // One level deep is the whole leadership team; going deeper by default runs
-    // to ten thousand pixels before you have clicked anything. Branches open on
-    // demand.
-    orgZoom = 1;
-    setOrgDepth(1);
-    document.getElementById("orgModal")?.classList.add("open");
-    fitOrgToWidth();     // after .open, or the modal has no width to measure
+    const modal = document.getElementById("orgModal");
+    const frame = document.getElementById("orgFrame");
+    if (!modal || !frame) return;
+
+    // ~2 MB, so it is fetched the first time the chart is opened rather than
+    // on every visit to the Employees page.
+    if (!frame.getAttribute("src")) frame.setAttribute("src", ORG_CHART_SRC);
+
+    modal.classList.add("open");
 }
 
 function closeOrgChart() {
