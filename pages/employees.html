@@ -47,6 +47,20 @@
         </div>
     </div>
 
+    <!-- Details for one person, opened by clicking their card in the chart -->
+    <div id="orgPersonModal" class="org-person-overlay">
+        <div class="org-person-box" role="dialog" aria-modal="true" aria-labelledby="orgPersonName">
+            <div class="org-person-head">
+                <div>
+                    <div class="org-person-name" id="orgPersonName"></div>
+                    <div class="org-person-role" id="orgPersonRole"></div>
+                </div>
+                <button class="org-person-close" id="orgPersonClose" title="Close">✕</button>
+            </div>
+            <div class="org-person-body" id="orgPersonBody"></div>
+        </div>
+    </div>
+
     <div class="card">
         <div class="table-toolbar">
             <input
@@ -396,6 +410,109 @@
 }
 
 .org-empty { text-align: center; color: #8a9aaa; padding: 40px; font-size: 13px; }
+
+/* ── one person's details ── */
+.org-node[data-emp] { cursor: pointer; }
+
+.org-person-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 25, 22, 0.55);
+    /* above the chart, which sits at 500 */
+    z-index: 600;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.org-person-overlay.open { display: flex; }
+
+.org-person-box {
+    background: #fff;
+    border-radius: 14px;
+    width: 460px;
+    max-width: 100%;
+    max-height: 86vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+}
+
+.org-person-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 20px;
+    background: #0d6b5e;
+}
+
+.org-person-name { font-size: 16px; font-weight: 700; color: #fff; line-height: 1.3; }
+.org-person-role { font-size: 12.5px; color: rgba(255,255,255,0.85); margin-top: 2px; }
+
+.org-person-close {
+    background: rgba(255,255,255,0.14);
+    border: none;
+    color: #fff;
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: 6px;
+    padding: 6px 9px;
+    flex: 0 0 auto;
+}
+
+.org-person-close:hover { background: rgba(255,255,255,0.26); }
+
+.org-person-body { padding: 6px 20px 18px; overflow-y: auto; }
+
+.org-person-row {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    padding: 9px 0;
+    border-bottom: 1px solid #eef2f5;
+}
+
+.org-person-row:last-child { border-bottom: none; }
+
+.org-person-key {
+    flex: 0 0 104px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #8a9aaa;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.org-person-val {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    color: #1a2533;
+    overflow-wrap: anywhere;
+}
+
+.org-person-val a { color: #0d6b5e; text-decoration: none; }
+.org-person-val a:hover { text-decoration: underline; }
+
+/* many-valued fields get a count and a scrollable list */
+.org-person-count { font-weight: 600; color: #0d6b5e; }
+
+.org-person-list {
+    margin-top: 5px;
+    max-height: 132px;
+    overflow-y: auto;
+    background: #f2faf9;
+    border: 1px solid #d8e4ec;
+    border-radius: 7px;
+    padding: 7px 10px;
+    font-size: 12px;
+    color: #475569;
+    line-height: 1.65;
+}
 
 .table-toolbar {
     display: flex;

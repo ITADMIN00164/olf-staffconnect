@@ -1358,6 +1358,7 @@ async function initEmployeesPage() {
     const orgCollapse  = document.getElementById("orgCollapseAll");
 
     if (orgBtn)      orgBtn.addEventListener("click", openOrgChart);
+    bindOrgEscape();
     if (closeOrg)    closeOrg.addEventListener("click", closeOrgChart);
     if (orgExpandAll)  orgExpandAll.addEventListener("click", () => { setOrgDepth(Infinity); centreOrgOnRoot(); });
     if (orgCollapse)   orgCollapse.addEventListener("click", () => { setOrgDepth(1); centreOrgOnRoot(); });
@@ -1373,8 +1374,18 @@ async function initEmployeesPage() {
     if (orgBody) {
         orgBody.addEventListener("click", (e) => {
             const btn = e.target.closest("button[data-org-toggle]");
-            if (btn) toggleOrgNode(btn.dataset.orgToggle);
+            if (btn) { toggleOrgNode(btn.dataset.orgToggle); return; }
+
+            const card = e.target.closest(".org-node[data-emp]");
+            if (card) openOrgPerson(card.dataset.emp);
         });
+
+    const personClose = document.getElementById("orgPersonClose");
+    const personModal = document.getElementById("orgPersonModal");
+    if (personClose) personClose.addEventListener("click", closeOrgPerson);
+    if (personModal) personModal.addEventListener("click", (e) => {
+        if (e.target === personModal) closeOrgPerson();   // click the backdrop
+    });
     }
 
     if (addBtn)    addBtn.addEventListener("click", openAddModal);
@@ -1614,7 +1625,8 @@ function orgNodeHtml(id, tree, depth, seen) {
     const role      = emp["Designation"] || emp["Name"] || id;
     const showName  = emp["Designation"] ? emp["Name"] : "";
 
-    let html = `<li><div class="org-node${depth === 0 ? " is-root" : ""}" title="${escHtml(emp.id)}">
+    let html = `<li><div class="org-node${depth === 0 ? " is-root" : ""}"
+        data-emp="${escHtml(id)}" title="${escHtml(emp.id)} — click for details">
         <div class="org-role">${escHtml(role)}</div>
         ${showName ? `<div class="org-name">${escHtml(showName)}</div>` : ""}
         ${emp["Dept"] ? `<div class="org-dept">${escHtml(emp["Dept"])}</div>` : ""}
@@ -1790,6 +1802,87 @@ function openOrgChart() {
     setOrgDepth(1);
     document.getElementById("orgModal")?.classList.add("open");
     fitOrgToWidth();     // after .open, or the modal has no width to measure
+}
+
+/* One person's details, opened from their card in the chart. Every value comes
+   from that employee's own record. The manager is named only when they are an
+   employee here too - the chart never puts a name to someone outside the
+   directory. */
+function openOrgPerson(id) {
+    const emp = employees.find(e => e.id === id);
+    if (!emp) return;
+
+    const nameEl = document.getElementById("orgPersonName");
+    const roleEl = document.getElementById("orgPersonRole");
+    const bodyEl = document.getElementById("orgPersonBody");
+    if (!nameEl || !bodyEl) return;
+
+    nameEl.textContent = emp["Name"] || emp.id;
+    roleEl.textContent = [emp["Designation"], emp["Dept"]].filter(Boolean).join(" \u00b7 ");
+
+    const row = (label, valueHtml) =>
+        `<div class="org-person-row">
+            <div class="org-person-key">${escHtml(label)}</div>
+            <div class="org-person-val">${valueHtml}</div>
+        </div>`;
+
+    const plain = (label, value) =>
+        value ? row(label, escHtml(value)) : "";
+
+    // Division, District and Block hold lists; show how many and let them scroll.
+    const listRow = (label, value) => {
+        const items = splitMulti(value);
+        if (!items.length) return "";
+        if (items.length === 1) return row(label, escHtml(items[0]));
+        const nouns = MULTI_VALUE_FIELDS[label];
+        return row(label,
+            `<span class="org-person-count">${items.length} ${nouns ? nouns.many : "entries"}</span>
+             <div class="org-person-list">${items.map(escHtml).join("<br>")}</div>`);
+    };
+
+    const { byId, childrenOf } = buildOrgTree();
+    const reports = (childrenOf.get(id) || []).length;
+    const mgrMail = String(emp["Reporting manager"] || "").trim().toLowerCase();
+    const mgr     = mgrMail
+        ? employees.find(e => String(e["Email"] || "").trim().toLowerCase() === mgrMail && e.id !== id)
+        : null;
+
+    bodyEl.innerHTML = [
+        plain("Employee ID", emp.id),
+        emp["Email"]  ? row("Email", `<a href="mailto:${escHtml(emp["Email"])}">${escHtml(emp["Email"])}</a>`) : "",
+        emp["Mobile"] ? row("Mobile", `<a href="tel:${escHtml(emp["Mobile"])}">${escHtml(emp["Mobile"])}</a>`) : "",
+        plain("Location", emp["Location"]),
+        plain("State", emp["State"]),
+        listRow("Division", emp["Division"]),
+        listRow("District", emp["District"]),
+        listRow("Block", emp["Block"]),
+        mgr ? plain("Reports to", mgr["Name"] || mgr.id) : "",
+        reports ? row("Direct reports", `<span class="org-person-count">${reports}</span>`) : ""
+    ].join("");
+
+    document.getElementById("orgPersonModal")?.classList.add("open");
+}
+
+function closeOrgPerson() {
+    document.getElementById("orgPersonModal")?.classList.remove("open");
+}
+
+/* Escape closes the details popup first, then the chart. Bound once: this page
+   is re-entered every time the user navigates back to it, and a listener on
+   document would otherwise stack up one copy per visit. */
+let orgEscBound = false;
+
+function bindOrgEscape() {
+    if (orgEscBound) return;
+    orgEscBound = true;
+    document.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape") return;
+        if (document.getElementById("orgPersonModal")?.classList.contains("open")) {
+            closeOrgPerson();
+        } else if (document.getElementById("orgModal")?.classList.contains("open")) {
+            closeOrgChart();
+        }
+    });
 }
 
 function closeOrgChart() {
