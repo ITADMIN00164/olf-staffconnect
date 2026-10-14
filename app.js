@@ -103,6 +103,12 @@ const CORE_FIELDS = [
     { key: "Mobile",            label: "Mobile",           placeholder: "Phone number"    },
     { key: "Reporting manager", label: "Reporting Manager",placeholder: "Manager's name"  },
 
+    // Someone who leaves is marked Inactive rather than deleted, so their
+    // record survives for history. Absent counts as Active: the directory
+    // predates this field and nobody should have to backfill 166 rows.
+    { key: "Status",            label: "Status",           placeholder: "Active",
+                                optional: true, choices: ["Active", "Inactive"] },
+
     // Geography, widest area first: State > Division > District > Block. These
     // arrived after the directory was already live, so every one of them is
     // optional - an Excel file prepared before they existed still validates,
@@ -123,6 +129,14 @@ const CORE_KEYS = CORE_FIELDS.map(f => f.key);
 
 // Columns an uploaded file is allowed to leave out entirely (see above).
 const OPTIONAL_KEYS = new Set(CORE_FIELDS.filter(f => f.optional).map(f => f.key));
+
+const STATUS_VALUES = ["Active", "Inactive"];
+
+/* A record with no Status is Active - the field arrived after the directory
+   did, so absence means "nobody has said otherwise". */
+function isActiveEmployee(emp) {
+    return String((emp || {})["Status"] || "").trim().toLowerCase() !== "inactive";
+}
 
 /* A blank cell never erases anything, which is what keeps an upload from
    wiping columns it simply does not carry. Clearing a value therefore has to be
@@ -1457,7 +1471,7 @@ function colClass(key) {
         "Name": "col-name", "Designation": "col-desig", "Dept": "col-dept",
         "Email": "col-email", "Location": "col-location",
         "Mobile": "col-extra", "Reporting manager": "col-extra",
-        "State": "col-geo",
+        "Status": "col-status", "State": "col-geo",
         "Division": "col-multi", "District": "col-multi", "Block": "col-multi"
     };
     return map[key] || "col-extra";
@@ -1544,7 +1558,7 @@ function renderEmployees() {
     }
 
     tableEl.innerHTML = filtered.map(emp => `
-        <tr>
+        <tr class="${isActiveEmployee(emp) ? "" : "row-inactive"}">
             ${currentRole === "Admin" ? `
             <td class="col-actions">
                 <button class="btn-edit"   data-action="edit"   data-id="${escHtml(emp.id)}" title="Edit" aria-label="Edit">✏️</button>
@@ -1554,6 +1568,11 @@ function renderEmployees() {
             ${tableCols.map(key => {
                 const val = emp[key] || "";
                 const cls = colClass(key);
+                if (key === "Status") {
+                    const active = isActiveEmployee(emp);
+                    return `<td class="${cls}"><span class="badge-status${active ? "" : " is-inactive"}">${
+                        active ? "Active" : "Inactive"}</span></td>`;
+                }
                 if (MULTI_VALUE_FIELDS[key]) return `<td class="${cls}">${multiCellHtml(val, emp.id, key)}</td>`;
                 if (key === "Dept") return `<td class="${cls}"><span class="badge-dept">${escHtml(val) || "—"}</span></td>`;
                 if (key === "Email" && val) return `<td class="${cls}"><a href="mailto:${escHtml(val)}" style="color:#4f8ef7;text-decoration:none;">${escHtml(val)}</a></td>`;
@@ -1577,12 +1596,19 @@ function renderEmployees() {
    otherwise recurse until the page died.
 ==================================== */
 
+function allActiveEmployees() {
+    return employees.filter(isActiveEmployee);
+}
+
 let orgCollapsed = new Set();   // ids whose children are hidden
 let orgZoom      = 1;           // 0.3 .. 1, applied to the tree canvas
 
 function buildOrgTree() {
+    // The chart is who is here now, so people who have left are left out.
+    const active = allActiveEmployees();
+
     const byEmail = new Map();
-    employees.forEach(emp => {
+    active.forEach(emp => {
         const mail = String(emp["Email"] || "").trim().toLowerCase();
         if (mail && !byEmail.has(mail)) byEmail.set(mail, emp.id);
     });
@@ -1591,7 +1617,7 @@ function buildOrgTree() {
     const roots      = [];
     const orphans    = [];
 
-    employees.forEach(emp => {
+    active.forEach(emp => {
         const mgrMail = String(emp["Reporting manager"] || "").trim().toLowerCase();
         if (!mgrMail) { roots.push(emp.id); return; }
 
@@ -1602,7 +1628,7 @@ function buildOrgTree() {
         childrenOf.get(mgrId).push(emp.id);
     });
 
-    const byId = new Map(employees.map(emp => [emp.id, emp]));
+    const byId = new Map(active.map(emp => [emp.id, emp]));
     const name = id => String((byId.get(id) || {})["Name"] || id).toLowerCase();
     childrenOf.forEach(list => list.sort((a, b) => name(a).localeCompare(name(b))));
 
@@ -1666,8 +1692,10 @@ function renderOrgChart() {
 
     const tree = buildOrgTree();
     const { byId, childrenOf, roots, orphans } = tree;
+    const active   = allActiveEmployees();
+    const inactive = employees.length - active.length;
 
-    if (!employees.length) {
+    if (!active.length) {
         body.innerHTML = `<div class="org-empty">No employees loaded yet.</div>`;
         if (meta) meta.textContent = "";
         return;
@@ -1696,15 +1724,15 @@ function renderOrgChart() {
         ids.forEach(id => mark(id, new Set()));
 
         html += `<div class="org-group-title">Not linked to the chart</div>
-                 <div class="org-group-note">Their Reporting manager is not an employee in this directory,
-                 so they have no place in the tree above.</div>
+                 <div class="org-group-note">Their Reporting manager is not an active employee in this
+                 directory, so they have no place in the tree above.</div>
                  <ul class="org-tree">${
                      ids.map(id => orgNodeHtml(id, tree, 1, new Set())).join("")
                  }</ul>`;
     }
 
     // Whatever is left can only be a reporting loop that no root leads into.
-    const stranded = employees.map(e => e.id).filter(id => !drawn.has(id));
+    const stranded = active.map(e => e.id).filter(id => !drawn.has(id));
     if (stranded.length) {
         html += `<div class="org-group-title">In a reporting loop</div>
                  <div class="org-group-note">These records report to each other in a circle, so they have no path to the top. Fix a Reporting manager to place them.</div>`;
@@ -1720,10 +1748,11 @@ function renderOrgChart() {
     body.scrollTop  = keepTop;
 
     if (meta) {
-        const bits = [`${employees.length} people`];
+        const bits = [`${active.length} people`];
         if (roots.length)     bits.push(`${roots.length === 1 ? "1 top" : roots.length + " tops"}`);
         if (orphans.length)   bits.push(`${orphans.length} unlinked`);
         if (stranded.length)  bits.push(`${stranded.length} in a loop`);
+        if (inactive)         bits.push(`${inactive} inactive hidden`);
         meta.textContent = bits.join(" \u00b7 ");
     }
 }
@@ -2085,6 +2114,21 @@ function fieldHtml(field, empData) {
     `;
     }
 
+    if (field.choices) {
+        // default a brand-new record to the first choice rather than to blank
+        const current = String(val || field.choices[0]);
+        return `
+        <div class="form-group">
+            <label>${field.label}</label>
+            <select id="${inputId}" data-fieldkey="${field.key}">
+                ${field.choices.map(c =>
+                    `<option value="${escHtml(c)}"${c === current ? " selected" : ""}>${escHtml(c)}</option>`
+                ).join("")}
+            </select>
+        </div>
+    `;
+    }
+
     const inputType = field.type || "text";
     return `
         <div class="form-group">
@@ -2143,7 +2187,8 @@ async function editEmployee(empId) {
 async function deleteEmployeeRecord(empId) {
     const confirmed = await showAppConfirm({
         title: "Delete employee?",
-        message: `Delete employee ${empId}? This cannot be undone.`,
+        message: `Delete employee ${empId}? This cannot be undone.\n\n` +
+                 `To keep the record for history, set Status to Inactive instead.`,
         type: "error",
         confirmText: "Delete",
         cancelText: "Cancel"
@@ -2231,6 +2276,7 @@ async function downloadSampleExcel() {
                 "Email":              "john.doe@openlinksfoundation.org",
                 "Mobile":             "9876543210",
                 "Reporting manager":  "Jane Smith",
+                "Status":             "Active",
                 "State":              "Maharashtra",
                 "District":           "Pune",
                 "Division":           "Pune",
@@ -2414,6 +2460,18 @@ async function handleExcelUpload(e) {
                 return;
             }
 
+            // Status drives whether someone shows in the chart, so a typo here
+            // would quietly take them out of it.
+            const status = obj["Status"];
+            if (status && !isClearToken(status) &&
+                !STATUS_VALUES.some(v => v.toLowerCase() === status.toLowerCase())) {
+                errors.push(`Row ${rowNum} (${empId}): Status must be Active or Inactive.`);
+                return;
+            }
+            if (status && !isClearToken(status)) {
+                obj["Status"] = STATUS_VALUES.find(v => v.toLowerCase() === status.toLowerCase());
+            }
+
             // Only recognised columns are written; anything else in the file is
             // ignored (the admin was warned about those above).
             const fields = {};
@@ -2593,7 +2651,7 @@ async function saveEmployee() {
         if (!empId) { notify("Employee ID is required.", "error"); return; }
 
         const employeeData = {};
-        document.querySelectorAll("#modalBody input[data-fieldkey], #modalBody textarea[data-fieldkey]").forEach(input => {
+        document.querySelectorAll("#modalBody input[data-fieldkey], #modalBody textarea[data-fieldkey], #modalBody select[data-fieldkey]").forEach(input => {
             employeeData[input.getAttribute("data-fieldkey")] = input.value;
         });
 
