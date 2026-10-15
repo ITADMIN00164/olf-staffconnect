@@ -72,6 +72,15 @@ window.AWARD_CONFIG = {
     newReqBtn: document.getElementById("new-req-btn"),
     listBanner: document.getElementById("list-banner"),
     listBannerText: document.getElementById("list-banner-text"),
+    standingNote: document.getElementById("standing-note"),
+    filterStatus: document.getElementById("filter-status"),
+    reviewModal: document.getElementById("review-modal"),
+    reviewSummary: document.getElementById("review-summary"),
+    reviewRemark: document.getElementById("review-remark"),
+    reviewBanner: document.getElementById("review-banner"),
+    reviewBannerText: document.getElementById("review-banner-text"),
+    reviewApprove: document.getElementById("review-approve"),
+    reviewDecline: document.getElementById("review-decline"),
     filterState: document.getElementById("filter-state"),
     filterDivision: document.getElementById("filter-division"),
     filterDistrict: document.getElementById("filter-district"),
@@ -88,6 +97,94 @@ window.AWARD_CONFIG = {
 
   // Every requisition row we've loaded; filtering happens in the browser.
   var allRequisitions = [];
+
+  /* A requisition carries its own decision: status says where it stands,
+     and the decided_* columns say who settled it, when and why. They arrive
+     with the approvals migration; until it is run the row is read without
+     them and everything shows as pending. */
+  var hasApproval = true;
+
+  function statusOf(row) {
+    var d = String((row && row.status) || "submitted").toLowerCase();
+    if (d === "approved" || d === "declined") {
+      return { decision: d, by: row.decided_by, byRole: row.decided_by_role,
+               remark: row.decision_remark, at: row.decided_at };
+    }
+    return { decision: null };
+  }
+
+  /* ------------------------------------------------------------------
+     Who may raise a requisition, and who may decide on one.
+
+     Both come from the Department recorded against the person in Employees.
+     Four levels, and an approver has to sit above the level the requisition
+     was raised at:
+
+       4  COO   Program Implementation COO    decides on DM, PM and PO
+       3  DM    Program Implementation Div    decides on PM and PO
+       2  PM    Program Implementation PM     decides on PO
+       1  PO    Program Implementation        raises only
+
+     Raising is for PO, PM and DM. The COO decides rather than asks.
+
+     The directory spells PO two ways - 94 people are plain "Program
+     Implementation" and one is "Program Implementation - PO" - so the
+     patterns are anchored and allow the separator rather than matching on a
+     prefix, which would have made every variant look like a PO. Anyone in
+     any other department, or in none, has no part in this.
+     ------------------------------------------------------------------ */
+  var ROLE_PATTERNS = [
+    { re: /^program implementation\s*[-–]?\s*coo$/, role: "COO", level: 4 },
+    { re: /^program implementation\s*[-–]?\s*div$/, role: "DM",  level: 3 },
+    { re: /^program implementation\s*[-–]?\s*pm$/,  role: "PM",  level: 2 },
+    { re: /^program implementation\s*[-–]?\s*po$/,  role: "PO",  level: 1 },
+    { re: /^program implementation$/,                       role: "PO",  level: 1 }
+  ];
+
+  var ROLE_TITLES = {
+    PO:  "Programme Officer",
+    PM:  "Programme Manager",
+    DM:  "Divisional Manager",
+    COO: "Chief Operating Officer"
+  };
+
+  // What someone's department makes them, or null if it makes them nothing.
+  function roleOfDepartment(dept) {
+    var d = String(dept || "").trim().toLowerCase().replace(/\s+/g, " ");
+    for (var i = 0; i < ROLE_PATTERNS.length; i++) {
+      if (ROLE_PATTERNS[i].re.test(d)) {
+        return { role: ROLE_PATTERNS[i].role, level: ROLE_PATTERNS[i].level };
+      }
+    }
+    return null;
+  }
+
+  /* The signed-in person's standing. Null for anyone outside Programme
+     Implementation, anyone with no Employees record at all (an admin
+     account, say), and anyone marked Inactive - a leaver should not be
+     raising or approving anything. */
+  function myStanding() {
+    var emp = window.__olfEmployee;
+    if (!emp) return null;
+    if (String(emp["Status"] || "Active").trim().toLowerCase() === "inactive") return null;
+    return roleOfDepartment(emp["Dept"]);
+  }
+
+  function canRaise(standing)  { return !!standing && standing.level <= 3; }
+
+  /* Legacy rows carry no level: they were filed before the role was
+     recorded. Treating them as the lowest keeps them actionable rather than
+     stranding them, which is the kinder failure for three test rows. */
+  function levelRaisedAt(row) {
+    var n = Number(row && row.requester_level);
+    return n >= 1 && n <= 4 ? n : 1;
+  }
+
+  function canDecide(standing, row) {
+    if (!standing) return false;
+    if (statusOf(row).decision) return false;        // already settled
+    return standing.level > levelRaisedAt(row);
+  }
 
   /* The name on a requisition comes from the signed-in user, preferring their
      Employees record - that is the name the rest of the directory shows - over
@@ -253,8 +350,12 @@ window.AWARD_CONFIG = {
 
   function placeholderRow(message) {
     setRowPill(allRequisitions.length === 1 ? "1 item" : allRequisitions.length + " items");
+    // Counted from the table rather than written down: the column count has
+    // changed three times and a stale number leaves the message short of the
+    // width, with a ragged edge where the row stops.
+    var cols = document.querySelectorAll("#requisitions-table thead th").length || 1;
     el.tbody.innerHTML =
-      '<tr class="placeholder-row"><td colspan="7">' +
+      '<tr class="placeholder-row"><td colspan="' + cols + '">' +
       escapeHtml(message) + "</td></tr>";
     el.tfoot.hidden = true;
   }
@@ -285,6 +386,7 @@ window.AWARD_CONFIG = {
     document.body.style.overflow = "";   // in case we left with it locked
     paintIcons();
     showSignedInUser();
+    applyStanding();
     showTab(el.tabs, "data-aw-tab", "stock");
     showTab(el.subtabs, "data-aw-subtab", "requisition");
 
@@ -456,6 +558,158 @@ window.AWARD_CONFIG = {
     el.listBanner.hidden = false;
   }
 
+  /* ---------------------------------------------------------------- review
+
+     Deciding is its own dialog rather than a pair of buttons in the row: a
+     decision cannot be taken back, so it is worth a moment and a sentence.
+     Declining asks for a reason - being turned down without one is the
+     complaint that comes back. Approving may carry one and usually will not.
+  */
+  var reviewing = null;          // the requisition under review
+
+  function openReview(id) {
+    var row = null;
+    for (var i = 0; i < allRequisitions.length; i++) {
+      if (String(allRequisitions[i].id) === String(id)) { row = allRequisitions[i]; break; }
+    }
+    if (!row || !canDecide(myStanding(), row)) return;
+
+    reviewing = row;
+    returnFocusTo = document.activeElement;
+
+    var p = placeOf(row);
+    el.reviewSummary.innerHTML =
+      "<dl>" +
+        "<div><dt>Requested by</dt><dd>" + escapeHtml(row.requester_name || "—") +
+          (row.requester_role ? ' <span class="chip-role">' +
+             escapeHtml(row.requester_role) + "</span>" : "") + "</dd></div>" +
+        "<div><dt>Award</dt><dd>" +
+          escapeHtml(row.award_types ? row.award_types.name : "—") + "</dd></div>" +
+        "<div><dt>Quantity</dt><dd>" + escapeHtml(row.quantity) + "</dd></div>" +
+        "<div><dt>For</dt><dd>" +
+          escapeHtml([p.district, p.division, p.state].filter(Boolean).join(", ")) +
+        "</dd></div>" +
+        "<div><dt>Dated</dt><dd>" + escapeHtml(formatDate(row.requisition_date)) + "</dd></div>" +
+      "</dl>";
+
+    el.reviewRemark.value = "";
+    setFieldError(el.reviewRemark, "review-remark-error", "");
+    setReviewStatus("");
+    el.reviewModal.classList.add("is-open");
+    document.addEventListener("keydown", onReviewKeydown);
+    scrollLockedAt = window.scrollY;
+    document.body.style.overflow = "hidden";
+    el.reviewRemark.focus();
+  }
+
+  function closeReview() {
+    reviewing = null;
+    el.reviewModal.classList.remove("is-open");
+    document.removeEventListener("keydown", onReviewKeydown);
+    document.body.style.overflow = "";
+    if (scrollLockedAt !== null) { window.scrollTo(0, scrollLockedAt); scrollLockedAt = null; }
+    if (returnFocusTo && typeof returnFocusTo.focus === "function") returnFocusTo.focus();
+    returnFocusTo = null;
+  }
+
+  function onReviewKeydown(event) {
+    if (event.key === "Escape") { event.stopPropagation(); closeReview(); }
+  }
+
+  function setReviewStatus(message, kind) {
+    if (!el.reviewBanner) return;
+    if (!message) { el.reviewBanner.hidden = true; return; }
+    el.reviewBannerText.textContent = message;
+    el.reviewBanner.className = "banner " + (kind === "bad" ? "banner-error" : "banner-success");
+    el.reviewBanner.hidden = false;
+  }
+
+  function decide(decision) {
+    if (!reviewing) return;
+    var standing = myStanding();
+    if (!canDecide(standing, reviewing)) {       // standing changed under them
+      setReviewStatus("You cannot decide on this requisition.", "bad");
+      return;
+    }
+
+    var remark = el.reviewRemark.value.trim();
+    if (decision === "declined" && !remark) {
+      setFieldError(el.reviewRemark, "review-remark-error",
+        "Say why it is being declined.");
+      el.reviewRemark.focus();
+      return;
+    }
+    setFieldError(el.reviewRemark, "review-remark-error", "");
+
+    el.reviewApprove.disabled = el.reviewDecline.disabled = true;
+
+    /* Only a row still sitting at submitted is written to, so two people
+       reaching it at once cannot overwrite one another: the second finds
+       nothing to change and is told so. */
+    db.from("requisitions")
+      .update({
+        status: decision,
+        decision_remark: remark || null,
+        decided_by: (signedInUser() || {}).name || "",
+        decided_by_role: standing.role,
+        decided_at: new Date().toISOString()
+      })
+      .eq("id", reviewing.id)
+      .eq("status", "submitted")
+      .select("id")
+      .then(function (res) {
+        el.reviewApprove.disabled = el.reviewDecline.disabled = false;
+        if (res.error) {
+          setReviewStatus(/decided_|decision_remark|status/i.test(res.error.message || "")
+            ? "Approvals are not set up in the database yet - run " +
+              "sql/2026-10-15-award-approvals.sql."
+            : "Could not save: " + res.error.message, "bad");
+          reportError("save decision", res.error);
+          return;
+        }
+        if (!res.data || !res.data.length) {
+          setReviewStatus("Somebody has already decided this one.", "bad");
+          loadRequisitions();
+          return;
+        }
+        var what = decision === "approved" ? "Approved" : "Declined";
+        closeReview();
+        showListBanner(what + " — " + (reviewing && reviewing.requester_name) +
+                       "'s requisition.");
+        loadRequisitions();
+      })
+      .catch(function (err) {
+        el.reviewApprove.disabled = el.reviewDecline.disabled = false;
+        setReviewStatus("Could not save: " + messageOf(err), "bad");
+        reportError("save decision", err);
+      });
+  }
+
+  /* Raising is for PO, PM and DM. Everyone else - the COO, anyone outside
+     Programme Implementation, anyone without a record - sees the list but
+     not the button, and is told why instead of being left to wonder at a
+     greyed-out control. */
+  function applyStanding() {
+    var standing = myStanding();
+    if (!el.standingNote) return;
+
+    if (canRaise(standing)) {
+      el.newReqBtn.hidden = false;
+      el.standingNote.textContent =
+        "You are filing as " + (ROLE_TITLES[standing.role] || standing.role) + ".";
+      el.standingNote.hidden = false;
+      return;
+    }
+
+    el.newReqBtn.hidden = true;
+    el.standingNote.hidden = false;
+    el.standingNote.textContent = standing
+      ? "As " + (ROLE_TITLES[standing.role] || standing.role) +
+        " you decide on requisitions rather than raise them."
+      : "Requisitions are raised by Programme Implementation staff. " +
+        "You can see them here but not add one.";
+  }
+
   function disableForm() {
     Array.prototype.forEach.call(
       el.form.querySelectorAll("input, select, button"),
@@ -478,6 +732,21 @@ window.AWARD_CONFIG = {
     wireTabList(el.subtabs, "data-aw-subtab");
 
     el.newReqBtn.addEventListener("click", openRequisitionModal);
+
+    // One listener on the body rather than one per row, since the rows are
+    // thrown away and rebuilt on every render.
+    el.tbody.addEventListener("click", function (event) {
+      var btn = event.target.closest ? event.target.closest("[data-aw-review]") : null;
+      if (btn) openReview(btn.getAttribute("data-aw-review"));
+    });
+
+    Array.prototype.forEach.call(
+      el.reviewModal.querySelectorAll("[data-aw-close-review]"),
+      function (node) { node.addEventListener("click", closeReview); }
+    );
+    el.reviewApprove.addEventListener("click", function () { decide("approved"); });
+    el.reviewDecline.addEventListener("click", function () { decide("declined"); });
+    if (el.filterStatus) el.filterStatus.addEventListener("change", renderTable);
 
     // The close button, and the backdrop behind the box.
     Array.prototype.forEach.call(
@@ -672,6 +941,10 @@ window.AWARD_CONFIG = {
       district_name: el.district.value || "",
       award_type_id: el.awardType.value ? Number(el.awardType.value) : null,
       requester_name: (signedInUser() || {}).name || "",
+      // Recorded now, not looked up later: who may approve this depends on
+      // the level it was raised at, and people move between roles.
+      requester_role: (myStanding() || {}).role || null,
+      requester_level: (myStanding() || {}).level || null,
       quantity: el.quantity.value.trim(),
       requisition_date: el.reqDate.value,
     };
@@ -823,6 +1096,8 @@ window.AWARD_CONFIG = {
       .select("id, requester_name, quantity, requisition_date, status, created_at," +
               (hasNameColumns  ? " state_name, division_name, district_name," : "") +
               (hasLookupTables ? " states ( code, name ), districts ( name )," : "") +
+              (hasApproval ? " requester_role, requester_level, decided_by," +
+                             " decided_by_role, decided_at, decision_remark," : "") +
               " award_types ( code, name )")
       .order("created_at", { ascending: false })
       .limit(500)
@@ -834,6 +1109,17 @@ window.AWARD_CONFIG = {
 
           if (hasNameColumns && /(state_name|division_name|district_name)/i.test(msg)) {
             hasNameColumns = false;      // not migrated yet - read the old shape
+            loadRequisitions();
+            return;
+          }
+          if (hasApproval && /(requester_role|requester_level|decided_|decision_remark)/i.test(msg)) {
+            hasApproval = false;      // the approvals migration is not run yet
+            showSetupBanner(
+              "Approvals need one more migration - run " +
+              "<code>sql/2026-10-15-award-approvals.sql</code> in the Supabase " +
+              "SQL Editor. Until then every requisition shows as pending.",
+              "Approvals are not set up yet."
+            );
             loadRequisitions();
             return;
           }
@@ -917,6 +1203,7 @@ window.AWARD_CONFIG = {
     var divisionFilter = el.filterDivision.value;
     var districtFilter = el.filterDistrict.value;
     var typeFilter = el.filterType.value;
+    var statusFilter = el.filterStatus ? el.filterStatus.value : "";
     var search = el.filterSearch.value.trim().toLowerCase();
 
     var rows = allRequisitions.filter(function (row) {
@@ -926,6 +1213,10 @@ window.AWARD_CONFIG = {
       if (districtFilter && p.district !== districtFilter) return false;
       if (typeFilter && (!row.award_types || row.award_types.name !== typeFilter)) return false;
       if (search && String(row.requester_name || "").toLowerCase().indexOf(search) === -1) return false;
+      if (statusFilter) {
+        var d = statusOf(row).decision || "pending";
+        if (d !== statusFilter) return false;
+      }
       return true;
     });
 
@@ -960,6 +1251,8 @@ window.AWARD_CONFIG = {
           '<td class="num">' + escapeHtml(row.quantity) + "</td>" +
           '<td class="cell-date">' + escapeHtml(formatDate(row.requisition_date)) + "</td>" +
           '<td class="cell-date muted">' + escapeHtml(formatTimestamp(row.created_at)) + "</td>" +
+          "<td>" + statusCellHtml(row) + "</td>" +
+          '<td class="cell-action">' + actionCellHtml(row) + "</td>" +
         "</tr>";
     });
 
@@ -972,6 +1265,33 @@ window.AWARD_CONFIG = {
       : rows.length + " of " + allRequisitions.length;
     el.footTotal.textContent = total.toLocaleString();
     el.tfoot.hidden = false;
+  }
+
+  /* The state of a requisition, and - where it has been settled - who said
+     so. The remark hangs off the chip rather than taking a column of its
+     own: most are short, and a column of mostly-empty cells reads worse. */
+  function statusCellHtml(row) {
+    var st = statusOf(row);
+    if (!st.decision) {
+      return '<span class="chip-status is-pending">Pending</span>';
+    }
+    var title = st.by + (st.byRole ? " (" + st.byRole + ")" : "") +
+                ", " + formatTimestamp(st.at) +
+                (st.remark ? " — " + st.remark : "");
+    return '<span class="chip-status is-' + escapeHtml(st.decision) + '" title="' +
+             escapeHtml(title) + '">' +
+             escapeHtml(st.decision === "approved" ? "Approved" : "Declined") +
+           "</span>" +
+           '<span class="cell-by">' + escapeHtml(st.by || "") + "</span>" +
+           (st.remark ? '<span class="cell-remark" title="' + escapeHtml(st.remark) +
+                        '">' + escapeHtml(st.remark) + "</span>" : "");
+  }
+
+  function actionCellHtml(row) {
+    if (!hasApproval) return "";
+    if (!canDecide(myStanding(), row)) return "";
+    return '<button type="button" class="btn btn-ghost btn-xs" data-aw-review="' +
+             escapeHtml(row.id) + '">Review</button>';
   }
 
   // ----------------------------------------------------------------- errors

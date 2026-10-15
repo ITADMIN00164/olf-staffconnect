@@ -38,6 +38,7 @@
         <div>
           <h1>Stock Management</h1>
           <p>Award stock requested from the districts</p>
+          <p class="aw-standing" id="standing-note" hidden></p>
         </div>
         <button type="button" id="new-req-btn" class="btn btn-primary">
           <i class="aw-icon" data-aw-icon="plus" aria-hidden="true"></i>
@@ -78,6 +79,15 @@
           <select id="filter-district"><option value="">All districts</option></select>
         </div>
         <div class="field field-sm">
+          <label for="filter-status">Filter by status</label>
+          <select id="filter-status">
+            <option value="">All statuses</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="declined">Declined</option>
+          </select>
+        </div>
+        <div class="field field-sm">
           <label for="filter-type">Filter by type</label>
           <select id="filter-type"><option value="">All types</option></select>
         </div>
@@ -98,18 +108,20 @@
               <th scope="col" class="num">Quantity</th>
               <th scope="col">Date</th>
               <th scope="col">Submitted At</th>
+              <th scope="col">Status</th>
+              <th scope="col"><span class="sr-only">Review</span></th>
             </tr>
           </thead>
           <tbody id="requisitions-body">
             <tr class="placeholder-row">
-              <td colspan="8">Loading requisitions…</td>
+              <td colspan="10">Loading requisitions…</td>
             </tr>
           </tbody>
           <tfoot id="requisitions-foot" hidden>
             <tr>
               <td colspan="5" id="foot-count"></td>
               <td class="num mono" id="foot-total"></td>
-              <td colspan="2"></td>
+              <td colspan="4"></td>
             </tr>
           </tfoot>
         </table>
@@ -206,6 +218,50 @@
         </button>
       </div>
     </form>        </div>
+      </div>
+    </div>
+
+    <!-- Deciding on a requisition. Separate from the raising dialog: it shows
+         what was asked for rather than asking for anything, and a decision
+         cannot be taken back. -->
+    <div class="aw-overlay" id="review-modal">
+      <div class="aw-overlay-backdrop" data-aw-close-review></div>
+
+      <div class="aw-box aw-box-sm" role="dialog" aria-modal="true"
+           aria-labelledby="review-heading">
+        <div class="aw-box-head">
+          <div class="aw-box-heading">
+            <h2 id="review-heading">Review Requisition</h2>
+            <p class="aw-box-sub">Recorded against your name, and not undone</p>
+          </div>
+          <button type="button" class="aw-box-close" data-aw-close-review aria-label="Close">
+            <i class="aw-icon" data-aw-icon="close" aria-hidden="true"></i>
+          </button>
+        </div>
+
+        <div class="aw-box-body">
+          <div id="review-banner" class="banner" role="status" aria-live="polite" hidden>
+            <span id="review-banner-text"></span>
+          </div>
+
+          <div class="review-summary" id="review-summary"></div>
+
+          <div class="field">
+            <label for="review-remark">Remark
+              <span class="hint">required when declining</span></label>
+            <textarea id="review-remark" rows="3"
+                      placeholder="Why this is being approved or declined"></textarea>
+            <p class="error" id="review-remark-error" role="alert"></p>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" id="review-decline" class="btn btn-danger">Decline</button>
+            <button type="button" id="review-approve" class="btn btn-primary">
+              <i class="aw-icon" data-aw-icon="check" aria-hidden="true"></i>
+              Approve
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 </div>
