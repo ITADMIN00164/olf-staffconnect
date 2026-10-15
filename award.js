@@ -67,6 +67,7 @@ window.AWARD_CONFIG = {
 
     refreshBtn: document.getElementById("refresh-btn"),
     filterState: document.getElementById("filter-state"),
+    filterDivision: document.getElementById("filter-division"),
     filterDistrict: document.getElementById("filter-district"),
     filterType: document.getElementById("filter-type"),
     filterSearch: document.getElementById("filter-search"),
@@ -323,8 +324,17 @@ window.AWARD_CONFIG = {
 
     el.refreshBtn.addEventListener("click", function () { loadRequisitions(); });
 
+    // Narrowing from the left clears what sat to its right, so the filters
+    // cannot be left describing a combination that matches nothing.
     el.filterState.addEventListener("change", function () {
+      el.filterDivision.value = "";
       el.filterDistrict.value = "";
+      buildFilterOptions();
+      renderTable();
+    });
+    el.filterDivision.addEventListener("change", function () {
+      el.filterDistrict.value = "";
+      buildFilterOptions();
       renderTable();
     });
     el.filterDistrict.addEventListener("change", renderTable);
@@ -663,20 +673,39 @@ window.AWARD_CONFIG = {
     };
   }
 
-  // Filter dropdowns list only values that actually appear in the loaded rows.
+  /* The filter dropdowns offer what the loaded rows actually contain - not
+     everything the directory knows - so nothing on offer can return nothing.
+     Each narrows the next: pick a state and only the divisions filed in it
+     remain. A selection that is still on offer survives the rebuild, because
+     fillSelect puts it back.
+
+     Award type is left alone. It has nothing to do with where a requisition
+     is for, and narrowing it would only hide types from someone looking for
+     them. */
   function buildFilterOptions() {
-    var states = {}, districts = {}, types = {};
+    var stateFilter    = el.filterState.value;
+    var divisionFilter = el.filterDivision.value;
+
+    var states = {}, divisions = {}, districts = {}, types = {};
 
     allRequisitions.forEach(function (row) {
       var p = placeOf(row);
       if (p.state) states[p.state] = p.code;
-      if (p.district) districts[p.district] = true;
       if (row.award_types) types[row.award_types.name] = true;
+
+      if (stateFilter && p.state !== stateFilter) return;
+      if (p.division) divisions[p.division] = true;
+
+      if (divisionFilter && p.division !== divisionFilter) return;
+      if (p.district) districts[p.district] = true;
     });
 
     fillSelect(el.filterState, Object.keys(states).sort(), "All states",
       function (name) { return name; },
       function (name) { return states[name] ? name + " (" + states[name] + ")" : name; });
+
+    fillSelect(el.filterDivision, Object.keys(divisions).sort(), "All divisions",
+      function (name) { return name; }, function (name) { return name; });
 
     fillSelect(el.filterDistrict, Object.keys(districts).sort(), "All districts",
       function (name) { return name; }, function (name) { return name; });
@@ -687,6 +716,7 @@ window.AWARD_CONFIG = {
 
   function renderTable() {
     var stateFilter = el.filterState.value;
+    var divisionFilter = el.filterDivision.value;
     var districtFilter = el.filterDistrict.value;
     var typeFilter = el.filterType.value;
     var search = el.filterSearch.value.trim().toLowerCase();
@@ -694,6 +724,7 @@ window.AWARD_CONFIG = {
     var rows = allRequisitions.filter(function (row) {
       var p = placeOf(row);
       if (stateFilter && p.state !== stateFilter) return false;
+      if (divisionFilter && p.division !== divisionFilter) return false;
       if (districtFilter && p.district !== districtFilter) return false;
       if (typeFilter && (!row.award_types || row.award_types.name !== typeFilter)) return false;
       if (search && String(row.requester_name || "").toLowerCase().indexOf(search) === -1) return false;
