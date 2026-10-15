@@ -712,10 +712,18 @@ window.AWARD_CONFIG = {
           loadRequisitions();
           return;
         }
+        // Read before closing: closeReview clears what is being reviewed, and
+        // the message is about it.
         var what = decision === "approved" ? "Approved" : "Declined";
+        var whose = String((reviewing && reviewing.requester_name) || "").trim();
+        var where = String((reviewing && reviewing.district_name) || "").trim();
+
         closeReview();
-        showListBanner(what + " — " + (reviewing && reviewing.requester_name) +
-                       "'s requisition.");
+        showListBanner(
+          whose
+            ? what + " — " + whose + "'s requisition" + (where ? " for " + where : "") + "."
+            : what + " — the requisition has been " + decision + "."
+        );
         loadRequisitions();
       })
       .catch(function (err) {
