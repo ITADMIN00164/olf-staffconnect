@@ -167,7 +167,46 @@ window.AWARD_CONFIG = {
     var emp = window.__olfEmployee;
     if (!emp) return null;
     if (String(emp["Status"] || "Active").trim().toLowerCase() === "inactive") return null;
-    return roleOfDepartment(emp["Dept"]);
+
+    var standing = roleOfDepartment(emp["Dept"]);
+    if (!standing) return null;
+
+    // Division is a many-valued field, so this is the set they cover.
+    standing.divisions = splitSemicolons(emp["Division"]);
+    return standing;
+  }
+
+  function splitSemicolons(value) {
+    return String(value || "").split(/[;\r\n]/)
+      .map(function (p) { return p.trim(); })
+      .filter(Boolean);
+  }
+
+  /* A requisition is decided by somebody responsible for the division it is
+     for. A PM in Pune has no business approving Nagpur's requests, and the
+     division is already on the requisition - it is where the award is going.
+
+     The COO is the exception, and the directory agrees: the one COO has no
+     division recorded, because the role is not a divisional one. Above the
+     divisions, so across all of them.
+
+     An approver whose own Division is blank covers nothing. Two of the five
+     DMs are in that position today; until their Division is filled in on the
+     Employees tab they will see no Review buttons. That is the honest
+     reading - the alternative, treating blank as everywhere, would handing
+     them the whole organisation on the strength of a missing field. */
+  function coversDivision(standing, row) {
+    if (!standing) return false;
+    if (standing.level >= 4) return true;            // the COO is org-wide
+
+    var want = String((row && row.division_name) || "").trim().toLowerCase();
+    if (!want) return false;                         // nothing to match on
+
+    var mine = standing.divisions || [];
+    for (var i = 0; i < mine.length; i++) {
+      if (mine[i].trim().toLowerCase() === want) return true;
+    }
+    return false;
   }
 
   function canRaise(standing)  { return !!standing && standing.level <= 3; }
@@ -183,7 +222,8 @@ window.AWARD_CONFIG = {
   function canDecide(standing, row) {
     if (!standing) return false;
     if (statusOf(row).decision) return false;        // already settled
-    return standing.level > levelRaisedAt(row);
+    if (standing.level <= levelRaisedAt(row)) return false;
+    return coversDivision(standing, row);
   }
 
   /* The name on a requisition comes from the signed-in user, preferring their
@@ -696,7 +736,8 @@ window.AWARD_CONFIG = {
     if (canRaise(standing)) {
       el.newReqBtn.hidden = false;
       el.standingNote.textContent =
-        "You are filing as " + (ROLE_TITLES[standing.role] || standing.role) + ".";
+        "You are filing as " + (ROLE_TITLES[standing.role] || standing.role) + "." +
+        decidingNote(standing);
       el.standingNote.hidden = false;
       return;
     }
@@ -705,9 +746,23 @@ window.AWARD_CONFIG = {
     el.standingNote.hidden = false;
     el.standingNote.textContent = standing
       ? "As " + (ROLE_TITLES[standing.role] || standing.role) +
-        " you decide on requisitions rather than raise them."
+        " you decide on requisitions rather than raise them." + decidingNote(standing)
       : "Requisitions are raised by Programme Implementation staff. " +
         "You can see them here but not add one.";
+  }
+
+  /* Said under the heading, because the alternative is someone who can
+     approve seeing no Review buttons and concluding the page is broken. */
+  function decidingNote(standing) {
+    if (!standing || standing.level < 2) return "";
+    if (standing.level >= 4) return " You decide on any division.";
+
+    var divs = standing.divisions || [];
+    if (!divs.length) {
+      return " No division is recorded against you, so there is nothing you " +
+             "can approve yet — ask for it to be filled in on the Employees tab.";
+    }
+    return " You decide on " + divs.join(" and ") + ".";
   }
 
   function disableForm() {
