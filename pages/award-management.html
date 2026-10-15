@@ -1,0 +1,644 @@
+<!-- pages/award-management.html
+     Ported from the standalone Award Management app. Its CSS styled
+     body/table/:root, so every rule here is scoped under .award-page and
+     the tokens sit on that element rather than :root - otherwise they
+     would restyle the shell, the Employees table included. -->
+<div class="award-page">
+
+
+    <!-- Shown only when app.js still holds placeholder credentials, or the first
+         Supabase call fails outright. -->
+    <div id="setup-banner" class="banner banner-error" hidden>
+      <span class="banner-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round"><path d="M12 8v5M12 16.5v.01"/><circle cx="12" cy="12" r="9"/></svg>
+      </span>
+      <span>
+        <strong id="setup-banner-title">Supabase is not configured yet.</strong>
+        <span id="setup-banner-detail"></span>
+      </span>
+    </div>
+
+    <!-- ================= New requisition ================= -->
+    <section class="card" aria-labelledby="form-heading">
+      <div class="section-head">
+        <span class="rule rule-accent" aria-hidden="true"></span>
+        <h2 id="form-heading">New Requisition</h2>
+      </div>
+
+      <!-- Submit result: green on success, red on failure. -->
+      <div id="form-banner" class="banner" role="status" aria-live="polite" hidden>
+        <span class="banner-icon" id="form-banner-icon" aria-hidden="true"></span>
+        <span id="form-banner-text"></span>
+      </div>
+
+      <form id="requisition-form" novalidate>
+        <div class="grid">
+
+          <div class="field">
+            <label for="state">State <span class="req" aria-hidden="true">*</span></label>
+            <select id="state" name="state" required>
+              <option value="">Loading…</option>
+            </select>
+            <p class="error" id="state-error" role="alert"></p>
+          </div>
+
+          <div class="field">
+            <label for="district">District <span class="req" aria-hidden="true">*</span></label>
+            <select id="district" name="district" required disabled>
+              <option value="">Select a state first</option>
+            </select>
+            <p class="error" id="district-error" role="alert"></p>
+          </div>
+
+          <div class="field">
+            <label for="award-type">Award Type <span class="req" aria-hidden="true">*</span></label>
+            <select id="award-type" name="award-type" required>
+              <option value="">Loading…</option>
+            </select>
+            <p class="error" id="award-type-error" role="alert"></p>
+          </div>
+          <div class="field">
+            <label>Requested By</label>
+            <div class="who" id="requester-who">
+              <span class="who-avatar" id="requester-initials" aria-hidden="true"></span>
+              <span class="who-text">
+                <span class="who-name" id="requester-name">Signed-in user</span>
+                <span class="who-mail" id="requester-mail"></span>
+              </span>
+            </div>
+            <p class="error" id="requester-error" role="alert"></p>
+          </div>
+<div class="field">
+            <label for="quantity">Quantity <span class="req" aria-hidden="true">*</span></label>
+            <input type="number" id="quantity" name="quantity" class="mono"
+                   min="1" max="1000000" step="1" placeholder="e.g. 100" required />
+            <p class="error" id="quantity-error" role="alert"></p>
+          </div>
+
+          <div class="field">
+            <label for="req-date">Date <span class="req" aria-hidden="true">*</span></label>
+            <input type="date" id="req-date" name="req-date" class="mono" required />
+            <p class="error" id="req-date-error" role="alert"></p>
+          </div>
+
+        </div>
+
+        <div class="form-actions">
+          <button type="reset" id="reset-btn" class="btn btn-ghost">Clear</button>
+          <button type="submit" id="submit-btn" class="btn btn-primary">
+            <span class="btn-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                   stroke-linecap="round" stroke-linejoin="round"><path d="m4.5 12.5 5 5 10-11"/></svg>
+            </span>
+            Submit Requisition
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ================= Requisitions table ================= -->
+    <section class="card" aria-labelledby="table-heading">
+      <div class="section-head">
+        <span class="rule rule-alt" aria-hidden="true"></span>
+        <div class="section-head-main">
+          <h2 id="table-heading">Requisitions</h2>
+          <span class="pill" id="row-pill">—</span>
+        </div>
+        <button type="button" id="refresh-btn" class="btn btn-ghost btn-sm">Refresh</button>
+      </div>
+
+      <div class="filters">
+        <div class="field field-sm">
+          <label for="filter-state">Filter by state</label>
+          <select id="filter-state"><option value="">All states</option></select>
+        </div>
+        <div class="field field-sm">
+          <label for="filter-district">Filter by district</label>
+          <select id="filter-district"><option value="">All districts</option></select>
+        </div>
+        <div class="field field-sm">
+          <label for="filter-type">Filter by type</label>
+          <select id="filter-type"><option value="">All types</option></select>
+        </div>
+        <div class="field field-sm">
+          <label for="filter-search">Search requester</label>
+          <input type="search" id="filter-search" placeholder="Name contains…" />
+        </div>
+      </div>
+
+      <div class="table-scroll">
+        <table id="requisitions-table">
+          <thead>
+            <tr>
+              <th scope="col">State</th>
+              <th scope="col">District</th>
+              <th scope="col">Requester</th>
+              <th scope="col">Type</th>
+              <th scope="col" class="num">Quantity</th>
+              <th scope="col">Date</th>
+              <th scope="col">Submitted At</th>
+            </tr>
+          </thead>
+          <tbody id="requisitions-body">
+            <tr class="placeholder-row">
+              <td colspan="7">Loading requisitions…</td>
+            </tr>
+          </tbody>
+          <tfoot id="requisitions-foot" hidden>
+            <tr>
+              <td colspan="4" id="foot-count"></td>
+              <td class="num mono" id="foot-total"></td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+</div>
+
+<style>
+    /* Award Management — plain CSS, no framework, no build step.
+     *
+     * Warm paper background, deep indigo as the single strong accent, serif
+     * headings against a sans UI, and monospace for anything you'd read as a
+     * value: codes, counts, dates.
+     *
+     * Retheming is a token edit: change the --accent-* values in :root below and
+     * every button, rule, chip, focus ring and success banner follows.
+     */
+    .award-page {
+      /* surfaces */
+      --bg: #f3f2ec;
+      --surface: #ffffff;
+      --surface-alt: #faf9f5;
+      --border: #e4e2d9;
+      --border-strong: #d2cfc3;
+
+      /* ink */
+      --text: #1e241f;
+      --text-soft: #4a514a;
+      --text-muted: #86887e;
+
+      /* deep indigo — the primary action colour */
+      --accent: #2c3a66;
+      --accent-hover: #223052;
+      --accent-line: #4e5f94;
+      --accent-soft: #e9ecf6;
+      --accent-soft-border: #ccd4e8;
+      --accent-ink: #283560;
+      --accent-on: #eef1f8;        /* text/icon sitting on --accent */
+
+      /* secondary accent, used on the table section rule */
+      --accent-2: #a8603c;         /* warm clay */
+
+      /* error */
+      --danger: #9d2f26;
+      --danger-soft: #fbeceb;
+      --danger-soft-border: #eecbc8;
+
+      --radius: 14px;
+      --radius-sm: 9px;
+      --shadow: 0 1px 2px rgba(31, 36, 30, .04), 0 8px 24px rgba(31, 36, 30, .05);
+
+      --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+      --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+    .award-page * { box-sizing: border-box;
+    }
+    /* Must come before any rule that sets `display` on an element the JS hides
+       with the `hidden` attribute — a plain `display: flex` would out-specify
+       the browser's default `[hidden] { display: none }` and pin it open. */
+    .award-page [hidden] { display: none !important;
+    }
+    .award-page { margin: 0;
+    }
+    .award-page {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 15px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    /* Full-bleed with a small gutter, rather than a centred column — the table
+       has seven columns and every pixel of width keeps it from scrolling
+       sideways. Set a max-width here if it ever runs on an ultrawide. */
+    .award-page .wrap {
+      margin: 0 auto;
+      padding: 0 28px;
+    }
+    .award-page .mono { font-family: var(--font-mono); font-size: .92em;
+    }
+    /* ---------------------------------------------------------------- topbar */
+    .award-page .topbar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 0;
+      margin-bottom: 28px;
+    }
+    .award-page .topbar-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .award-page .brand { display: flex; align-items: center; gap: 14px;
+    }
+    .award-page .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 46px;
+      height: 46px;
+      flex: 0 0 46px;
+      border-radius: 13px;
+      background: var(--accent);
+      color: var(--accent-on);
+    }
+    .award-page .brand-mark svg { width: 24px; height: 24px;
+    }
+    .award-page .brand-text { display: flex; flex-direction: column; line-height: 1.2;
+    }
+    .award-page .brand-org {
+      font-size: .68rem;
+      font-weight: 600;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .award-page .brand-title {
+      font-family: var(--font-serif);
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: -.012em;
+      color: var(--text);
+    }
+    /* ----------------------------------------------------------------- cards */
+    .award-page main.wrap { padding-bottom: 36px;
+    }
+    .award-page .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 26px;
+      margin-bottom: 24px;
+    }
+    .award-page .section-head {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+    /* The little coloured bar to the left of each section title. */
+    .award-page .rule {
+      width: 4px;
+      flex: 0 0 4px;
+      align-self: stretch;
+      min-height: 34px;
+      border-radius: 999px;
+      background: var(--accent-line);
+    }
+    .award-page .rule-alt { background: var(--accent-2);
+    }
+    .award-page .section-head h2 {
+      margin: 0;
+      font-family: var(--font-serif);
+      font-size: 1.32rem;
+      font-weight: 600;
+      letter-spacing: -.012em;
+    }
+    .award-page .section-head-main {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      min-width: 0;
+    }
+    .award-page .section-head > .btn { margin-left: auto; flex: 0 0 auto;
+    }
+    .award-page .pill {
+      font-family: var(--font-mono);
+      font-size: .72rem;
+      font-weight: 500;
+      color: var(--text-soft);
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 3px 11px;
+      white-space: nowrap;
+    }
+    /* ---------------------------------------------------------------- fields */
+    /* 260px tracks make six fields land on clean splits as the window grows:
+       3+3, then 4+2, then all six across. A smaller track size lands on a
+       ragged 5+1 at common laptop widths. */
+    .award-page .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 18px;
+    }
+    .award-page .field { display: flex; flex-direction: column; min-width: 0;
+    }
+    .award-page .field label {
+      font-size: .69rem;
+      font-weight: 600;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 7px;
+    }
+    .award-page .req { color: var(--danger);
+    }
+    .award-page .field input, .award-page .field select {
+      font: inherit;
+      font-size: .94rem;
+      color: var(--text);
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      width: 100%;
+      min-width: 0;
+      transition: border-color .12s ease, box-shadow .12s ease;
+    }
+    .award-page .field input.mono { font-family: var(--font-mono);
+    }
+    .award-page .field input::placeholder { color: #a9aba1;
+    }
+    /* :not(:focus) keeps this off a focused field. Without it this selector
+       out-specifies the :focus rule below and eats the focus border whenever
+       the pointer happens to rest on the field. */
+    .award-page .field input:hover:not(:disabled):not(:focus), .award-page .field select:hover:not(:disabled):not(:focus) { border-color: #b9b5a6;
+    }
+    .award-page .field input:focus, .award-page .field select:focus {
+      outline: none;
+      border-color: var(--accent-line);
+      box-shadow: 0 0 0 3px rgba(78, 95, 148, .18);
+    }
+    .award-page .field select:disabled, .award-page .field input:disabled {
+      background: var(--surface-alt);
+      color: var(--text-muted);
+      cursor: not-allowed;
+    }
+    .award-page .field input.invalid, .award-page .field select.invalid { border-color: var(--danger);
+    }
+    .award-page .field input.invalid:focus, .award-page .field select.invalid:focus { box-shadow: 0 0 0 3px rgba(157, 47, 38, .13);
+    }
+    .award-page .error {
+      margin: 6px 0 0;
+      min-height: 1em;
+      font-size: .76rem;
+      color: var(--danger);
+    }
+    /* --------------------------------------------------------------- actions */
+    .award-page .form-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 22px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+    }
+    .award-page .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font: inherit;
+      font-size: .9rem;
+      font-weight: 600;
+      border-radius: 999px;
+      padding: 10px 20px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: background-color .12s ease, border-color .12s ease, color .12s ease;
+    }
+    .award-page .btn-icon { display: inline-grid; place-items: center;
+    }
+    .award-page .btn-icon svg { width: 15px; height: 15px;
+    }
+    .award-page .btn-sm { padding: 7px 15px; font-size: .82rem;
+    }
+    .award-page .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--accent-on);
+    }
+    .award-page .btn-primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover);
+    }
+    .award-page .btn-primary:disabled { opacity: .55; cursor: progress;
+    }
+    .award-page .btn-ghost {
+      background: var(--surface);
+      border-color: var(--border-strong);
+      color: var(--text-soft);
+    }
+    .award-page .btn-ghost:hover:not(:disabled) {
+      background: var(--surface-alt);
+      border-color: #b9b5a6;
+      color: var(--text);
+    }
+    .award-page .btn-ghost:disabled { opacity: .5; cursor: progress;
+    }
+    .award-page .btn:focus-visible { outline: 2px solid var(--accent-line); outline-offset: 2px;
+    }
+    /* --------------------------------------------------------------- banners */
+    .award-page .banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 11px;
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      margin-bottom: 22px;
+      font-size: .88rem;
+      border: 1px solid transparent;
+    }
+    .award-page .banner-icon { flex: 0 0 auto; margin-top: 1px;
+    }
+    .award-page .banner-icon svg { width: 17px; height: 17px; display: block;
+    }
+    .award-page .banner-success {
+      background: var(--accent-soft);
+      border-color: var(--accent-soft-border);
+      color: var(--accent-ink);
+    }
+    .award-page .banner-error {
+      background: var(--danger-soft);
+      border-color: var(--danger-soft-border);
+      color: var(--danger);
+    }
+    .award-page .banner code {
+      font-family: var(--font-mono);
+      font-size: .88em;
+      background: rgba(31, 36, 30, .07);
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+    /* --------------------------------------------------------------- filters */
+    .award-page .filters {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+      gap: 14px;
+      padding: 16px;
+      margin-bottom: 18px;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+    }
+    .award-page .field-sm label { font-size: .64rem;
+    }
+    .award-page .field-sm input, .award-page .field-sm select { padding: 8px 10px; font-size: .88rem;
+    }
+    /* ----------------------------------------------------------------- table */
+    .award-page .table-scroll {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+    }
+    .award-page table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .89rem;
+    }
+    .award-page thead th {
+      background: var(--surface-alt);
+      text-align: left;
+      font-size: .66rem;
+      font-weight: 600;
+      letter-spacing: .11em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .award-page tbody td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #f0efe8;
+      white-space: nowrap;
+      color: var(--text-soft);
+    }
+    .award-page tbody td:nth-child(3) { color: var(--text); font-weight: 500;
+    }
+    .award-page tbody tr:last-child td { border-bottom: none;
+    }
+    .award-page tbody tr:hover td { background: #fbfaf6;
+    }
+    .award-page .num { text-align: right; font-variant-numeric: tabular-nums;
+    }
+    .award-page tbody .num { font-family: var(--font-mono); color: var(--text); font-weight: 500;
+    }
+    .award-page .cell-date { font-family: var(--font-mono); font-size: .85em;
+    }
+    .award-page .state-code {
+      display: inline-block;
+      font-family: var(--font-mono);
+      background: var(--accent-soft);
+      color: var(--accent-ink);
+      font-weight: 500;
+      font-size: .76rem;
+      letter-spacing: .04em;
+      padding: 3px 9px;
+      border-radius: 6px;
+    }
+    .award-page .type-chip {
+      display: inline-block;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      color: var(--text-soft);
+      font-weight: 500;
+      font-size: .78rem;
+      padding: 3px 10px;
+      border-radius: 999px;
+    }
+    .award-page .muted { color: var(--text-muted);
+    }
+    .award-page .placeholder-row td {
+      padding: 34px 14px;
+      text-align: center;
+      color: var(--text-muted);
+      white-space: normal;
+    }
+    .award-page tfoot td {
+      background: var(--surface-alt);
+      border-top: 1px solid var(--border);
+      padding: 12px 14px;
+      font-weight: 600;
+      font-size: .82rem;
+      color: var(--text-soft);
+    }
+    .award-page tfoot .num { color: var(--text); font-size: .92rem;
+    }
+    /* ----------------------------------------------------------------- phone */
+    @media (max-width: 620px) {
+      .award-page .topbar { padding: 13px 0; margin-bottom: 18px;
+      }
+      .award-page .brand-title { font-size: 1.28rem;
+      }
+      .award-page .card { padding: 18px;
+      }
+      .award-page .wrap { padding: 0 16px;
+      }
+      .award-page .grid { grid-template-columns: 1fr; gap: 15px;
+      }
+      .award-page .form-actions { justify-content: stretch;
+      }
+      .award-page .form-actions .btn { flex: 1 1 auto; justify-content: center;
+      }
+      .award-page .section-head > .btn { margin-left: 0;
+      }
+    }
+
+    /* Requested By - a read-only chip, not an input. It has to read as
+       "this is you", not as a field someone forgot to fill in, so it keeps the
+       field's height and border but drops the white input surface. */
+    .award-page .who {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 11px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface-alt);
+      min-height: 42px;
+    }
+
+    .award-page .who-avatar {
+      flex: 0 0 auto;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: var(--accent-on);
+      font-family: var(--font-sans);
+      font-size: 11.5px;
+      font-weight: 600;
+      letter-spacing: .3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .award-page .who-text { min-width: 0; line-height: 1.25; }
+
+    .award-page .who-name {
+      display: block;
+      font-size: 14px;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .award-page .who-mail {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+</style>

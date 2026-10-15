@@ -1205,6 +1205,14 @@ window.navigate = async function (page) {
         }
     }
 
+    else if (page === "award-management") {
+        // award.js reads window.__olfUser / window.__olfEmployee itself for the
+        // requester, so there is nothing to inject here.
+        if (window.AwardManagement && typeof window.AwardManagement.mount === "function") {
+            window.AwardManagement.mount();
+        }
+    }
+
     else if (page === "gr") {
         const user = window.__olfUser;
         if (user) {
