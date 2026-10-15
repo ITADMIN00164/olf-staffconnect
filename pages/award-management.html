@@ -20,16 +20,32 @@
       </span>
     </div>
 
-    <nav class="aw-tabs" role="tablist" aria-label="Award Management">
-      <button type="button" role="tab" id="aw-tab-stock" class="aw-tab is-active"
-              data-aw-tab="stock" aria-controls="aw-panel-stock" aria-selected="true">
-        Stock Management
-      </button>
-    </nav>
+    <div class="aw-topbar">
+      <nav class="aw-tabs" role="tablist" aria-label="Award Management">
+        <button type="button" role="tab" id="aw-tab-stock" class="aw-tab is-active"
+                data-aw-tab="stock" aria-controls="aw-panel-stock" aria-selected="true">
+          Stock Management
+        </button>
+      </nav>
+      <div class="aw-topbar-right">
+        <button type="button" id="refresh-btn" class="btn btn-ghost btn-sm">Refresh</button>
+      </div>
+    </div>
 
     <div id="aw-panel-stock" class="aw-panel" role="tabpanel" aria-labelledby="aw-tab-stock">
 
-      <nav class="aw-subtabs" role="tablist" aria-label="Stock Management sections">
+      <div class="aw-page-header">
+        <div>
+          <h1>Stock Management</h1>
+          <p>Award stock requested from the districts</p>
+        </div>
+        <button type="button" id="new-req-btn" class="btn btn-primary">
+          <i class="aw-icon" data-aw-icon="plus" aria-hidden="true"></i>
+          New Requisition
+        </button>
+      </div>
+
+      <nav class="aw-subtabs" role="tablist" aria-label="Stock Management views">
         <button type="button" role="tab" id="aw-subtab-requisition" class="aw-subtab is-active"
                 data-aw-subtab="requisition" aria-controls="aw-subpanel-requisition"
                 aria-selected="true">
@@ -45,15 +61,6 @@
             <div class="section-head-main">
               <h2 id="table-heading">Requisitions</h2>
               <span class="pill" id="row-pill">—</span>
-            </div>
-            <div class="aw-head-actions">
-              <button type="button" id="refresh-btn" class="btn btn-ghost btn-sm">Refresh</button>
-              <button type="button" id="new-req-btn" class="btn btn-primary btn-sm">
-                <span class="btn-icon" aria-hidden="true">
-                  <i class="aw-icon" data-aw-icon="plus" aria-hidden="true"></i>
-                </span>
-                New Requisition
-              </button>
             </div>
           </div>
 

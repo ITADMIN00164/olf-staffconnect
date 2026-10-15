@@ -21,48 +21,47 @@
  * every button, rule, chip, focus ring and success banner follows.
  */
 .award-page {
-  /* These are the shell's own values, not a second palette. This page began
-     life as a standalone app in warm paper and serif, which read as a
-     different product bolted onto Staff Connect. The rules below are written
-     against tokens, so pointing the tokens at index.html's :root re-themes
-     the whole page without touching them.
+  /* These are HO Plan & Review's values, so this tab reads as the same
+     product. It arrived as a standalone app in warm paper and Source Serif,
+     which looked like something bolted on. Every rule below is written
+     against tokens, so pointing the tokens at that page's palette re-themes
+     the lot without touching them.
 
-     They stay on .award-page rather than :root so nothing leaks back out. */
+     They sit on .award-page, not :root, so nothing leaks back out. */
 
-  /* surfaces - the shell's canvas, glass and hairline */
+  /* surfaces */
   --bg: transparent;                 /* the shell paints the canvas */
-  --surface: #ffffff;
-  --surface-alt: #f6f8fc;
-  --border: rgba(15, 23, 42, .08);   /* --hairline */
-  --border-strong: rgba(15, 23, 42, .16);
+  --surface: #FFFFFF;
+  --surface-alt: #F4F7FA;
+  --border: #D8E4EC;
+  --border-strong: #BAD3CE;
 
   /* ink */
-  --text: #0F172A;                   /* --text */
-  --text-soft: #5A6577;              /* --text-soft */
-  --text-muted: #8A94A6;             /* --text-faint */
+  --text: #1A2533;
+  --text-soft: #5A6B7A;
+  --text-muted: #8A9AAA;
 
-  /* the shell's navy, with its blue for anything that reads as a link */
-  --accent: #0B1220;                 /* --ink */
-  --accent-hover: #131C2E;           /* --ink-soft */
-  --accent-line: #4F8EF7;            /* --brand */
-  --accent-soft: #eaf1fe;
-  --accent-soft-border: #c7ddfd;
-  --accent-ink: #1d4ed8;
-  --accent-on: #ffffff;              /* text/icon sitting on --accent */
+  /* the deep green this app uses for anything active or primary */
+  --accent: #0D6B5E;
+  --accent-hover: #0A5648;
+  --accent-line: #1A8577;
+  --accent-soft: #E8F5F3;
+  --accent-soft-border: #BAD3CE;
+  --accent-ink: #0D6B5E;
+  --accent-on: #FFFFFF;
 
-  /* secondary accent, used on the table section rule */
-  --accent-2: #10B197;               /* --teal */
+  --accent-2: #1A8577;
 
   /* error */
-  --danger: #EF4444;                 /* --danger */
-  --danger-soft: #fef2f2;
-  --danger-soft-border: #fecaca;
+  --danger: #C2362B;
+  --danger-soft: #FDF2F1;
+  --danger-soft-border: #F3C9C4;
 
-  --radius: 14px;                    /* --r-md */
-  --radius-sm: 10px;                 /* --r-sm */
-  --shadow: 0 2px 4px rgba(15,23,42,.04), 0 8px 24px rgba(15,23,42,.07);
+  --radius: 10px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
 
-  /* One family, the shell's. The serif headings were the loudest sign that
+  /* One family, the app's. The serif headings were the loudest sign that
      this page came from somewhere else. */
   --font-sans: "Inter", Arial, sans-serif;
   --font-serif: "Inter", Arial, sans-serif;
@@ -487,49 +486,6 @@
   color: var(--text-muted);
 }
 
-/* ---- tabs -------------------------------------------------------- */
-.award-page .aw-tabs {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 18px;
-  border-bottom: 1px solid var(--border);
-}
-
-.award-page .aw-tab {
-  appearance: none;
-  background: none;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;          /* sit on the rule, not above it */
-  padding: 9px 14px;
-  font-family: var(--font-sans);
-  font-size: 13.5px;
-  font-weight: 500;
-  color: var(--text-muted);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.award-page .aw-tab:hover { color: var(--text); }
-
-.award-page .aw-tab.is-active {
-  color: var(--accent-ink);
-  border-bottom-color: var(--accent);
-  font-weight: 600;
-}
-
-.award-page .aw-tab:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-  border-radius: 4px;
-}
-
-.award-page .aw-head-actions {
-  margin-left: auto;
-  display: flex;
-  gap: 8px;
-  flex: 0 0 auto;
-}
 
 /* ---- the stock tab, until it has something in it ------------------ */
 .award-page .aw-empty {
@@ -660,48 +616,6 @@
   .award-page .aw-box-body .grid { grid-template-columns: 1fr; }
 }
 
-/* ---- the section's own tabs --------------------------------------------
-
-   Requisition sits inside Stock Management, so it reads as a part of it
-   rather than an alternative to it: smaller, pill-shaped, and set in from
-   the section tab above. */
-.award-page .aw-subtabs {
-  display: flex;
-  gap: 6px;
-  margin: 0 0 16px;
-}
-
-.award-page .aw-subtab {
-  appearance: none;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  padding: 5px 13px;
-  font-family: var(--font-sans);
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--text-muted);
-  background: none;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.award-page .aw-subtab:hover { color: var(--text); background: var(--surface-alt); }
-
-.award-page .aw-subtab.is-active {
-  color: var(--accent-ink);
-  background: var(--accent-soft);
-  border-color: var(--accent-soft-border);
-  font-weight: 600;
-}
-
-.award-page .aw-subtab:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-/* The section tab carries the page, so it is the larger of the two. */
-.award-page .aw-tab { font-size: 14.5px; padding: 10px 2px; margin-right: 18px; }
-.award-page .aw-tabs { gap: 0; margin-bottom: 16px; }
 
 /* Icon holders. The SVG is put in by award.js, so the fragment stays plain
    markup - inline <svg> in a fragment is what tooling trips over. */
@@ -709,3 +623,129 @@
 .award-page .aw-icon svg { width: 1em; height: 1em; }
 .award-page .banner-icon .aw-icon svg,
 .award-page .aw-box-close .aw-icon svg { width: 18px; height: 18px; }
+
+/* ======================================================================
+   Tabs and page header
+
+   Taken from HO Plan & Review so the two read as one app: an underline row
+   of sections across the top with the page actions on the right, a heading
+   under it, and a row of pills for the views inside the section.
+   ====================================================================== */
+
+.award-page .aw-topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.award-page .aw-tabs { display: flex; }
+
+.award-page .aw-tab {
+  position: relative;
+  padding: 0 18px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-soft);
+  background: none;
+  border: none;
+  border-bottom: 2.5px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .15s;
+}
+
+.award-page .aw-tab:hover { color: var(--accent); background: rgba(13, 107, 94, .05); }
+.award-page .aw-tab.is-active { color: var(--accent); font-weight: 600; }
+
+/* The active marker is a rounded, softly lit bar rather than a plain rule -
+   the same one the other tabs use. */
+.award-page .aw-tab.is-active::after {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: -1px;                       /* sit on the row's own border */
+  height: 2.5px;
+  border-radius: 3px 3px 0 0;
+  background: linear-gradient(90deg, var(--accent), var(--accent-line));
+  box-shadow: 0 0 10px rgba(13, 107, 94, .45);
+}
+
+.award-page .aw-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+
+.award-page .aw-topbar-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+
+/* ---- the heading under the tabs ---------------------------------- */
+.award-page .aw-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.award-page .aw-page-header h1 {
+  font-family: var(--font-sans);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  color: var(--text);
+  margin: 0;
+}
+
+.award-page .aw-page-header p {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 3px 0 0;
+}
+
+/* ---- the views inside a section ---------------------------------- */
+.award-page .aw-subtabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 14px; }
+
+.award-page .aw-subtab {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 8px;
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-soft);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.award-page .aw-subtab:hover { color: var(--accent); border-color: var(--border-strong); }
+
+.award-page .aw-subtab.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.award-page .aw-subtab:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* The table head, as the other tables wear it: solid brand, white caps. */
+.award-page #requisitions-table th {
+  background: var(--accent);
+  color: #fff;
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+
+/* The sort/row rules underneath assumed a pale head; keep the corners with
+   the card now that it is dark. */
+.award-page #requisitions-table thead tr:first-child th:first-child { border-top-left-radius: var(--radius-sm); }
+.award-page #requisitions-table thead tr:first-child th:last-child  { border-top-right-radius: var(--radius-sm); }
