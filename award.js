@@ -54,7 +54,8 @@ window.AWARD_CONFIG = {
     district: document.getElementById("district"),
     awardType: document.getElementById("award-type"),
     requesterName: document.getElementById("requester-name"),
-    requesterMail: document.getElementById("requester-mail"),
+    requesterWho: document.getElementById("requester-who"),
+    requesterSub: document.getElementById("requester-sub"),
     requesterInitials: document.getElementById("requester-initials"),
     quantity: document.getElementById("quantity"),
     reqDate: document.getElementById("req-date"),
@@ -92,9 +93,10 @@ window.AWARD_CONFIG = {
                (user && String(user.displayName || "").trim()) || "";
     var mail = (user && String(user.email || "").trim()) ||
                (emp && String(emp["Email"] || "").trim()) || "";
+    var role = (emp && String(emp["Designation"] || "").trim()) || "";
 
     if (!name && mail) name = mail.split("@")[0];
-    return name ? { name: name, email: mail } : null;
+    return name ? { name: name, email: mail, role: role } : null;
   }
 
   function initialsOf(name) {
@@ -110,13 +112,21 @@ window.AWARD_CONFIG = {
 
     if (!who) {
       el.requesterName.textContent = "Not signed in";
-      el.requesterMail.textContent = "";
+      el.requesterSub.textContent = "";
       el.requesterInitials.textContent = "?";
+      if (el.requesterWho) el.requesterWho.removeAttribute("title");
       return;
     }
+
     el.requesterName.textContent = who.name;
-    el.requesterMail.textContent = who.email || "";
     el.requesterInitials.textContent = initialsOf(who.name);
+
+    // Their job title rather than their address: it is shorter, it is what the
+    // header beside it shows, and a full address turned the chip into a wall of
+    // small type. The address is still there on hover for anyone checking which
+    // account they are filing under.
+    el.requesterSub.textContent = who.role || who.email || "";
+    if (el.requesterWho && who.email) el.requesterWho.title = who.email;
   }
 
   // ----------------------------------------------------------- small utils

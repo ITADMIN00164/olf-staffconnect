@@ -64,7 +64,7 @@
               <span class="who-avatar" id="requester-initials" aria-hidden="true"></span>
               <span class="who-text">
                 <span class="who-name" id="requester-name">Signed-in user</span>
-                <span class="who-mail" id="requester-mail"></span>
+                <span class="who-sub" id="requester-sub"></span>
               </span>
             </div>
             <p class="error" id="requester-error" role="alert"></p>
@@ -591,54 +591,58 @@
       }
     }
 
-    /* Requested By - a read-only chip, not an input. It has to read as
-       "this is you", not as a field someone forgot to fill in, so it keeps the
-       field's height and border but drops the white input surface. */
+    /* Requested By - filled in from the sign-in, so it is shown, not typed.
+       Tinted and pill-shaped rather than a white box: an input-coloured
+       rectangle with text sitting in it reads as a field you have yet to deal
+       with, and there is nothing here to edit. */
     .award-page .who {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 7px 11px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      background: var(--surface-alt);
-      min-height: 42px;
+      padding: 6px 14px 6px 7px;
+      border: 1px solid var(--accent-soft-border);
+      border-radius: 999px;
+      background: var(--accent-soft);
+      min-height: 44px;          /* level with the selects beside it */
+      box-sizing: border-box;
     }
 
     .award-page .who-avatar {
       flex: 0 0 auto;
-      width: 28px;
-      height: 28px;
+      width: 30px;
+      height: 30px;
       border-radius: 50%;
       background: var(--accent);
       color: var(--accent-on);
       font-family: var(--font-sans);
       font-size: 11.5px;
       font-weight: 600;
-      letter-spacing: .3px;
+      letter-spacing: .4px;
       display: flex;
       align-items: center;
       justify-content: center;
     }
 
-    .award-page .who-text { min-width: 0; line-height: 1.25; }
+    .award-page .who-text { min-width: 0; line-height: 1.3; }
+
+    .award-page .who-name,
+    .award-page .who-sub {
+      display: block;
+      font-family: var(--font-sans);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
 
     .award-page .who-name {
-      display: block;
-      font-size: 14px;
-      color: var(--text);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--accent-ink);
     }
 
-    .award-page .who-mail {
-      display: block;
-      font-family: var(--font-mono);
+    .award-page .who-sub {
       font-size: 11px;
       color: var(--text-muted);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
     }
+
 </style>
