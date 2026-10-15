@@ -592,10 +592,19 @@ window.AWARD_CONFIG = {
 
   // ------------------------------------------------------------- load list
 
-  // Columns added by sql/2026-10-15-award-store-geography-as-text.sql. Until
-  // that has been run they do not exist, and asking for them fails the whole
-  // query - so the list falls back to the joins and keeps working.
-  var hasNameColumns = true;
+  /* The log has to stay readable at every stage of the move off the old
+     lookup tables, whichever order the steps happen in:
+
+       state_name and the rest arrive with
+         sql/2026-10-15-award-store-geography-as-text.sql
+       states and districts go with
+         sql/2026-10-15-award-drop-lookup-tables.sql
+
+     Asking for either when it is not there fails the whole query, so each is
+     tried once and switched off if the database says no. The two tests cannot
+     catch each other's message: "state_name" does not contain "states". */
+  var hasNameColumns  = true;
+  var hasLookupTables = true;
 
   function loadRequisitions() {
     el.refreshBtn.disabled = true;
@@ -604,22 +613,30 @@ window.AWARD_CONFIG = {
       // The names are what new rows carry; the joins are for the rows filed
       // before this page recorded them, which still point at the old tables.
       .select("id, requester_name, quantity, requisition_date, status, created_at," +
-              (hasNameColumns ? " state_name, division_name, district_name," : "") +
-              " states ( code, name ), districts ( name ), award_types ( code, name )")
+              (hasNameColumns  ? " state_name, division_name, district_name," : "") +
+              (hasLookupTables ? " states ( code, name ), districts ( name )," : "") +
+              " award_types ( code, name )")
       .order("created_at", { ascending: false })
       .limit(500)
       .then(function (res) {
         el.refreshBtn.disabled = false;
 
         if (res.error) {
-          if (hasNameColumns &&
-              /(state_name|division_name|district_name)/i.test(res.error.message || "")) {
+          var msg = res.error.message || "";
+
+          if (hasNameColumns && /(state_name|division_name|district_name)/i.test(msg)) {
             hasNameColumns = false;      // not migrated yet - read the old shape
             loadRequisitions();
             return;
           }
-          placeholderRow("Could not load requisitions: " + res.error.message);
-          reportError("load requisitions", res.error);
+          if (hasLookupTables && /(states|districts)/i.test(msg)) {
+            hasLookupTables = false;     // lookup tables gone - the names carry it
+            loadRequisitions();
+            return;
+          }
+
+          placeholderRow("Could not load requisitions: " + msg);
+          reportError("load requisitions", msg);
           return;
         }
 
