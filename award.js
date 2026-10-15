@@ -56,7 +56,6 @@ window.AWARD_CONFIG = {
     requesterName: document.getElementById("requester-name"),
     requesterWho: document.getElementById("requester-who"),
     requesterSub: document.getElementById("requester-sub"),
-    requesterInitials: document.getElementById("requester-initials"),
     quantity: document.getElementById("quantity"),
     reqDate: document.getElementById("req-date"),
     submitBtn: document.getElementById("submit-btn"),
@@ -99,13 +98,6 @@ window.AWARD_CONFIG = {
     return name ? { name: name, email: mail, role: role } : null;
   }
 
-  function initialsOf(name) {
-    var parts = String(name || "").trim().split(/\s+/).filter(Boolean);
-    if (!parts.length) return "?";
-    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
-  }
-
   function showSignedInUser() {
     var who = signedInUser();
     if (!el.requesterName) return;
@@ -113,18 +105,16 @@ window.AWARD_CONFIG = {
     if (!who) {
       el.requesterName.textContent = "Not signed in";
       el.requesterSub.textContent = "";
-      el.requesterInitials.textContent = "?";
       if (el.requesterWho) el.requesterWho.removeAttribute("title");
       return;
     }
 
     el.requesterName.textContent = who.name;
-    el.requesterInitials.textContent = initialsOf(who.name);
 
     // Their job title rather than their address: it is shorter, it is what the
-    // header beside it shows, and a full address turned the chip into a wall of
-    // small type. The address is still there on hover for anyone checking which
-    // account they are filing under.
+    // header beside it shows, and a full address made the field the loudest
+    // thing in the row. The address is still there on hover for anyone
+    // checking which account they are filing under.
     el.requesterSub.textContent = who.role || who.email || "";
     if (el.requesterWho && who.email) el.requesterWho.title = who.email;
   }

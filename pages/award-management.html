@@ -61,11 +61,8 @@
           <div class="field">
             <label>Requested By</label>
             <div class="who" id="requester-who">
-              <span class="who-avatar" id="requester-initials" aria-hidden="true"></span>
-              <span class="who-text">
-                <span class="who-name" id="requester-name">Signed-in user</span>
-                <span class="who-sub" id="requester-sub"></span>
-              </span>
+              <span class="who-name" id="requester-name">Signed-in user</span>
+              <span class="who-sub" id="requester-sub"></span>
             </div>
             <p class="error" id="requester-error" role="alert"></p>
           </div>
@@ -591,39 +588,18 @@
       }
     }
 
-    /* Requested By - filled in from the sign-in, so it is shown, not typed.
-       Tinted and pill-shaped rather than a white box: an input-coloured
-       rectangle with text sitting in it reads as a field you have yet to deal
-       with, and there is nothing here to edit. */
+    /* Requested By - taken from the sign-in, so it is shown rather than typed.
+       No box and no avatar: a bordered rectangle makes it look like a field
+       waiting to be filled, and the initials only repeat the badge already in
+       the header. Name and role, set to sit level with the inputs beside it. */
     .award-page .who {
       display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 6px 14px 6px 7px;
-      border: 1px solid var(--accent-soft-border);
-      border-radius: 999px;
-      background: var(--accent-soft);
-      min-height: 44px;          /* level with the selects beside it */
-      box-sizing: border-box;
-    }
-
-    .award-page .who-avatar {
-      flex: 0 0 auto;
-      width: 30px;
-      height: 30px;
-      border-radius: 50%;
-      background: var(--accent);
-      color: var(--accent-on);
-      font-family: var(--font-sans);
-      font-size: 11.5px;
-      font-weight: 600;
-      letter-spacing: .4px;
-      display: flex;
-      align-items: center;
+      flex-direction: column;
       justify-content: center;
+      min-height: 44px;          /* level with the selects beside it */
+      min-width: 0;
+      line-height: 1.35;
     }
-
-    .award-page .who-text { min-width: 0; line-height: 1.3; }
 
     .award-page .who-name,
     .award-page .who-sub {
@@ -635,13 +611,13 @@
     }
 
     .award-page .who-name {
-      font-size: 13.5px;
+      font-size: 14.5px;
       font-weight: 600;
-      color: var(--accent-ink);
+      color: var(--text);
     }
 
     .award-page .who-sub {
-      font-size: 11px;
+      font-size: 11.5px;
       color: var(--text-muted);
     }
 
