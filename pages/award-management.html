@@ -1,10 +1,12 @@
 <!-- pages/award-management.html
-     Ported from the standalone Award Management app. Its CSS styled
-     body/table/:root, so every rule here is scoped under .award-page and
-     the tokens sit on that element rather than :root - otherwise they
-     would restyle the shell, the Employees table included. -->
-<div class="award-page">
+     Was ported from the standalone Award Management app, whose CSS styled
+     body/table/:root - so every rule here is scoped under .award-page and the
+     tokens sit on that element rather than :root, otherwise they would
+     restyle the shell, the Employees table included.
 
+     Edited directly from here on. The port is done and the standalone app is
+     not being kept in step, so there is nothing left to regenerate from. -->
+<div class="award-page">
 
     <!-- Shown only when app.js still holds placeholder credentials, or the first
          Supabase call fails outright. -->
@@ -19,18 +21,141 @@
       </span>
     </div>
 
-    <!-- ================= New requisition ================= -->
-    <section class="card" aria-labelledby="form-heading">
+    <nav class="aw-tabs" role="tablist" aria-label="Award Management">
+      <button type="button" role="tab" id="aw-tab-requisitions" class="aw-tab is-active"
+              data-aw-tab="requisitions" aria-controls="aw-panel-requisitions" aria-selected="true">
+        Requisitions
+      </button>
+      <button type="button" role="tab" id="aw-tab-stock" class="aw-tab"
+              data-aw-tab="stock" aria-controls="aw-panel-stock" aria-selected="false" tabindex="-1">
+        Stock Management
+      </button>
+    </nav>
+
+    <div id="aw-panel-requisitions" class="aw-panel" role="tabpanel"
+         aria-labelledby="aw-tab-requisitions">
+    <!-- ================= Requisitions table ================= -->
+    <section class="card" aria-labelledby="table-heading">
       <div class="section-head">
-        <span class="rule rule-accent" aria-hidden="true"></span>
-        <h2 id="form-heading">New Requisition</h2>
+        <span class="rule rule-alt" aria-hidden="true"></span>
+        <div class="section-head-main">
+          <h2 id="table-heading">Requisitions</h2>
+          <span class="pill" id="row-pill">—</span>
+        </div>
+        <div class="aw-head-actions">
+          <button type="button" id="refresh-btn" class="btn btn-ghost btn-sm">Refresh</button>
+          <button type="button" id="new-req-btn" class="btn btn-primary btn-sm">
+            <span class="btn-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                   stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </span>
+            New Requisition
+          </button>
+        </div>
       </div>
 
-      <!-- Submit result: green on success, red on failure. -->
-      <div id="form-banner" class="banner" role="status" aria-live="polite" hidden>
-        <span class="banner-icon" id="form-banner-icon" aria-hidden="true"></span>
-        <span id="form-banner-text"></span>
+      <!-- The form closes on success, so the confirmation lands here. -->
+      <div id="list-banner" class="banner banner-success" role="status" aria-live="polite" hidden>
+        <span class="banner-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+               stroke-linecap="round" stroke-linejoin="round"><path d="m4.5 12.5 5 5 10-11"/></svg>
+        </span>
+        <span id="list-banner-text"></span>
       </div>
+
+      <div class="filters">
+        <div class="field field-sm">
+          <label for="filter-state">Filter by state</label>
+          <select id="filter-state"><option value="">All states</option></select>
+        </div>
+        <div class="field field-sm">
+          <label for="filter-division">Filter by division</label>
+          <select id="filter-division"><option value="">All divisions</option></select>
+        </div>
+        <div class="field field-sm">
+          <label for="filter-district">Filter by district</label>
+          <select id="filter-district"><option value="">All districts</option></select>
+        </div>
+        <div class="field field-sm">
+          <label for="filter-type">Filter by type</label>
+          <select id="filter-type"><option value="">All types</option></select>
+        </div>
+        <div class="field field-sm">
+          <label for="filter-search">Search requester</label>
+          <input type="search" id="filter-search" placeholder="Name contains…" />
+        </div>
+      </div>
+
+      <div class="table-scroll">
+        <table id="requisitions-table">
+          <thead>
+            <tr>
+              <th scope="col">State</th>
+              <th scope="col">Division</th>
+              <th scope="col">District</th>
+              <th scope="col">Requester</th>
+              <th scope="col">Type</th>
+              <th scope="col" class="num">Quantity</th>
+              <th scope="col">Date</th>
+              <th scope="col">Submitted At</th>
+            </tr>
+          </thead>
+          <tbody id="requisitions-body">
+            <tr class="placeholder-row">
+              <td colspan="8">Loading requisitions…</td>
+            </tr>
+          </tbody>
+          <tfoot id="requisitions-foot" hidden>
+            <tr>
+              <td colspan="5" id="foot-count"></td>
+              <td class="num mono" id="foot-total"></td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+    </div>
+
+    <div id="aw-panel-stock" class="aw-panel" role="tabpanel"
+         aria-labelledby="aw-tab-stock" hidden>
+      <section class="card">
+        <div class="section-head">
+          <span class="rule rule-alt" aria-hidden="true"></span>
+          <h2>Stock Management</h2>
+        </div>
+        <div class="aw-empty">
+          <p class="aw-empty-title">Nothing here yet.</p>
+          <p>Stock has not been built. The tab is here so the page has somewhere
+             to put it.</p>
+        </div>
+      </section>
+    </div>
+
+    <!-- New requisition, as a dialog.
+
+         The overlay is shown by a class rather than the hidden attribute:
+         .award-page [hidden] carries display:none !important, which would win
+         against the display:flex that puts the box on screen. -->
+    <div class="aw-overlay" id="requisition-modal">
+      <div class="aw-overlay-backdrop" data-aw-close></div>
+
+      <div class="aw-box" role="dialog" aria-modal="true" aria-labelledby="form-heading">
+        <div class="aw-box-head">
+          <span class="rule rule-accent" aria-hidden="true"></span>
+          <h2 id="form-heading">New Requisition</h2>
+          <button type="button" class="aw-box-close" data-aw-close aria-label="Close">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+
+        <div class="aw-box-body">
+          <!-- Anything that goes wrong is said here, next to the fields. -->
+          <div id="form-banner" class="banner" role="status" aria-live="polite" hidden>
+            <span class="banner-icon" id="form-banner-icon" aria-hidden="true"></span>
+            <span id="form-banner-text"></span>
+          </div>
 
       <form id="requisition-form" novalidate>
         <div class="grid">
@@ -99,71 +224,9 @@
           </button>
         </div>
       </form>
-    </section>
-
-    <!-- ================= Requisitions table ================= -->
-    <section class="card" aria-labelledby="table-heading">
-      <div class="section-head">
-        <span class="rule rule-alt" aria-hidden="true"></span>
-        <div class="section-head-main">
-          <h2 id="table-heading">Requisitions</h2>
-          <span class="pill" id="row-pill">—</span>
-        </div>
-        <button type="button" id="refresh-btn" class="btn btn-ghost btn-sm">Refresh</button>
-      </div>
-
-      <div class="filters">
-        <div class="field field-sm">
-          <label for="filter-state">Filter by state</label>
-          <select id="filter-state"><option value="">All states</option></select>
-        </div>
-        <div class="field field-sm">
-          <label for="filter-division">Filter by division</label>
-          <select id="filter-division"><option value="">All divisions</option></select>
-        </div>
-        <div class="field field-sm">
-          <label for="filter-district">Filter by district</label>
-          <select id="filter-district"><option value="">All districts</option></select>
-        </div>
-        <div class="field field-sm">
-          <label for="filter-type">Filter by type</label>
-          <select id="filter-type"><option value="">All types</option></select>
-        </div>
-        <div class="field field-sm">
-          <label for="filter-search">Search requester</label>
-          <input type="search" id="filter-search" placeholder="Name contains…" />
         </div>
       </div>
-
-      <div class="table-scroll">
-        <table id="requisitions-table">
-          <thead>
-            <tr>
-              <th scope="col">State</th>
-              <th scope="col">Division</th>
-              <th scope="col">District</th>
-              <th scope="col">Requester</th>
-              <th scope="col">Type</th>
-              <th scope="col" class="num">Quantity</th>
-              <th scope="col">Date</th>
-              <th scope="col">Submitted At</th>
-            </tr>
-          </thead>
-          <tbody id="requisitions-body">
-            <tr class="placeholder-row">
-              <td colspan="8">Loading requisitions…</td>
-            </tr>
-          </tbody>
-          <tfoot id="requisitions-foot" hidden>
-            <tr>
-              <td colspan="5" id="foot-count"></td>
-              <td class="num mono" id="foot-total"></td>
-              <td colspan="2"></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    </section>
+    </div>
 </div>
 
 <style>
@@ -631,6 +694,146 @@
     .award-page .who-sub {
       font-size: 11.5px;
       color: var(--text-muted);
+    }
+
+    /* ---- tabs -------------------------------------------------------- */
+    .award-page .aw-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 18px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .award-page .aw-tab {
+      appearance: none;
+      background: none;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;          /* sit on the rule, not above it */
+      padding: 9px 14px;
+      font-family: var(--font-sans);
+      font-size: 13.5px;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .award-page .aw-tab:hover { color: var(--text); }
+
+    .award-page .aw-tab.is-active {
+      color: var(--accent-ink);
+      border-bottom-color: var(--accent);
+      font-weight: 600;
+    }
+
+    .award-page .aw-tab:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+      border-radius: 4px;
+    }
+
+    .award-page .aw-head-actions {
+      margin-left: auto;
+      display: flex;
+      gap: 8px;
+      flex: 0 0 auto;
+    }
+
+    /* ---- the stock tab, until it has something in it ------------------ */
+    .award-page .aw-empty {
+      padding: 34px 4px 10px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 13.5px;
+    }
+
+    .award-page .aw-empty-title {
+      font-family: var(--font-serif);
+      font-size: 16px;
+      color: var(--text);
+      margin: 0 0 6px;
+    }
+
+    .award-page .aw-empty p { margin: 0; }
+
+    /* ---- the new requisition dialog ----------------------------------- */
+    .award-page .aw-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 600;                 /* over the shell's own modals at 500 */
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 16px;
+      overflow-y: auto;
+    }
+
+    .award-page .aw-overlay.is-open { display: flex; }
+
+    .award-page .aw-overlay-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(28, 26, 20, .55);
+    }
+
+    .award-page .aw-box {
+      position: relative;           /* above the backdrop */
+      width: 760px;
+      max-width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: 0 24px 70px rgba(0, 0, 0, .28);
+      overflow: hidden;
+    }
+
+    .award-page .aw-box-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-alt);
+    }
+
+    .award-page .aw-box-head h2 {
+      font-family: var(--font-serif);
+      font-size: 19px;
+      font-weight: 600;
+      margin: 0;
+      color: var(--text);
+    }
+
+    .award-page .aw-box-close {
+      margin-left: auto;
+      appearance: none;
+      background: none;
+      border: 0;
+      padding: 6px;
+      line-height: 0;
+      border-radius: 50%;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+
+    .award-page .aw-box-close svg { width: 18px; height: 18px; }
+    .award-page .aw-box-close:hover { background: var(--border); color: var(--text); }
+
+    .award-page .aw-box-close:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+
+    .award-page .aw-box-body { padding: 18px; }
+
+    /* The form sat in a card of its own and carried the spacing for it. */
+    .award-page .aw-box-body > form { margin: 0; }
+
+    @media (max-width: 640px) {
+      .award-page .aw-overlay { padding: 0; }
+      .award-page .aw-box { border-radius: 0; min-height: 100%; }
+      .award-page .aw-head-actions { width: 100%; }
     }
 
 </style>

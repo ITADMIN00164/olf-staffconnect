@@ -66,6 +66,15 @@ window.AWARD_CONFIG = {
     formBannerText: document.getElementById("form-banner-text"),
 
     refreshBtn: document.getElementById("refresh-btn"),
+    tabs: document.querySelectorAll(".award-page .aw-tab"),
+    panels: {
+      requisitions: document.getElementById("aw-panel-requisitions"),
+      stock: document.getElementById("aw-panel-stock")
+    },
+    modal: document.getElementById("requisition-modal"),
+    newReqBtn: document.getElementById("new-req-btn"),
+    listBanner: document.getElementById("list-banner"),
+    listBannerText: document.getElementById("list-banner-text"),
     filterState: document.getElementById("filter-state"),
     filterDivision: document.getElementById("filter-division"),
     filterDistrict: document.getElementById("filter-district"),
@@ -242,7 +251,9 @@ window.AWARD_CONFIG = {
     if (!el.form) return;        // the tab is not on screen
 
     allRequisitions = [];
+    returnFocusTo = null;          // the node it pointed at is gone
     showSignedInUser();
+    showTab("requisitions");
 
     el.reqDate.value = todayLocalISO();
     el.reqDate.max = todayLocalISO();
@@ -282,11 +293,83 @@ window.AWARD_CONFIG = {
     loadRequisitions();
   }
 
+  // ------------------------------------------------------------- the tabs
+
+  function showTab(name) {
+    Array.prototype.forEach.call(el.tabs, function (tab) {
+      var on = tab.getAttribute("data-aw-tab") === name;
+      tab.classList.toggle("is-active", on);
+      tab.setAttribute("aria-selected", on ? "true" : "false");
+      // Only the selected tab is in the tab order; the arrow keys move
+      // between them, which is how a tablist is meant to behave.
+      tab.tabIndex = on ? 0 : -1;
+    });
+    Object.keys(el.panels).forEach(function (key) {
+      if (el.panels[key]) el.panels[key].hidden = key !== name;
+    });
+  }
+
+  // ----------------------------------------------------------- the dialog
+
+  // Where focus was before the dialog opened, to put it back afterwards.
+  var returnFocusTo = null;
+
+  // What was last filed, so filing several for one place does not mean
+  // choosing it again every time.
+  var lastPlace = null;
+
+  function openRequisitionModal() {
+    returnFocusTo = document.activeElement;
+
+    clearFieldErrors();
+    setFormStatus("");
+    el.reqDate.value = todayLocalISO();
+
+    // Put back where the last one was for, if that is still on offer.
+    if (lastPlace) {
+      el.state.value = lastPlace.state;
+      loadDivisions(lastPlace.state);
+      el.division.value = lastPlace.division;
+      loadDistricts(lastPlace.state, lastPlace.division);
+      el.district.value = lastPlace.district;
+    }
+
+    el.modal.classList.add("is-open");
+    document.addEventListener("keydown", onModalKeydown);
+
+    // Straight to the first thing that still needs choosing.
+    var first = el.state.value ? (el.awardType.value ? el.quantity : el.awardType) : el.state;
+    if (first && typeof first.focus === "function") first.focus();
+  }
+
+  function closeRequisitionModal() {
+    el.modal.classList.remove("is-open");
+    document.removeEventListener("keydown", onModalKeydown);
+    if (returnFocusTo && typeof returnFocusTo.focus === "function") returnFocusTo.focus();
+    returnFocusTo = null;
+  }
+
+  function onModalKeydown(event) {
+    if (event.key === "Escape") {
+      event.stopPropagation();      // the shell closes its own popups on Escape
+      closeRequisitionModal();
+    }
+  }
+
+  function showListBanner(message) {
+    if (!el.listBanner) return;
+    el.listBannerText.textContent = message;
+    el.listBanner.hidden = false;
+  }
+
   function disableForm() {
     Array.prototype.forEach.call(
       el.form.querySelectorAll("input, select, button"),
       function (node) { node.disabled = true; }
     );
+    // The button sits outside the form now, so it has to be told separately -
+    // otherwise it still opens a dialog nobody can submit.
+    if (el.newReqBtn) el.newReqBtn.disabled = true;
   }
 
   function wireEvents() {
@@ -296,6 +379,29 @@ window.AWARD_CONFIG = {
     // the requisition twice, and this log cannot be edited or deleted.
     if (el.form.dataset.awWired === "1") return;
     el.form.dataset.awWired = "1";
+
+    Array.prototype.forEach.call(el.tabs, function (tab) {
+      tab.addEventListener("click", function () {
+        showTab(tab.getAttribute("data-aw-tab"));
+      });
+      tab.addEventListener("keydown", function (event) {
+        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+        var list = Array.prototype.slice.call(el.tabs);
+        var next = list[(list.indexOf(tab) + (event.key === "ArrowRight" ? 1 : -1) +
+                         list.length) % list.length];
+        showTab(next.getAttribute("data-aw-tab"));
+        next.focus();
+        event.preventDefault();
+      });
+    });
+
+    el.newReqBtn.addEventListener("click", openRequisitionModal);
+
+    // The close button, and the backdrop behind the box.
+    Array.prototype.forEach.call(
+      el.modal.querySelectorAll("[data-aw-close]"),
+      function (node) { node.addEventListener("click", closeRequisitionModal); }
+    );
 
     el.state.addEventListener("change", function () {
       setFieldError(el.state, "state-error", "");
@@ -571,17 +677,27 @@ window.AWARD_CONFIG = {
           return;
         }
 
-        setFormStatus(
-          "Saved — " + values.quantity + " " + selectedText(el.awardType) +
-          " for " + values.district_name + ".",
-          "ok"
-        );
+        // Remembered so that filing several for one place does not mean
+        // choosing it again each time the dialog opens.
+        lastPlace = {
+          state: values.state_name,
+          division: values.division_name,
+          district: values.district_name
+        };
 
-        // Keep state, district and date — entries usually come in batches for
-        // the same place. Clear only what changes per row.
+        // Read before clearing: the message names the award type.
+        var typeName = selectedText(el.awardType);
+
         el.awardType.value = "";
         el.quantity.value = "";
-        el.quantity.focus();
+
+        // The dialog closes, so the confirmation goes above the list, which
+        // is where they are now looking and where the new row appears.
+        closeRequisitionModal();
+        showListBanner(
+          "Saved — " + values.quantity + " " + typeName +
+          " for " + values.district_name + ", " + values.state_name + "."
+        );
 
         loadRequisitions();
       })
