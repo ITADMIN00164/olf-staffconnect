@@ -763,14 +763,17 @@ window.AWARD_CONFIG = {
       showSetupBanner(
         "Failed to " + escapeHtml(what) + ": <code>" + escapeHtml(message) +
         "</code>. " + (missingTable
-          ? "The tables are not there yet — run <code>supabase/schema.sql</code> " +
-            "and then <code>supabase/seed.sql</code> in the Supabase SQL Editor, " +
-            "then reload."
-          : "Check that the config block at the top of <code>app.js</code> holds " +
-            "the right Project URL and " +
-            "publishable key, and that <code>supabase/schema.sql</code> and " +
-            "<code>supabase/seed.sql</code> have both been run in the SQL Editor."),
-        missingTable ? "Database tables are missing." : "Could not reach the database."
+          // The old states and districts tables were dropped on purpose; this
+          // page does not use them. Something in the database still does -
+          // a row-level security policy or a trigger on requisitions is the
+          // usual culprit, since neither shows up until you write.
+          ? "This page does not read those tables. Something in the database " +
+            "still refers to them — run " +
+            "<code>sql/2026-10-15-award-check-leftover-references.sql</code> " +
+            "in the Supabase SQL Editor to find what."
+          : "Check that the config block at the top of <code>award.js</code> " +
+            "holds the right Project URL and publishable key."),
+        missingTable ? "Something in the database is missing." : "Could not reach the database."
       );
     }
   }
