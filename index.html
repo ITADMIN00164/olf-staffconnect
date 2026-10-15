@@ -2331,6 +2331,14 @@
             .dtp { width: 100%; max-width: 340px; }
         }
     </style>
+
+<!-- Award Management's styles. They live in a file rather than inside
+     pages/award-management.html because a page fragment is not a document:
+     a <style> in one does not survive tooling that rewrites HTML on its way
+     out, and the page then arrives with its markup and none of its looks.
+     Every rule in it is scoped under .award-page, so it touches nothing
+     else. -->
+<link rel="stylesheet" href="award.css">
 </head>
 <body>
 

@@ -67,10 +67,7 @@ window.AWARD_CONFIG = {
 
     refreshBtn: document.getElementById("refresh-btn"),
     tabs: document.querySelectorAll(".award-page .aw-tab"),
-    panels: {
-      requisitions: document.getElementById("aw-panel-requisitions"),
-      stock: document.getElementById("aw-panel-stock")
-    },
+    subtabs: document.querySelectorAll(".award-page .aw-subtab"),
     modal: document.getElementById("requisition-modal"),
     newReqBtn: document.getElementById("new-req-btn"),
     listBanner: document.getElementById("list-banner"),
@@ -190,6 +187,38 @@ window.AWARD_CONFIG = {
       });
   }
 
+  /* The icons are drawn from here rather than written into the fragment.
+
+     Inline <svg> in a page fragment is a liability: Live Server treats a
+     fragment containing one as a document to inject its reload script into,
+     and with several of them the response comes back truncated - the form
+     went missing entirely. A fragment that is plain markup is served
+     untouched. Keeping them here also means one copy of each. */
+  var ICONS = {
+    alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+           'stroke-width="2" stroke-linecap="round">' +
+           '<path d="M12 8v5M12 16.5v.01"/><circle cx="12" cy="12" r="9"/></svg>',
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+           'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+           '<path d="m4.5 12.5 5 5 10-11"/></svg>',
+    plus:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+           'stroke-width="2.2" stroke-linecap="round">' +
+           '<path d="M12 5v14M5 12h14"/></svg>',
+    close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+           'stroke-width="2" stroke-linecap="round">' +
+           '<path d="M6 6l12 12M18 6L6 18"/></svg>'
+  };
+
+  function paintIcons() {
+    Array.prototype.forEach.call(
+      document.querySelectorAll(".award-page [data-aw-icon]"),
+      function (node) {
+        var svg = ICONS[node.getAttribute("data-aw-icon")];
+        if (svg) node.innerHTML = svg;
+      }
+    );
+  }
+
   var ICON_CHECK =
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ' +
     'stroke-linecap="round" stroke-linejoin="round"><path d="m4.5 12.5 5 5 10-11"/></svg>';
@@ -254,8 +283,10 @@ window.AWARD_CONFIG = {
     returnFocusTo = null;          // the node it pointed at is gone
     scrollLockedAt = null;
     document.body.style.overflow = "";   // in case we left with it locked
+    paintIcons();
     showSignedInUser();
-    showTab("requisitions");
+    showTab(el.tabs, "data-aw-tab", "stock");
+    showTab(el.subtabs, "data-aw-subtab", "requisition");
 
     el.reqDate.value = todayLocalISO();
     el.reqDate.max = todayLocalISO();
@@ -297,17 +328,37 @@ window.AWARD_CONFIG = {
 
   // ------------------------------------------------------------- the tabs
 
-  function showTab(name) {
-    Array.prototype.forEach.call(el.tabs, function (tab) {
-      var on = tab.getAttribute("data-aw-tab") === name;
+  /* Two levels of them - Stock Management, and Requisition inside it - so
+     this works off each button's own attribute and the panel it names,
+     rather than a list that would have to be kept in step with the markup. */
+  function showTab(buttons, attr, name) {
+    Array.prototype.forEach.call(buttons, function (tab) {
+      var on = tab.getAttribute(attr) === name;
       tab.classList.toggle("is-active", on);
       tab.setAttribute("aria-selected", on ? "true" : "false");
       // Only the selected tab is in the tab order; the arrow keys move
       // between them, which is how a tablist is meant to behave.
       tab.tabIndex = on ? 0 : -1;
+
+      var panel = document.getElementById(tab.getAttribute("aria-controls"));
+      if (panel) panel.hidden = !on;
     });
-    Object.keys(el.panels).forEach(function (key) {
-      if (el.panels[key]) el.panels[key].hidden = key !== name;
+  }
+
+  function wireTabList(buttons, attr) {
+    Array.prototype.forEach.call(buttons, function (tab) {
+      tab.addEventListener("click", function () {
+        showTab(buttons, attr, tab.getAttribute(attr));
+      });
+      tab.addEventListener("keydown", function (event) {
+        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+        var list = Array.prototype.slice.call(buttons);
+        var next = list[(list.indexOf(tab) + (event.key === "ArrowRight" ? 1 : -1) +
+                         list.length) % list.length];
+        showTab(buttons, attr, next.getAttribute(attr));
+        next.focus();
+        event.preventDefault();
+      });
     });
   }
 
@@ -423,20 +474,8 @@ window.AWARD_CONFIG = {
     if (el.form.dataset.awWired === "1") return;
     el.form.dataset.awWired = "1";
 
-    Array.prototype.forEach.call(el.tabs, function (tab) {
-      tab.addEventListener("click", function () {
-        showTab(tab.getAttribute("data-aw-tab"));
-      });
-      tab.addEventListener("keydown", function (event) {
-        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-        var list = Array.prototype.slice.call(el.tabs);
-        var next = list[(list.indexOf(tab) + (event.key === "ArrowRight" ? 1 : -1) +
-                         list.length) % list.length];
-        showTab(next.getAttribute("data-aw-tab"));
-        next.focus();
-        event.preventDefault();
-      });
-    });
+    wireTabList(el.tabs, "data-aw-tab");
+    wireTabList(el.subtabs, "data-aw-subtab");
 
     el.newReqBtn.addEventListener("click", openRequisitionModal);
 
