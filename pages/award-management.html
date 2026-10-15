@@ -186,17 +186,19 @@
           <p class="error" id="district-error" role="alert"></p>
         </div>
 
-        <div class="field">
-          <label for="award-type">Award Type <span class="req" aria-hidden="true">*</span></label>
-          <select id="award-type" name="award-type" required>
-            <option value="">Loading…</option>
-          </select>
+        <div class="field field-wide">
+          <label>Awards <span class="req" aria-hidden="true">*</span></label>
+
+          <!-- One line per award asked for. Built by award.js from the award
+               types it loads, so there is nothing to keep in step here. -->
+          <div class="award-lines" id="award-lines"></div>
+
+          <button type="button" class="btn btn-ghost btn-sm award-add" id="award-add">
+            <i class="aw-icon" data-aw-icon="plus" aria-hidden="true"></i>
+            Add another award
+          </button>
+
           <p class="error" id="award-type-error" role="alert"></p>
-        </div>
-<div class="field">
-          <label for="quantity">Quantity <span class="req" aria-hidden="true">*</span></label>
-          <input type="number" id="quantity" name="quantity" class="mono"
-                 min="1" max="1000000" step="1" placeholder="e.g. 100" required />
           <p class="error" id="quantity-error" role="alert"></p>
         </div>
 

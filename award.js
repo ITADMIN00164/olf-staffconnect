@@ -73,6 +73,8 @@ window.AWARD_CONFIG = {
     listBanner: document.getElementById("list-banner"),
     listBannerText: document.getElementById("list-banner-text"),
     standingNote: document.getElementById("standing-note"),
+    awardLines: document.getElementById("award-lines"),
+    awardAdd: document.getElementById("award-add"),
     filterStatus: document.getElementById("filter-status"),
     reviewModal: document.getElementById("review-modal"),
     reviewSummary: document.getElementById("review-summary"),
@@ -103,6 +105,7 @@ window.AWARD_CONFIG = {
      with the approvals migration; until it is run the row is read without
      them and everything shows as pending. */
   var hasApproval = true;
+  var hasItems = true;        // false until the multiple-awards migration runs
 
   function statusOf(row) {
     var d = String((row && row.status) || "submitted").toLowerCase();
@@ -521,6 +524,7 @@ window.AWARD_CONFIG = {
 
     clearFieldErrors();
     setFormStatus("");
+    resetAwardLines();
     el.reqDate.value = todayLocalISO();
 
     // Put back where the last one was for, if that is still on offer.
@@ -541,7 +545,7 @@ window.AWARD_CONFIG = {
     document.body.style.overflow = "hidden";
 
     // Straight to the first thing that still needs choosing.
-    var first = el.state.value ? (el.awardType.value ? el.quantity : el.awardType) : el.state;
+    var first = el.state.value ? el.awardLines.querySelector(".award-line-type") : el.state;
     if (first && typeof first.focus === "function") first.focus();
   }
 
@@ -623,9 +627,9 @@ window.AWARD_CONFIG = {
         "<div><dt>Requested by</dt><dd>" + escapeHtml(row.requester_name || "—") +
           (row.requester_role ? ' <span class="chip-role">' +
              escapeHtml(row.requester_role) + "</span>" : "") + "</dd></div>" +
-        "<div><dt>Award</dt><dd>" +
-          escapeHtml(row.award_types ? row.award_types.name : "—") + "</dd></div>" +
-        "<div><dt>Quantity</dt><dd>" + escapeHtml(row.quantity) + "</dd></div>" +
+        "<div><dt>Awards</dt><dd>" + awardsCellHtml(awardsOf(row)) + "</dd></div>" +
+        "<div><dt>Total</dt><dd>" + escapeHtml(Number(row.quantity).toLocaleString()) +
+        "</dd></div>" +
         "<div><dt>For</dt><dd>" +
           escapeHtml([p.district, p.division, p.state].filter(Boolean).join(", ")) +
         "</dd></div>" +
@@ -795,6 +799,24 @@ window.AWARD_CONFIG = {
     wireTabList(el.subtabs, "data-aw-subtab");
 
     el.newReqBtn.addEventListener("click", openRequisitionModal);
+
+    el.awardAdd.addEventListener("click", addAwardLine);
+
+    // The lines are rebuilt as they are added and removed, so the listeners
+    // sit on the container rather than on each one.
+    el.awardLines.addEventListener("change", function (event) {
+      if (event.target.classList.contains("award-line-type")) {
+        setFieldError(null, "award-type-error", "");
+        syncAwardLines();
+      }
+    });
+    el.awardLines.addEventListener("click", function (event) {
+      var btn = event.target.closest && event.target.closest(".award-line-remove");
+      if (!btn) return;
+      if (el.awardLines.querySelectorAll(".award-line").length < 2) return;
+      btn.closest(".award-line").remove();
+      syncAwardLines();
+    });
 
     // One listener on the body rather than one per row, since the rows are
     // thrown away and rebuilt on every render.
@@ -969,21 +991,91 @@ window.AWARD_CONFIG = {
     if (dv.districts.length === 1) el.district.value = dv.districts[0];
   }
 
+  /* The award types, kept so a line can be built whenever one is added. */
+  var awardTypes = [];
+
+  function awardLineHtml() {
+    var opts = '<option value="">Select award type</option>';
+    awardTypes.forEach(function (t) {
+      opts += '<option value="' + escapeHtml(t.id) + '">' + escapeHtml(t.name) + "</option>";
+    });
+    return '<div class="award-line">' +
+             '<select class="award-line-type" aria-label="Award type">' + opts + "</select>" +
+             '<input type="number" class="award-line-qty mono" min="1" max="1000000" ' +
+                    'step="1" placeholder="Qty" aria-label="Quantity" />' +
+             '<button type="button" class="award-line-remove" aria-label="Remove this award">' +
+               '<i class="aw-icon" data-aw-icon="close" aria-hidden="true"></i>' +
+             "</button>" +
+           "</div>";
+  }
+
+  function addAwardLine() {
+    el.awardLines.insertAdjacentHTML("beforeend", awardLineHtml());
+    paintIcons();
+    syncAwardLines();
+    var lines = el.awardLines.querySelectorAll(".award-line");
+    var last = lines[lines.length - 1];
+    if (last) last.querySelector(".award-line-type").focus();
+  }
+
+  function resetAwardLines() {
+    el.awardLines.innerHTML = awardLineHtml();
+    paintIcons();
+    syncAwardLines();
+  }
+
+  /* An award already on the requisition is taken out of the other lines'
+     lists, so the same one cannot be asked for twice - two lines of the same
+     award is a mistake every time, and catching it here is kinder than
+     refusing it on submit. The remove button hides when one line is left,
+     since there is nothing to go back to. */
+  function syncAwardLines() {
+    var lines = Array.prototype.slice.call(el.awardLines.querySelectorAll(".award-line"));
+    var chosen = lines.map(function (l) { return l.querySelector(".award-line-type").value; });
+
+    lines.forEach(function (line, i) {
+      var select = line.querySelector(".award-line-type");
+      Array.prototype.forEach.call(select.options, function (opt) {
+        opt.disabled = opt.value !== "" && opt.value !== chosen[i] &&
+                       chosen.indexOf(opt.value) !== -1;
+      });
+      line.querySelector(".award-line-remove").hidden = lines.length < 2;
+    });
+
+    // Nothing left to add once every award is on the requisition.
+    el.awardAdd.hidden = lines.length >= awardTypes.length;
+  }
+
+  function readAwardLines() {
+    return Array.prototype.map.call(
+      el.awardLines.querySelectorAll(".award-line"),
+      function (line) {
+        var id = line.querySelector(".award-line-type").value;
+        var qty = line.querySelector(".award-line-qty").value.trim();
+        var type = null;
+        for (var i = 0; i < awardTypes.length; i++) {
+          if (String(awardTypes[i].id) === String(id)) { type = awardTypes[i]; break; }
+        }
+        return { line: line, id: id, qty: qty, type: type };
+      }
+    );
+  }
+
   function loadAwardTypes() {
     db.from("award_types").select("id, code, name")
       .order("sort_order").order("name")
       .then(function (res) {
         if (res.error) {
-          el.awardType.innerHTML = '<option value="">Could not load types</option>';
+          el.awardLines.innerHTML =
+            '<p class="error">Could not load award types.</p>';
           reportError("load award types", res.error);
           return;
         }
-        fillSelect(el.awardType, res.data || [], "Select award type",
-          function (t) { return t.id; },
-          function (t) { return t.name; });
+        awardTypes = res.data || [];
+        resetAwardLines();
       })
       .catch(function (err) {
-        el.awardType.innerHTML = '<option value="">Could not load types</option>';
+        el.awardLines.innerHTML = '<p class="error">Could not load award types.</p>';
         reportError("load award types", err);
       });
   }
@@ -1002,13 +1094,15 @@ window.AWARD_CONFIG = {
       state_name: el.state.value || "",
       division_name: el.division.value || "",
       district_name: el.district.value || "",
-      award_type_id: el.awardType.value ? Number(el.awardType.value) : null,
+      // Filled in below, from the award lines.
+      award_type_id: null,
+      items: null,
       requester_name: (signedInUser() || {}).name || "",
       // Recorded now, not looked up later: who may approve this depends on
       // the level it was raised at, and people move between roles.
       requester_role: (myStanding() || {}).role || null,
       requester_level: (myStanding() || {}).level || null,
-      quantity: el.quantity.value.trim(),
+      quantity: 0,
       requisition_date: el.reqDate.value,
     };
 
@@ -1034,25 +1128,57 @@ window.AWARD_CONFIG = {
         ok = false;
       }
     }
-    if (!values.award_type_id) {
-      setFieldError(el.awardType, "award-type-error", "Select an award type."); ok = false;
+    /* The awards asked for. Every line has to name one and say how many.
+       Only the first fault is reported: a list of complaints about a
+       three-line form reads worse than one clear sentence. */
+    var lines = readAwardLines();
+    var items = [];
+    var total = 0;
+    var lineFault = "";
+
+    lines.forEach(function (l) {
+      l.line.classList.remove("has-error");
+      var n = Number(l.qty);
+
+      if (!l.id) {
+        if (!lineFault) lineFault = "Choose an award on every line, or remove the empty one.";
+      } else if (!l.qty) {
+        if (!lineFault) lineFault = "Say how many of each award.";
+      } else if (!Number.isInteger(n) || n < 1) {
+        if (!lineFault) lineFault = "Quantities are whole numbers of 1 or more.";
+      } else if (n > 1000000) {
+        if (!lineFault) lineFault = "That quantity looks too large.";
+      } else {
+        items.push({
+          award_type_id: Number(l.id),
+          code: l.type ? l.type.code : null,
+          name: l.type ? l.type.name : null,
+          quantity: n
+        });
+        total += n;
+        return;
+      }
+      l.line.classList.add("has-error");
+    });
+
+    if (!items.length && !lineFault) lineFault = "Add at least one award.";
+
+    if (lineFault) {
+      setFieldError(null, "award-type-error", lineFault);
+      ok = false;
+    } else {
+      setFieldError(null, "award-type-error", "");
+      values.items = items;
+      values.quantity = total;
+      // Still set when exactly one is asked for, so the older rows and the
+      // join keep meaning something.
+      values.award_type_id = items.length === 1 ? items[0].award_type_id : null;
     }
     // Nothing to type here any more, so the only way this fails is a session
     // that has gone away underneath them.
     if (!values.requester_name) {
       setFieldError(null, "requester-error",
         "Could not tell who you are. Reload the page and sign in again."); ok = false;
-    }
-
-    var qty = Number(values.quantity);
-    if (!values.quantity) {
-      setFieldError(el.quantity, "quantity-error", "Enter a quantity."); ok = false;
-    } else if (!Number.isInteger(qty) || qty < 1) {
-      setFieldError(el.quantity, "quantity-error", "Quantity must be a whole number of 1 or more."); ok = false;
-    } else if (qty > 1000000) {
-      setFieldError(el.quantity, "quantity-error", "That quantity looks too large."); ok = false;
-    } else {
-      values.quantity = qty;
     }
 
     if (!values.requisition_date) {
@@ -1104,10 +1230,11 @@ window.AWARD_CONFIG = {
         };
 
         // Read before clearing: the message names the award type.
-        var typeName = selectedText(el.awardType);
+        var typeName = values.items.length === 1
+          ? values.items[0].name
+          : values.items.length + " awards";
 
-        el.awardType.value = "";
-        el.quantity.value = "";
+        resetAwardLines();
 
         // The dialog closes, so the confirmation goes above the list, which
         // is where they are now looking and where the new row appears.
@@ -1159,6 +1286,7 @@ window.AWARD_CONFIG = {
       .select("id, requester_name, quantity, requisition_date, status, created_at," +
               (hasNameColumns  ? " state_name, division_name, district_name," : "") +
               (hasLookupTables ? " states ( code, name ), districts ( name )," : "") +
+              (hasItems ? " items," : "") +
               (hasApproval ? " requester_role, requester_level, decided_by," +
                              " decided_by_role, decided_at, decision_remark," : "") +
               " award_types ( code, name )")
@@ -1172,6 +1300,11 @@ window.AWARD_CONFIG = {
 
           if (hasNameColumns && /(state_name|division_name|district_name)/i.test(msg)) {
             hasNameColumns = false;      // not migrated yet - read the old shape
+            loadRequisitions();
+            return;
+          }
+          if (hasItems && /items/i.test(msg)) {
+            hasItems = false;                 // multiple awards not migrated yet
             loadRequisitions();
             return;
           }
@@ -1238,7 +1371,7 @@ window.AWARD_CONFIG = {
     allRequisitions.forEach(function (row) {
       var p = placeOf(row);
       if (p.state) states[p.state] = p.code;
-      if (row.award_types) types[row.award_types.name] = true;
+      awardsOf(row).forEach(function (a) { types[a.name] = true; });
 
       if (stateFilter && p.state !== stateFilter) return;
       if (p.division) divisions[p.division] = true;
@@ -1274,7 +1407,7 @@ window.AWARD_CONFIG = {
       if (stateFilter && p.state !== stateFilter) return false;
       if (divisionFilter && p.division !== divisionFilter) return false;
       if (districtFilter && p.district !== districtFilter) return false;
-      if (typeFilter && (!row.award_types || row.award_types.name !== typeFilter)) return false;
+      if (typeFilter && awardsOf(row).every(function (a) { return a.name !== typeFilter; })) return false;
       if (search && String(row.requester_name || "").toLowerCase().indexOf(search) === -1) return false;
       if (statusFilter) {
         var d = statusOf(row).decision || "pending";
@@ -1301,7 +1434,7 @@ window.AWARD_CONFIG = {
       var stateName = p.state || "Unknown state";
       // Rows filed before the directory fed this page have no division, and
       // an em dash is more honest than guessing one.
-      var typeName = row.award_types ? row.award_types.name : "—";
+      var awards = awardsOf(row);
 
       html +=
         "<tr>" +
@@ -1310,7 +1443,7 @@ window.AWARD_CONFIG = {
           "<td>" + escapeHtml(p.division || "—") + "</td>" +
           "<td>" + escapeHtml(p.district || "—") + "</td>" +
           "<td>" + escapeHtml(row.requester_name) + "</td>" +
-          '<td><span class="type-chip">' + escapeHtml(typeName) + "</span></td>" +
+          "<td>" + awardsCellHtml(awards) + "</td>" +
           '<td class="num">' + escapeHtml(row.quantity) + "</td>" +
           '<td class="cell-date">' + escapeHtml(formatDate(row.requisition_date)) + "</td>" +
           '<td class="cell-date muted">' + escapeHtml(formatTimestamp(row.created_at)) + "</td>" +
@@ -1328,6 +1461,28 @@ window.AWARD_CONFIG = {
       : rows.length + " of " + allRequisitions.length;
     el.footTotal.textContent = total.toLocaleString();
     el.tfoot.hidden = false;
+  }
+
+  /* What a requisition asks for. New rows carry a list; the ones filed
+     before that asked for one award and are read from the join. */
+  function awardsOf(row) {
+    if (row && row.items && row.items.length) {
+      return row.items.map(function (it) {
+        return { name: it.name || it.code || "Award", quantity: Number(it.quantity) || 0 };
+      });
+    }
+    if (row && row.award_types) {
+      return [{ name: row.award_types.name, quantity: Number(row.quantity) || 0 }];
+    }
+    return [];
+  }
+
+  function awardsCellHtml(awards) {
+    if (!awards.length) return "—";
+    return awards.map(function (a) {
+      return '<span class="type-chip">' + escapeHtml(a.name) +
+             '<b>' + escapeHtml(a.quantity.toLocaleString()) + "</b></span>";
+    }).join(" ");
   }
 
   /* The state of a requisition, and - where it has been settled - who said

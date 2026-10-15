@@ -916,3 +916,49 @@
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
+
+/* ---- several awards on one requisition ---------------------------- */
+
+/* The awards block spans the dialog rather than sharing a row, because the
+   lines inside it are already two controls wide. */
+.award-page .aw-box-body .grid .field-wide { grid-column: 1 / -1; }
+
+.award-page .award-lines { display: flex; flex-direction: column; gap: 8px; }
+
+.award-page .award-line {
+  display: grid;
+  grid-template-columns: 1fr 120px 32px;
+  gap: 8px;
+  align-items: center;
+}
+
+.award-page .award-line.has-error select,
+.award-page .award-line.has-error input { border-color: var(--danger); }
+
+.award-page .award-line-remove {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 6px;
+  line-height: 0;
+  border-radius: 50%;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.award-page .award-line-remove:hover { background: var(--border); color: var(--danger); }
+.award-page .award-line-remove svg { width: 15px; height: 15px; }
+.award-page .award-line-remove[hidden] { visibility: hidden; display: block; }
+
+.award-page .award-add { margin-top: 10px; align-self: flex-start; }
+.award-page .award-add[hidden] { display: none; }
+
+/* A chip now carries its count, so the table says what was asked for without
+   a column per award. */
+.award-page .type-chip b {
+  margin-left: 6px;
+  padding-left: 6px;
+  border-left: 1px solid currentColor;
+  font-weight: 700;
+  opacity: .85;
+}
+.award-page td .type-chip { margin: 1px 2px 1px 0; }
