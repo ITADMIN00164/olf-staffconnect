@@ -1151,7 +1151,12 @@ window.olfGeography = async function () {
 
 async function getPageHtml(page) {
     if (pageFragments.has(page)) return pageFragments.get(page);
-    const res  = await fetch(`pages/${page}.html`);
+    // Revalidate rather than trust the browser's copy. These fragments carry
+    // their own <style>, so a stale one shows new markup with old styling -
+    // which looks like a broken page rather than a cached one. Hosting already
+    // sends no-cache for HTML, so in production this costs a 304 and nothing
+    // more; locally it is the difference between seeing an edit and not.
+    const res  = await fetch(`pages/${page}.html`, { cache: "no-cache" });
     const html = await res.text();
     pageFragments.set(page, html);
     return html;

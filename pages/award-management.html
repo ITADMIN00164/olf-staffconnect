@@ -143,7 +143,14 @@
       <div class="aw-box" role="dialog" aria-modal="true" aria-labelledby="form-heading">
         <div class="aw-box-head">
           <span class="rule rule-accent" aria-hidden="true"></span>
-          <h2 id="form-heading">New Requisition</h2>
+          <div class="aw-box-heading">
+            <h2 id="form-heading">New Requisition</h2>
+            <p class="aw-box-sub" id="requester-who">
+              Filed by <span id="requester-name">Signed-in user</span><span
+                id="requester-sub" class="aw-box-sub-role"></span>
+            </p>
+            <p class="error" id="requester-error" role="alert"></p>
+          </div>
           <button type="button" class="aw-box-close" data-aw-close aria-label="Close">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                  stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
@@ -189,14 +196,6 @@
               <option value="">Loading…</option>
             </select>
             <p class="error" id="award-type-error" role="alert"></p>
-          </div>
-          <div class="field">
-            <label>Requested By</label>
-            <div class="who" id="requester-who">
-              <span class="who-name" id="requester-name">Signed-in user</span>
-              <span class="who-sub" id="requester-sub"></span>
-            </div>
-            <p class="error" id="requester-error" role="alert"></p>
           </div>
 <div class="field">
             <label for="quantity">Quantity <span class="req" aria-hidden="true">*</span></label>
@@ -834,6 +833,39 @@
       .award-page .aw-overlay { padding: 0; }
       .award-page .aw-box { border-radius: 0; min-height: 100%; }
       .award-page .aw-head-actions { width: 100%; }
+    }
+
+    /* Six inputs in the dialog, so two columns divide evenly. Left to
+       auto-fit it made three rows of two and stranded the last one. */
+    .award-page .aw-box-body .grid { grid-template-columns: 1fr 1fr; }
+
+    .award-page .aw-box-heading { min-width: 0; }
+
+    .award-page .aw-box-sub {
+      margin: 2px 0 0;
+      font-family: var(--font-sans);
+      font-size: 11.5px;
+      color: var(--text-muted);
+    }
+
+    .award-page .aw-box-sub #requester-name {
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    /* The role reads as an aside, so it gets a separator rather than a line
+       of its own - the head is not the place for a second column of text. */
+    .award-page .aw-box-sub-role:not(:empty)::before {
+      content: " · ";
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .award-page .aw-box-heading .error:empty { display: none; }
+    .award-page .aw-box-heading .error { margin: 3px 0 0; }
+
+    @media (max-width: 640px) {
+      .award-page .aw-box-body .grid { grid-template-columns: 1fr; }
     }
 
 </style>

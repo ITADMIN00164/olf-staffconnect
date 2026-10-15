@@ -252,6 +252,8 @@ window.AWARD_CONFIG = {
 
     allRequisitions = [];
     returnFocusTo = null;          // the node it pointed at is gone
+    scrollLockedAt = null;
+    document.body.style.overflow = "";   // in case we left with it locked
     showSignedInUser();
     showTab("requisitions");
 
@@ -314,6 +316,9 @@ window.AWARD_CONFIG = {
   // Where focus was before the dialog opened, to put it back afterwards.
   var returnFocusTo = null;
 
+  // Where the page behind was scrolled to, so locking it does not lose it.
+  var scrollLockedAt = null;
+
   // What was last filed, so filing several for one place does not mean
   // choosing it again every time.
   var lastPlace = null;
@@ -337,6 +342,11 @@ window.AWARD_CONFIG = {
     el.modal.classList.add("is-open");
     document.addEventListener("keydown", onModalKeydown);
 
+    // The page behind must not scroll under the dialog, and must not lose
+    // its place when the scrollbar goes.
+    scrollLockedAt = window.scrollY;
+    document.body.style.overflow = "hidden";
+
     // Straight to the first thing that still needs choosing.
     var first = el.state.value ? (el.awardType.value ? el.quantity : el.awardType) : el.state;
     if (first && typeof first.focus === "function") first.focus();
@@ -345,14 +355,47 @@ window.AWARD_CONFIG = {
   function closeRequisitionModal() {
     el.modal.classList.remove("is-open");
     document.removeEventListener("keydown", onModalKeydown);
+
+    document.body.style.overflow = "";
+    if (scrollLockedAt !== null) {
+      window.scrollTo(0, scrollLockedAt);
+      scrollLockedAt = null;
+    }
+
     if (returnFocusTo && typeof returnFocusTo.focus === "function") returnFocusTo.focus();
     returnFocusTo = null;
   }
+
+  var FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), ' +
+                  'select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
   function onModalKeydown(event) {
     if (event.key === "Escape") {
       event.stopPropagation();      // the shell closes its own popups on Escape
       closeRequisitionModal();
+      return;
+    }
+
+    // Tab must stay inside the dialog. Without this it walks off into the
+    // list behind, where nothing is visible and nothing can be reached back.
+    if (event.key !== "Tab") return;
+
+    var items = Array.prototype.filter.call(
+      el.modal.querySelectorAll(FOCUSABLE),
+      function (n) { return n.offsetParent !== null; }
+    );
+    if (!items.length) return;
+
+    var first = items[0];
+    var last  = items[items.length - 1];
+    var here  = document.activeElement;
+
+    if (event.shiftKey && (here === first || !el.modal.contains(here))) {
+      last.focus();
+      event.preventDefault();
+    } else if (!event.shiftKey && here === last) {
+      first.focus();
+      event.preventDefault();
     }
   }
 
