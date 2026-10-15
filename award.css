@@ -34,7 +34,7 @@
   --surface: #FFFFFF;
   --surface-alt: #F4F7FA;
   --border: #D8E4EC;
-  --border-strong: #BAD3CE;
+  --border-strong: #CBD5E1;
 
   /* ink */
   --text: #1A2533;
@@ -42,15 +42,15 @@
   --text-muted: #8A9AAA;
 
   /* the deep green this app uses for anything active or primary */
-  --accent: #0D6B5E;
-  --accent-hover: #0A5648;
-  --accent-line: #1A8577;
-  --accent-soft: #E8F5F3;
-  --accent-soft-border: #BAD3CE;
-  --accent-ink: #0D6B5E;
+  --accent: #8A5A14;
+  --accent-hover: #6E4710;
+  --accent-line: #C8912E;
+  --accent-soft: #FBF3E4;
+  --accent-soft-border: #E8D3A6;
+  --accent-ink: #7A4F11;
   --accent-on: #FFFFFF;
 
-  --accent-2: #1A8577;
+  --accent-2: #C8912E;
 
   /* error */
   --danger: #C2362B;
@@ -660,7 +660,7 @@
   transition: all .15s;
 }
 
-.award-page .aw-tab:hover { color: var(--accent); background: rgba(13, 107, 94, .05); }
+.award-page .aw-tab:hover { color: var(--accent); background: rgba(138, 90, 20, .06); }
 .award-page .aw-tab.is-active { color: var(--accent); font-weight: 600; }
 
 /* The active marker is a rounded, softly lit bar rather than a plain rule -
@@ -674,7 +674,7 @@
   height: 2.5px;
   border-radius: 3px 3px 0 0;
   background: linear-gradient(90deg, var(--accent), var(--accent-line));
-  box-shadow: 0 0 10px rgba(13, 107, 94, .45);
+  box-shadow: 0 0 10px rgba(138, 90, 20, .38);
 }
 
 .award-page .aw-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
@@ -749,3 +749,46 @@
    the card now that it is dark. */
 .award-page #requisitions-table thead tr:first-child th:first-child { border-top-left-radius: var(--radius-sm); }
 .award-page #requisitions-table thead tr:first-child th:last-child  { border-top-right-radius: var(--radius-sm); }
+
+
+/* ======================================================================
+   Finishing
+   ====================================================================== */
+
+/* The section had three headings for one thing - Stock Management, then a
+   Requisition pill, then a Requisitions card head, each with its own rule
+   bar. The card's head goes; the count moves up beside the pill it belongs
+   to, which also stops a lone pill reading as a stray button. */
+.award-page .aw-subtabs {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+.award-page .aw-subtabs .pill {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+/* The card is now just the list, so it does not need a header's worth of
+   padding above it. */
+.award-page .aw-subpanel .card { padding: 18px; }
+
+/* The dialog ran a rule down the side of its title, the same motif the
+   cards used - one flourish too many once the cards stopped. And the gap
+   above its buttons was sized for a form that filled a page. */
+.award-page .aw-box-head .rule { display: none; }
+.award-page .aw-box-body .form-actions { margin-top: 18px; }
+
+/* Rows: give the table a little more air and a clearer hover, now that the
+   head is solid and the card around it is tighter. */
+.award-page #requisitions-table td { padding: 11px 14px; }
+.award-page #requisitions-table tbody tr:hover { background: var(--accent-soft); }
+.award-page #requisitions-table tbody tr:last-child td { border-bottom: 0; }
