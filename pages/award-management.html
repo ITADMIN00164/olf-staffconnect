@@ -44,9 +44,16 @@
           </div>
 
           <div class="field">
+            <label for="division">Division <span class="req" aria-hidden="true">*</span></label>
+            <select id="division" name="division" required disabled>
+              <option value="">Select a state first</option>
+            </select>
+            <p class="error" id="division-error" role="alert"></p>
+          </div>
+          <div class="field">
             <label for="district">District <span class="req" aria-hidden="true">*</span></label>
             <select id="district" name="district" required disabled>
-              <option value="">Select a state first</option>
+              <option value="">Select a division first</option>
             </select>
             <p class="error" id="district-error" role="alert"></p>
           </div>
@@ -129,6 +136,7 @@
           <thead>
             <tr>
               <th scope="col">State</th>
+              <th scope="col">Division</th>
               <th scope="col">District</th>
               <th scope="col">Requester</th>
               <th scope="col">Type</th>
@@ -139,12 +147,12 @@
           </thead>
           <tbody id="requisitions-body">
             <tr class="placeholder-row">
-              <td colspan="7">Loading requisitions…</td>
+              <td colspan="8">Loading requisitions…</td>
             </tr>
           </tbody>
           <tfoot id="requisitions-foot" hidden>
             <tr>
-              <td colspan="4" id="foot-count"></td>
+              <td colspan="5" id="foot-count"></td>
               <td class="num mono" id="foot-total"></td>
               <td colspan="2"></td>
             </tr>

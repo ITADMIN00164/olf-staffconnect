@@ -1072,6 +1072,83 @@ window.olfStaffDirectory = async function () {
     return list;
 };
 
+/* ====================================
+   WHERE THE ORGANISATION WORKS
+
+   State -> Division -> District, built from the Employees records rather
+   than kept in a second place that has to be remembered. Only Inactive
+   staff are skipped: a district nobody is posted to any more should stop
+   being offered.
+
+   Three spellings in the directory do not match the district they mean.
+   Each was checked against the division it sits under - Beed is in
+   Chhatrapati Sambhajinagar, Raigad in Konkan, Sangli in Pune - and is
+   mapped here rather than corrected in Firestore, so nothing is rewritten
+   in production and the fix stays in one visible place.
+
+   A state with no districts is left out: it cannot carry a requisition, so
+   offering it only strands whoever picks it. Delhi is the live example.
+
+   Fetched once per page load and cached, like the directory above.
+==================================== */
+
+const DISTRICT_RENAMES = {
+    "bid":         "Beed",
+    "raigarh mh":  "Raigad",
+    "sangli - mc": "Sangli"
+};
+
+let orgGeography = null;
+
+window.olfGeography = async function () {
+    if (orgGeography) return orgGeography;
+
+    const snapshot = await getDocs(collection(db, "Employees"));
+
+    // state -> division -> Set(district)
+    const tree = new Map();
+
+    snapshot.forEach(d => {
+        const r = d.data();
+        if (!isActiveEmployee(r)) return;
+
+        const states    = splitMulti(r["State"]);
+        const divisions = splitMulti(r["Division"]);
+        const districts = splitMulti(r["District"]).map(n => {
+            const key = n.toLowerCase();
+            return DISTRICT_RENAMES[key] || n;
+        });
+
+        for (const st of states) {
+            if (!tree.has(st)) tree.set(st, new Map());
+            const byDiv = tree.get(st);
+            for (const dv of divisions) {
+                if (!byDiv.has(dv)) byDiv.set(dv, new Set());
+                districts.forEach(dt => byDiv.get(dv).add(dt));
+            }
+        }
+    });
+
+    const out = [];
+    for (const [state, byDiv] of tree) {
+        const divisions = [];
+        for (const [division, districts] of byDiv) {
+            if (!districts.size) continue;
+            divisions.push({
+                name: division,
+                districts: [...districts].sort((a, b) => a.localeCompare(b))
+            });
+        }
+        if (!divisions.length) continue;        // nothing selectable under it
+        divisions.sort((a, b) => a.name.localeCompare(b.name));
+        out.push({ name: state, divisions });
+    }
+    out.sort((a, b) => a.name.localeCompare(b.name));
+
+    orgGeography = out;
+    return out;
+};
+
 async function getPageHtml(page) {
     if (pageFragments.has(page)) return pageFragments.get(page);
     const res  = await fetch(`pages/${page}.html`);

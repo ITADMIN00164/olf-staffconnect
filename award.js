@@ -54,6 +54,7 @@ window.AWARD_CONFIG = {
     district: document.getElementById("district"),
     awardType: document.getElementById("award-type"),
     requesterName: document.getElementById("requester-name"),
+    division: document.getElementById("division"),
     requesterWho: document.getElementById("requester-who"),
     requesterSub: document.getElementById("requester-sub"),
     quantity: document.getElementById("quantity"),
@@ -170,7 +171,7 @@ window.AWARD_CONFIG = {
   }
 
   function clearFieldErrors() {
-    ["state", "district", "award-type", "requester", "quantity", "req-date"]
+    ["state", "division", "district", "award-type", "requester", "quantity", "req-date"]
       .forEach(function (id) {
         var node = document.getElementById(id + "-error");
         if (node) node.textContent = "";
@@ -275,7 +276,7 @@ window.AWARD_CONFIG = {
     if (!db) db = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
     wireEvents();
-    loadStates();
+    loadGeography();
     loadAwardTypes();
     loadRequisitions();
   }
@@ -297,7 +298,12 @@ window.AWARD_CONFIG = {
 
     el.state.addEventListener("change", function () {
       setFieldError(el.state, "state-error", "");
-      loadDistricts(el.state.value);
+      loadDivisions(el.state.value);
+    });
+
+    el.division.addEventListener("change", function () {
+      setFieldError(el.division, "division-error", "");
+      loadDistricts(el.state.value, el.division.value);
     });
 
     el.form.addEventListener("submit", onSubmit);
@@ -308,7 +314,9 @@ window.AWARD_CONFIG = {
         clearFieldErrors();
         setFormStatus("");
         el.reqDate.value = todayLocalISO();
-        el.district.innerHTML = '<option value="">Select a state first</option>';
+        el.division.innerHTML = '<option value="">Select a state first</option>';
+        el.division.disabled = true;
+        el.district.innerHTML = '<option value="">Select a division first</option>';
         el.district.disabled = true;
       }, 0);
     });
@@ -326,58 +334,109 @@ window.AWARD_CONFIG = {
 
   // -------------------------------------------------------- reference data
 
-  function loadStates() {
-    db.from("states").select("id, code, name").order("name")
-      .then(function (res) {
-        if (res.error) {
-          el.state.innerHTML = '<option value="">Could not load states</option>';
-          reportError("load states", res.error);
+  /* Where the organisation works, from the Employees directory rather than a
+     copy kept here. The shell builds the State -> Division -> District tree
+     once per page load; this just reads it, so changing the cascade is a
+     matter of correcting someone's record in the Employees tab. */
+  var geography = [];
+
+  function stateNamed(name) {
+    for (var i = 0; i < geography.length; i++) {
+      if (geography[i].name === name) return geography[i];
+    }
+    return null;
+  }
+
+  function divisionNamed(stateName, divisionName) {
+    var st = stateNamed(stateName);
+    if (!st) return null;
+    for (var i = 0; i < st.divisions.length; i++) {
+      if (st.divisions[i].name === divisionName) return st.divisions[i];
+    }
+    return null;
+  }
+
+  function loadGeography() {
+    if (typeof window.olfGeography !== "function") {
+      el.state.innerHTML = '<option value="">Unavailable</option>';
+      showSetupBanner(
+        "This page reads the states, divisions and districts from the " +
+        "Employees directory, and that is not loaded. Reload Staff Connect " +
+        "and open the tab again.",
+        "Could not reach the staff directory."
+      );
+      disableForm();
+      return;
+    }
+
+    window.olfGeography()
+      .then(function (tree) {
+        geography = tree || [];
+
+        if (!geography.length) {
+          el.state.innerHTML = '<option value="">No locations found</option>';
+          showSetupBanner(
+            "No employee has a State, Division and District recorded, so " +
+            "there is nothing to choose from. Fill those in on the Employees " +
+            "tab and reload.",
+            "The directory has no locations yet."
+          );
+          disableForm();
           return;
         }
-        var states = res.data || [];
-        fillSelect(el.state, states, "Select state",
-          function (s) { return s.id; },
-          function (s) { return s.name + " (" + s.code + ")"; });
 
-        // Only one state seeded? Pick it and load its districts straight away.
-        if (states.length === 1) {
-          el.state.value = String(states[0].id);
-          loadDistricts(el.state.value);
+        fillSelect(el.state, geography, "Select state",
+          function (s) { return s.name; },
+          function (s) { return s.name; });
+
+        // Only one state in the directory? Choose it and move on.
+        if (geography.length === 1) {
+          el.state.value = geography[0].name;
+          loadDivisions(el.state.value);
         }
       })
       .catch(function (err) {
         el.state.innerHTML = '<option value="">Could not load states</option>';
-        reportError("load states", err);
+        reportError("load the directory's locations", err);
       });
   }
 
-  function loadDistricts(stateId) {
-    if (!stateId) {
-      el.district.innerHTML = '<option value="">Select a state first</option>';
+  function loadDivisions(stateName) {
+    el.district.innerHTML = '<option value="">Select a division first</option>';
+    el.district.disabled = true;
+
+    var st = stateName ? stateNamed(stateName) : null;
+    if (!st) {
+      el.division.innerHTML = '<option value="">Select a state first</option>';
+      el.division.disabled = true;
+      return;
+    }
+
+    fillSelect(el.division, st.divisions, "Select division",
+      function (d) { return d.name; },
+      function (d) { return d.name; });
+    el.division.disabled = false;
+
+    if (st.divisions.length === 1) {
+      el.division.value = st.divisions[0].name;
+      loadDistricts(stateName, el.division.value);
+    }
+  }
+
+  function loadDistricts(stateName, divisionName) {
+    var dv = divisionName ? divisionNamed(stateName, divisionName) : null;
+    if (!dv) {
+      el.district.innerHTML = '<option value="">Select a division first</option>';
       el.district.disabled = true;
       return;
     }
 
-    el.district.disabled = true;
-    el.district.innerHTML = '<option value="">Loading…</option>';
+    fillSelect(el.district, dv.districts, "Select district",
+      function (n) { return n; },
+      function (n) { return n; });
+    el.district.disabled = false;
 
-    db.from("districts").select("id, name")
-      .eq("state_id", Number(stateId)).order("name")
-      .then(function (res) {
-        if (res.error) {
-          el.district.innerHTML = '<option value="">Could not load districts</option>';
-          reportError("load districts", res.error);
-          return;
-        }
-        fillSelect(el.district, res.data || [], "Select district",
-          function (d) { return d.id; },
-          function (d) { return d.name; });
-        el.district.disabled = false;
-      })
-      .catch(function (err) {
-        el.district.innerHTML = '<option value="">Could not load districts</option>';
-        reportError("load districts", err);
-      });
+    if (dv.districts.length === 1) el.district.value = dv.districts[0];
   }
 
   function loadAwardTypes() {
@@ -404,9 +463,15 @@ window.AWARD_CONFIG = {
   function readForm() {
     clearFieldErrors();
 
+    /* Where it is for is recorded as the names that were chosen, not as ids
+       into this database's own tables: the directory covers districts those
+       tables have never heard of. For a log that cannot be edited the name is
+       the better record anyway - it keeps what was picked at the time instead
+       of following a row somebody renames later. */
     var values = {
-      state_id: el.state.value ? Number(el.state.value) : null,
-      district_id: el.district.value ? Number(el.district.value) : null,
+      state_name: el.state.value || "",
+      division_name: el.division.value || "",
+      district_name: el.district.value || "",
       award_type_id: el.awardType.value ? Number(el.awardType.value) : null,
       requester_name: (signedInUser() || {}).name || "",
       quantity: el.quantity.value.trim(),
@@ -415,11 +480,25 @@ window.AWARD_CONFIG = {
 
     var ok = true;
 
-    if (!values.state_id) {
+    if (!values.state_name) {
       setFieldError(el.state, "state-error", "Select a state."); ok = false;
     }
-    if (!values.district_id) {
+    if (!values.division_name) {
+      setFieldError(el.division, "division-error", "Select a division."); ok = false;
+    }
+    if (!values.district_name) {
       setFieldError(el.district, "district-error", "Select a district."); ok = false;
+    }
+
+    // The three cascade, so a stale pairing means the directory changed under
+    // them mid-form. Better to stop than to file a place that does not exist.
+    if (values.state_name && values.division_name && values.district_name) {
+      var dv = divisionNamed(values.state_name, values.division_name);
+      if (!dv || dv.districts.indexOf(values.district_name) === -1) {
+        setFieldError(el.district, "district-error",
+          "That district is no longer listed under this division. Choose again.");
+        ok = false;
+      }
     }
     if (!values.award_type_id) {
       setFieldError(el.awardType, "award-type-error", "Select an award type."); ok = false;
@@ -467,14 +546,24 @@ window.AWARD_CONFIG = {
     db.from("requisitions").insert([values])
       .then(function (res) {
         if (res.error) {
-          setFormStatus("Could not save: " + res.error.message, "bad");
+          // The columns these names go into arrive with a migration. Say so,
+          // rather than showing the raw PostgREST complaint, which reads
+          // "Could not find the 'state_name' column of 'requisitions'" - the
+          // name comes before the word column, so this matches on the name.
+          var missing = /(state_name|division_name|district_name)/i
+            .test(res.error.message || "");
+          setFormStatus(missing
+            ? "This database has not been updated for divisions yet. Run " +
+              "sql/2026-10-15-award-store-geography-as-text.sql in the " +
+              "Supabase SQL editor, then try again."
+            : "Could not save: " + res.error.message, "bad");
           reportError("save requisition", res.error);
           return;
         }
 
         setFormStatus(
           "Saved — " + values.quantity + " " + selectedText(el.awardType) +
-          " for " + selectedText(el.district) + ".",
+          " for " + values.district_name + ".",
           "ok"
         );
 
@@ -503,11 +592,19 @@ window.AWARD_CONFIG = {
 
   // ------------------------------------------------------------- load list
 
+  // Columns added by sql/2026-10-15-award-store-geography-as-text.sql. Until
+  // that has been run they do not exist, and asking for them fails the whole
+  // query - so the list falls back to the joins and keeps working.
+  var hasNameColumns = true;
+
   function loadRequisitions() {
     el.refreshBtn.disabled = true;
 
     db.from("requisitions")
+      // The names are what new rows carry; the joins are for the rows filed
+      // before this page recorded them, which still point at the old tables.
       .select("id, requester_name, quantity, requisition_date, status, created_at," +
+              (hasNameColumns ? " state_name, division_name, district_name," : "") +
               " states ( code, name ), districts ( name ), award_types ( code, name )")
       .order("created_at", { ascending: false })
       .limit(500)
@@ -515,6 +612,12 @@ window.AWARD_CONFIG = {
         el.refreshBtn.disabled = false;
 
         if (res.error) {
+          if (hasNameColumns &&
+              /(state_name|division_name|district_name)/i.test(res.error.message || "")) {
+            hasNameColumns = false;      // not migrated yet - read the old shape
+            loadRequisitions();
+            return;
+          }
           placeholderRow("Could not load requisitions: " + res.error.message);
           reportError("load requisitions", res.error);
           return;
@@ -531,19 +634,32 @@ window.AWARD_CONFIG = {
       });
   }
 
+  /* Where a row says it is for. New rows carry the names; the ones filed
+     before that still point at this database's own tables, so both are read
+     and the newer answer wins. */
+  function placeOf(row) {
+    return {
+      state:    row.state_name    || (row.states    ? row.states.name    : ""),
+      division: row.division_name || "",
+      district: row.district_name || (row.districts ? row.districts.name : ""),
+      code:     row.states ? row.states.code : ""
+    };
+  }
+
   // Filter dropdowns list only values that actually appear in the loaded rows.
   function buildFilterOptions() {
     var states = {}, districts = {}, types = {};
 
     allRequisitions.forEach(function (row) {
-      if (row.states) states[row.states.name] = row.states.code;
-      if (row.districts) districts[row.districts.name] = true;
+      var p = placeOf(row);
+      if (p.state) states[p.state] = p.code;
+      if (p.district) districts[p.district] = true;
       if (row.award_types) types[row.award_types.name] = true;
     });
 
     fillSelect(el.filterState, Object.keys(states).sort(), "All states",
       function (name) { return name; },
-      function (name) { return name + " (" + states[name] + ")"; });
+      function (name) { return states[name] ? name + " (" + states[name] + ")" : name; });
 
     fillSelect(el.filterDistrict, Object.keys(districts).sort(), "All districts",
       function (name) { return name; }, function (name) { return name; });
@@ -559,8 +675,9 @@ window.AWARD_CONFIG = {
     var search = el.filterSearch.value.trim().toLowerCase();
 
     var rows = allRequisitions.filter(function (row) {
-      if (stateFilter && (!row.states || row.states.name !== stateFilter)) return false;
-      if (districtFilter && (!row.districts || row.districts.name !== districtFilter)) return false;
+      var p = placeOf(row);
+      if (stateFilter && p.state !== stateFilter) return false;
+      if (districtFilter && p.district !== districtFilter) return false;
       if (typeFilter && (!row.award_types || row.award_types.name !== typeFilter)) return false;
       if (search && String(row.requester_name || "").toLowerCase().indexOf(search) === -1) return false;
       return true;
@@ -580,16 +697,18 @@ window.AWARD_CONFIG = {
 
     rows.forEach(function (row) {
       total += Number(row.quantity) || 0;
-      var stateCode = row.states ? row.states.code : "?";
-      var stateName = row.states ? row.states.name : "Unknown state";
-      var district = row.districts ? row.districts.name : "—";
+      var p = placeOf(row);
+      var stateName = p.state || "Unknown state";
+      // Rows filed before the directory fed this page have no division, and
+      // an em dash is more honest than guessing one.
       var typeName = row.award_types ? row.award_types.name : "—";
 
       html +=
         "<tr>" +
           '<td><span class="state-code" title="' + escapeHtml(stateName) + '">' +
-            escapeHtml(stateCode) + "</span></td>" +
-          "<td>" + escapeHtml(district) + "</td>" +
+            escapeHtml(p.code || stateName) + "</span></td>" +
+          "<td>" + escapeHtml(p.division || "—") + "</td>" +
+          "<td>" + escapeHtml(p.district || "—") + "</td>" +
           "<td>" + escapeHtml(row.requester_name) + "</td>" +
           '<td><span class="type-chip">' + escapeHtml(typeName) + "</span></td>" +
           '<td class="num">' + escapeHtml(row.quantity) + "</td>" +
