@@ -1135,3 +1135,18 @@
   padding: 4px 0;
 }
 .award-page .stock-line label { font-size: 13px; color: var(--text); }
+
+/* A requisition that was part-filled says so where it is listed, not only in
+   the stock sheet. */
+.award-page .cell-short {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  background: #FFF4E0;
+  color: #8A5A14;
+  border: 1px solid #EBD6AC;
+}
+.award-page .stock-line .hint { font-weight: 400; color: var(--text-muted); font-size: 11px; }

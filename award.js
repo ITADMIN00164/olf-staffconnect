@@ -79,6 +79,8 @@ window.AWARD_CONFIG = {
     hoSummary: document.getElementById("ho-summary"),
     hoRemark: document.getElementById("ho-remark"),
     hoRemarkLabel: document.getElementById("ho-remark-label"),
+    hoLinesField: document.getElementById("ho-lines-field"),
+    hoLines: document.getElementById("ho-lines"),
     hoConfirm: document.getElementById("ho-confirm"),
     deliveryBody: document.getElementById("delivery-body"),
     stockYear: document.getElementById("stock-year"),
@@ -1095,6 +1097,24 @@ window.AWARD_CONFIG = {
         "</dd></div>" +
       "</dl>";
 
+    /* Dispatching asks how many are going, filled in with what was asked
+       for. Changing a figure is the whole point: a district that is sent 60
+       of the 100 it wanted has 60, and the stock has to say so. */
+    var sending = action === "dispatch";
+    el.hoLinesField.hidden = !sending;
+    if (sending) {
+      var asked = quantitiesOf(row, "items");
+      el.hoLines.innerHTML = awardTypes.filter(function (t) {
+        return asked[t.id];
+      }).map(function (t) {
+        return '<div class="stock-line"><label>' + escapeHtml(t.name) +
+               ' <span class="hint">asked for ' + escapeHtml(asked[t.id]) + '</span></label>' +
+               '<input type="number" class="mono ho-qty" data-type="' + escapeHtml(t.id) +
+               '" min="0" max="1000000" step="1" value="' + escapeHtml(asked[t.id]) + '" /></div>';
+      }).join("");
+      setFieldError(null, "ho-lines-error", "");
+    }
+
     el.hoRemark.value = "";
     /* A reason is asked for wherever the answer is no, or not yet, or it
        did not turn up - the three a requester is owed an explanation for. */
@@ -1186,7 +1206,51 @@ window.AWARD_CONFIG = {
       from = "on_hold";
 
     } else if (action === "dispatch") {
+      var going = [];
+      var short = false;
+      var fault = "";
+      Array.prototype.forEach.call(el.hoLines.querySelectorAll(".ho-qty"), function (input) {
+        var id = Number(input.getAttribute("data-type"));
+        var n = Number(input.value.trim());
+        var asked = quantitiesOf(row, "items")[id] || 0;
+        if (!Number.isInteger(n) || n < 0) {
+          if (!fault) fault = "Quantities are whole numbers, nothing or more.";
+          return;
+        }
+        if (n > asked) {
+          if (!fault) fault = "More than was asked for. Raise a new requisition instead.";
+          return;
+        }
+        if (n < asked) short = true;
+        if (n > 0) {
+          var type = awardTypes.filter(function (t) { return Number(t.id) === id; })[0] || {};
+          going.push({ award_type_id: id, code: type.code || null,
+                       name: type.name || null, quantity: n });
+        }
+      });
+
+      if (fault) {
+        setFieldError(null, "ho-lines-error", fault);
+        el.hoConfirm.disabled = false;
+        return;
+      }
+      if (!going.length) {
+        setFieldError(null, "ho-lines-error",
+          "Nothing is going. Reject it instead, so the requester is told why.");
+        el.hoConfirm.disabled = false;
+        return;
+      }
+      if (short && !remark) {
+        setFieldError(el.hoRemark, "ho-remark-error",
+          "Less than was asked for - say why, so the requester is not left counting.");
+        el.hoRemark.focus();
+        el.hoConfirm.disabled = false;
+        return;
+      }
+      setFieldError(null, "ho-lines-error", "");
+
       hoNote();
+      patch.dispatched_items = going;
       patch.status = "dispatched";
       patch.dispatched_by = me;
       patch.dispatched_at = now;
@@ -2155,6 +2219,20 @@ window.AWARD_CONFIG = {
     return [];
   }
 
+  /* What is on its way, or arrived, where that differs from what was
+     asked for. A requisition that was part-filled should say so on its own
+     row rather than only in the stock sheet. */
+  function shortfallHtml(row) {
+    if (!row.dispatched_items || !row.dispatched_items.length) return "";
+    var asked = quantitiesOf(row, "items");
+    var sent = quantitiesOf(row, "dispatched");
+    var short = Object.keys(asked).filter(function (id) {
+      return (sent[id] || 0) < asked[id];
+    });
+    if (!short.length) return "";
+    return '<span class="cell-short">part-filled</span>';
+  }
+
   function awardsCellHtml(awards) {
     if (!awards.length) return "—";
     return awards.map(function (a) {
@@ -2273,7 +2351,7 @@ window.AWARD_CONFIG = {
         "<td>" + escapeHtml(p.division || "—") + "</td>" +
         "<td>" + escapeHtml(p.district || "—") + "</td>" +
         "<td>" + escapeHtml(row.requester_name || "—") + "</td>" +
-        "<td>" + awardsCellHtml(awards) + "</td>" +
+        "<td>" + awardsCellHtml(awards) + shortfallHtml(row) + "</td>" +
         '<td class="num">' + escapeHtml(Number(row.quantity).toLocaleString()) + "</td>" +
         "<td>" + statusCellHtml(row, true) + "</td>" +
         '<td class="cell-action">' + actionCellHtml(row) + "</td>" +
@@ -2472,13 +2550,29 @@ window.AWARD_CONFIG = {
      division it sits in. */
   function stockPlaces() {
     var out = [];
+    var seen = {};
+
     geography.forEach(function (st) {
       st.divisions.forEach(function (dv) {
         dv.districts.forEach(function (d) {
+          seen[d.toLowerCase()] = true;
           out.push({ state: st.name, division: dv.name, district: d, pm: dv.pm || "" });
         });
       });
     });
+
+    /* A district can hold stock without anybody being posted to it - five of
+       them do today. Leaving them out of the directory's list would leave
+       their stock nowhere to be seen, so anywhere with a movement against it
+       is listed too, with whatever place the movement itself carries. */
+    stockMovements.forEach(function (m) {
+      var d = String(m.district_name || "").trim();
+      if (!d || seen[d.toLowerCase()]) return;
+      seen[d.toLowerCase()] = true;
+      out.push({ state: m.state_name || "", division: m.division_name || "",
+                 district: d, pm: "", unstaffed: true });
+    });
+
     return out;
   }
 

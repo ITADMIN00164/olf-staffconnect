@@ -400,6 +400,15 @@
         </div>
         <div class="aw-box-body">
           <div class="review-summary" id="ho-summary"></div>
+
+          <!-- Only when dispatching: what is actually going, which the
+               spreadsheet keeps apart from what was asked for. -->
+          <div class="field field-wide" id="ho-lines-field" hidden>
+            <label id="ho-lines-label">How many are going</label>
+            <div class="award-lines" id="ho-lines"></div>
+            <p class="error" id="ho-lines-error" role="alert"></p>
+          </div>
+
           <div class="field">
             <label for="ho-remark" id="ho-remark-label">Note</label>
             <textarea id="ho-remark" rows="3"></textarea>
