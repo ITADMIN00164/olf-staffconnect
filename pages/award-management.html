@@ -121,15 +121,14 @@
               <th scope="col">Requester</th>
               <th scope="col">Type</th>
               <th scope="col" class="num">Quantity</th>
-              <th scope="col">Date</th>
-              <th scope="col">Submitted At</th>
+              <th scope="col">Submitted</th>
               <th scope="col">Status</th>
               <th scope="col"><span class="sr-only">Review</span></th>
             </tr>
           </thead>
           <tbody id="requisitions-body">
             <tr class="placeholder-row">
-              <td colspan="10">Loading requisitions…</td>
+              <td colspan="9">Loading requisitions…</td>
             </tr>
           </tbody>
           <tfoot id="requisitions-foot" hidden>
@@ -277,11 +276,6 @@
           <p class="error" id="quantity-error" role="alert"></p>
         </div>
 
-        <div class="field">
-          <label for="req-date">Date <span class="req" aria-hidden="true">*</span></label>
-          <input type="date" id="req-date" name="req-date" class="mono" required />
-          <p class="error" id="req-date-error" role="alert"></p>
-        </div>
 
       </div>
 

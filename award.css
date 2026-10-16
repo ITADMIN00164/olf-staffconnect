@@ -1048,3 +1048,14 @@
 /* On hold is waiting, not refusing - amber rather than red, and visibly not
    the same thing as rejected. */
 .award-page .chip-status.is-held { background: #FFF7E6; color: #92610E; border-color: #F0DCB4; }
+
+/* Who a requisition is sitting with. "Pending" alone says a thing is waiting
+   without saying on whom, which is the one thing anyone looking at it wants
+   to know. */
+.award-page .cell-waiting {
+  display: block;
+  margin-top: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-soft);
+}

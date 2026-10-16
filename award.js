@@ -58,7 +58,6 @@ window.AWARD_CONFIG = {
     requesterWho: document.getElementById("requester-who"),
     requesterSub: document.getElementById("requester-sub"),
     quantity: document.getElementById("quantity"),
-    reqDate: document.getElementById("req-date"),
     submitBtn: document.getElementById("submit-btn"),
     resetBtn: document.getElementById("reset-btn"),
     formBanner: document.getElementById("form-banner"),
@@ -179,6 +178,37 @@ window.AWARD_CONFIG = {
                remark: row.decision_remark, at: row.decided_at };
     }
     return { decision: null };
+  }
+
+  /* Pending is not much use on its own - pending on whom, and for what?
+     Every open stage is waiting on somebody, and this says who, by name
+     where there is one and by the role that has to act where there is not.
+
+     For one still awaiting approval that means the levels above the one it
+     was raised at, in its own division, because that is exactly who is
+     allowed to touch it. A COO has no division, so none is named when they
+     are the only ones left. */
+  function waitingOn(row) {
+    switch (stageOf(row)) {
+      case "submitted":
+        var lvl = levelRaisedAt(row);
+        var div = String(row.division_name || "").trim();
+        if (lvl >= 3) return "the COO";
+        var who = lvl === 2
+          ? "a Divisional Manager or the COO"
+          : "a Programme Manager, Divisional Manager or the COO";
+        return who + (div ? " in " + div : "");
+
+      case "approved":     return "Head Office, to acknowledge it";
+      case "acknowledged": return "Head Office, to send it";
+      case "on_hold":      return "Head Office, who are waiting on stock";
+      case "dispatched":
+        var name = String(row.requester_name || "").trim();
+        return (name || "the requester") + ", to confirm it arrived";
+
+      // Settled. Nobody is waiting on anything.
+      default: return "";
+    }
   }
 
   /* Every step a requisition has been through, newest last. Drawn under the
@@ -505,7 +535,7 @@ window.AWARD_CONFIG = {
   }
 
   function clearFieldErrors() {
-    ["state", "division", "district", "award-type", "requester", "quantity", "req-date"]
+    ["state", "division", "district", "award-type", "requester", "quantity"]
       .forEach(function (id) {
         var node = document.getElementById(id + "-error");
         if (node) node.textContent = "";
@@ -621,8 +651,6 @@ window.AWARD_CONFIG = {
     showTab(el.subtabs, "data-aw-subtab", "requisition");
     applyAccess();
 
-    el.reqDate.value = todayLocalISO();
-    el.reqDate.max = todayLocalISO();
 
     if (!window.supabase || typeof window.supabase.createClient !== "function") {
       showSetupBanner(
@@ -714,7 +742,6 @@ window.AWARD_CONFIG = {
     clearFieldErrors();
     setFormStatus("");
     resetAwardLines();
-    el.reqDate.value = todayLocalISO();
 
     // Put back where the last one was for, if that is still on offer.
     if (lastPlace) {
@@ -822,7 +849,7 @@ window.AWARD_CONFIG = {
         "<div><dt>For</dt><dd>" +
           escapeHtml([p.district, p.division, p.state].filter(Boolean).join(", ")) +
         "</dd></div>" +
-        "<div><dt>Dated</dt><dd>" + escapeHtml(formatDate(row.requisition_date)) + "</dd></div>" +
+        "<div><dt>Filed</dt><dd>" + escapeHtml(formatTimestamp(row.created_at)) + "</dd></div>" +
       "</dl>";
 
     el.reviewRemark.value = "";
@@ -1423,7 +1450,6 @@ window.AWARD_CONFIG = {
       window.setTimeout(function () {
         clearFieldErrors();
         setFormStatus("");
-        el.reqDate.value = todayLocalISO();
         el.division.innerHTML = '<option value="">Select a state first</option>';
         el.division.disabled = true;
         el.district.innerHTML = '<option value="">Select a division first</option>';
@@ -1698,7 +1724,10 @@ window.AWARD_CONFIG = {
       requester_role: (myStanding() || {}).role || null,
       requester_level: (myStanding() || {}).level || null,
       quantity: 0,
-      requisition_date: el.reqDate.value,
+      // The moment it was filed, which the clock knows. It used to be typed,
+      // which meant a requisition could be dated anything at all - and the
+      // Submitted column sat beside it saying something different.
+      requisition_date: todayLocalISO(),
     };
 
     var ok = true;
@@ -1776,9 +1805,6 @@ window.AWARD_CONFIG = {
         "Could not tell who you are. Reload the page and sign in again."); ok = false;
     }
 
-    if (!values.requisition_date) {
-      setFieldError(el.reqDate, "req-date-error", "Pick a date."); ok = false;
-    }
 
     return ok ? values : null;
   }
@@ -2058,7 +2084,6 @@ window.AWARD_CONFIG = {
           "<td>" + escapeHtml(row.requester_name) + "</td>" +
           "<td>" + awardsCellHtml(awards) + "</td>" +
           '<td class="num">' + escapeHtml(row.quantity) + "</td>" +
-          '<td class="cell-date">' + escapeHtml(formatDate(row.requisition_date)) + "</td>" +
           '<td class="cell-date muted">' + escapeHtml(formatTimestamp(row.created_at)) + "</td>" +
           "<td>" + statusCellHtml(row) + "</td>" +
           '<td class="cell-action">' + actionCellHtml(row) + "</td>" +
@@ -2119,8 +2144,12 @@ window.AWARD_CONFIG = {
     var remark = row.issue_note || row.receipt_note || row.ho_remark ||
                  row.decision_remark || "";
 
+    var waiting = waitingOn(row);
+
     return '<span class="chip-status is-' + escapeHtml(stage.tone) + '">' +
              escapeHtml(stageLabel(row, forHo)) + "</span>" +
+           (waiting ? '<span class="cell-waiting">With ' + escapeHtml(waiting) +
+                      "</span>" : "") +
            '<span class="cell-trail">' + trail + "</span>" +
            (remark ? '<span class="cell-remark" title="' + escapeHtml(remark) + '">' +
                      escapeHtml(remark) + "</span>" : "");
