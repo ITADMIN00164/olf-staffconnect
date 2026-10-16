@@ -44,9 +44,29 @@ alter table public.requisitions add column if not exists rejected_by     text;
 alter table public.requisitions add column if not exists rejected_at     timestamptz;
 alter table public.requisitions add column if not exists ho_remark       text;
 
--- status gains the three stages after approval. The old constraint only knew
--- the first three words, so it is replaced rather than added to.
-alter table public.requisitions drop constraint if exists requisitions_status_known;
+-- status gains the three stages after approval.
+--
+-- Every check on the table that mentions status is dropped, not just the one
+-- this project created. A CHECK written inline on a column is named
+-- <table>_<column>_check by Postgres, so the original table definition left
+-- behind requisitions_status_check, which knew only the first three words.
+-- Naming one constraint to drop missed it, and acknowledging was refused by
+-- the one nobody had looked at.
+do $$
+declare
+  c record;
+begin
+  for c in
+    select conname
+    from   pg_constraint
+    where  conrelid = 'public.requisitions'::regclass
+      and  contype  = 'c'
+      and  pg_get_constraintdef(oid) ilike '%status%'
+  loop
+    execute format('alter table public.requisitions drop constraint %I', c.conname);
+  end loop;
+end $$;
+
 alter table public.requisitions
   add constraint requisitions_status_known
   check (status in ('submitted', 'approved', 'declined',

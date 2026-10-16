@@ -2031,7 +2031,12 @@ window.AWARD_CONFIG = {
     console.error("[award-management] Failed to " + what + ":", err);
 
     if (el.setupBanner.hidden) {
-      var missingTable = /schema cache|does not exist/i.test(message);
+      /* A refusal is not a failure to connect. Saying "could not reach the
+         database, check your Project URL" when the database answered - and
+         said no - sends whoever reads it to the wrong place entirely. */
+      var refused = /violates|constraint|duplicate key|permission denied|row-level security/i
+        .test(message);
+      var missingTable = !refused && /schema cache|does not exist/i.test(message);
       showSetupBanner(
         "Failed to " + escapeHtml(what) + ": <code>" + escapeHtml(message) +
         "</code>. " + (missingTable
@@ -2043,9 +2048,16 @@ window.AWARD_CONFIG = {
             "still refers to them — run " +
             "<code>sql/2026-10-15-award-check-leftover-references.sql</code> " +
             "in the Supabase SQL Editor to find what."
-          : "Check that the config block at the top of <code>award.js</code> " +
-            "holds the right Project URL and publishable key."),
-        missingTable ? "Something in the database is missing." : "Could not reach the database."
+          : refused
+            ? "The database refused it. Nothing was saved, and nothing is " +
+              "broken - this is a rule in the database disagreeing with what " +
+              "the page sent. The migrations in <code>sql/</code> are where " +
+              "those rules are set."
+            : "Check that the config block at the top of <code>award.js</code> " +
+              "holds the right Project URL and publishable key."),
+        missingTable ? "Something in the database is missing."
+          : refused ? "The database would not accept that."
+          : "Could not reach the database."
       );
     }
   }
