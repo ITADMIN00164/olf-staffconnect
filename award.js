@@ -123,19 +123,25 @@ window.AWARD_CONFIG = {
 
   /* Where a requisition has got to.
 
-       raised ──> approved ──> acknowledged ──> delivered
-          │           │              │
-          │           └── rejected ──┘
+       raised ─> approved ─> acknowledged ─> dispatched ─> received
+          │          │             │
+          │          └── rejected ─┘
           └── declined
 
      declined is the approver turning it down; rejected is HO being unable to
      fulfil it. Two words, because they are two different events by different
-     people - one word would lose where it died. */
+     people - one word would lose where it died.
+
+     Dispatch and receipt are likewise two events, not one. Head Office knows
+     it sent the award; only the person who asked for it knows whether it
+     arrived. Having HO mark something "delivered" was recording a fact
+     nobody at that desk could see. */
   var STAGES = {
     submitted:    { label: "Pending",      tone: "pending",  open: true },
     approved:     { label: "Approved",     tone: "approved", open: true },
     acknowledged: { label: "Acknowledged", tone: "progress", open: true },
-    delivered:    { label: "Delivered",    tone: "done",     open: false },
+    dispatched:   { label: "Dispatched",   tone: "progress", open: true  },
+    received:     { label: "Received",     tone: "done",     open: false },
     declined:     { label: "Declined",     tone: "declined", open: false },
     rejected:     { label: "Rejected",     tone: "declined", open: false }
   };
@@ -149,7 +155,7 @@ window.AWARD_CONFIG = {
   function statusOf(row) {
     var d = stageOf(row);
     if (d === "declined" || d === "approved" || d === "acknowledged" ||
-        d === "delivered" || d === "rejected") {
+        d === "dispatched" || d === "received" || d === "rejected") {
       // Anything past submitted has been through an approver, except the
       // older rows that predate approvals - they have nobody recorded.
       return { decision: d === "declined" ? "declined" : "approved",
@@ -174,7 +180,8 @@ window.AWARD_CONFIG = {
            row.decided_by, row.decided_at, row.decided_by_email);
     }
     push("Acknowledged", row.acknowledged_by, row.acknowledged_at);
-    push("Delivered", row.delivered_by, row.delivered_at);
+    push("Dispatched", row.dispatched_by, row.dispatched_at);
+    push("Received", row.received_by, row.received_at);
     push("Rejected", row.rejected_by, row.rejected_at);
     return steps;
   }
@@ -324,9 +331,32 @@ window.AWARD_CONFIG = {
     if (!isHoAdmin()) return [];
     switch (stageOf(row)) {
       case "approved":     return ["acknowledge", "reject"];
-      case "acknowledged": return ["deliver", "reject"];
+      case "acknowledged": return ["dispatch", "reject"];
+      // Once it has been sent there is nothing left for HO to do, and
+      // nothing left to withhold.
       default:             return [];
     }
+  }
+
+  /* Confirming receipt belongs to whoever asked for it - they are the only
+     one who can see it arrive.
+
+     Matched on the address where the row has one. The rows filed before
+     addresses were recorded fall back to the name, which is weaker but is
+     all those rows carry; without it their requesters could never close
+     them. */
+  function isMine(row) {
+    var mine = myEmail();
+    var theirs = String((row && row.requester_email) || "").trim().toLowerCase();
+    if (theirs && mine) return theirs === mine;
+
+    var myName = String((signedInUser() || {}).name || "").trim().toLowerCase();
+    var theirName = String((row && row.requester_name) || "").trim().toLowerCase();
+    return !!myName && myName === theirName;
+  }
+
+  function canConfirmReceipt(row) {
+    return stageOf(row) === "dispatched" && isMine(row);
   }
 
   function canDecide(standing, row) {
@@ -923,7 +953,10 @@ window.AWARD_CONFIG = {
     for (var i = 0; i < allRequisitions.length; i++) {
       if (String(allRequisitions[i].id) === String(id)) { row = allRequisitions[i]; break; }
     }
-    if (!row || hoActions(row).indexOf(action) === -1) return;
+    var allowed = action === "receive"
+      ? canConfirmReceipt(row)
+      : hoActions(row).indexOf(action) !== -1;
+    if (!row || !allowed) return;
 
     hoPending = { row: row, action: action };
     returnFocusTo = document.activeElement;
@@ -931,11 +964,13 @@ window.AWARD_CONFIG = {
     var p = placeOf(row);
     el.hoHeading.textContent =
       action === "acknowledge" ? "Acknowledge requisition" :
-      action === "deliver"     ? "Mark as delivered" : "Reject requisition";
+      action === "dispatch"    ? "Mark as dispatched" :
+      action === "receive"     ? "Confirm it arrived" : "Reject requisition";
     el.hoSub.textContent =
-      action === "reject"
-        ? "The requester is told this is the reason nothing is coming."
-        : "Recorded against your name, and not undone.";
+      action === "reject"  ? "The requester is told this is the reason nothing is coming." :
+      action === "dispatch" ? "The requester is asked to confirm it arrives." :
+      action === "receive"  ? "Only you can say this - you are the one it was sent to."
+                            : "Recorded against your name, and not undone.";
 
     el.hoSummary.innerHTML =
       "<dl>" +
@@ -949,7 +984,9 @@ window.AWARD_CONFIG = {
     el.hoRemark.value = "";
     el.hoRemarkLabel.innerHTML = action === "reject"
       ? 'Reason <span class="hint">required</span>'
-      : 'Note <span class="hint">optional</span>';
+      : action === "receive"
+        ? 'Note <span class="hint">anything short or damaged?</span>'
+        : 'Note <span class="hint">optional</span>';
     setFieldError(el.hoRemark, "ho-remark-error", "");
     el.hoConfirm.textContent = HO_LABELS[action];
     el.hoConfirm.className = "btn " + (action === "reject" ? "btn-danger" : "btn-primary");
@@ -980,7 +1017,10 @@ window.AWARD_CONFIG = {
     var row = hoPending.row;
     var action = hoPending.action;
 
-    if (hoActions(row).indexOf(action) === -1) {    // it moved under them
+    var stillAllowed = action === "receive"
+      ? canConfirmReceipt(row)
+      : hoActions(row).indexOf(action) !== -1;
+    if (!stillAllowed) {                           // it moved under them
       setFieldError(el.hoRemark, "ho-remark-error",
         "This requisition is no longer at that stage.");
       return;
@@ -996,20 +1036,34 @@ window.AWARD_CONFIG = {
 
     var me = (signedInUser() || {}).name || myEmail();
     var now = new Date().toISOString();
-    var patch = { ho_remark: remark || null, ho_by_email: myEmail() || null };
+    var patch = {};
     var from;
 
     if (action === "acknowledge") {
+      patch.ho_remark = remark || null;
+      patch.ho_by_email = myEmail() || null;
       patch.status = "acknowledged";
       patch.acknowledged_by = me;
       patch.acknowledged_at = now;
       from = "approved";
-    } else if (action === "deliver") {
-      patch.status = "delivered";
-      patch.delivered_by = me;
-      patch.delivered_at = now;
+    } else if (action === "dispatch") {
+      patch.ho_remark = remark || null;
+      patch.ho_by_email = myEmail() || null;
+      patch.status = "dispatched";
+      patch.dispatched_by = me;
+      patch.dispatched_at = now;
       from = "acknowledged";
+    } else if (action === "receive") {
+      // The requester's note, kept apart from HO's - they are different
+      // people saying different things about the same requisition.
+      patch.receipt_note = remark || null;
+      patch.status = "received";
+      patch.received_by = me;
+      patch.received_at = now;
+      from = "dispatched";
     } else {
+      patch.ho_remark = remark || null;
+      patch.ho_by_email = myEmail() || null;
       patch.status = "rejected";
       patch.rejected_by = me;
       patch.rejected_at = now;
@@ -1038,7 +1092,8 @@ window.AWARD_CONFIG = {
         }
         var whose = String(row.requester_name || "").trim();
         var done = action === "acknowledge" ? "Acknowledged"
-                 : action === "deliver"     ? "Delivered" : "Rejected";
+                 : action === "dispatch"    ? "Dispatched"
+                 : action === "receive"     ? "Receipt confirmed" : "Rejected";
         closeHo();
         showListBanner(done + (whose ? " — " + whose + "'s requisition." : "."));
         loadRequisitions();
@@ -1721,8 +1776,9 @@ window.AWARD_CONFIG = {
               (hasNameColumns  ? " state_name, division_name, district_name," : "") +
               (hasLookupTables ? " states ( code, name ), districts ( name )," : "") +
               (hasItems ? " items," : "") +
-              (hasFulfilment ? " acknowledged_by, acknowledged_at, delivered_by," +
-                               " delivered_at, rejected_by, rejected_at, ho_remark," : "") +
+              (hasFulfilment ? " acknowledged_by, acknowledged_at, dispatched_by," +
+                               " dispatched_at, received_by, received_at, receipt_note," +
+                               " rejected_by, rejected_at, ho_remark," : "") +
               (hasEmails ? " requester_email, decided_by_email, ho_by_email," : "") +
               (hasApproval ? " requester_role, requester_level, decided_by," +
                              " decided_by_role, decided_at, decision_remark," : "") +
@@ -1745,7 +1801,8 @@ window.AWARD_CONFIG = {
             loadRequisitions();
             return;
           }
-          if (hasFulfilment && /(acknowledged_|delivered_|rejected_|ho_remark)/i.test(msg)) {
+          if (hasFulfilment &&
+              /(acknowledged_|dispatched_|received_|receipt_note|rejected_|ho_remark)/i.test(msg)) {
             hasFulfilment = false;            // fulfilment not migrated yet
             loadRequisitions();
             return;
@@ -1953,7 +2010,7 @@ window.AWARD_CONFIG = {
              "</span>";
     }).join("");
 
-    var remark = row.ho_remark || row.decision_remark || "";
+    var remark = row.receipt_note || row.ho_remark || row.decision_remark || "";
 
     return '<span class="chip-status is-' + escapeHtml(stage.tone) + '">' +
              escapeHtml(stage.label) + "</span>" +
@@ -1962,7 +2019,12 @@ window.AWARD_CONFIG = {
                      escapeHtml(remark) + "</span>" : "");
   }
 
-  var HO_LABELS = { acknowledge: "Acknowledge", deliver: "Mark delivered", reject: "Reject" };
+  var HO_LABELS = {
+    acknowledge: "Acknowledge",
+    dispatch:    "Mark dispatched",
+    reject:      "Reject",
+    receive:     "Confirm received"
+  };
 
   function actionCellHtml(row) {
     if (!hasApproval) return "";
@@ -1970,6 +2032,12 @@ window.AWARD_CONFIG = {
     if (canDecide(myStanding(), row)) {
       return '<button type="button" class="btn btn-ghost btn-xs" data-aw-review="' +
                escapeHtml(row.id) + '">Review</button>';
+    }
+
+    if (canConfirmReceipt(row)) {
+      return '<button type="button" class="btn btn-ghost btn-xs" ' +
+               'data-aw-ho="receive" data-aw-row="' + escapeHtml(row.id) + '">' +
+               HO_LABELS.receive + "</button>";
     }
 
     return hoActions(row).map(function (act) {
@@ -1987,6 +2055,9 @@ window.AWARD_CONFIG = {
 
     var rows = allRequisitions.filter(function (r) {
       var k = stageOf(r);
+      // HO's work ends when it leaves the building; what happens next is the
+      // requester's to confirm, and a dispatched row sitting in this queue
+      // would look like something still to do.
       return k === "approved" || k === "acknowledged";
     });
 
