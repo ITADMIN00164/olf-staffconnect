@@ -137,14 +137,28 @@ window.AWARD_CONFIG = {
      arrived. Having HO mark something "delivered" was recording a fact
      nobody at that desk could see. */
   var STAGES = {
-    submitted:    { label: "Pending",      tone: "pending",  open: true },
-    approved:     { label: "Approved",     tone: "approved", open: true },
-    acknowledged: { label: "Acknowledged", tone: "progress", open: true },
-    dispatched:   { label: "Dispatched",   tone: "progress", open: true  },
-    received:     { label: "Received",     tone: "done",     open: false },
+    submitted:    { label: "Pending",      tone: "pending",  open: true  },
+    approved:     { label: "Approved",     tone: "approved", open: true  },
+    acknowledged: { label: "Acknowledged", tone: "progress", open: true  },
+    on_hold:      { label: "On hold",      tone: "held",     open: true  },
+    dispatched:   { label: "Dispatched",   tone: "progress", open: true,
+                    // One event seen from two places: the requester is
+                    // waiting for it, Head Office is waiting to hear.
+                    hoLabel: "Awaiting confirmation" },
+    received:     { label: "Received",     tone: "done",     open: false,
+                    hoLabel: "Delivered" },
     declined:     { label: "Declined",     tone: "declined", open: false },
     rejected:     { label: "Rejected",     tone: "declined", open: false }
   };
+
+  /* The same state reads differently depending on who is looking. Receipt is
+     the requester confirming it arrived, which to Head Office is the
+     delivery completing - one fact, two vantage points, and neither word is
+     wrong from where it is said. */
+  function stageLabel(row, forHo) {
+    var stage = STAGES[stageOf(row)];
+    return (forHo && stage.hoLabel) || stage.label;
+  }
 
   function stageOf(row) {
     var key = String((row && row.status) || "submitted").toLowerCase();
@@ -180,7 +194,9 @@ window.AWARD_CONFIG = {
            row.decided_by, row.decided_at, row.decided_by_email);
     }
     push("Acknowledged", row.acknowledged_by, row.acknowledged_at);
+    push("On hold", row.held_by, row.held_at);
     push("Dispatched", row.dispatched_by, row.dispatched_at);
+    push("Not received", row.issue_by, row.issue_at);
     push("Received", row.received_by, row.received_at);
     push("Rejected", row.rejected_by, row.rejected_at);
     return steps;
@@ -331,9 +347,12 @@ window.AWARD_CONFIG = {
     if (!isHoAdmin()) return [];
     switch (stageOf(row)) {
       case "approved":     return ["acknowledge", "reject"];
-      case "acknowledged": return ["dispatch", "reject"];
-      // Once it has been sent there is nothing left for HO to do, and
-      // nothing left to withhold.
+      case "acknowledged": return ["dispatch", "hold", "reject"];
+      // On hold is waiting, not refusing. It can go either way once the
+      // stock question is settled.
+      case "on_hold":      return ["dispatch", "resume", "reject"];
+      // Once it has been sent there is nothing left for HO to do and nothing
+      // left to withhold; the next move belongs to the requester.
       default:             return [];
     }
   }
@@ -355,7 +374,28 @@ window.AWARD_CONFIG = {
     return !!myName && myName === theirName;
   }
 
+  /* Whoever approved it can also close it. The requester is the right
+     person, but people leave, and without this a dispatched requisition
+     whose requester has gone could never be closed by anybody. Recorded
+     under their own name, so the trail shows it was not the requester. */
+  function iApproved(row) {
+    var mine = myEmail();
+    var theirs = String((row && row.decided_by_email) || "").trim().toLowerCase();
+    if (theirs && mine) return theirs === mine;
+
+    var myName = String((signedInUser() || {}).name || "").trim().toLowerCase();
+    var theirName = String((row && row.decided_by) || "").trim().toLowerCase();
+    return !!myName && myName === theirName;
+  }
+
   function canConfirmReceipt(row) {
+    return stageOf(row) === "dispatched" && (isMine(row) || iApproved(row));
+  }
+
+  /* Dispatched and nothing came. Without this the only move on a dispatched
+     requisition is to confirm it, so a lost parcel leaves the row open for
+     ever with nobody able to say so. */
+  function canReportIssue(row) {
     return stageOf(row) === "dispatched" && isMine(row);
   }
 
@@ -948,29 +988,43 @@ window.AWARD_CONFIG = {
      nothing arrived. */
   var hoPending = null;          // { row, action } awaiting confirmation
 
+  function mayDo(row, action) {
+    if (action === "receive") return canConfirmReceipt(row);
+    if (action === "issue")   return canReportIssue(row);
+    return hoActions(row).indexOf(action) !== -1;
+  }
+
   function startHoAction(id, action) {
     var row = null;
     for (var i = 0; i < allRequisitions.length; i++) {
       if (String(allRequisitions[i].id) === String(id)) { row = allRequisitions[i]; break; }
     }
-    var allowed = action === "receive"
-      ? canConfirmReceipt(row)
-      : hoActions(row).indexOf(action) !== -1;
-    if (!row || !allowed) return;
+    if (!row || !mayDo(row, action)) return;
 
     hoPending = { row: row, action: action };
     returnFocusTo = document.activeElement;
 
     var p = placeOf(row);
-    el.hoHeading.textContent =
-      action === "acknowledge" ? "Acknowledge requisition" :
-      action === "dispatch"    ? "Mark as dispatched" :
-      action === "receive"     ? "Confirm it arrived" : "Reject requisition";
-    el.hoSub.textContent =
-      action === "reject"  ? "The requester is told this is the reason nothing is coming." :
-      action === "dispatch" ? "The requester is asked to confirm it arrives." :
-      action === "receive"  ? "Only you can say this - you are the one it was sent to."
-                            : "Recorded against your name, and not undone.";
+    var HEADINGS = {
+      acknowledge: "Acknowledge requisition",
+      dispatch:    "Mark as dispatched",
+      hold:        "Put on hold",
+      resume:      "Take off hold",
+      reject:      "Reject requisition",
+      receive:     "Confirm it arrived",
+      issue:       "Report that it never arrived"
+    };
+    var SUBS = {
+      acknowledge: "Recorded against your name, and not undone.",
+      dispatch:    "The requester is asked to confirm it arrives.",
+      hold:        "It stays on the list. Nobody is told no - say what is being waited for.",
+      resume:      "Back to the queue, ready to go out.",
+      reject:      "The requester is told this is the reason nothing is coming.",
+      receive:     "Only you can say this - you are the one it was sent to.",
+      issue:       "It goes back to Head Office with what you say here."
+    };
+    el.hoHeading.textContent = HEADINGS[action] || "Requisition";
+    el.hoSub.textContent = SUBS[action] || "";
 
     el.hoSummary.innerHTML =
       "<dl>" +
@@ -982,11 +1036,16 @@ window.AWARD_CONFIG = {
       "</dl>";
 
     el.hoRemark.value = "";
-    el.hoRemarkLabel.innerHTML = action === "reject"
-      ? 'Reason <span class="hint">required</span>'
-      : action === "receive"
-        ? 'Note <span class="hint">anything short or damaged?</span>'
-        : 'Note <span class="hint">optional</span>';
+    /* A reason is asked for wherever the answer is no, or not yet, or it
+       did not turn up - the three a requester is owed an explanation for. */
+    var NEEDS_REASON = { reject: 1, hold: 1, issue: 1 };
+    el.hoRemarkLabel.innerHTML =
+      action === "reject" ? 'Reason <span class="hint">required</span>' :
+      action === "hold"   ? 'What is being waited for <span class="hint">required</span>' :
+      action === "issue"  ? 'What happened <span class="hint">required</span>' :
+      action === "receive" ? 'Note <span class="hint">anything short or damaged?</span>'
+                           : 'Note <span class="hint">optional</span>';
+    el.hoRemark.dataset.needsReason = NEEDS_REASON[action] ? "1" : "";
     setFieldError(el.hoRemark, "ho-remark-error", "");
     el.hoConfirm.textContent = HO_LABELS[action];
     el.hoConfirm.className = "btn " + (action === "reject" ? "btn-danger" : "btn-primary");
@@ -1017,18 +1076,18 @@ window.AWARD_CONFIG = {
     var row = hoPending.row;
     var action = hoPending.action;
 
-    var stillAllowed = action === "receive"
-      ? canConfirmReceipt(row)
-      : hoActions(row).indexOf(action) !== -1;
-    if (!stillAllowed) {                           // it moved under them
+    if (!mayDo(row, action)) {                     // it moved under them
       setFieldError(el.hoRemark, "ho-remark-error",
         "This requisition is no longer at that stage.");
       return;
     }
 
     var remark = el.hoRemark.value.trim();
-    if (action === "reject" && !remark) {
-      setFieldError(el.hoRemark, "ho-remark-error", "Say why it is being rejected.");
+    if (el.hoRemark.dataset.needsReason === "1" && !remark) {
+      setFieldError(el.hoRemark, "ho-remark-error",
+        action === "reject" ? "Say why it is being rejected." :
+        action === "hold"   ? "Say what is being waited for." :
+                              "Say what happened.");
       el.hoRemark.focus();
       return;
     }
@@ -1036,34 +1095,66 @@ window.AWARD_CONFIG = {
 
     var me = (signedInUser() || {}).name || myEmail();
     var now = new Date().toISOString();
+    /* Each move writes only its own columns, so one step never overwrites
+       what another recorded - HO's note and the requester's stay apart,
+       because they are different people saying different things. */
     var patch = {};
     var from;
-
-    if (action === "acknowledge") {
+    var hoNote = function () {
       patch.ho_remark = remark || null;
       patch.ho_by_email = myEmail() || null;
+    };
+
+    if (action === "acknowledge") {
+      hoNote();
       patch.status = "acknowledged";
       patch.acknowledged_by = me;
       patch.acknowledged_at = now;
       from = "approved";
+
+    } else if (action === "hold") {
+      hoNote();
+      patch.status = "on_hold";
+      patch.held_by = me;
+      patch.held_at = now;
+      from = "acknowledged";
+
+    } else if (action === "resume") {
+      hoNote();
+      patch.status = "acknowledged";
+      // held_by and held_at stay: it was on hold, and the trail should say so.
+      from = "on_hold";
+
     } else if (action === "dispatch") {
-      patch.ho_remark = remark || null;
-      patch.ho_by_email = myEmail() || null;
+      hoNote();
       patch.status = "dispatched";
       patch.dispatched_by = me;
       patch.dispatched_at = now;
-      from = "acknowledged";
+      // Clears any earlier report of non-arrival; this is a fresh sending.
+      patch.issue_by = null;
+      patch.issue_at = null;
+      patch.issue_note = null;
+      from = stageOf(row);                 // dispatchable from acknowledged or on_hold
+
     } else if (action === "receive") {
-      // The requester's note, kept apart from HO's - they are different
-      // people saying different things about the same requisition.
       patch.receipt_note = remark || null;
       patch.status = "received";
       patch.received_by = me;
       patch.received_at = now;
       from = "dispatched";
+
+    } else if (action === "issue") {
+      // Back to Head Office, who are the only ones who can send it again.
+      patch.issue_note = remark || null;
+      patch.issue_by = me;
+      patch.issue_at = now;
+      patch.status = "acknowledged";
+      from = "dispatched";
+
     } else {
-      patch.ho_remark = remark || null;
-      patch.ho_by_email = myEmail() || null;
+      // reject: from wherever it stands, which is only ever a stage before
+      // it was sent - hoActions stops offering this once it has shipped.
+      hoNote();
       patch.status = "rejected";
       patch.rejected_by = me;
       patch.rejected_at = now;
@@ -1091,9 +1182,13 @@ window.AWARD_CONFIG = {
           return;
         }
         var whose = String(row.requester_name || "").trim();
-        var done = action === "acknowledge" ? "Acknowledged"
-                 : action === "dispatch"    ? "Dispatched"
-                 : action === "receive"     ? "Receipt confirmed" : "Rejected";
+        var DONE = {
+          acknowledge: "Acknowledged", dispatch: "Dispatched",
+          hold: "Put on hold", resume: "Back in the queue",
+          receive: "Receipt confirmed", issue: "Reported as not arrived",
+          reject: "Rejected"
+        };
+        var done = DONE[action] || "Updated";
         closeHo();
         showListBanner(done + (whose ? " — " + whose + "'s requisition." : "."));
         loadRequisitions();
@@ -1115,7 +1210,7 @@ window.AWARD_CONFIG = {
 
     if (!hasAdmins) {
       el.adminList.innerHTML =
-        '<p class="aw-empty-line">Run <code>sql/2026-10-16-award-fulfilment.sql</code> ' +
+        '<p class="aw-empty-line">Run <code>sql/2026-10-16-award-hold-and-issues.sql</code> ' +
         "to set this up.</p>";
       return;
     }
@@ -1997,7 +2092,7 @@ window.AWARD_CONFIG = {
      own: most are short, and a column of mostly-empty cells reads worse. */
   /* The stage it has reached, and under it the steps that got it there, so
      the whole journey is on the row rather than hidden behind a tooltip. */
-  function statusCellHtml(row) {
+  function statusCellHtml(row, forHo) {
     var key = stageOf(row);
     var stage = STAGES[key];
 
@@ -2010,10 +2105,11 @@ window.AWARD_CONFIG = {
              "</span>";
     }).join("");
 
-    var remark = row.receipt_note || row.ho_remark || row.decision_remark || "";
+    var remark = row.issue_note || row.receipt_note || row.ho_remark ||
+                 row.decision_remark || "";
 
     return '<span class="chip-status is-' + escapeHtml(stage.tone) + '">' +
-             escapeHtml(stage.label) + "</span>" +
+             escapeHtml(stageLabel(row, forHo)) + "</span>" +
            '<span class="cell-trail">' + trail + "</span>" +
            (remark ? '<span class="cell-remark" title="' + escapeHtml(remark) + '">' +
                      escapeHtml(remark) + "</span>" : "");
@@ -2022,8 +2118,11 @@ window.AWARD_CONFIG = {
   var HO_LABELS = {
     acknowledge: "Acknowledge",
     dispatch:    "Mark dispatched",
+    hold:        "Put on hold",
+    resume:      "Take off hold",
     reject:      "Reject",
-    receive:     "Confirm received"
+    receive:     "Confirm received",
+    issue:       "Never arrived"
   };
 
   function actionCellHtml(row) {
@@ -2035,9 +2134,15 @@ window.AWARD_CONFIG = {
     }
 
     if (canConfirmReceipt(row)) {
-      return '<button type="button" class="btn btn-ghost btn-xs" ' +
-               'data-aw-ho="receive" data-aw-row="' + escapeHtml(row.id) + '">' +
-               HO_LABELS.receive + "</button>";
+      var mine = '<button type="button" class="btn btn-ghost btn-xs" ' +
+                   'data-aw-ho="receive" data-aw-row="' + escapeHtml(row.id) + '">' +
+                   HO_LABELS.receive + "</button>";
+      if (canReportIssue(row)) {
+        mine += ' <button type="button" class="btn btn-ghost btn-xs is-danger" ' +
+                  'data-aw-ho="issue" data-aw-row="' + escapeHtml(row.id) + '">' +
+                  HO_LABELS.issue + "</button>";
+      }
+      return mine;
     }
 
     return hoActions(row).map(function (act) {
@@ -2053,20 +2158,25 @@ window.AWARD_CONFIG = {
   function renderDelivery() {
     if (!el.deliveryBody) return;
 
+    /* Everything that has reached HO, open ones first. A dispatched
+       requisition stays here rather than vanishing: HO needs to see it turn
+       into Delivered when the requester confirms, which is the whole point
+       of them confirming. The settled ones sit underneath as the record. */
+    var ORDER = { approved: 0, on_hold: 1, acknowledged: 2, dispatched: 3,
+                  received: 4, rejected: 5 };
     var rows = allRequisitions.filter(function (r) {
-      var k = stageOf(r);
-      // HO's work ends when it leaves the building; what happens next is the
-      // requester's to confirm, and a dispatched row sitting in this queue
-      // would look like something still to do.
-      return k === "approved" || k === "acknowledged";
+      return ORDER[stageOf(r)] !== undefined;
+    }).sort(function (a, b) {
+      var d = ORDER[stageOf(a)] - ORDER[stageOf(b)];
+      return d !== 0 ? d : String(b.created_at).localeCompare(String(a.created_at));
     });
 
     if (!rows.length) {
       el.deliveryBody.innerHTML =
         '<tr class="placeholder-row"><td colspan="8">' +
         (hasAdmins
-          ? "Nothing waiting. Approved requisitions appear here."
-          : "Run sql/2026-10-16-award-fulfilment.sql to set this up.") +
+          ? "Nothing yet. Requisitions appear here once they are approved."
+          : "Run sql/2026-10-16-award-hold-and-issues.sql to set this up.") +
         "</td></tr>";
       return;
     }
@@ -2082,7 +2192,7 @@ window.AWARD_CONFIG = {
         "<td>" + escapeHtml(row.requester_name || "—") + "</td>" +
         "<td>" + awardsCellHtml(awards) + "</td>" +
         '<td class="num">' + escapeHtml(Number(row.quantity).toLocaleString()) + "</td>" +
-        "<td>" + statusCellHtml(row) + "</td>" +
+        "<td>" + statusCellHtml(row, true) + "</td>" +
         '<td class="cell-action">' + actionCellHtml(row) + "</td>" +
       "</tr>";
     }).join("");

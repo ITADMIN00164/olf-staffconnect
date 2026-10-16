@@ -1044,3 +1044,7 @@
   .award-page .admin-add-row { grid-template-columns: 1fr; }
   .award-page .admin-add-row .btn { margin-top: 0; }
 }
+
+/* On hold is waiting, not refusing - amber rather than red, and visibly not
+   the same thing as rejected. */
+.award-page .chip-status.is-held { background: #FFF7E6; color: #92610E; border-color: #F0DCB4; }
