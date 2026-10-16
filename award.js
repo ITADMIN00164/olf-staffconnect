@@ -168,10 +168,12 @@ window.AWARD_CONFIG = {
   /* The approver's part, which the review dialog and the Status cell read. */
   function statusOf(row) {
     var d = stageOf(row);
-    if (d === "declined" || d === "approved" || d === "acknowledged" ||
-        d === "dispatched" || d === "received" || d === "rejected") {
-      // Anything past submitted has been through an approver, except the
-      // older rows that predate approvals - they have nobody recorded.
+    /* Anything that is not still submitted has been past an approver, so it
+       is listed by what it is not rather than by naming the stages: naming
+       them meant on_hold was missed when it was added, and a requisition
+       already in Head Office's hands showed a Review button to an approver
+       who had long since approved it. */
+    if (d !== "submitted") {
       return { decision: d === "declined" ? "declined" : "approved",
                by: row.decided_by, byRole: row.decided_by_role,
                remark: row.decision_remark, at: row.decided_at };
@@ -886,7 +888,7 @@ window.AWARD_CONFIG = {
         if (res.error) {
           setReviewStatus(/decided_|decision_remark|status/i.test(res.error.message || "")
             ? "Approvals are not set up in the database yet - run " +
-              "sql/2026-10-15-award-approvals.sql."
+              "sql/award-management-setup.sql."
             : "Could not save: " + res.error.message, "bad");
           reportError("save decision", res.error);
           return;
@@ -1210,7 +1212,7 @@ window.AWARD_CONFIG = {
 
     if (!hasAdmins) {
       el.adminList.innerHTML =
-        '<p class="aw-empty-line">Run <code>sql/2026-10-16-award-hold-and-issues.sql</code> ' +
+        '<p class="aw-empty-line">Run <code>sql/award-management-setup.sql</code> ' +
         "to set this up.</p>";
       return;
     }
@@ -1798,7 +1800,7 @@ window.AWARD_CONFIG = {
             .test(res.error.message || "");
           setFormStatus(missing
             ? "This database has not been updated for divisions yet. Run " +
-              "sql/2026-10-15-award-store-geography-as-text.sql in the " +
+              "sql/award-management-setup.sql in the " +
               "Supabase SQL editor, then try again."
             : "Could not save: " + res.error.message, "bad");
           reportError("save requisition", res.error);
@@ -1851,9 +1853,9 @@ window.AWARD_CONFIG = {
      lookup tables, whichever order the steps happen in:
 
        state_name and the rest arrive with
-         sql/2026-10-15-award-store-geography-as-text.sql
+         sql/award-management-setup.sql
        states and districts go with
-         sql/2026-10-15-award-drop-lookup-tables.sql
+         sql/award-management-setup.sql
 
      Asking for either when it is not there fails the whole query, so each is
      tried once and switched off if the database says no. The two tests cannot
@@ -1911,7 +1913,7 @@ window.AWARD_CONFIG = {
             hasApproval = false;      // the approvals migration is not run yet
             showSetupBanner(
               "Approvals need one more migration - run " +
-              "<code>sql/2026-10-15-award-approvals.sql</code> in the Supabase " +
+              "<code>sql/award-management-setup.sql</code> in the Supabase " +
               "SQL Editor. Until then every requisition shows as pending.",
               "Approvals are not set up yet."
             );
@@ -2011,10 +2013,10 @@ window.AWARD_CONFIG = {
       if (districtFilter && p.district !== districtFilter) return false;
       if (typeFilter && awardsOf(row).every(function (a) { return a.name !== typeFilter; })) return false;
       if (search && String(row.requester_name || "").toLowerCase().indexOf(search) === -1) return false;
-      if (statusFilter) {
-        var d = statusOf(row).decision || "pending";
-        if (d !== statusFilter) return false;
-      }
+      // Filtered on the stage itself. Going through statusOf collapsed
+      // every stage after approval into "approved", so choosing Dispatched
+      // or Received could not tell them apart.
+      if (statusFilter && stageOf(row) !== statusFilter) return false;
       return true;
     });
 
@@ -2162,7 +2164,10 @@ window.AWARD_CONFIG = {
        requisition stays here rather than vanishing: HO needs to see it turn
        into Delivered when the requester confirms, which is the whole point
        of them confirming. The settled ones sit underneath as the record. */
-    var ORDER = { approved: 0, on_hold: 1, acknowledged: 2, dispatched: 3,
+    /* Ordered by what Head Office has to do next: waiting to be picked up,
+       then ready to send, then blocked, then sent and waiting on somebody
+       else, then finished. */
+    var ORDER = { approved: 0, acknowledged: 1, on_hold: 2, dispatched: 3,
                   received: 4, rejected: 5 };
     var rows = allRequisitions.filter(function (r) {
       return ORDER[stageOf(r)] !== undefined;
@@ -2176,7 +2181,7 @@ window.AWARD_CONFIG = {
         '<tr class="placeholder-row"><td colspan="8">' +
         (hasAdmins
           ? "Nothing yet. Requisitions appear here once they are approved."
-          : "Run sql/2026-10-16-award-hold-and-issues.sql to set this up.") +
+          : "Run sql/award-management-setup.sql to set this up.") +
         "</td></tr>";
       return;
     }
@@ -2227,7 +2232,7 @@ window.AWARD_CONFIG = {
           // usual culprit, since neither shows up until you write.
           ? "This page does not read those tables. Something in the database " +
             "still refers to them — run " +
-            "<code>sql/2026-10-15-award-check-leftover-references.sql</code> " +
+            "<code>sql/award-management-setup.sql</code> " +
             "in the Supabase SQL Editor to find what."
           : refused
             ? "The database refused it. Nothing was saved, and nothing is " +
