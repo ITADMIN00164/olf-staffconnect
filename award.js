@@ -1472,6 +1472,18 @@ window.AWARD_CONFIG = {
       el.stockModal.querySelectorAll("[data-aw-close-stock]"),
       function (n) { n.addEventListener("click", closeStockModal); }
     );
+    // A complaint about a figure should not outlive the figure. Without
+    // this the message sits there contradicting what is now on screen.
+    el.stockLines.addEventListener("input", function () {
+      setFieldError(null, "stock-qty-error", "");
+    });
+    el.hoLines.addEventListener("input", function () {
+      setFieldError(null, "ho-lines-error", "");
+    });
+    el.awardLines.addEventListener("input", function () {
+      setFieldError(null, "award-type-error", "");
+    });
+
     el.stockFState.addEventListener("change", stockDivisionsFor);
     el.stockFDivision.addEventListener("change", stockDistrictsFor);
 
@@ -2608,6 +2620,10 @@ window.AWARD_CONFIG = {
       var y = fyStartOf(r.created_at); if (y) years[y] = true;
     });
     stockMovements.forEach(function (m) {
+      /* Opening figures are dated the March before the year they open, so
+         counting them here would offer a year that holds nothing but a
+         number with no column to explain it. */
+      if (m.kind === "opening") return;
       var y = fyStartOf(m.occurred_on); if (y) years[y] = true;
     });
     return Object.keys(years).map(Number).sort(function (a, b) { return b - a; });
@@ -2805,8 +2821,12 @@ window.AWARD_CONFIG = {
     // nobody is looking at.
     var fy = Number(el.stockYear.value) || fyStartOf(new Date());
     if (opening) {
+      /* March of the year the year begins in - the same date the import
+         writes. The unique index that stops a district being given two
+         opening figures includes the date, so a different one here would
+         slip past it and the stock would be counted twice. */
       el.stockFMonth.innerHTML =
-        '<option value="' + (fy - 1) + '-03">Before ' + escapeHtml(fyLabel(fy)) + '</option>';
+        '<option value="' + fy + '-03">Before ' + escapeHtml(fyLabel(fy)) + '</option>';
     } else {
       el.stockFMonth.innerHTML = fyMonthKeys(fy).map(function (k) {
         return '<option value="' + k + '">' + escapeHtml(monthLabelOf(k)) + '</option>';
@@ -2872,6 +2892,36 @@ window.AWARD_CONFIG = {
 
   /* What a district holds at the end of a month, which is what a utilisation
      has to fit inside. */
+  /* What the months after this one would look like if these were recorded.
+     Checking only the month being edited is not enough: utilisation entered
+     against March, after April and May have already been accounted for, can
+     leave those months holding less than nothing - and the figure that goes
+     wrong is not the one being typed. */
+  function wouldGoNegative(district, monthKey, additions) {
+    var fy = fyStartOf(monthKey + "-01");
+    var pretend = stockMovements.concat(additions.map(function (a) {
+      return { kind: "utilised", district_name: district,
+               award_type_id: a.award_type_id, quantity: a.quantity,
+               occurred_on: a.occurred_on };
+    }));
+
+    var rows = stockRows(fy, allRequisitions, pretend,
+                         [{ state: "", division: "", district: district, pm: "" }]);
+
+    for (var i = 0; i < rows.length; i++) {
+      if (!rows[i].monthKey || rows[i].monthKey < monthKey) continue;
+      var balance = rows[i].balance;
+      var ids = Object.keys(balance);
+      for (var j = 0; j < ids.length; j++) {
+        if (balance[ids[j]] < 0) {
+          return { month: rows[i].monthKey, award_type_id: Number(ids[j]),
+                   short: -balance[ids[j]] };
+        }
+      }
+    }
+    return null;
+  }
+
   function balanceAt(district, monthKey) {
     var fy = fyStartOf(monthKey + "-01");
     var rows = stockRows(fy, allRequisitions, stockMovements,
@@ -2925,19 +2975,20 @@ window.AWARD_CONFIG = {
     /* Nothing can be given out that was never held. A negative balance is a
        mistake being written down rather than caught. */
     if (stockKind === "utilised") {
-      var holding = balanceAt(district, month);
-      var over = null;
-      rows.forEach(function (r) {
-        if (!over && (holding[r.award_type_id] || 0) < r.quantity) over = r;
-      });
-      if (over) {
+      var trouble = wouldGoNegative(district, month, rows);
+      if (trouble) {
         var type = awardTypes.filter(function (a) {
-          return Number(a.id) === over.award_type_id;
+          return Number(a.id) === trouble.award_type_id;
         })[0] || {};
+        var here = trouble.month === month;
         setFieldError(null, "stock-qty-error",
-          district + " was holding " + (holding[over.award_type_id] || 0) + " " +
-          (type.name || "of that award") + " in " + monthLabelOf(month) + ", so " +
-          over.quantity + " cannot have gone out.");
+          here
+            ? district + " was not holding that many " + (type.name || "of that award") +
+              " in " + monthLabelOf(month) + " - it is short by " + trouble.short + "."
+            : "That would leave " + district + " holding " + trouble.short + " fewer " +
+              (type.name || "of that award") + " than nothing by " +
+              monthLabelOf(trouble.month) + ". Something later has already been " +
+              "recorded against this stock.");
         return;
       }
     }
