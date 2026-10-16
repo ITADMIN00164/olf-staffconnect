@@ -340,7 +340,15 @@ window.AWARD_CONFIG = {
     return String((window.__olfUser || {}).role || "").toLowerCase() === "admin";
   }
 
-  function canManageAdmins() { return isHoAdmin() || isAppAdmin(); }
+  /* Settings is for Staff Connect Admins alone. Head Office fulfils
+     requisitions; appointing who does that is a different job, and letting
+     them hold both meant somebody could add a colleague, or remove
+     themselves, with nobody above them involved.
+
+     It also ends the lock-out worry the other way round: Admins exist
+     independently of this list, so emptying the list can never shut the
+     door on the room the key is kept in. */
+  function canManageAdmins() { return isAppAdmin(); }
 
   /* What HO may do to a requisition at its current stage. Nothing before it
      has been approved - an unapproved requisition is not HO's business
@@ -927,6 +935,8 @@ window.AWARD_CONFIG = {
      is shown to people they mean nothing to. Hidden rather than disabled: a
      tab you may never open is clutter, not information. */
   function applyAccess() {
+    // Delivery is the work; Settings is deciding who does the work. Held by
+    // different people on purpose.
     var show = { requisition: true, delivery: isHoAdmin(), settings: canManageAdmins() };
 
     Array.prototype.forEach.call(el.subtabs, function (tab) {
@@ -1204,9 +1214,8 @@ window.AWARD_CONFIG = {
 
   /* ------------------------------------------------------------ Settings
 
-     Who fulfils requisitions. Open to the people on the list and to Staff
-     Connect Admins - without the second, removing the last name would lock
-     the door from the inside. */
+     Who fulfils requisitions. Staff Connect Admins only - the people on the
+     list do the fulfilling, not the appointing. */
   function renderAdmins() {
     if (!el.adminList) return;
 
