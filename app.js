@@ -1125,6 +1125,12 @@ window.olfGeography = async function () {
     // state -> division -> Set(district)
     const tree = new Map();
 
+    /* Who manages each division, for the stock sheet's PM column. A
+       Programme Manager covers one division, so the division is the link -
+       the sheet lists a PM beside every district, and that is the PM of the
+       division the district sits in. */
+    const pmOfDivision = new Map();
+
     snapshot.forEach(d => {
         const r = d.data();
         if (!isActiveEmployee(r)) return;
@@ -1132,6 +1138,14 @@ window.olfGeography = async function () {
         const states    = splitMulti(r["State"]);
         const divisions = splitMulti(r["Division"]);
         const districts = splitMulti(r["District"]).map(tidyDistrict);
+
+        const isPM = /^program implementation\s*[-–]?\s*pm$/
+            .test(String(r["Dept"] || "").trim().toLowerCase().replace(/\s+/g, " "));
+        if (isPM) {
+            for (const dv of divisions) {
+                if (!pmOfDivision.has(dv)) pmOfDivision.set(dv, String(r.Name || "").trim());
+            }
+        }
 
         for (const st of states) {
             if (!tree.has(st)) tree.set(st, new Map());
@@ -1150,6 +1164,7 @@ window.olfGeography = async function () {
             if (!districts.size) continue;
             divisions.push({
                 name: division,
+                pm: pmOfDivision.get(division) || "",
                 districts: [...districts].sort((a, b) => a.localeCompare(b))
             });
         }

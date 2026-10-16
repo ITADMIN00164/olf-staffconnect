@@ -1059,3 +1059,79 @@
   font-weight: 600;
   color: var(--text-soft);
 }
+
+/* ======================================================================
+   Stock
+   ====================================================================== */
+
+.award-page .stock-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 14px;
+}
+.award-page .stock-controls .field-sm { min-width: 150px; }
+.award-page .stock-actions { margin-left: auto; display: flex; gap: 8px; }
+
+/* The sheet is wide by nature - four groups of five columns. It scrolls
+   sideways, and the first columns stay put so a row never loses its
+   district. */
+.award-page #stock-table { border-collapse: separate; border-spacing: 0; min-width: 100%; }
+
+.award-page #stock-table th,
+.award-page #stock-table td {
+  padding: 7px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}
+
+.award-page #stock-table thead th {
+  background: var(--accent);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+/* The four groups are told apart by shade rather than by rule, so the eye
+   can follow a column down without counting. */
+.award-page #stock-table thead th.grp-0 { background: #6E4710; }
+.award-page #stock-table thead th.grp-1 { background: #8A5A14; }
+.award-page #stock-table thead th.grp-2 { background: #A06A18; }
+.award-page #stock-table thead th.grp-3 { background: #0D6B5E; }
+
+.award-page #stock-table td.num { text-align: right; font-family: var(--font-mono); }
+.award-page #stock-table td.is-nil { color: var(--text-muted); }
+.award-page #stock-table td.is-total { font-weight: 700; background: rgba(0,0,0,.02); }
+.award-page #stock-table td.is-strong { color: var(--accent-ink); }
+.award-page #stock-table td.is-district { font-weight: 600; }
+.award-page #stock-table td.muted { color: var(--text-muted); }
+
+/* The carry-forward row opens each district, so it reads as a heading for
+   the block of months under it. */
+.award-page #stock-table tr.is-carry td {
+  background: var(--accent-soft);
+  font-weight: 600;
+  border-top: 2px solid var(--accent-soft-border);
+}
+
+.award-page #stock-table tbody tr:hover td { background: #FFFDF7; }
+.award-page #stock-table tbody tr.is-carry:hover td { background: var(--accent-soft); }
+
+/* one row per award type in the recording dialog */
+.award-page .stock-line {
+  display: grid;
+  grid-template-columns: 1fr 120px;
+  gap: 10px;
+  align-items: center;
+  padding: 4px 0;
+}
+.award-page .stock-line label { font-size: 13px; color: var(--text); }

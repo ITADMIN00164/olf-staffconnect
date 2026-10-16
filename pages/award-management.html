@@ -52,6 +52,11 @@
                 aria-selected="true">
           Requisition
         </button>
+        <button type="button" role="tab" id="aw-subtab-stock" class="aw-subtab"
+                data-aw-subtab="stock" aria-controls="aw-subpanel-stock"
+                aria-selected="false" tabindex="-1">
+          Stock
+        </button>
         <button type="button" role="tab" id="aw-subtab-delivery" class="aw-subtab"
                 data-aw-subtab="delivery" aria-controls="aw-subpanel-delivery"
                 aria-selected="false" tabindex="-1" hidden>
@@ -140,6 +145,48 @@
           </tfoot>
         </table>
       </div>        </section>
+      </div>
+
+      <div id="aw-subpanel-stock" class="aw-subpanel" role="tabpanel"
+           aria-labelledby="aw-subtab-stock" hidden>
+        <section class="card">
+          <div class="aw-panel-head">
+            <h3>Stock</h3>
+            <p>What each district is holding. Opening, what arrived, what was
+               given out, and what carries into the next month. Nothing here is
+               typed twice - the balance is added up from what happened.</p>
+          </div>
+
+          <div class="stock-controls">
+            <div class="field field-sm">
+              <label for="stock-year">Year</label>
+              <select id="stock-year"></select>
+            </div>
+            <div class="field field-sm">
+              <label for="stock-state">State</label>
+              <select id="stock-state"><option value="">All states</option></select>
+            </div>
+            <div class="field field-sm">
+              <label for="stock-division">Division</label>
+              <select id="stock-division"><option value="">All divisions</option></select>
+            </div>
+            <div class="field field-sm">
+              <label for="stock-district">District</label>
+              <select id="stock-district"><option value="">All districts</option></select>
+            </div>
+            <div class="stock-actions">
+              <button type="button" id="stock-use" class="btn btn-primary btn-sm">
+                <i class="aw-icon" data-aw-icon="plus" aria-hidden="true"></i>
+                Record utilisation
+              </button>
+              <button type="button" id="stock-open" class="btn btn-ghost btn-sm" hidden>
+                Opening stock
+              </button>
+            </div>
+          </div>
+
+          <div class="table-scroll" id="stock-table-wrap"></div>
+        </section>
       </div>
 
       <div id="aw-subpanel-delivery" class="aw-subpanel" role="tabpanel"
@@ -361,6 +408,65 @@
           <div class="form-actions">
             <button type="button" class="btn btn-ghost" data-aw-close-ho>Cancel</button>
             <button type="button" id="ho-confirm" class="btn btn-primary">Acknowledge</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recording what went out, or what a district started the year with.
+         One dialog: the two differ only in which month they land in and what
+         the number means, so two would be the same form twice. -->
+    <div class="aw-overlay" id="stock-modal">
+      <div class="aw-overlay-backdrop" data-aw-close-stock></div>
+      <div class="aw-box" role="dialog" aria-modal="true" aria-labelledby="stock-heading">
+        <div class="aw-box-head">
+          <div class="aw-box-heading">
+            <h2 id="stock-heading">Record utilisation</h2>
+            <p class="aw-box-sub" id="stock-sub"></p>
+          </div>
+          <button type="button" class="aw-box-close" data-aw-close-stock aria-label="Close">
+            <i class="aw-icon" data-aw-icon="close" aria-hidden="true"></i>
+          </button>
+        </div>
+
+        <div class="aw-box-body">
+          <div id="stock-banner" class="banner" role="status" aria-live="polite" hidden>
+            <span id="stock-banner-text"></span>
+          </div>
+
+          <div class="grid">
+            <div class="field">
+              <label for="stock-f-state">State <span class="req" aria-hidden="true">*</span></label>
+              <select id="stock-f-state"></select>
+            </div>
+            <div class="field">
+              <label for="stock-f-division">Division <span class="req" aria-hidden="true">*</span></label>
+              <select id="stock-f-division" disabled></select>
+            </div>
+            <div class="field">
+              <label for="stock-f-district">District <span class="req" aria-hidden="true">*</span></label>
+              <select id="stock-f-district" disabled></select>
+            </div>
+            <div class="field">
+              <label for="stock-f-month">Month <span class="req" aria-hidden="true">*</span></label>
+              <select id="stock-f-month"></select>
+            </div>
+          </div>
+
+          <div class="field field-wide">
+            <label id="stock-f-label">How many were given out</label>
+            <div class="award-lines" id="stock-lines"></div>
+            <p class="error" id="stock-qty-error" role="alert"></p>
+          </div>
+
+          <div class="field">
+            <label for="stock-note">Note <span class="hint">optional</span></label>
+            <input type="text" id="stock-note" placeholder="Anything worth recording" />
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="btn btn-ghost" data-aw-close-stock>Cancel</button>
+            <button type="button" id="stock-save" class="btn btn-primary">Record</button>
           </div>
         </div>
       </div>

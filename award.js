@@ -81,6 +81,23 @@ window.AWARD_CONFIG = {
     hoRemarkLabel: document.getElementById("ho-remark-label"),
     hoConfirm: document.getElementById("ho-confirm"),
     deliveryBody: document.getElementById("delivery-body"),
+    stockYear: document.getElementById("stock-year"),
+    stockState: document.getElementById("stock-state"),
+    stockDivision: document.getElementById("stock-division"),
+    stockDistrict: document.getElementById("stock-district"),
+    stockUse: document.getElementById("stock-use"),
+    stockOpen: document.getElementById("stock-open"),
+    stockModal: document.getElementById("stock-modal"),
+    stockHeading: document.getElementById("stock-heading"),
+    stockSub: document.getElementById("stock-sub"),
+    stockFState: document.getElementById("stock-f-state"),
+    stockFDivision: document.getElementById("stock-f-division"),
+    stockFDistrict: document.getElementById("stock-f-district"),
+    stockFMonth: document.getElementById("stock-f-month"),
+    stockFLabel: document.getElementById("stock-f-label"),
+    stockLines: document.getElementById("stock-lines"),
+    stockNote: document.getElementById("stock-note"),
+    stockSave: document.getElementById("stock-save"),
     adminList: document.getElementById("admin-list"),
     adminEmail: document.getElementById("admin-email"),
     adminName: document.getElementById("admin-name"),
@@ -683,6 +700,7 @@ window.AWARD_CONFIG = {
 
     wireEvents();
     loadAdmins(function () { applyAccess(); renderTable(); });
+    loadStock(function () { refreshStockControls(); renderStock(); });
     loadGeography();
     loadAwardTypes();
     loadRequisitions();
@@ -964,7 +982,8 @@ window.AWARD_CONFIG = {
   function applyAccess() {
     // Delivery is the work; Settings is deciding who does the work. Held by
     // different people on purpose.
-    var show = { requisition: true, delivery: isHoAdmin(), settings: canManageAdmins() };
+    var show = { requisition: true, stock: true,
+                 delivery: isHoAdmin(), settings: canManageAdmins() };
 
     Array.prototype.forEach.call(el.subtabs, function (tab) {
       var key = tab.getAttribute("data-aw-subtab");
@@ -981,6 +1000,8 @@ window.AWARD_CONFIG = {
     if (!active) showTab(el.subtabs, "data-aw-subtab", "requisition");
 
     renderAdmins();
+    refreshStockControls();
+    renderStock();
   }
 
   function applyStanding() {
@@ -1379,6 +1400,23 @@ window.AWARD_CONFIG = {
       function (node) { node.addEventListener("click", closeHo); }
     );
     el.hoConfirm.addEventListener("click", confirmHoAction);
+
+    el.stockUse.addEventListener("click", function () { openStockModal("utilised"); });
+    el.stockOpen.addEventListener("click", function () { openStockModal("opening"); });
+    el.stockSave.addEventListener("click", saveStock);
+    Array.prototype.forEach.call(
+      el.stockModal.querySelectorAll("[data-aw-close-stock]"),
+      function (n) { n.addEventListener("click", closeStockModal); }
+    );
+    el.stockFState.addEventListener("change", stockDivisionsFor);
+    el.stockFDivision.addEventListener("change", stockDistrictsFor);
+
+    [el.stockYear, el.stockState, el.stockDivision, el.stockDistrict].forEach(function (sel) {
+      sel.addEventListener("change", function () {
+        if (sel === el.stockState || sel === el.stockDivision) stockFiltersFor(sel);
+        renderStock();
+      });
+    });
 
     el.adminAdd.addEventListener("click", addAdmin);
     el.adminEmail.addEventListener("keydown", function (e) {
@@ -1969,9 +2007,11 @@ window.AWARD_CONFIG = {
         allRequisitions = res.data || [];
         buildFilterOptions();
         renderTable();
-        // Its own table, and renderTable returns early when the list is
-        // empty - which is exactly when the queue needs its empty state.
+        // Their own tables, and renderTable returns early when the list is
+        // empty - which is exactly when they need their empty states.
         renderDelivery();
+        refreshStockControls();
+        renderStock();
       })
       .catch(function (err) {
         el.refreshBtn.disabled = false;
@@ -2239,6 +2279,606 @@ window.AWARD_CONFIG = {
         '<td class="cell-action">' + actionCellHtml(row) + "</td>" +
       "</tr>";
     }).join("");
+  }
+
+  /* ==================================================================
+     Stock
+
+       balance = opening + delivered - utilised (+/- corrections)
+
+     carried month to month, per district, per award type. Nothing stores
+     the balance; it is added up from what happened each time it is shown.
+     A stored balance is a second copy of the truth, and the spreadsheet
+     this replaces shows the cost - one carry-forward row lost 62 units
+     between its delivery column and its balance, and the sheet it fed is
+     #REF! throughout.
+
+     A district gains stock when it confirms the award arrived - not when it
+     was asked for, and not when Head Office sent it. It holds stock when it
+     has it.
+     ================================================================== */
+
+  // The year runs April to March, so anything before April belongs to the
+  // year that started the previous April.
+  function fyStartOf(date) {
+    var d = date instanceof Date ? date : new Date(date);
+    if (isNaN(d.getTime())) return null;
+    return d.getMonth() + 1 >= 4 ? d.getFullYear() : d.getFullYear() - 1;
+  }
+
+  function fyLabel(fyStart) {
+    return fyStart + "-" + String((fyStart + 1) % 100).padStart(2, "0");
+  }
+
+  function monthKeyOf(value) {
+    var d = value instanceof Date ? value : new Date(value);
+    if (isNaN(d.getTime())) return "";
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+  }
+
+  var MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+  function monthLabelOf(key) {
+    var parts = String(key).split("-");
+    var m = Number(parts[1]);
+    if (!m) return key;
+    return MONTH_NAMES[m - 1] + "'" + String(Number(parts[0]) % 100).padStart(2, "0");
+  }
+
+  // April through March, in order.
+  function fyMonthKeys(fyStart) {
+    var keys = [];
+    for (var i = 0; i < 12; i++) {
+      var m = 4 + i;
+      var year = fyStart + (m > 12 ? 1 : 0);
+      var month = m > 12 ? m - 12 : m;
+      keys.push(year + "-" + String(month).padStart(2, "0"));
+    }
+    return keys;
+  }
+
+  function fyStartsBefore(key, fyStart) {
+    return key !== "" && key < (fyStart + "-04");
+  }
+
+  /* The awards on a requisition, as a map of award type to quantity. What
+     Head Office dispatched where that was recorded, and what was asked for
+     where it was not - the older rows predate the distinction. */
+  function quantitiesOf(row, which) {
+    var list = (which === "dispatched" && row.dispatched_items && row.dispatched_items.length)
+      ? row.dispatched_items
+      : row.items;
+
+    var out = {};
+    if (list && list.length) {
+      list.forEach(function (it) {
+        var id = Number(it.award_type_id);
+        if (id) out[id] = (out[id] || 0) + (Number(it.quantity) || 0);
+      });
+    } else if (row.award_type_id) {
+      out[Number(row.award_type_id)] = Number(row.quantity) || 0;
+    }
+    return out;
+  }
+
+  function addInto(target, source) {
+    Object.keys(source).forEach(function (id) {
+      target[id] = (target[id] || 0) + source[id];
+    });
+  }
+
+  /* Every movement of stock, flattened to one shape so the running total
+     does not have to care where each came from. */
+  function stockEvents(requisitions, movements) {
+    var events = [];
+
+    (requisitions || []).forEach(function (row) {
+      var district = String(row.district_name || "").trim();
+      if (!district) return;
+
+      // what was asked for, which does not move stock but is reported
+      var raised = monthKeyOf(row.created_at);
+      if (raised) {
+        events.push({ district: district, month: raised, column: "requisition",
+                      quantities: quantitiesOf(row, "items") });
+      }
+
+      // what arrived, which does
+      if (stageOf(row) === "received" && row.received_at) {
+        events.push({ district: district, month: monthKeyOf(row.received_at),
+                      column: "delivery", sign: 1,
+                      quantities: quantitiesOf(row, "dispatched") });
+      }
+    });
+
+    (movements || []).forEach(function (m) {
+      var district = String(m.district_name || "").trim();
+      if (!district) return;
+      var q = {};
+      q[Number(m.award_type_id)] = Number(m.quantity) || 0;
+
+      events.push({
+        district: district,
+        month: monthKeyOf(m.occurred_on),
+        column: m.kind === "utilised" ? "utilisation" : "other",
+        sign: m.kind === "utilised" ? -1 : 1,
+        quantities: q
+      });
+    });
+
+    return events;
+  }
+
+  /* One block of rows per district: what it was holding when the year
+     started, then every month of that year whether or not anything moved -
+     a month with no activity still has to show the stock sitting there. */
+  function stockRows(fyStart, requisitions, movements, places) {
+    var events = stockEvents(requisitions, movements);
+    var months = fyMonthKeys(fyStart);
+    var rows = [];
+
+    places.forEach(function (place) {
+      var mine = events.filter(function (e) { return e.district === place.district; });
+
+      // Everything before April is one number: the carry forward. It is
+      // computed rather than typed, so a year's opening needs entering only
+      // once ever - the first year - and every year after follows from what
+      // actually happened.
+      var balance = {};
+      mine.forEach(function (e) {
+        if (e.sign && fyStartsBefore(e.month, fyStart)) {
+          var signed = {};
+          Object.keys(e.quantities).forEach(function (id) {
+            signed[id] = e.quantities[id] * e.sign;
+          });
+          addInto(balance, signed);
+        }
+      });
+
+      rows.push(Object.assign({}, place, {
+        month: "Carry forward", monthKey: "", items: "Inventory",
+        requisition: {}, delivery: {}, utilisation: {},
+        balance: Object.assign({}, balance)
+      }));
+
+      months.forEach(function (key) {
+        var cell = { requisition: {}, delivery: {}, utilisation: {}, other: {} };
+        mine.forEach(function (e) {
+          if (e.month === key) addInto(cell[e.column], e.quantities);
+        });
+
+        addInto(balance, cell.delivery);
+        addInto(balance, cell.other);
+        Object.keys(cell.utilisation).forEach(function (id) {
+          balance[id] = (balance[id] || 0) - cell.utilisation[id];
+        });
+
+        rows.push(Object.assign({}, place, {
+          month: monthLabelOf(key), monthKey: key, items: "No. of Teachers",
+          requisition: cell.requisition,
+          delivery: cell.delivery,
+          utilisation: cell.utilisation,
+          balance: Object.assign({}, balance)
+        }));
+      });
+    });
+
+    return rows;
+  }
+
+  /* Every district the directory knows, with the manager of its division -
+     the sheet lists a PM beside each district, and that is the PM of the
+     division it sits in. */
+  function stockPlaces() {
+    var out = [];
+    geography.forEach(function (st) {
+      st.divisions.forEach(function (dv) {
+        dv.districts.forEach(function (d) {
+          out.push({ state: st.name, division: dv.name, district: d, pm: dv.pm || "" });
+        });
+      });
+    });
+    return out;
+  }
+
+  var stockMovements = [];
+  var hasStock = true;             // false until the stock migration is run
+
+  function loadStock(done) {
+    if (!hasStock) { stockMovements = []; return done && done(); }
+
+    db.from("award_stock_movements")
+      .select("id, kind, state_name, division_name, district_name, award_type_id," +
+              " quantity, occurred_on, note, recorded_by")
+      .order("occurred_on")
+      .then(function (res) {
+        if (res.error) {
+          if (/award_stock_movements/i.test(res.error.message || "")) hasStock = false;
+          else reportError("load stock", res.error);
+          stockMovements = [];
+          return done && done();
+        }
+        stockMovements = res.data || [];
+        done && done();
+      })
+      .catch(function (err) {
+        reportError("load stock", err);
+        stockMovements = [];
+        done && done();
+      });
+  }
+
+  // ------------------------------------------------------------ the sheet
+
+  function stockYears() {
+    var years = {};
+    var now = fyStartOf(new Date());
+    years[now] = true;
+
+    allRequisitions.forEach(function (r) {
+      var y = fyStartOf(r.created_at); if (y) years[y] = true;
+    });
+    stockMovements.forEach(function (m) {
+      var y = fyStartOf(m.occurred_on); if (y) years[y] = true;
+    });
+    return Object.keys(years).map(Number).sort(function (a, b) { return b - a; });
+  }
+
+  function cellsHtml(map, types, emphasis) {
+    var html = "";
+    types.forEach(function (t) {
+      var n = map[t.id] || 0;
+      html += '<td class="num' + (n ? "" : " is-nil") + '">' +
+              (n ? escapeHtml(n.toLocaleString()) : "\u2013") + "</td>";
+    });
+    var total = sumOf(map);
+    html += '<td class="num is-total' + (emphasis ? " is-strong" : "") + '">' +
+            (total ? escapeHtml(total.toLocaleString()) : "\u2013") + "</td>";
+    return html;
+  }
+
+  /* The filters narrow each other, the same way the requisition form does:
+     a division that is not in the chosen state is not an option. */
+  function stockFiltersFor(changed) {
+    var places = stockPlaces();
+    if (changed === el.stockState) {
+      el.stockDivision.value = ""; el.stockDistrict.value = "";
+    } else if (changed === el.stockDivision) {
+      el.stockDistrict.value = "";
+    }
+
+    var inState = places.filter(function (p) {
+      return !el.stockState.value || p.state === el.stockState.value;
+    });
+    var divs = [], dists = [];
+    inState.forEach(function (p) {
+      if (divs.indexOf(p.division) === -1) divs.push(p.division);
+      if ((!el.stockDivision.value || p.division === el.stockDivision.value) &&
+          dists.indexOf(p.district) === -1) dists.push(p.district);
+    });
+
+    fillSelect(el.stockDivision, divs.sort(), "All divisions",
+      function (n) { return n; }, function (n) { return n; });
+    fillSelect(el.stockDistrict, dists.sort(), "All districts",
+      function (n) { return n; }, function (n) { return n; });
+  }
+
+  function refreshStockControls() {
+    if (!el.stockYear) return;
+
+    var years = stockYears();
+    var current = el.stockYear.value;
+    el.stockYear.innerHTML = years.map(function (y) {
+      return '<option value="' + y + '">' + escapeHtml(fyLabel(y)) + '</option>';
+    }).join("");
+    if (current && years.indexOf(Number(current)) !== -1) el.stockYear.value = current;
+
+    var states = [];
+    stockPlaces().forEach(function (p) {
+      if (states.indexOf(p.state) === -1) states.push(p.state);
+    });
+    fillSelect(el.stockState, states.sort(), "All states",
+      function (n) { return n; }, function (n) { return n; });
+    stockFiltersFor(null);
+
+    el.stockUse.hidden = !canRecordUse();
+    el.stockOpen.hidden = !canSetOpening();
+  }
+
+  function renderStock() {
+    var wrap = document.getElementById("stock-table-wrap");
+    if (!wrap) return;
+
+    if (!hasStock) {
+      wrap.innerHTML = '<p class="aw-empty-line">Run ' +
+        "<code>sql/award-stock-setup.sql</code> in the Supabase SQL Editor to " +
+        "set this up.</p>";
+      return;
+    }
+    if (!geography.length) {
+      wrap.innerHTML = '<p class="aw-empty-line">Waiting for the staff directory.</p>';
+      return;
+    }
+
+    var fy = Number(el.stockYear.value) || fyStartOf(new Date());
+    var places = stockPlaces().filter(function (p) {
+      return (!el.stockState.value    || p.state === el.stockState.value) &&
+             (!el.stockDivision.value || p.division === el.stockDivision.value) &&
+             (!el.stockDistrict.value || p.district === el.stockDistrict.value);
+    });
+
+    if (!places.length) {
+      wrap.innerHTML = '<p class="aw-empty-line">No districts match.</p>';
+      return;
+    }
+
+    var types = awardTypes;
+    var rows = stockRows(fy, allRequisitions, stockMovements, places);
+
+    var head =
+      "<thead><tr>" +
+        '<th rowspan="2">Month</th><th rowspan="2">PM</th><th rowspan="2">State</th>' +
+        '<th rowspan="2">District</th><th rowspan="2">Items</th>' +
+        ['Requisition', 'Delivery', 'Utilisation', 'Stock Balance'].map(function (g, i) {
+          return '<th colspan="' + (types.length + 1) + '" class="grp grp-' + i + '">' +
+                 escapeHtml(g) + "</th>";
+        }).join("") +
+      "</tr><tr>" +
+        [0, 1, 2, 3].map(function (i) {
+          return types.map(function (t) {
+            return '<th class="num grp-' + i + '">' + escapeHtml(shortType(t)) + "</th>";
+          }).join("") + '<th class="num grp-' + i + '">Total</th>';
+        }).join("") +
+      "</tr></thead>";
+
+    var body = rows.map(function (r) {
+      var carry = r.monthKey === "";
+      return '<tr class="' + (carry ? "is-carry" : "") + '">' +
+        "<td>" + escapeHtml(r.month) + "</td>" +
+        "<td>" + escapeHtml(r.pm || "\u2014") + "</td>" +
+        "<td>" + escapeHtml(r.state) + "</td>" +
+        '<td class="is-district">' + escapeHtml(r.district) + "</td>" +
+        '<td class="muted">' + escapeHtml(r.items) + "</td>" +
+        cellsHtml(r.requisition, types) +
+        cellsHtml(r.delivery, types) +
+        cellsHtml(r.utilisation, types) +
+        cellsHtml(r.balance, types, true) +
+      "</tr>";
+    }).join("");
+
+    wrap.innerHTML = '<table id="stock-table">' + head + "<tbody>" + body + "</tbody></table>";
+  }
+
+  /* Block, District, NS, SU - the names the sheet uses, which are the award
+     names with the part they all share taken off. */
+  function shortType(t) {
+    var code = String(t.code || "").toUpperCase();
+    if (code === "POM_BLOCK") return "Block";
+    if (code === "POM_DISTRICT") return "District";
+    return code || t.name;
+  }
+
+  /* Recording what went out, or what a district started with. One dialog:
+     the two differ only in the month they land in and what the number means,
+     so two would be the same form twice.
+
+     Utilisation belongs to whoever works the district - the people who hand
+     the awards out. Opening stock is a setting-up job, so it is kept to Head
+     Office and administrators. */
+  var stockKind = "utilised";
+
+  function canSetOpening() { return isHoAdmin() || isAppAdmin(); }
+  function canRecordUse()  { return placesIMayRecord().length > 0; }
+
+  /* Which districts somebody may record against. A manager records for their
+     own division; the COO, Head Office and administrators for anywhere,
+     because they are the ones who see across divisions. */
+  function placesIMayRecord() {
+    var all = stockPlaces();
+    var standing = myStanding();
+    if (isHoAdmin() || isAppAdmin() || (standing && standing.level >= 4)) return all;
+    if (!standing) return [];
+
+    var mine = (standing.divisions || []).map(function (d) {
+      return String(d).trim().toLowerCase();
+    });
+    return all.filter(function (p) {
+      return mine.indexOf(String(p.division).trim().toLowerCase()) !== -1;
+    });
+  }
+
+  function openStockModal(kind) {
+    stockKind = kind;
+    returnFocusTo = document.activeElement;
+
+    var opening = kind === "opening";
+    el.stockHeading.textContent = opening ? "Opening stock" : "Record utilisation";
+    el.stockSub.textContent = opening
+      ? "What the district already held before any of this was recorded. Entered once."
+      : "Awards handed out. This comes off the district's stock.";
+    el.stockFLabel.textContent = opening
+      ? "How many it was holding" : "How many were given out";
+    el.stockSave.textContent = opening ? "Set opening stock" : "Record";
+
+    var places = placesIMayRecord();
+    var states = [];
+    places.forEach(function (p) { if (states.indexOf(p.state) === -1) states.push(p.state); });
+
+    fillSelect(el.stockFState, states.sort(), "Select state",
+      function (n) { return n; }, function (n) { return n; });
+    el.stockFDivision.innerHTML = '<option value="">Select a state first</option>';
+    el.stockFDivision.disabled = true;
+    el.stockFDistrict.innerHTML = '<option value="">Select a division first</option>';
+    el.stockFDistrict.disabled = true;
+    if (states.length === 1) { el.stockFState.value = states[0]; stockDivisionsFor(); }
+
+    // The months of the year on screen, so a figure cannot land in a year
+    // nobody is looking at.
+    var fy = Number(el.stockYear.value) || fyStartOf(new Date());
+    if (opening) {
+      el.stockFMonth.innerHTML =
+        '<option value="' + (fy - 1) + '-03">Before ' + escapeHtml(fyLabel(fy)) + '</option>';
+    } else {
+      el.stockFMonth.innerHTML = fyMonthKeys(fy).map(function (k) {
+        return '<option value="' + k + '">' + escapeHtml(monthLabelOf(k)) + '</option>';
+      }).join("");
+      var thisMonth = monthKeyOf(new Date());
+      if (fyMonthKeys(fy).indexOf(thisMonth) !== -1) el.stockFMonth.value = thisMonth;
+    }
+
+    el.stockLines.innerHTML = awardTypes.map(function (t) {
+      return '<div class="stock-line"><label>' + escapeHtml(t.name) + '</label>' +
+             '<input type="number" class="mono stock-qty" data-type="' + escapeHtml(t.id) +
+             '" min="0" max="1000000" step="1" placeholder="0" /></div>';
+    }).join("");
+
+    el.stockNote.value = "";
+    setFieldError(null, "stock-qty-error", "");
+
+    el.stockModal.classList.add("is-open");
+    document.addEventListener("keydown", onStockKeydown);
+    scrollLockedAt = window.scrollY;
+    document.body.style.overflow = "hidden";
+    el.stockFState.focus();
+  }
+
+  function closeStockModal() {
+    el.stockModal.classList.remove("is-open");
+    document.removeEventListener("keydown", onStockKeydown);
+    document.body.style.overflow = "";
+    if (scrollLockedAt !== null) { window.scrollTo(0, scrollLockedAt); scrollLockedAt = null; }
+    if (returnFocusTo && typeof returnFocusTo.focus === "function") returnFocusTo.focus();
+    returnFocusTo = null;
+  }
+
+  function onStockKeydown(e) {
+    if (e.key === "Escape") { e.stopPropagation(); closeStockModal(); }
+  }
+
+  function stockDivisionsFor() {
+    var divs = [];
+    placesIMayRecord().forEach(function (p) {
+      if (p.state === el.stockFState.value && divs.indexOf(p.division) === -1) {
+        divs.push(p.division);
+      }
+    });
+    fillSelect(el.stockFDivision, divs.sort(), "Select division",
+      function (n) { return n; }, function (n) { return n; });
+    el.stockFDivision.disabled = !divs.length;
+    el.stockFDistrict.innerHTML = '<option value="">Select a division first</option>';
+    el.stockFDistrict.disabled = true;
+    if (divs.length === 1) { el.stockFDivision.value = divs[0]; stockDistrictsFor(); }
+  }
+
+  function stockDistrictsFor() {
+    var dists = placesIMayRecord().filter(function (p) {
+      return p.state === el.stockFState.value && p.division === el.stockFDivision.value;
+    }).map(function (p) { return p.district; });
+
+    fillSelect(el.stockFDistrict, dists.sort(), "Select district",
+      function (n) { return n; }, function (n) { return n; });
+    el.stockFDistrict.disabled = !dists.length;
+    if (dists.length === 1) el.stockFDistrict.value = dists[0];
+  }
+
+  /* What a district holds at the end of a month, which is what a utilisation
+     has to fit inside. */
+  function balanceAt(district, monthKey) {
+    var fy = fyStartOf(monthKey + "-01");
+    var rows = stockRows(fy, allRequisitions, stockMovements,
+                         [{ state: "", division: "", district: district, pm: "" }]);
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].monthKey === monthKey) return rows[i].balance;
+    }
+    return {};
+  }
+
+  function saveStock() {
+    var state = el.stockFState.value;
+    var division = el.stockFDivision.value;
+    var district = el.stockFDistrict.value;
+    var month = el.stockFMonth.value;
+
+    if (!state || !division || !district) {
+      setFieldError(null, "stock-qty-error", "Choose where this stock is.");
+      return;
+    }
+
+    var rows = [];
+    var fault = "";
+    Array.prototype.forEach.call(el.stockLines.querySelectorAll(".stock-qty"), function (input) {
+      var raw = input.value.trim();
+      if (!raw) return;
+      var n = Number(raw);
+      if (!Number.isInteger(n) || n < 1) {
+        if (!fault) fault = "Quantities are whole numbers of 1 or more.";
+        return;
+      }
+      rows.push({
+        kind: stockKind,
+        state_name: state, division_name: division, district_name: district,
+        award_type_id: Number(input.getAttribute("data-type")),
+        quantity: n,
+        occurred_on: month + "-01",
+        note: el.stockNote.value.trim() || null,
+        recorded_by: (signedInUser() || {}).name || myEmail(),
+        recorded_email: myEmail() || null
+      });
+    });
+
+    if (fault) { setFieldError(null, "stock-qty-error", fault); return; }
+    if (!rows.length) {
+      setFieldError(null, "stock-qty-error", "Enter at least one quantity.");
+      return;
+    }
+    setFieldError(null, "stock-qty-error", "");
+
+    /* Nothing can be given out that was never held. A negative balance is a
+       mistake being written down rather than caught. */
+    if (stockKind === "utilised") {
+      var holding = balanceAt(district, month);
+      var over = null;
+      rows.forEach(function (r) {
+        if (!over && (holding[r.award_type_id] || 0) < r.quantity) over = r;
+      });
+      if (over) {
+        var type = awardTypes.filter(function (a) {
+          return Number(a.id) === over.award_type_id;
+        })[0] || {};
+        setFieldError(null, "stock-qty-error",
+          district + " was holding " + (holding[over.award_type_id] || 0) + " " +
+          (type.name || "of that award") + " in " + monthLabelOf(month) + ", so " +
+          over.quantity + " cannot have gone out.");
+        return;
+      }
+    }
+
+    el.stockSave.disabled = true;
+    db.from("award_stock_movements").insert(rows).select("id")
+      .then(function (res) {
+        el.stockSave.disabled = false;
+        if (res.error) {
+          setFieldError(null, "stock-qty-error",
+            /duplicate|unique/i.test(res.error.message || "")
+              ? "An opening figure is already set for that district and award."
+              : "Could not save: " + res.error.message);
+          reportError("save stock", res.error);
+          return;
+        }
+        closeStockModal();
+        showListBanner((stockKind === "opening" ? "Opening stock set for "
+                                                : "Utilisation recorded for ") + district + ".");
+        loadStock(function () { renderStock(); });
+      })
+      .catch(function (err) {
+        el.stockSave.disabled = false;
+        setFieldError(null, "stock-qty-error", "Could not save: " + messageOf(err));
+      });
+  }
+
+  function sumOf(map) {
+    return Object.keys(map).reduce(function (n, id) { return n + (map[id] || 0); }, 0);
   }
 
   // ----------------------------------------------------------------- errors
