@@ -74,6 +74,18 @@ window.AWARD_CONFIG = {
     listBannerText: document.getElementById("list-banner-text"),
     standingNote: document.getElementById("standing-note"),
     awardLines: document.getElementById("award-lines"),
+    hoModal: document.getElementById("ho-modal"),
+    hoHeading: document.getElementById("ho-heading"),
+    hoSub: document.getElementById("ho-sub"),
+    hoSummary: document.getElementById("ho-summary"),
+    hoRemark: document.getElementById("ho-remark"),
+    hoRemarkLabel: document.getElementById("ho-remark-label"),
+    hoConfirm: document.getElementById("ho-confirm"),
+    deliveryBody: document.getElementById("delivery-body"),
+    adminList: document.getElementById("admin-list"),
+    adminEmail: document.getElementById("admin-email"),
+    adminName: document.getElementById("admin-name"),
+    adminAdd: document.getElementById("admin-add"),
     awardAdd: document.getElementById("award-add"),
     filterStatus: document.getElementById("filter-status"),
     reviewModal: document.getElementById("review-modal"),
@@ -106,14 +118,62 @@ window.AWARD_CONFIG = {
      them and everything shows as pending. */
   var hasApproval = true;
   var hasItems = true;        // false until the multiple-awards migration runs
+  var hasFulfilment = true;   // false until the fulfilment migration runs
 
+  /* Where a requisition has got to.
+
+       raised ──> approved ──> acknowledged ──> delivered
+          │           │              │
+          │           └── rejected ──┘
+          └── declined
+
+     declined is the approver turning it down; rejected is HO being unable to
+     fulfil it. Two words, because they are two different events by different
+     people - one word would lose where it died. */
+  var STAGES = {
+    submitted:    { label: "Pending",      tone: "pending",  open: true },
+    approved:     { label: "Approved",     tone: "approved", open: true },
+    acknowledged: { label: "Acknowledged", tone: "progress", open: true },
+    delivered:    { label: "Delivered",    tone: "done",     open: false },
+    declined:     { label: "Declined",     tone: "declined", open: false },
+    rejected:     { label: "Rejected",     tone: "declined", open: false }
+  };
+
+  function stageOf(row) {
+    var key = String((row && row.status) || "submitted").toLowerCase();
+    return STAGES[key] ? key : "submitted";
+  }
+
+  /* The approver's part, which the review dialog and the Status cell read. */
   function statusOf(row) {
-    var d = String((row && row.status) || "submitted").toLowerCase();
-    if (d === "approved" || d === "declined") {
-      return { decision: d, by: row.decided_by, byRole: row.decided_by_role,
+    var d = stageOf(row);
+    if (d === "declined" || d === "approved" || d === "acknowledged" ||
+        d === "delivered" || d === "rejected") {
+      // Anything past submitted has been through an approver, except the
+      // older rows that predate approvals - they have nobody recorded.
+      return { decision: d === "declined" ? "declined" : "approved",
+               by: row.decided_by, byRole: row.decided_by_role,
                remark: row.decision_remark, at: row.decided_at };
     }
     return { decision: null };
+  }
+
+  /* Every step a requisition has been through, newest last. Drawn under the
+     chip so the whole journey is on the row rather than hidden in a tooltip. */
+  function trailOf(row) {
+    var steps = [];
+    var push = function (what, who, when) {
+      if (who || when) steps.push({ what: what, who: who || "", when: when || "" });
+    };
+    push("Raised", row.requester_name, row.created_at);
+    if (row.decided_at) {
+      push(stageOf(row) === "declined" ? "Declined" : "Approved",
+           row.decided_by, row.decided_at);
+    }
+    push("Acknowledged", row.acknowledged_by, row.acknowledged_at);
+    push("Delivered", row.delivered_by, row.delivered_at);
+    push("Rejected", row.rejected_by, row.rejected_at);
+    return steps;
   }
 
   /* ------------------------------------------------------------------
@@ -220,6 +280,50 @@ window.AWARD_CONFIG = {
   function levelRaisedAt(row) {
     var n = Number(row && row.requester_level);
     return n >= 1 && n <= 4 ? n : 1;
+  }
+
+  /* ------------------------------------------------------------ HO
+
+     The people who fulfil requisitions, kept in award_admins and managed
+     from Settings. Matched on the signed-in address, lower-cased.
+
+     Staff Connect Admins can always reach Settings as well. Without that,
+     removing the last award admin would shut the door on the room the key
+     is kept in. */
+  var hoAdmins = [];             // [{ email, name }]
+  var hasAdmins = true;          // false until the fulfilment migration runs
+
+  function myEmail() {
+    var u = window.__olfUser || {};
+    var e = window.__olfEmployee || {};
+    return String(u.email || e["Email"] || "").trim().toLowerCase();
+  }
+
+  function isHoAdmin() {
+    var mine = myEmail();
+    if (!mine) return false;
+    for (var i = 0; i < hoAdmins.length; i++) {
+      if (String(hoAdmins[i].email || "").trim().toLowerCase() === mine) return true;
+    }
+    return false;
+  }
+
+  function isAppAdmin() {
+    return String((window.__olfUser || {}).role || "").toLowerCase() === "admin";
+  }
+
+  function canManageAdmins() { return isHoAdmin() || isAppAdmin(); }
+
+  /* What HO may do to a requisition at its current stage. Nothing before it
+     has been approved - an unapproved requisition is not HO's business
+     yet. */
+  function hoActions(row) {
+    if (!isHoAdmin()) return [];
+    switch (stageOf(row)) {
+      case "approved":     return ["acknowledge", "reject"];
+      case "acknowledged": return ["deliver", "reject"];
+      default:             return [];
+    }
   }
 
   function canDecide(standing, row) {
@@ -432,6 +536,7 @@ window.AWARD_CONFIG = {
     applyStanding();
     showTab(el.tabs, "data-aw-tab", "stock");
     showTab(el.subtabs, "data-aw-subtab", "requisition");
+    applyAccess();
 
     el.reqDate.value = todayLocalISO();
     el.reqDate.max = todayLocalISO();
@@ -466,6 +571,7 @@ window.AWARD_CONFIG = {
     if (!db) db = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
     wireEvents();
+    loadAdmins(function () { applyAccess(); renderTable(); });
     loadGeography();
     loadAwardTypes();
     loadRequisitions();
@@ -741,6 +847,29 @@ window.AWARD_CONFIG = {
      Programme Implementation, anyone without a record - sees the list but
      not the button, and is told why instead of being left to wonder at a
      greyed-out control. */
+  /* Delivery is HO's queue and Settings is where HO is decided, so neither
+     is shown to people they mean nothing to. Hidden rather than disabled: a
+     tab you may never open is clutter, not information. */
+  function applyAccess() {
+    var show = { requisition: true, delivery: isHoAdmin(), settings: canManageAdmins() };
+
+    Array.prototype.forEach.call(el.subtabs, function (tab) {
+      var key = tab.getAttribute("data-aw-subtab");
+      tab.hidden = !show[key];
+      var panel = document.getElementById(tab.getAttribute("aria-controls"));
+      if (panel && !show[key]) panel.hidden = true;
+    });
+
+    // If the open tab has just gone, fall back to the one everybody has.
+    var active = null;
+    Array.prototype.forEach.call(el.subtabs, function (tab) {
+      if (tab.classList.contains("is-active") && !tab.hidden) active = tab;
+    });
+    if (!active) showTab(el.subtabs, "data-aw-subtab", "requisition");
+
+    renderAdmins();
+  }
+
   function applyStanding() {
     var standing = myStanding();
     if (!el.standingNote) return;
@@ -777,6 +906,249 @@ window.AWARD_CONFIG = {
     return " You decide on " + divs.join(" and ") + ".";
   }
 
+  /* --------------------------------------------------------- HO's moves
+
+     Acknowledging and delivering are a step forward and take a note only if
+     there is one to make. Rejecting ends the requisition, so it asks for a
+     reason - the requester is owed one, and it is the only record of why
+     nothing arrived. */
+  var hoPending = null;          // { row, action } awaiting confirmation
+
+  function startHoAction(id, action) {
+    var row = null;
+    for (var i = 0; i < allRequisitions.length; i++) {
+      if (String(allRequisitions[i].id) === String(id)) { row = allRequisitions[i]; break; }
+    }
+    if (!row || hoActions(row).indexOf(action) === -1) return;
+
+    hoPending = { row: row, action: action };
+    returnFocusTo = document.activeElement;
+
+    var p = placeOf(row);
+    el.hoHeading.textContent =
+      action === "acknowledge" ? "Acknowledge requisition" :
+      action === "deliver"     ? "Mark as delivered" : "Reject requisition";
+    el.hoSub.textContent =
+      action === "reject"
+        ? "The requester is told this is the reason nothing is coming."
+        : "Recorded against your name, and not undone.";
+
+    el.hoSummary.innerHTML =
+      "<dl>" +
+        "<div><dt>Requested by</dt><dd>" + escapeHtml(row.requester_name || "—") + "</dd></div>" +
+        "<div><dt>Awards</dt><dd>" + awardsCellHtml(awardsOf(row)) + "</dd></div>" +
+        "<div><dt>For</dt><dd>" +
+          escapeHtml([p.district, p.division, p.state].filter(Boolean).join(", ")) +
+        "</dd></div>" +
+      "</dl>";
+
+    el.hoRemark.value = "";
+    el.hoRemarkLabel.innerHTML = action === "reject"
+      ? 'Reason <span class="hint">required</span>'
+      : 'Note <span class="hint">optional</span>';
+    setFieldError(el.hoRemark, "ho-remark-error", "");
+    el.hoConfirm.textContent = HO_LABELS[action];
+    el.hoConfirm.className = "btn " + (action === "reject" ? "btn-danger" : "btn-primary");
+
+    el.hoModal.classList.add("is-open");
+    document.addEventListener("keydown", onHoKeydown);
+    scrollLockedAt = window.scrollY;
+    document.body.style.overflow = "hidden";
+    el.hoRemark.focus();
+  }
+
+  function closeHo() {
+    hoPending = null;
+    el.hoModal.classList.remove("is-open");
+    document.removeEventListener("keydown", onHoKeydown);
+    document.body.style.overflow = "";
+    if (scrollLockedAt !== null) { window.scrollTo(0, scrollLockedAt); scrollLockedAt = null; }
+    if (returnFocusTo && typeof returnFocusTo.focus === "function") returnFocusTo.focus();
+    returnFocusTo = null;
+  }
+
+  function onHoKeydown(event) {
+    if (event.key === "Escape") { event.stopPropagation(); closeHo(); }
+  }
+
+  function confirmHoAction() {
+    if (!hoPending) return;
+    var row = hoPending.row;
+    var action = hoPending.action;
+
+    if (hoActions(row).indexOf(action) === -1) {    // it moved under them
+      setFieldError(el.hoRemark, "ho-remark-error",
+        "This requisition is no longer at that stage.");
+      return;
+    }
+
+    var remark = el.hoRemark.value.trim();
+    if (action === "reject" && !remark) {
+      setFieldError(el.hoRemark, "ho-remark-error", "Say why it is being rejected.");
+      el.hoRemark.focus();
+      return;
+    }
+    setFieldError(el.hoRemark, "ho-remark-error", "");
+
+    var me = (signedInUser() || {}).name || myEmail();
+    var now = new Date().toISOString();
+    var patch = { ho_remark: remark || null };
+    var from;
+
+    if (action === "acknowledge") {
+      patch.status = "acknowledged";
+      patch.acknowledged_by = me;
+      patch.acknowledged_at = now;
+      from = "approved";
+    } else if (action === "deliver") {
+      patch.status = "delivered";
+      patch.delivered_by = me;
+      patch.delivered_at = now;
+      from = "acknowledged";
+    } else {
+      patch.status = "rejected";
+      patch.rejected_by = me;
+      patch.rejected_at = now;
+      from = stageOf(row);
+    }
+
+    el.hoConfirm.disabled = true;
+
+    // Conditional on the stage it was read at, so two people acting at once
+    // cannot step on each other.
+    db.from("requisitions").update(patch)
+      .eq("id", row.id).eq("status", from).select("id")
+      .then(function (res) {
+        el.hoConfirm.disabled = false;
+        if (res.error) {
+          setFieldError(el.hoRemark, "ho-remark-error",
+            "Could not save: " + res.error.message);
+          reportError("save fulfilment", res.error);
+          return;
+        }
+        if (!res.data || !res.data.length) {
+          setFieldError(el.hoRemark, "ho-remark-error",
+            "Somebody has already moved this one on.");
+          loadRequisitions();
+          return;
+        }
+        var whose = String(row.requester_name || "").trim();
+        var done = action === "acknowledge" ? "Acknowledged"
+                 : action === "deliver"     ? "Delivered" : "Rejected";
+        closeHo();
+        showListBanner(done + (whose ? " — " + whose + "'s requisition." : "."));
+        loadRequisitions();
+      })
+      .catch(function (err) {
+        el.hoConfirm.disabled = false;
+        setFieldError(el.hoRemark, "ho-remark-error", "Could not save: " + messageOf(err));
+        reportError("save fulfilment", err);
+      });
+  }
+
+  /* ------------------------------------------------------------ Settings
+
+     Who fulfils requisitions. Open to the people on the list and to Staff
+     Connect Admins - without the second, removing the last name would lock
+     the door from the inside. */
+  function renderAdmins() {
+    if (!el.adminList) return;
+
+    if (!hasAdmins) {
+      el.adminList.innerHTML =
+        '<p class="aw-empty-line">Run <code>sql/2026-10-16-award-fulfilment.sql</code> ' +
+        "to set this up.</p>";
+      return;
+    }
+    if (!hoAdmins.length) {
+      el.adminList.innerHTML =
+        '<p class="aw-empty-line">Nobody yet. Until somebody is added, approved ' +
+        "requisitions sit waiting with no one able to act on them.</p>";
+      return;
+    }
+
+    el.adminList.innerHTML = hoAdmins.map(function (a) {
+      return '<li class="admin-row">' +
+               '<span class="admin-who"><b>' + escapeHtml(a.name || a.email) + "</b>" +
+                 (a.name ? '<span>' + escapeHtml(a.email) + "</span>" : "") +
+               "</span>" +
+               '<span class="admin-added">' +
+                 (a.added_by ? "added by " + escapeHtml(a.added_by) : "") +
+               "</span>" +
+               '<button type="button" class="btn btn-ghost btn-xs is-danger" ' +
+                 'data-aw-admin-remove="' + escapeHtml(a.id) + '">Remove</button>' +
+             "</li>";
+    }).join("");
+  }
+
+  function addAdmin() {
+    var email = el.adminEmail.value.trim().toLowerCase();
+    var name = el.adminName.value.trim();
+
+    setFieldError(el.adminEmail, "admin-email-error", "");
+    if (!email) {
+      setFieldError(el.adminEmail, "admin-email-error", "Enter an email address.");
+      return;
+    }
+    if (email.indexOf("@") < 1 || email.indexOf(".", email.indexOf("@")) < 0) {
+      setFieldError(el.adminEmail, "admin-email-error", "That does not look like an address.");
+      return;
+    }
+    for (var i = 0; i < hoAdmins.length; i++) {
+      if (String(hoAdmins[i].email).toLowerCase() === email) {
+        setFieldError(el.adminEmail, "admin-email-error", "They are already on the list.");
+        return;
+      }
+    }
+
+    el.adminAdd.disabled = true;
+    db.from("award_admins").insert([{
+      email: email, name: name || null,
+      added_by: (signedInUser() || {}).name || myEmail()
+    }]).select("id")
+      .then(function (res) {
+        el.adminAdd.disabled = false;
+        if (res.error) {
+          setFieldError(el.adminEmail, "admin-email-error",
+            /duplicate|unique/i.test(res.error.message || "")
+              ? "They are already on the list."
+              : "Could not add: " + res.error.message);
+          return;
+        }
+        el.adminEmail.value = "";
+        el.adminName.value = "";
+        loadAdmins(function () { renderAdmins(); applyAccess(); renderTable(); });
+      })
+      .catch(function (err) {
+        el.adminAdd.disabled = false;
+        setFieldError(el.adminEmail, "admin-email-error", "Could not add: " + messageOf(err));
+      });
+  }
+
+  function removeAdmin(id) {
+    var who = null;
+    for (var i = 0; i < hoAdmins.length; i++) {
+      if (String(hoAdmins[i].id) === String(id)) { who = hoAdmins[i]; break; }
+    }
+    if (!who) return;
+
+    // Taking the last one off leaves nobody to fulfil anything, so it is
+    // worth a pause rather than a quiet removal.
+    var last = hoAdmins.length === 1;
+    var message = last
+      ? "Remove " + (who.name || who.email) + "? Nobody will be left to " +
+        "acknowledge or deliver requisitions."
+      : "Remove " + (who.name || who.email) + " from HO?";
+    if (!window.confirm(message)) return;
+
+    db.from("award_admins").delete().eq("id", id)
+      .then(function (res) {
+        if (res.error) { reportError("remove an HO admin", res.error); return; }
+        loadAdmins(function () { renderAdmins(); applyAccess(); renderTable(); });
+      })
+      .catch(function (err) { reportError("remove an HO admin", err); });
+  }
+
   function disableForm() {
     Array.prototype.forEach.call(
       el.form.querySelectorAll("input, select, button"),
@@ -797,6 +1169,21 @@ window.AWARD_CONFIG = {
 
     wireTabList(el.tabs, "data-aw-tab");
     wireTabList(el.subtabs, "data-aw-subtab");
+
+    Array.prototype.forEach.call(
+      el.hoModal.querySelectorAll("[data-aw-close-ho]"),
+      function (node) { node.addEventListener("click", closeHo); }
+    );
+    el.hoConfirm.addEventListener("click", confirmHoAction);
+
+    el.adminAdd.addEventListener("click", addAdmin);
+    el.adminEmail.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); addAdmin(); }
+    });
+    el.adminList.addEventListener("click", function (event) {
+      var btn = event.target.closest && event.target.closest("[data-aw-admin-remove]");
+      if (btn) removeAdmin(btn.getAttribute("data-aw-admin-remove"));
+    });
 
     el.newReqBtn.addEventListener("click", openRequisitionModal);
 
@@ -821,8 +1208,11 @@ window.AWARD_CONFIG = {
     // One listener on the body rather than one per row, since the rows are
     // thrown away and rebuilt on every render.
     el.tbody.addEventListener("click", function (event) {
-      var btn = event.target.closest ? event.target.closest("[data-aw-review]") : null;
-      if (btn) openReview(btn.getAttribute("data-aw-review"));
+      var review = event.target.closest ? event.target.closest("[data-aw-review]") : null;
+      if (review) { openReview(review.getAttribute("data-aw-review")); return; }
+
+      var ho = event.target.closest ? event.target.closest("[data-aw-ho]") : null;
+      if (ho) startHoAction(ho.getAttribute("data-aw-row"), ho.getAttribute("data-aw-ho"));
     });
 
     Array.prototype.forEach.call(
@@ -1061,6 +1451,31 @@ window.AWARD_CONFIG = {
     );
   }
 
+  function loadAdmins(done) {
+    if (!hasAdmins) { hoAdmins = []; return done && done(); }
+
+    db.from("award_admins").select("id, email, name, added_by, added_at")
+      .order("email")
+      .then(function (res) {
+        if (res.error) {
+          if (/award_admins/i.test(res.error.message || "")) {
+            hasAdmins = false;                // fulfilment migration not run
+          } else {
+            reportError("load the HO list", res.error);
+          }
+          hoAdmins = [];
+          return done && done();
+        }
+        hoAdmins = res.data || [];
+        done && done();
+      })
+      .catch(function (err) {
+        reportError("load the HO list", err);
+        hoAdmins = [];
+        done && done();
+      });
+  }
+
   function loadAwardTypes() {
     db.from("award_types").select("id, code, name")
       .order("sort_order").order("name")
@@ -1287,6 +1702,8 @@ window.AWARD_CONFIG = {
               (hasNameColumns  ? " state_name, division_name, district_name," : "") +
               (hasLookupTables ? " states ( code, name ), districts ( name )," : "") +
               (hasItems ? " items," : "") +
+              (hasFulfilment ? " acknowledged_by, acknowledged_at, delivered_by," +
+                               " delivered_at, rejected_by, rejected_at, ho_remark," : "") +
               (hasApproval ? " requester_role, requester_level, decided_by," +
                              " decided_by_role, decided_at, decision_remark," : "") +
               " award_types ( code, name )")
@@ -1300,6 +1717,11 @@ window.AWARD_CONFIG = {
 
           if (hasNameColumns && /(state_name|division_name|district_name)/i.test(msg)) {
             hasNameColumns = false;      // not migrated yet - read the old shape
+            loadRequisitions();
+            return;
+          }
+          if (hasFulfilment && /(acknowledged_|delivered_|rejected_|ho_remark)/i.test(msg)) {
+            hasFulfilment = false;            // fulfilment not migrated yet
             loadRequisitions();
             return;
           }
@@ -1333,6 +1755,9 @@ window.AWARD_CONFIG = {
         allRequisitions = res.data || [];
         buildFilterOptions();
         renderTable();
+        // Its own table, and renderTable returns early when the list is
+        // empty - which is exactly when the queue needs its empty state.
+        renderDelivery();
       })
       .catch(function (err) {
         el.refreshBtn.disabled = false;
@@ -1488,28 +1913,81 @@ window.AWARD_CONFIG = {
   /* The state of a requisition, and - where it has been settled - who said
      so. The remark hangs off the chip rather than taking a column of its
      own: most are short, and a column of mostly-empty cells reads worse. */
+  /* The stage it has reached, and under it the steps that got it there, so
+     the whole journey is on the row rather than hidden behind a tooltip. */
   function statusCellHtml(row) {
-    var st = statusOf(row);
-    if (!st.decision) {
-      return '<span class="chip-status is-pending">Pending</span>';
-    }
-    var title = st.by + (st.byRole ? " (" + st.byRole + ")" : "") +
-                ", " + formatTimestamp(st.at) +
-                (st.remark ? " — " + st.remark : "");
-    return '<span class="chip-status is-' + escapeHtml(st.decision) + '" title="' +
-             escapeHtml(title) + '">' +
-             escapeHtml(st.decision === "approved" ? "Approved" : "Declined") +
-           "</span>" +
-           '<span class="cell-by">' + escapeHtml(st.by || "") + "</span>" +
-           (st.remark ? '<span class="cell-remark" title="' + escapeHtml(st.remark) +
-                        '">' + escapeHtml(st.remark) + "</span>" : "");
+    var key = stageOf(row);
+    var stage = STAGES[key];
+
+    var trail = trailOf(row).map(function (st) {
+      return '<span class="cell-step"><b>' + escapeHtml(st.what) + "</b>" +
+             (st.who ? " " + escapeHtml(st.who) : "") +
+             (st.when ? ' <i>' + escapeHtml(formatTimestamp(st.when)) + "</i>" : "") +
+             "</span>";
+    }).join("");
+
+    var remark = row.ho_remark || row.decision_remark || "";
+
+    return '<span class="chip-status is-' + escapeHtml(stage.tone) + '">' +
+             escapeHtml(stage.label) + "</span>" +
+           '<span class="cell-trail">' + trail + "</span>" +
+           (remark ? '<span class="cell-remark" title="' + escapeHtml(remark) + '">' +
+                     escapeHtml(remark) + "</span>" : "");
   }
+
+  var HO_LABELS = { acknowledge: "Acknowledge", deliver: "Mark delivered", reject: "Reject" };
 
   function actionCellHtml(row) {
     if (!hasApproval) return "";
-    if (!canDecide(myStanding(), row)) return "";
-    return '<button type="button" class="btn btn-ghost btn-xs" data-aw-review="' +
-             escapeHtml(row.id) + '">Review</button>';
+
+    if (canDecide(myStanding(), row)) {
+      return '<button type="button" class="btn btn-ghost btn-xs" data-aw-review="' +
+               escapeHtml(row.id) + '">Review</button>';
+    }
+
+    return hoActions(row).map(function (act) {
+      return '<button type="button" class="btn btn-ghost btn-xs' +
+               (act === "reject" ? " is-danger" : "") +
+               '" data-aw-ho="' + escapeHtml(act) + '" data-aw-row="' +
+               escapeHtml(row.id) + '">' + HO_LABELS[act] + "</button>";
+    }).join(" ");
+  }
+
+  /* HO's queue: what has been approved and not yet finished with. Settled
+     requisitions drop off - this is a list of work, not a record. */
+  function renderDelivery() {
+    if (!el.deliveryBody) return;
+
+    var rows = allRequisitions.filter(function (r) {
+      var k = stageOf(r);
+      return k === "approved" || k === "acknowledged";
+    });
+
+    if (!rows.length) {
+      el.deliveryBody.innerHTML =
+        '<tr class="placeholder-row"><td colspan="8">' +
+        (hasAdmins
+          ? "Nothing waiting. Approved requisitions appear here."
+          : "Run sql/2026-10-16-award-fulfilment.sql to set this up.") +
+        "</td></tr>";
+      return;
+    }
+
+    el.deliveryBody.innerHTML = rows.map(function (row) {
+      var p = placeOf(row);
+      var awards = awardsOf(row);
+      return "<tr>" +
+        '<td><span class="state-code" title="' + escapeHtml(p.state) + '">' +
+          escapeHtml(p.code || p.state || "—") + "</span></td>" +
+        "<td>" + escapeHtml(p.division || "—") + "</td>" +
+        "<td>" + escapeHtml(p.district || "—") + "</td>" +
+        "<td>" + escapeHtml(row.requester_name || "—") + "</td>" +
+        "<td>" + awardsCellHtml(awards) + "</td>" +
+        '<td class="num">' + escapeHtml(Number(row.quantity).toLocaleString()) + "</td>" +
+        "<td>" + statusCellHtml(row) + "</td>" +
+        '<td class="cell-action">' + actionCellHtml(row) + "</td>" +
+      "</tr>";
+    }).join("");
   }
 
   // ----------------------------------------------------------------- errors

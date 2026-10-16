@@ -52,6 +52,16 @@
                 aria-selected="true">
           Requisition
         </button>
+        <button type="button" role="tab" id="aw-subtab-delivery" class="aw-subtab"
+                data-aw-subtab="delivery" aria-controls="aw-subpanel-delivery"
+                aria-selected="false" tabindex="-1" hidden>
+          Delivery
+        </button>
+        <button type="button" role="tab" id="aw-subtab-settings" class="aw-subtab"
+                data-aw-subtab="settings" aria-controls="aw-subpanel-settings"
+                aria-selected="false" tabindex="-1" hidden>
+          Settings
+        </button>
         <span class="pill" id="row-pill">—</span>
       </nav>
 
@@ -126,6 +136,65 @@
           </tfoot>
         </table>
       </div>        </section>
+      </div>
+
+      <div id="aw-subpanel-delivery" class="aw-subpanel" role="tabpanel"
+           aria-labelledby="aw-subtab-delivery" hidden>
+        <section class="card">
+          <div class="aw-panel-head">
+            <h3>Approved and waiting</h3>
+            <p>Requisitions that have been approved and are now yours to
+               acknowledge, deliver, or reject.</p>
+          </div>
+          <div class="table-scroll">
+            <table id="delivery-table">
+              <thead>
+                <tr>
+                  <th scope="col">State</th>
+                  <th scope="col">Division</th>
+                  <th scope="col">District</th>
+                  <th scope="col">Requester</th>
+                  <th scope="col">Awards</th>
+                  <th scope="col" class="num">Quantity</th>
+                  <th scope="col">Status</th>
+                  <th scope="col"><span class="sr-only">Action</span></th>
+                </tr>
+              </thead>
+              <tbody id="delivery-body">
+                <tr class="placeholder-row"><td colspan="8">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <div id="aw-subpanel-settings" class="aw-subpanel" role="tabpanel"
+           aria-labelledby="aw-subtab-settings" hidden>
+        <section class="card">
+          <div class="aw-panel-head">
+            <h3>Head Office</h3>
+            <p>Who acknowledges and delivers approved requisitions. They see the
+               Delivery tab; nobody else does.</p>
+          </div>
+
+          <div class="admin-add-row">
+            <div class="field field-sm">
+              <label for="admin-email">Email</label>
+              <input type="email" id="admin-email" placeholder="name@openlinksfoundation.org" />
+              <p class="error" id="admin-email-error" role="alert"></p>
+            </div>
+            <div class="field field-sm">
+              <label for="admin-name">Name <span class="hint">optional</span></label>
+              <input type="text" id="admin-name" placeholder="How to show them" />
+            </div>
+            <button type="button" id="admin-add" class="btn btn-primary btn-sm">
+              <i class="aw-icon" data-aw-icon="plus" aria-hidden="true"></i>
+              Add
+            </button>
+          </div>
+
+          <ul class="admin-list" id="admin-list"></ul>
+        </section>
       </div>
     </div>
 
@@ -262,6 +331,36 @@
               <i class="aw-icon" data-aw-icon="check" aria-hidden="true"></i>
               Approve
             </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HO acting on an approved requisition. Its own dialog because the
+         wording changes with the action, and rejecting ends the thing. -->
+    <div class="aw-overlay" id="ho-modal">
+      <div class="aw-overlay-backdrop" data-aw-close-ho></div>
+      <div class="aw-box aw-box-sm" role="dialog" aria-modal="true"
+           aria-labelledby="ho-heading">
+        <div class="aw-box-head">
+          <div class="aw-box-heading">
+            <h2 id="ho-heading">Acknowledge requisition</h2>
+            <p class="aw-box-sub" id="ho-sub"></p>
+          </div>
+          <button type="button" class="aw-box-close" data-aw-close-ho aria-label="Close">
+            <i class="aw-icon" data-aw-icon="close" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="aw-box-body">
+          <div class="review-summary" id="ho-summary"></div>
+          <div class="field">
+            <label for="ho-remark" id="ho-remark-label">Note</label>
+            <textarea id="ho-remark" rows="3"></textarea>
+            <p class="error" id="ho-remark-error" role="alert"></p>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-ghost" data-aw-close-ho>Cancel</button>
+            <button type="button" id="ho-confirm" class="btn btn-primary">Acknowledge</button>
           </div>
         </div>
       </div>

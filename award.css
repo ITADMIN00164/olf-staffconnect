@@ -962,3 +962,85 @@
   opacity: .85;
 }
 .award-page td .type-chip { margin: 1px 2px 1px 0; }
+
+/* ---- delivery and settings --------------------------------------- */
+
+.award-page .aw-panel-head { margin-bottom: 16px; }
+.award-page .aw-panel-head h3 {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text);
+}
+.award-page .aw-panel-head p {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  max-width: 62ch;
+}
+
+.award-page .aw-empty-line {
+  margin: 0;
+  padding: 18px 2px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* The steps a requisition has been through, under its chip. */
+.award-page .cell-trail { display: block; margin-top: 4px; }
+.award-page .cell-step {
+  display: block;
+  font-size: 10.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.award-page .cell-step b { font-weight: 700; color: var(--text-soft); }
+.award-page .cell-step i { font-style: normal; opacity: .75; }
+
+.award-page .chip-status.is-progress { background: #FFF4E0; color: #8A5A14; border-color: #EBD6AC; }
+.award-page .chip-status.is-done     { background: #E7F4EC; color: #1F7A46; border-color: #BFE3CD; }
+
+.award-page .btn.is-danger { color: var(--danger); }
+.award-page .btn.is-danger:hover { background: var(--danger-soft); }
+
+.award-page .cell-action .btn + .btn { margin-left: 4px; }
+
+/* ---- the HO list ------------------------------------------------- */
+.award-page .admin-add-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.award-page .admin-add-row .btn { margin-top: 19px; }
+
+.award-page .admin-list { list-style: none; margin: 0; padding: 0; }
+
+.award-page .admin-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 2px;
+  border-bottom: 1px solid var(--border);
+}
+.award-page .admin-row:last-child { border-bottom: 0; }
+
+.award-page .admin-who { display: flex; flex-direction: column; min-width: 0; }
+.award-page .admin-who b { font-size: 13.5px; font-weight: 600; color: var(--text); }
+.award-page .admin-who span { font-size: 11.5px; color: var(--text-muted); }
+
+.award-page .admin-added {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .award-page .admin-add-row { grid-template-columns: 1fr; }
+  .award-page .admin-add-row .btn { margin-top: 0; }
+}
