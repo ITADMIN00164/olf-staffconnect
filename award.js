@@ -119,6 +119,7 @@ window.AWARD_CONFIG = {
   var hasApproval = true;
   var hasItems = true;        // false until the multiple-awards migration runs
   var hasFulfilment = true;   // false until the fulfilment migration runs
+  var hasEmails = true;       // false until the addresses migration runs
 
   /* Where a requisition has got to.
 
@@ -162,13 +163,15 @@ window.AWARD_CONFIG = {
      chip so the whole journey is on the row rather than hidden in a tooltip. */
   function trailOf(row) {
     var steps = [];
-    var push = function (what, who, when) {
-      if (who || when) steps.push({ what: what, who: who || "", when: when || "" });
+    var push = function (what, who, when, email) {
+      if (who || when) {
+        steps.push({ what: what, who: who || "", when: when || "", email: email || "" });
+      }
     };
-    push("Raised", row.requester_name, row.created_at);
+    push("Raised", row.requester_name, row.created_at, row.requester_email);
     if (row.decided_at) {
       push(stageOf(row) === "declined" ? "Declined" : "Approved",
-           row.decided_by, row.decided_at);
+           row.decided_by, row.decided_at, row.decided_by_email);
     }
     push("Acknowledged", row.acknowledged_by, row.acknowledged_at);
     push("Delivered", row.delivered_by, row.delivered_at);
@@ -801,6 +804,7 @@ window.AWARD_CONFIG = {
         status: decision,
         decision_remark: remark || null,
         decided_by: (signedInUser() || {}).name || "",
+        decided_by_email: myEmail() || null,
         decided_by_role: standing.role,
         decided_at: new Date().toISOString()
       })
@@ -992,7 +996,7 @@ window.AWARD_CONFIG = {
 
     var me = (signedInUser() || {}).name || myEmail();
     var now = new Date().toISOString();
-    var patch = { ho_remark: remark || null };
+    var patch = { ho_remark: remark || null, ho_by_email: myEmail() || null };
     var from;
 
     if (action === "acknowledge") {
@@ -1132,21 +1136,33 @@ window.AWARD_CONFIG = {
     }
     if (!who) return;
 
-    // Taking the last one off leaves nobody to fulfil anything, so it is
-    // worth a pause rather than a quiet removal.
+    /* Taking the last one off leaves nobody able to fulfil anything, so it
+       says so rather than removing quietly. Asked through the shell's own
+       dialog, not window.confirm - the rest of Staff Connect does, and a
+       browser box in the middle of this would look like something had gone
+       wrong. */
     var last = hoAdmins.length === 1;
-    var message = last
-      ? "Remove " + (who.name || who.email) + "? Nobody will be left to " +
-        "acknowledge or deliver requisitions."
-      : "Remove " + (who.name || who.email) + " from HO?";
-    if (!window.confirm(message)) return;
+    var ask = window.showAppConfirm ? window.showAppConfirm({
+      title: last ? "Remove the last HO admin?" : "Remove from Head Office?",
+      type: last ? "warning" : "question",
+      message: last
+        ? "Nobody will be left to acknowledge or deliver requisitions, and the "
+          + "Delivery tab will disappear until somebody is added again."
+        : (who.name || who.email) + " will no longer see the Delivery tab.",
+      confirmText: "Remove",
+      cancelText: "Keep"
+    }) : Promise.resolve(window.confirm("Remove " + (who.name || who.email) + "?"));
 
-    db.from("award_admins").delete().eq("id", id)
-      .then(function (res) {
-        if (res.error) { reportError("remove an HO admin", res.error); return; }
-        loadAdmins(function () { renderAdmins(); applyAccess(); renderTable(); });
-      })
-      .catch(function (err) { reportError("remove an HO admin", err); });
+    Promise.resolve(ask).then(function (yes) {
+      if (!yes) return;
+
+      db.from("award_admins").delete().eq("id", id)
+        .then(function (res) {
+          if (res.error) { reportError("remove an HO admin", res.error); return; }
+          loadAdmins(function () { renderAdmins(); applyAccess(); renderTable(); });
+        })
+        .catch(function (err) { reportError("remove an HO admin", err); });
+    });
   }
 
   function disableForm() {
@@ -1513,6 +1529,9 @@ window.AWARD_CONFIG = {
       award_type_id: null,
       items: null,
       requester_name: (signedInUser() || {}).name || "",
+      // The name is what gets shown; the address is what identifies the
+      // account behind it, and names are neither unique nor permanent.
+      requester_email: myEmail() || null,
       // Recorded now, not looked up later: who may approve this depends on
       // the level it was raised at, and people move between roles.
       requester_role: (myStanding() || {}).role || null,
@@ -1625,7 +1644,7 @@ window.AWARD_CONFIG = {
           // rather than showing the raw PostgREST complaint, which reads
           // "Could not find the 'state_name' column of 'requisitions'" - the
           // name comes before the word column, so this matches on the name.
-          var missing = /(state_name|division_name|district_name)/i
+          var missing = /(state_name|division_name|district_name|requester_email)/i
             .test(res.error.message || "");
           setFormStatus(missing
             ? "This database has not been updated for divisions yet. Run " +
@@ -1704,6 +1723,7 @@ window.AWARD_CONFIG = {
               (hasItems ? " items," : "") +
               (hasFulfilment ? " acknowledged_by, acknowledged_at, delivered_by," +
                                " delivered_at, rejected_by, rejected_at, ho_remark," : "") +
+              (hasEmails ? " requester_email, decided_by_email, ho_by_email," : "") +
               (hasApproval ? " requester_role, requester_level, decided_by," +
                              " decided_by_role, decided_at, decision_remark," : "") +
               " award_types ( code, name )")
@@ -1717,6 +1737,11 @@ window.AWARD_CONFIG = {
 
           if (hasNameColumns && /(state_name|division_name|district_name)/i.test(msg)) {
             hasNameColumns = false;      // not migrated yet - read the old shape
+            loadRequisitions();
+            return;
+          }
+          if (hasEmails && /(requester_email|decided_by_email|ho_by_email)/i.test(msg)) {
+            hasEmails = false;                // addresses not migrated yet
             loadRequisitions();
             return;
           }
@@ -1920,7 +1945,9 @@ window.AWARD_CONFIG = {
     var stage = STAGES[key];
 
     var trail = trailOf(row).map(function (st) {
-      return '<span class="cell-step"><b>' + escapeHtml(st.what) + "</b>" +
+      return '<span class="cell-step"' +
+             (st.email ? ' title="' + escapeHtml(st.email) + '"' : "") + "><b>" +
+             escapeHtml(st.what) + "</b>" +
              (st.who ? " " + escapeHtml(st.who) : "") +
              (st.when ? ' <i>' + escapeHtml(formatTimestamp(st.when)) + "</i>" : "") +
              "</span>";

@@ -1093,10 +1093,27 @@ window.olfStaffDirectory = async function () {
 ==================================== */
 
 const DISTRICT_RENAMES = {
-    "bid":         "Beed",
-    "raigarh mh":  "Raigad",
-    "sangli - mc": "Sangli"
+    "bid":        "Beed",
+    "raigarh mh": "Raigad"     // Raigarh is a Chhattisgarh district; this is Raigad
 };
+
+/* Districts as the award form should offer them.
+
+   A municipal corporation is part of its district, not a district of its
+   own, so "Sangli - MC" and "Pune - MC" are both filed under the district
+   they sit in. That is a rule rather than a list because the directory
+   gains these as it grows - Pune - MC appeared after the first three were
+   written down, and a list would have missed it.
+
+   It stays a rule about "- MC" specifically, not about suffixes generally:
+   "Janjgir - Champa" is a real district name, and dropping what follows the
+   dash would rename it. "Raigarh MH" stays in the map above for the same
+   reason - taking off the MH leaves Raigarh, which is a different district
+   in a different state. */
+function tidyDistrict(name) {
+    const trimmed = String(name || "").trim().replace(/\s*[-–]?\s*MC$/i, "").trim();
+    return DISTRICT_RENAMES[trimmed.toLowerCase()] || trimmed;
+}
 
 let orgGeography = null;
 
@@ -1114,10 +1131,7 @@ window.olfGeography = async function () {
 
         const states    = splitMulti(r["State"]);
         const divisions = splitMulti(r["Division"]);
-        const districts = splitMulti(r["District"]).map(n => {
-            const key = n.toLowerCase();
-            return DISTRICT_RENAMES[key] || n;
-        });
+        const districts = splitMulti(r["District"]).map(tidyDistrict);
 
         for (const st of states) {
             if (!tree.has(st)) tree.set(st, new Map());
