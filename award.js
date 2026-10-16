@@ -2561,18 +2561,12 @@ window.AWARD_CONFIG = {
       });
     });
 
-    /* A district can hold stock without anybody being posted to it - five of
-       them do today. Leaving them out of the directory's list would leave
-       their stock nowhere to be seen, so anywhere with a movement against it
-       is listed too, with whatever place the movement itself carries. */
-    stockMovements.forEach(function (m) {
-      var d = String(m.district_name || "").trim();
-      if (!d || seen[d.toLowerCase()]) return;
-      seen[d.toLowerCase()] = true;
-      out.push({ state: m.state_name || "", division: m.division_name || "",
-                 district: d, pm: "", unstaffed: true });
-    });
-
+    /* The directory is the only place this page takes its districts from -
+       the same list the requisition form offers, so the two can never
+       disagree about where a place is or who manages it. A district nobody
+       is posted to is not in it, and its stock has nowhere to sit; adding
+       one from a stock row instead would be a second source of places, and
+       two lists of the same thing drift. */
     return out;
   }
 

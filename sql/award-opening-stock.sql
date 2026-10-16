@@ -6,14 +6,21 @@
 --
 -- Where this came from
 --   The 'Carry forward stock' sheet of Gift Stock compilation - 2026-27,
---   read straight out of the file. 30 districts, 3515 awards in all.
+--   read straight out of the file. 31 districts, 3515 awards in all.
 --   Districts are matched against the staff directory, because that is where
 --   the page gets its own list from.
 --
 -- This is needed once. Every year after this one closes into the next by
 -- itself - the carry forward is worked out from what actually happened.
 --
--- Not written, because the directory has no such district:
+-- Added together, because the directory holds these as one
+-- district:
+--   Amravati       = Amrarvati MNP + Amravati ZP
+--   Nagpur         = Nagpur + Nagpur NMC & ATC
+--
+-- Left out. The Employees directory has no district by these
+-- names, and the directory is the only place this page takes its
+-- places from - so there is nowhere to put their stock:
 --   KDMC
 --   Latur
 --   Palghar
@@ -42,22 +49,20 @@ from (values
   ('Maharashtra', 'Nagpur', 'Bhandara', 2, 65),
   ('Maharashtra', 'Nagpur', 'Gadchiroli', 1, 5),
   ('Maharashtra', 'Nagpur', 'Gadchiroli', 2, 113),
-  ('Maharashtra', 'Amravati', 'Amravati', 1, 10),
-  ('Maharashtra', 'Amravati', 'Amravati', 2, 40),
+  ('Maharashtra', 'Amravati', 'Amravati', 1, 144),
+  ('Maharashtra', 'Amravati', 'Amravati', 2, 100),
   ('Maharashtra', 'Nashik', 'Jalgaon', 1, 65),
   ('Maharashtra', 'Nashik', 'Jalgaon', 2, 57),
   ('Maharashtra', 'Nashik', 'Nashik', 1, 53),
   ('Maharashtra', 'Nashik', 'Nashik', 2, 3),
   ('Maharashtra', 'Pune', 'Pune', 1, 77),
   ('Maharashtra', 'Pune', 'Pune', 2, 191),
-  ('Maharashtra', 'Amravati', 'Amravati', 1, 134),
-  ('Maharashtra', 'Amravati', 'Amravati', 2, 60),
   ('Maharashtra', 'Nagpur', 'Chandrapur', 1, 28),
   ('Maharashtra', 'Nagpur', 'Chandrapur', 2, 51),
-  ('Maharashtra', 'Nagpur', 'Nagpur', 1, 21),
-  ('Maharashtra', 'Nagpur', 'Nagpur', 2, 70),
-  ('Chhattisgarh', 'Bilaspur', 'Raigarh', 1, 131),
-  ('Chhattisgarh', 'Bilaspur', 'Raigarh', 2, 32),
+  ('Maharashtra', 'Nagpur', 'Nagpur', 1, 27),
+  ('Maharashtra', 'Nagpur', 'Nagpur', 2, 83),
+  ('Maharashtra', 'Konkan', 'Raigad', 1, 131),
+  ('Maharashtra', 'Konkan', 'Raigad', 2, 32),
   ('Bihar', 'Munger', 'Begusarai', 1, 116),
   ('Bihar', 'Munger', 'Begusarai', 2, 25),
   ('Maharashtra', 'Amravati', 'Yavatmal', 1, 64),
@@ -66,8 +71,6 @@ from (values
   ('Maharashtra', 'Chhatrapati Sambhajinagar', 'Hingoli', 2, 57),
   ('Maharashtra', 'Chhatrapati Sambhajinagar', 'Beed', 1, 57),
   ('Maharashtra', 'Chhatrapati Sambhajinagar', 'Beed', 2, 14),
-  ('Maharashtra', 'Nagpur', 'Nagpur', 1, 6),
-  ('Maharashtra', 'Nagpur', 'Nagpur', 2, 13),
   ('Maharashtra', 'Nagpur', 'Wardha', 1, 38),
   ('Maharashtra', 'Nagpur', 'Wardha', 2, 8),
   ('Chhattisgarh', 'Raipur', 'Dhamtari', 1, 40),
