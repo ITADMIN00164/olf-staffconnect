@@ -897,6 +897,31 @@
 .award-page .btn-danger:hover { filter: brightness(.93); }
 
 /* ---- the review dialog ------------------------------------------- */
+/* Where a requisition is being filed from - the filer's own division and
+   state, out of Employees. A line of fact above the one thing there is to
+   choose, not a field. */
+.award-page .req-where {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 9px;
+  margin: 0 0 18px;
+  padding: 11px 14px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-soft-border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--text-soft);
+}
+.award-page .req-where b { font-size: 14.5px; color: var(--text); }
+.award-page .req-where.is-bad {
+  display: block;
+  background: var(--danger-soft);
+  border-color: var(--danger-soft-border);
+  color: var(--danger);
+  line-height: 1.5;
+}
+
 .award-page .aw-box-sm { width: 560px; }
 
 /* What is being decided on, as a short list of facts rather than a form. */

@@ -50,11 +50,10 @@ window.AWARD_CONFIG = {
     setupDetail: document.getElementById("setup-banner-detail"),
 
     form: document.getElementById("requisition-form"),
-    state: document.getElementById("state"),
     district: document.getElementById("district"),
+    reqWhere: document.getElementById("req-where"),
     awardType: document.getElementById("award-type"),
     requesterName: document.getElementById("requester-name"),
-    division: document.getElementById("division"),
     requesterWho: document.getElementById("requester-who"),
     requesterSub: document.getElementById("requester-sub"),
     quantity: document.getElementById("quantity"),
@@ -816,14 +815,13 @@ window.AWARD_CONFIG = {
     setFormStatus("");
     resetAwardLines();
 
+    /* Built each time it opens, from the directory as it stands now: a
+       person moved to another division between two requisitions should be
+       offered the new one, not the one that was loaded with the page. */
+    fillMyDistricts();
+
     // Put back where the last one was for, if that is still on offer.
-    if (lastPlace) {
-      el.state.value = lastPlace.state;
-      loadDivisions(lastPlace.state);
-      el.division.value = lastPlace.division;
-      loadDistricts(lastPlace.state, lastPlace.division);
-      el.district.value = lastPlace.district;
-    }
+    if (lastPlace) el.district.value = lastPlace.district;
 
     el.modal.classList.add("is-open");
     document.addEventListener("keydown", onModalKeydown);
@@ -834,7 +832,9 @@ window.AWARD_CONFIG = {
     document.body.style.overflow = "hidden";
 
     // Straight to the first thing that still needs choosing.
-    var first = el.state.value ? el.awardLines.querySelector(".award-line-type") : el.state;
+    var first = el.district.value
+      ? el.awardLines.querySelector(".award-line-type")
+      : el.district;
     if (first && typeof first.focus === "function") first.focus();
   }
 
@@ -1630,16 +1630,6 @@ window.AWARD_CONFIG = {
       function (node) { node.addEventListener("click", closeRequisitionModal); }
     );
 
-    el.state.addEventListener("change", function () {
-      setFieldError(el.state, "state-error", "");
-      loadDivisions(el.state.value);
-    });
-
-    el.division.addEventListener("change", function () {
-      setFieldError(el.division, "division-error", "");
-      loadDistricts(el.state.value, el.division.value);
-    });
-
     el.form.addEventListener("submit", onSubmit);
 
     el.resetBtn.addEventListener("click", function () {
@@ -1647,10 +1637,7 @@ window.AWARD_CONFIG = {
       window.setTimeout(function () {
         clearFieldErrors();
         setFormStatus("");
-        el.division.innerHTML = '<option value="">Select a state first</option>';
-        el.division.disabled = true;
-        el.district.innerHTML = '<option value="">Select a division first</option>';
-        el.district.disabled = true;
+        fillMyDistricts();
       }, 0);
     });
 
@@ -1682,25 +1669,109 @@ window.AWARD_CONFIG = {
      matter of correcting someone's record in the Employees tab. */
   var geography = [];
 
-  function stateNamed(name) {
-    for (var i = 0; i < geography.length; i++) {
-      if (geography[i].name === name) return geography[i];
-    }
-    return null;
+  /* The districts this person may raise a requisition for: the ones in the
+     division or divisions recorded against them in Employees. A Programme
+     Officer in Pune asks for Pune's districts - choosing the state and the
+     division first was three dropdowns to arrive at the only answer the
+     directory would have given anyway, and a fourth chance to file against
+     somewhere they have nothing to do with.
+
+     Most people have one division. The few who have more - a manager
+     covering two - get every district of both, told apart by the heading
+     over them. */
+  function myPlaces() {
+    var standing = myStanding();
+    var mine = ((standing && standing.divisions) || []).map(function (d) {
+      return String(d).trim().toLowerCase();
+    });
+    if (!mine.length) return [];
+
+    var out = [];
+    geography.forEach(function (st) {
+      st.divisions.forEach(function (dv) {
+        if (mine.indexOf(String(dv.name).trim().toLowerCase()) === -1) return;
+        dv.districts.forEach(function (d) {
+          out.push({ state: st.name, division: dv.name, district: d });
+        });
+      });
+    });
+    return out;
   }
 
-  function divisionNamed(stateName, divisionName) {
-    var st = stateNamed(stateName);
-    if (!st) return null;
-    for (var i = 0; i < st.divisions.length; i++) {
-      if (st.divisions[i].name === divisionName) return st.divisions[i];
+  // The entry for a district, where it is one of theirs.
+  function myPlaceOf(district) {
+    var want = String(district || "").trim().toLowerCase();
+    return myPlaces().filter(function (p) {
+      return String(p.district).trim().toLowerCase() === want;
+    })[0] || null;
+  }
+
+  function fillMyDistricts() {
+    var places = myPlaces();
+    var standing = myStanding();
+
+    /* Nothing to file against is nothing to submit. Left enabled, the button
+       answers a missing Division with "Select a district", which is not the
+       problem and not something they can do anything about. */
+    if (el.submitBtn) el.submitBtn.disabled = !places.length;
+
+    if (!places.length) {
+      el.district.innerHTML = '<option value="">Nothing to choose</option>';
+      el.district.disabled = true;
+      el.reqWhere.hidden = false;
+      el.reqWhere.className = "req-where is-bad";
+      el.reqWhere.textContent = standing && (standing.divisions || []).length
+        ? "The division recorded against you is not one the directory has " +
+          "districts for, so there is nowhere to file this. Ask IT to check " +
+          "your Division on the Employees tab."
+        : "No Division is recorded against you on the Employees tab, so there " +
+          "is nowhere to file this. Ask IT to fill it in.";
+      return;
     }
-    return null;
+
+    // The divisions in play, in the order they came out of the directory.
+    var divisions = [];
+    places.forEach(function (p) {
+      if (!divisions.filter(function (d) { return d.division === p.division; }).length) {
+        divisions.push({ division: p.division, state: p.state });
+      }
+    });
+
+    el.reqWhere.hidden = false;
+    el.reqWhere.className = "req-where";
+    el.reqWhere.innerHTML = divisions.length === 1
+      ? "<b>" + escapeHtml(divisions[0].division) + "</b><span>" +
+        escapeHtml(divisions[0].state) + "</span>"
+      : "<b>" + escapeHtml(divisions.map(function (d) { return d.division; }).join(", ")) +
+        "</b><span>your divisions</span>";
+
+    var html = '<option value="">Select district</option>';
+    if (divisions.length === 1) {
+      places.forEach(function (p) {
+        html += '<option value="' + escapeHtml(p.district) + '">' +
+                escapeHtml(p.district) + "</option>";
+      });
+    } else {
+      divisions.forEach(function (d) {
+        html += '<optgroup label="' + escapeHtml(d.division) + '">';
+        places.filter(function (p) { return p.division === d.division; })
+              .forEach(function (p) {
+                html += '<option value="' + escapeHtml(p.district) + '">' +
+                        escapeHtml(p.district) + "</option>";
+              });
+        html += "</optgroup>";
+      });
+    }
+    el.district.innerHTML = html;
+    el.district.disabled = false;
+
+    // One district and nothing to decide: choose it.
+    if (places.length === 1) el.district.value = places[0].district;
   }
 
   function loadGeography() {
     if (typeof window.olfGeography !== "function") {
-      el.state.innerHTML = '<option value="">Unavailable</option>';
+      el.district.innerHTML = '<option value="">Unavailable</option>';
       showSetupBanner(
         "This page reads the states, divisions and districts from the " +
         "Employees directory, and that is not loaded. Reload Staff Connect " +
@@ -1716,7 +1787,7 @@ window.AWARD_CONFIG = {
         geography = tree || [];
 
         if (!geography.length) {
-          el.state.innerHTML = '<option value="">No locations found</option>';
+          el.district.innerHTML = '<option value="">No locations found</option>';
           showSetupBanner(
             "No employee has a State, Division and District recorded, so " +
             "there is nothing to choose from. Fill those in on the Employees " +
@@ -1727,58 +1798,12 @@ window.AWARD_CONFIG = {
           return;
         }
 
-        fillSelect(el.state, geography, "Select state",
-          function (s) { return s.name; },
-          function (s) { return s.name; });
-
-        // Only one state in the directory? Choose it and move on.
-        if (geography.length === 1) {
-          el.state.value = geography[0].name;
-          loadDivisions(el.state.value);
-        }
+        fillMyDistricts();
       })
       .catch(function (err) {
-        el.state.innerHTML = '<option value="">Could not load states</option>';
+        el.district.innerHTML = '<option value="">Could not load districts</option>';
         reportError("load the directory's locations", err);
       });
-  }
-
-  function loadDivisions(stateName) {
-    el.district.innerHTML = '<option value="">Select a division first</option>';
-    el.district.disabled = true;
-
-    var st = stateName ? stateNamed(stateName) : null;
-    if (!st) {
-      el.division.innerHTML = '<option value="">Select a state first</option>';
-      el.division.disabled = true;
-      return;
-    }
-
-    fillSelect(el.division, st.divisions, "Select division",
-      function (d) { return d.name; },
-      function (d) { return d.name; });
-    el.division.disabled = false;
-
-    if (st.divisions.length === 1) {
-      el.division.value = st.divisions[0].name;
-      loadDistricts(stateName, el.division.value);
-    }
-  }
-
-  function loadDistricts(stateName, divisionName) {
-    var dv = divisionName ? divisionNamed(stateName, divisionName) : null;
-    if (!dv) {
-      el.district.innerHTML = '<option value="">Select a division first</option>';
-      el.district.disabled = true;
-      return;
-    }
-
-    fillSelect(el.district, dv.districts, "Select district",
-      function (n) { return n; },
-      function (n) { return n; });
-    el.district.disabled = false;
-
-    if (dv.districts.length === 1) el.district.value = dv.districts[0];
   }
 
   /* The award types, kept so a line can be built whenever one is added. */
@@ -1905,9 +1930,15 @@ window.AWARD_CONFIG = {
        tables have never heard of. For a log that cannot be edited the name is
        the better record anyway - it keeps what was picked at the time instead
        of following a row somebody renames later. */
+    /* The district is chosen; the state and the division come with it, out
+       of the filer's own record. They are still written onto the row rather
+       than looked up later - who may approve this depends on the division it
+       was for at the time, and people move. */
+    var where = myPlaceOf(el.district.value) || {};
+
     var values = {
-      state_name: el.state.value || "",
-      division_name: el.division.value || "",
+      state_name: where.state || "",
+      division_name: where.division || "",
       district_name: el.district.value || "",
       // Filled in below, from the award lines.
       award_type_id: null,
@@ -1940,25 +1971,15 @@ window.AWARD_CONFIG = {
 
     var ok = true;
 
-    if (!values.state_name) {
-      setFieldError(el.state, "state-error", "Select a state."); ok = false;
-    }
-    if (!values.division_name) {
-      setFieldError(el.division, "division-error", "Select a division."); ok = false;
-    }
     if (!values.district_name) {
       setFieldError(el.district, "district-error", "Select a district."); ok = false;
-    }
-
-    // The three cascade, so a stale pairing means the directory changed under
-    // them mid-form. Better to stop than to file a place that does not exist.
-    if (values.state_name && values.division_name && values.district_name) {
-      var dv = divisionNamed(values.state_name, values.division_name);
-      if (!dv || dv.districts.indexOf(values.district_name) === -1) {
-        setFieldError(el.district, "district-error",
-          "That district is no longer listed under this division. Choose again.");
-        ok = false;
-      }
+    } else if (!values.state_name || !values.division_name) {
+      /* The district is no longer one of theirs - the directory changed
+         under the form, or their own posting did. Better to stop than to
+         file a requisition against a division nobody can approve. */
+      setFieldError(el.district, "district-error",
+        "That district is no longer one of yours. Choose again.");
+      ok = false;
     }
     /* The awards asked for. Every line has to name one and say how many.
        Only the first fault is reported: a list of complaints about a
