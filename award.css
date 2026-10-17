@@ -1150,3 +1150,19 @@
   border: 1px solid #EBD6AC;
 }
 .award-page .stock-line .hint { font-weight: 400; color: var(--text-muted); font-size: 11px; }
+
+/* Quiet districts are hidden by default, so the few with anything in them
+   are not buried under four hundred rows of dashes. */
+.award-page .stock-all {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--text-soft);
+  white-space: nowrap;
+  padding-bottom: 7px;
+  cursor: pointer;
+}
+.award-page .stock-all input { accent-color: var(--accent); }
+.award-page .stock-all-inline { display: block; margin-top: 10px; cursor: pointer; }
+.award-page .stock-all-inline input { margin-right: 6px; accent-color: var(--accent); }

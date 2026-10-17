@@ -87,6 +87,8 @@ window.AWARD_CONFIG = {
     stockState: document.getElementById("stock-state"),
     stockDivision: document.getElementById("stock-division"),
     stockDistrict: document.getElementById("stock-district"),
+    stockAll: document.getElementById("stock-all"),
+    stockAllWrap: document.getElementById("stock-all-wrap"),
     stockUse: document.getElementById("stock-use"),
     stockOpen: document.getElementById("stock-open"),
     stockModal: document.getElementById("stock-modal"),
@@ -1487,6 +1489,8 @@ window.AWARD_CONFIG = {
     el.stockFState.addEventListener("change", stockDivisionsFor);
     el.stockFDivision.addEventListener("change", stockDistrictsFor);
 
+    if (el.stockAll) el.stockAll.addEventListener("change", renderStock);
+
     [el.stockYear, el.stockState, el.stockDivision, el.stockDistrict].forEach(function (sel) {
       sel.addEventListener("change", function () {
         if (sel === el.stockState || sel === el.stockDivision) stockFiltersFor(sel);
@@ -2686,6 +2690,9 @@ window.AWARD_CONFIG = {
       function (n) { return n; }, function (n) { return n; });
     stockFiltersFor(null);
 
+    if (el.stockAllWrap) {
+      el.stockAllWrap.hidden = false;
+    }
     el.stockUse.hidden = !canRecordUse();
     el.stockOpen.hidden = !canSetOpening();
   }
@@ -2719,6 +2726,43 @@ window.AWARD_CONFIG = {
 
     var types = awardTypes;
     var rows = stockRows(fy, allRequisitions, stockMovements, places);
+
+    /* Districts where nothing has happened are hidden unless asked for.
+       Thirty-five districts over twelve months is four hundred and fifty
+       rows, and on a quiet day every one of them is dashes - which buries
+       the handful that have anything in them. The ones with stock sitting
+       in them count as having something: a balance is news even when the
+       month was quiet. */
+    var showAll = el.stockAll && el.stockAll.checked;
+    if (!showAll) {
+      var busy = {};
+      rows.forEach(function (r) {
+        if (sumOf(r.requisition) || sumOf(r.delivery) ||
+            sumOf(r.utilisation) || sumOf(r.balance)) {
+          busy[r.district] = true;
+        }
+      });
+      rows = rows.filter(function (r) { return busy[r.district]; });
+    }
+
+    if (!rows.length) {
+      wrap.innerHTML = '<p class="aw-empty-line">' +
+        (showAll
+          ? "No districts match."
+          : "Nothing has moved yet. A district appears here once a requisition " +
+            "is raised for it, or once it is given an opening figure. " +
+            "<label class=\"stock-all-inline\"><input type=\"checkbox\" " +
+            "id=\"stock-all-inline\"> Show every district anyway</label>") +
+        "</p>";
+      var inline = document.getElementById("stock-all-inline");
+      if (inline) {
+        inline.addEventListener("change", function () {
+          if (el.stockAll) { el.stockAll.checked = inline.checked; }
+          renderStock();
+        });
+      }
+      return;
+    }
 
     var head =
       "<thead><tr>" +
