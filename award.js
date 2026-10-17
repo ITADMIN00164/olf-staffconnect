@@ -65,7 +65,6 @@ window.AWARD_CONFIG = {
     formBannerText: document.getElementById("form-banner-text"),
 
     refreshBtn: document.getElementById("refresh-btn"),
-    tabs: document.querySelectorAll(".award-page .aw-tab"),
     subtabs: document.querySelectorAll(".award-page .aw-subtab"),
     modal: document.getElementById("requisition-modal"),
     newReqBtn: document.getElementById("new-req-btn"),
@@ -87,9 +86,9 @@ window.AWARD_CONFIG = {
     stockState: document.getElementById("stock-state"),
     stockDivision: document.getElementById("stock-division"),
     stockDistrict: document.getElementById("stock-district"),
-    stockAll: document.getElementById("stock-all"),
-    stockAllWrap: document.getElementById("stock-all-wrap"),
-    stockUse: document.getElementById("stock-use"),
+    stockFetch: document.getElementById("stock-fetch"),
+    stockWhere: document.getElementById("stock-where"),
+    stockPlace: document.getElementById("stock-place"),
     stockOpen: document.getElementById("stock-open"),
     stockModal: document.getElementById("stock-modal"),
     stockHeading: document.getElementById("stock-heading"),
@@ -140,6 +139,8 @@ window.AWARD_CONFIG = {
   var hasItems = true;        // false until the multiple-awards migration runs
   var hasFulfilment = true;   // false until the fulfilment migration runs
   var hasEmails = true;       // false until the addresses migration runs
+  var hasLog = true;          // false until sql/award-log-setup.sql is run
+  var hasSent = true;         // false until sql/award-stock-setup.sql is run
 
   /* Where a requisition has got to.
 
@@ -232,27 +233,85 @@ window.AWARD_CONFIG = {
     }
   }
 
-  /* Every step a requisition has been through, newest last. Drawn under the
-     chip so the whole journey is on the row rather than hidden in a tooltip. */
+  /* Every step a requisition has been through, in the order it happened.
+
+     Read out of the log the row carries rather than pieced together from the
+     column each step writes. Those columns cannot hold a step that has no
+     column of its own - taking something off hold left no trace at all - and
+     they remember only the last time a step repeated, so a requisition held
+     twice looked like one held once. The log is appended to and never
+     rewritten: held, taken off hold, held again all stay, in that order.
+
+     Rows filed before the log existed fall back to their columns, which is
+     the best those rows can do. */
+  var STEP_WORDS = {
+    raised:       { label: "Raised",         tone: "start" },
+    approved:     { label: "Approved",       tone: "good"  },
+    declined:     { label: "Declined",       tone: "bad"   },
+    acknowledged: { label: "Acknowledged",   tone: "move"  },
+    held:         { label: "Put on hold",    tone: "warn"  },
+    resumed:      { label: "Taken off hold", tone: "move"  },
+    dispatched:   { label: "Dispatched",     tone: "move"  },
+    not_received: { label: "Never arrived",  tone: "bad"   },
+    received:     { label: "Received",       tone: "good"  },
+    rejected:     { label: "Rejected",       tone: "bad"   }
+  };
+
   function trailOf(row) {
+    var log = row && row.log;
+    if (log && log.length) {
+      return log.slice().sort(function (a, b) {
+        return String(a.at || "").localeCompare(String(b.at || ""));
+      }).map(function (e) {
+        var word = STEP_WORDS[e.what] || { label: String(e.what || "Step"), tone: "move" };
+        return { what: word.label, tone: word.tone, who: e.by || "",
+                 when: e.at || "", note: e.note || "", email: e.email || "" };
+      });
+    }
+
+    // Nothing logged: read back what the columns can still tell us.
     var steps = [];
-    var push = function (what, who, when, email) {
+    var push = function (what, who, when, note, email) {
       if (who || when) {
-        steps.push({ what: what, who: who || "", when: when || "", email: email || "" });
+        var word = STEP_WORDS[what];
+        steps.push({ what: word.label, tone: word.tone, who: who || "",
+                     when: when || "", note: note || "", email: email || "" });
       }
     };
-    push("Raised", row.requester_name, row.created_at, row.requester_email);
+    push("raised", row.requester_name, row.created_at, "", row.requester_email);
     if (row.decided_at) {
-      push(stageOf(row) === "declined" ? "Declined" : "Approved",
-           row.decided_by, row.decided_at, row.decided_by_email);
+      push(stageOf(row) === "declined" ? "declined" : "approved",
+           row.decided_by, row.decided_at, row.decision_remark, row.decided_by_email);
     }
-    push("Acknowledged", row.acknowledged_by, row.acknowledged_at);
-    push("On hold", row.held_by, row.held_at);
-    push("Dispatched", row.dispatched_by, row.dispatched_at);
-    push("Not received", row.issue_by, row.issue_at);
-    push("Received", row.received_by, row.received_at);
-    push("Rejected", row.rejected_by, row.rejected_at);
+    push("acknowledged", row.acknowledged_by, row.acknowledged_at);
+    push("held", row.held_by, row.held_at);
+    push("dispatched", row.dispatched_by, row.dispatched_at, row.ho_remark);
+    push("not_received", row.issue_by, row.issue_at, row.issue_note);
+    push("received", row.received_by, row.received_at, row.receipt_note);
+    push("rejected", row.rejected_by, row.rejected_at, row.ho_remark);
     return steps;
+  }
+
+  // The patch a step writes, with the step added to the log - or without it,
+  // where the column is not there yet.
+  function withLog(row, what, note, patch) {
+    if (hasLog && what) patch.log = logEntry(row, what, note);
+    return patch;
+  }
+
+  /* What to add to the log when a step is taken. The columns beside it still
+     record the latest of each step, because the stock arithmetic reads them;
+     the log is the history, and it only ever grows. */
+  function logEntry(row, what, note) {
+    var log = (row && row.log && row.log.slice()) || [];
+    log.push({
+      at: new Date().toISOString(),
+      what: what,
+      by: (signedInUser() || {}).name || myEmail() || "",
+      email: myEmail() || null,
+      note: note || null
+    });
+    return log;
   }
 
   /* ------------------------------------------------------------------
@@ -435,22 +494,12 @@ window.AWARD_CONFIG = {
     return !!myName && myName === theirName;
   }
 
-  /* Whoever approved it can also close it. The requester is the right
-     person, but people leave, and without this a dispatched requisition
-     whose requester has gone could never be closed by anybody. Recorded
-     under their own name, so the trail shows it was not the requester. */
-  function iApproved(row) {
-    var mine = myEmail();
-    var theirs = String((row && row.decided_by_email) || "").trim().toLowerCase();
-    if (theirs && mine) return theirs === mine;
-
-    var myName = String((signedInUser() || {}).name || "").trim().toLowerCase();
-    var theirName = String((row && row.decided_by) || "").trim().toLowerCase();
-    return !!myName && myName === theirName;
-  }
-
+  /* Whoever raised it, and nobody else. They are the one it was sent to and
+     the only one in a position to see it arrive - an approver sitting in
+     another office is no better placed than Head Office to say it did, and
+     letting them say so put a receipt against a parcel they never saw. */
   function canConfirmReceipt(row) {
-    return stageOf(row) === "dispatched" && (isMine(row) || iApproved(row));
+    return stageOf(row) === "dispatched" && isMine(row);
   }
 
   /* Dispatched and nothing came. Without this the only move on a dispatched
@@ -584,7 +633,10 @@ window.AWARD_CONFIG = {
            '<path d="M12 5v14M5 12h14"/></svg>',
     close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
            'stroke-width="2" stroke-linecap="round">' +
-           '<path d="M6 6l12 12M18 6L6 18"/></svg>'
+           '<path d="M6 6l12 12M18 6L6 18"/></svg>',
+    search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+            'stroke-width="2" stroke-linecap="round">' +
+            '<circle cx="11" cy="11" r="6"/><path d="m16 16 4.5 4.5"/></svg>'
   };
 
   function paintIcons() {
@@ -668,7 +720,6 @@ window.AWARD_CONFIG = {
     paintIcons();
     showSignedInUser();
     applyStanding();
-    showTab(el.tabs, "data-aw-tab", "stock");
     showTab(el.subtabs, "data-aw-subtab", "requisition");
     applyAccess();
 
@@ -929,14 +980,14 @@ window.AWARD_CONFIG = {
        reaching it at once cannot overwrite one another: the second finds
        nothing to change and is told so. */
     db.from("requisitions")
-      .update({
+      .update(withLog(reviewing, decision === "approved" ? "approved" : "declined", remark, {
         status: decision,
         decision_remark: remark || null,
         decided_by: (signedInUser() || {}).name || "",
         decided_by_email: myEmail() || null,
         decided_by_role: standing.role,
         decided_at: new Date().toISOString()
-      })
+      }))
       .eq("id", reviewing.id)
       .eq("status", "submitted")
       .select("id")
@@ -1289,6 +1340,15 @@ window.AWARD_CONFIG = {
 
     el.hoConfirm.disabled = true;
 
+    /* The step goes into the log as well. "resume" is why it has to: it has
+       no column of its own, so before this there was nothing anywhere to say
+       a requisition had ever come back off hold. */
+    patch = withLog(row, {
+      acknowledge: "acknowledged", hold: "held", resume: "resumed",
+      dispatch: "dispatched", receive: "received", issue: "not_received",
+      reject: "rejected"
+    }[action], remark, patch);
+
     // Conditional on the stage it was read at, so two people acting at once
     // cannot step on each other.
     db.from("requisitions").update(patch)
@@ -1458,7 +1518,6 @@ window.AWARD_CONFIG = {
     if (el.form.dataset.awWired === "1") return;
     el.form.dataset.awWired = "1";
 
-    wireTabList(el.tabs, "data-aw-tab");
     wireTabList(el.subtabs, "data-aw-subtab");
 
     Array.prototype.forEach.call(
@@ -1467,8 +1526,20 @@ window.AWARD_CONFIG = {
     );
     el.hoConfirm.addEventListener("click", confirmHoAction);
 
-    el.stockUse.addEventListener("click", function () { openStockModal("utilised"); });
     el.stockOpen.addEventListener("click", function () { openStockModal("opening"); });
+
+    /* Utilisation is recorded from the row it belongs to. The table is
+       redrawn on every change, so the click is caught on the wrapper, which
+       is not. */
+    var stockWrap = document.getElementById("stock-table-wrap");
+    if (stockWrap) {
+      stockWrap.addEventListener("click", function (event) {
+        var btn = event.target.closest && event.target.closest("[data-aw-use]");
+        if (!btn) return;
+        openStockModal("utilised", { district: btn.getAttribute("data-aw-where"),
+                                     month: btn.getAttribute("data-aw-use") });
+      });
+    }
     el.stockSave.addEventListener("click", saveStock);
     Array.prototype.forEach.call(
       el.stockModal.querySelectorAll("[data-aw-close-stock]"),
@@ -1489,11 +1560,19 @@ window.AWARD_CONFIG = {
     el.stockFState.addEventListener("change", stockDivisionsFor);
     el.stockFDivision.addEventListener("change", stockDistrictsFor);
 
-    if (el.stockAll) el.stockAll.addEventListener("change", renderStock);
+    el.stockFetch.addEventListener("click", function () {
+      stockShown = true;
+      renderStock();
+    });
 
+    /* Changing a filter puts the sheet away again rather than redrawing it.
+       Four hundred rows should be asked for, not arrived at by touching a
+       dropdown - and a sheet that half-follows the filters is worse than one
+       that waits to be asked. */
     [el.stockYear, el.stockState, el.stockDivision, el.stockDistrict].forEach(function (sel) {
       sel.addEventListener("change", function () {
         if (sel === el.stockState || sel === el.stockDivision) stockFiltersFor(sel);
+        stockShown = false;
         renderStock();
       });
     });
@@ -1848,6 +1927,17 @@ window.AWARD_CONFIG = {
       requisition_date: todayLocalISO(),
     };
 
+    /* The first entry in the log. Every step after this appends to it, so the
+       history is on the row itself rather than inferred from which columns
+       happen to be filled in. */
+    if (hasLog) {
+      values.log = [{
+        at: new Date().toISOString(), what: "raised",
+        by: (signedInUser() || {}).name || myEmail() || "",
+        email: myEmail() || null, note: null
+      }];
+    }
+
     var ok = true;
 
     if (!values.state_name) {
@@ -2026,9 +2116,18 @@ window.AWARD_CONFIG = {
               (hasNameColumns  ? " state_name, division_name, district_name," : "") +
               (hasLookupTables ? " states ( code, name ), districts ( name )," : "") +
               (hasItems ? " items," : "") +
+              /* held_ and issue_ were written but never read back, so a
+                 requisition that had been on hold, or reported as never
+                 arrived, showed no sign of it after a refresh. */
               (hasFulfilment ? " acknowledged_by, acknowledged_at, dispatched_by," +
                                " dispatched_at, received_by, received_at, receipt_note," +
-                               " rejected_by, rejected_at, ho_remark," : "") +
+                               " rejected_by, rejected_at, ho_remark," +
+                               " held_by, held_at, issue_by, issue_at, issue_note," : "") +
+              /* What Head Office actually sent. Also never read back, which
+                 left the stock sheet crediting a district with everything it
+                 asked for whenever it was sent less. */
+              (hasSent ? " dispatched_items," : "") +
+              (hasLog ? " log," : "") +
               (hasEmails ? " requester_email, decided_by_email, ho_by_email," : "") +
               (hasApproval ? " requester_role, requester_level, decided_by," +
                              " decided_by_role, decided_at, decision_remark," : "") +
@@ -2051,8 +2150,18 @@ window.AWARD_CONFIG = {
             loadRequisitions();
             return;
           }
+          if (hasLog && /\blog\b/i.test(msg)) {
+            hasLog = false;                   // the log migration is not run
+            loadRequisitions();
+            return;
+          }
+          if (hasSent && /dispatched_items/i.test(msg)) {
+            hasSent = false;                  // the stock migration is not run
+            loadRequisitions();
+            return;
+          }
           if (hasFulfilment &&
-              /(acknowledged_|dispatched_|received_|receipt_note|rejected_|ho_remark)/i.test(msg)) {
+              /(acknowledged_|dispatched_|received_|receipt_note|rejected_|ho_remark|held_|issue_)/i.test(msg)) {
             hasFulfilment = false;            // fulfilment not migrated yet
             loadRequisitions();
             return;
@@ -2202,10 +2311,11 @@ window.AWARD_CONFIG = {
           "<td>" + escapeHtml(p.division || "—") + "</td>" +
           "<td>" + escapeHtml(p.district || "—") + "</td>" +
           "<td>" + escapeHtml(row.requester_name) + "</td>" +
-          "<td>" + awardsCellHtml(awards) + "</td>" +
+          '<td class="cell-awards">' + awardsCellHtml(awards) + "</td>" +
           '<td class="num">' + escapeHtml(row.quantity) + "</td>" +
           '<td class="cell-date muted">' + escapeHtml(formatTimestamp(row.created_at)) + "</td>" +
           "<td>" + statusCellHtml(row) + "</td>" +
+          '<td class="cell-log-col">' + logCellHtml(row) + "</td>" +
           '<td class="cell-action">' + actionCellHtml(row) + "</td>" +
         "</tr>";
     });
@@ -2257,36 +2367,49 @@ window.AWARD_CONFIG = {
     }).join(" ");
   }
 
-  /* The state of a requisition, and - where it has been settled - who said
-     so. The remark hangs off the chip rather than taking a column of its
-     own: most are short, and a column of mostly-empty cells reads worse. */
-  /* The stage it has reached, and under it the steps that got it there, so
-     the whole journey is on the row rather than hidden behind a tooltip. */
+  /* Where a requisition stands, and who it is sitting with. Just that: the
+     steps that got it there are a column of their own now. One cell holding
+     both the state and the whole history made the state hard to find, which
+     is the thing most people are looking for. */
   function statusCellHtml(row, forHo) {
-    var key = stageOf(row);
-    var stage = STAGES[key];
-
-    var trail = trailOf(row).map(function (st) {
-      return '<span class="cell-step"' +
-             (st.email ? ' title="' + escapeHtml(st.email) + '"' : "") + "><b>" +
-             escapeHtml(st.what) + "</b>" +
-             (st.who ? " " + escapeHtml(st.who) : "") +
-             (st.when ? ' <i>' + escapeHtml(formatTimestamp(st.when)) + "</i>" : "") +
-             "</span>";
-    }).join("");
-
-    var remark = row.issue_note || row.receipt_note || row.ho_remark ||
-                 row.decision_remark || "";
-
+    var stage = STAGES[stageOf(row)];
     var waiting = waitingOn(row);
 
     return '<span class="chip-status is-' + escapeHtml(stage.tone) + '">' +
              escapeHtml(stageLabel(row, forHo)) + "</span>" +
            (waiting ? '<span class="cell-waiting">With ' + escapeHtml(waiting) +
-                      "</span>" : "") +
-           '<span class="cell-trail">' + trail + "</span>" +
-           (remark ? '<span class="cell-remark" title="' + escapeHtml(remark) + '">' +
-                     escapeHtml(remark) + "</span>" : "");
+                      "</span>" : "");
+  }
+
+  /* The journey, in its own column: every step, who took it, when, and
+     anything they said about it. Coloured by what the step was, so a hold or
+     a rejection shows without having to be read. */
+  function logCellHtml(row) {
+    var steps = trailOf(row);
+    if (!steps.length) return '<span class="log-none">\u2014</span>';
+
+    var html = '<ol class="cell-log">' + steps.map(function (st) {
+      return '<li class="log-step is-' + escapeHtml(st.tone) + '"' +
+               (st.email ? ' title="' + escapeHtml(st.email) + '"' : "") + ">" +
+               '<span class="log-what">' + escapeHtml(st.what) + "</span>" +
+               (st.who ? '<span class="log-who">' + escapeHtml(st.who) + "</span>" : "") +
+               (st.when ? '<span class="log-when">' +
+                          escapeHtml(formatTimestamp(st.when)) + "</span>" : "") +
+               (st.note ? '<span class="log-note">\u201c' + escapeHtml(st.note) +
+                          "\u201d</span>" : "") +
+             "</li>";
+    }).join("") + "</ol>";
+
+    /* A remark on a row filed before the log carried notes would otherwise
+       disappear with the column it used to be read from. */
+    var noted = steps.some(function (st) { return !!st.note; });
+    var remark = row.issue_note || row.receipt_note || row.ho_remark ||
+                 row.decision_remark || "";
+    if (remark && !noted) {
+      html += '<span class="log-note is-loose">\u201c' + escapeHtml(remark) +
+              "\u201d</span>";
+    }
+    return html;
   }
 
   var HO_LABELS = {
@@ -2350,7 +2473,8 @@ window.AWARD_CONFIG = {
 
     if (!rows.length) {
       el.deliveryBody.innerHTML =
-        '<tr class="placeholder-row"><td colspan="8">' +
+        '<tr class="placeholder-row"><td colspan="' +
+        (document.querySelectorAll("#delivery-table thead th").length || 9) + '">' +
         (hasAdmins
           ? "Nothing yet. Requisitions appear here once they are approved."
           : "Run sql/award-management-setup.sql to set this up.") +
@@ -2367,9 +2491,10 @@ window.AWARD_CONFIG = {
         "<td>" + escapeHtml(p.division || "—") + "</td>" +
         "<td>" + escapeHtml(p.district || "—") + "</td>" +
         "<td>" + escapeHtml(row.requester_name || "—") + "</td>" +
-        "<td>" + awardsCellHtml(awards) + shortfallHtml(row) + "</td>" +
+        '<td class="cell-awards">' + awardsCellHtml(awards) + shortfallHtml(row) + "</td>" +
         '<td class="num">' + escapeHtml(Number(row.quantity).toLocaleString()) + "</td>" +
         "<td>" + statusCellHtml(row, true) + "</td>" +
+        '<td class="cell-log-col">' + logCellHtml(row) + "</td>" +
         '<td class="cell-action">' + actionCellHtml(row) + "</td>" +
       "</tr>";
     }).join("");
@@ -2534,7 +2659,7 @@ window.AWARD_CONFIG = {
       });
 
       rows.push(Object.assign({}, place, {
-        month: "Carry forward", monthKey: "", items: "Inventory", remark: "",
+        month: "Carry forward", monthKey: "", remark: "",
         requisition: {}, delivery: {}, utilisation: {},
         balance: Object.assign({}, balance)
       }));
@@ -2555,7 +2680,7 @@ window.AWARD_CONFIG = {
         });
 
         rows.push(Object.assign({}, place, {
-          month: monthLabelOf(key), monthKey: key, items: "No. of Teachers",
+          month: monthLabelOf(key), monthKey: key,
           requisition: cell.requisition,
           delivery: cell.delivery,
           utilisation: cell.utilisation,
@@ -2640,17 +2765,21 @@ window.AWARD_CONFIG = {
     return Object.keys(years).map(Number).sort(function (a, b) { return b - a; });
   }
 
-  function cellsHtml(map, types, emphasis) {
+  /* One group of cells - what was asked for, what arrived, what was given
+     out, or what is left. Each carries its group, so the sheet can be read
+     by colour: four groups of five numbers all in the same ink is what made
+     it hard to follow a column down. A figure of nothing is greyed, and a
+     negative one is red - it should never happen, and if it does it should be
+     the first thing seen. */
+  function cellsHtml(map, types, kind) {
     var html = "";
-    types.forEach(function (t) {
-      var n = map[t.id] || 0;
-      html += '<td class="num' + (n ? "" : " is-nil") + '">' +
-              (n ? escapeHtml(n.toLocaleString()) : "\u2013") + "</td>";
-    });
-    var total = sumOf(map);
-    html += '<td class="num is-total' + (emphasis ? " is-strong" : "") + '">' +
-            (total ? escapeHtml(total.toLocaleString()) : "\u2013") + "</td>";
-    return html;
+    var cell = function (n, extra) {
+      return '<td class="num col-' + kind + (n ? "" : " is-nil") +
+             (n < 0 ? " is-neg" : "") + extra + '">' +
+             (n ? escapeHtml(n.toLocaleString()) : "\u2013") + "</td>";
+    };
+    types.forEach(function (t) { html += cell(map[t.id] || 0, ""); });
+    return html + cell(sumOf(map), " is-total");
   }
 
   /* The filters narrow each other, the same way the requisition form does:
@@ -2697,16 +2826,30 @@ window.AWARD_CONFIG = {
       function (n) { return n; }, function (n) { return n; });
     stockFiltersFor(null);
 
-    if (el.stockAllWrap) {
-      el.stockAllWrap.hidden = false;
-    }
-    el.stockUse.hidden = !canRecordUse();
     el.stockOpen.hidden = !canSetOpening();
   }
+
+  /* Whether the sheet has been asked for. It is not drawn on arrival: the
+     tab opens on its filters, and the figures come when Fetch is pressed.
+     Thirty-five districts over twelve months is four hundred rows, and
+     landing in them before saying what you came for is no use to anybody. */
+  var stockShown = false;
 
   function renderStock() {
     var wrap = document.getElementById("stock-table-wrap");
     if (!wrap) return;
+
+    if (!stockShown) {
+      wrap.innerHTML =
+        '<div class="stock-prompt">' +
+          "<p><b>Choose a year, and narrow it if you want to.</b></p>" +
+          "<p>Then press Fetch. Leaving the places on " +
+          "<i>All</i> shows the districts something has happened in; " +
+          "choosing a state, a division or a district shows every district " +
+          "in it, whether or not anything has.</p>" +
+        "</div>";
+      return;
+    }
 
     if (!hasStock) {
       wrap.innerHTML = '<p class="aw-empty-line">Run ' +
@@ -2734,14 +2877,16 @@ window.AWARD_CONFIG = {
     var types = awardTypes;
     var rows = stockRows(fy, allRequisitions, stockMovements, places);
 
-    /* Districts where nothing has happened are hidden unless asked for.
-       Thirty-five districts over twelve months is four hundred and fifty
-       rows, and on a quiet day every one of them is dashes - which buries
-       the handful that have anything in them. The ones with stock sitting
-       in them count as having something: a balance is news even when the
-       month was quiet. */
-    var showAll = el.stockAll && el.stockAll.checked;
-    if (!showAll) {
+    /* Asking for a place is asking for it whether or not anything has
+       happened there - that is how a district with no stock yet is given an
+       opening figure. Asking for nothing in particular shows the districts
+       with something in them: on a quiet day the other four hundred rows are
+       all dashes, and they bury the handful that are not. Stock sitting in a
+       district counts as something; a balance is news even in a quiet
+       month. */
+    var narrowed = !!(el.stockState.value || el.stockDivision.value ||
+                      el.stockDistrict.value);
+    if (!narrowed) {
       var busy = {};
       rows.forEach(function (r) {
         if (sumOf(r.requisition) || sumOf(r.delivery) ||
@@ -2753,55 +2898,70 @@ window.AWARD_CONFIG = {
     }
 
     if (!rows.length) {
-      wrap.innerHTML = '<p class="aw-empty-line">' +
-        (showAll
-          ? "No districts match."
-          : "Nothing has moved yet. A district appears here once a requisition " +
-            "is raised for it, or once it is given an opening figure. " +
-            "<label class=\"stock-all-inline\"><input type=\"checkbox\" " +
-            "id=\"stock-all-inline\"> Show every district anyway</label>") +
-        "</p>";
-      var inline = document.getElementById("stock-all-inline");
-      if (inline) {
-        inline.addEventListener("change", function () {
-          if (el.stockAll) { el.stockAll.checked = inline.checked; }
-          renderStock();
-        });
-      }
+      wrap.innerHTML =
+        '<div class="stock-prompt">' +
+          "<p><b>Nothing has moved yet.</b></p>" +
+          "<p>A district appears here once a requisition is raised for it, " +
+          "or once it is given an opening figure. To see a district that is " +
+          "still empty - to set its opening stock, say - choose it above and " +
+          "press Fetch again.</p>" +
+        "</div>";
       return;
     }
+
+    /* The four groups of the sheet. There used to be an Items column
+       between District and these, saying "No. of Teachers" on every single
+       row - the same words four hundred times, which is not information. */
+    var GROUPS = [
+      { kind: "req", label: "Requisition" },
+      { kind: "del", label: "Delivery" },
+      { kind: "use", label: "Utilisation" },
+      { kind: "bal", label: "Stock Balance" }
+    ];
 
     var head =
       "<thead><tr>" +
         '<th rowspan="2">Month</th><th rowspan="2">PM</th><th rowspan="2">State</th>' +
-        '<th rowspan="2">District</th><th rowspan="2">Items</th>' +
-        ['Requisition', 'Delivery', 'Utilisation', 'Stock Balance'].map(function (g, i) {
-          return '<th colspan="' + (types.length + 1) + '" class="grp grp-' + i + '">' +
-                 escapeHtml(g) + "</th>";
+        '<th rowspan="2">District</th>' +
+        GROUPS.map(function (g) {
+          return '<th colspan="' + (types.length + 1) + '" class="grp col-' + g.kind +
+                 '">' + escapeHtml(g.label) + "</th>";
         }).join("") +
         '<th rowspan="2">Remark</th>' +
+        '<th rowspan="2" class="col-act"><span class="sr-only">Record</span></th>' +
       "</tr><tr>" +
-        [0, 1, 2, 3].map(function (i) {
+        GROUPS.map(function (g) {
           return types.map(function (t) {
-            return '<th class="num grp-' + i + '">' + escapeHtml(shortType(t)) + "</th>";
-          }).join("") + '<th class="num grp-' + i + '">Total</th>';
+            return '<th class="num col-' + g.kind + '">' + escapeHtml(shortType(t)) +
+                   "</th>";
+          }).join("") + '<th class="num col-' + g.kind + ' is-total">Total</th>';
         }).join("") +
       "</tr></thead>";
 
     var body = rows.map(function (r) {
       var carry = r.monthKey === "";
+      /* Nothing held is nothing to give out, so the button is not offered -
+         the alternative is a dialog that can only refuse. */
+      var mayUse = !carry && canUseHere(r.district) && sumOf(r.balance) > 0;
       return '<tr class="' + (carry ? "is-carry" : "") + '">' +
         "<td>" + escapeHtml(r.month) + "</td>" +
-        "<td>" + escapeHtml(r.pm || "\u2014") + "</td>" +
+        '<td class="col-pm" title="' + escapeHtml(r.pm || "") + '">' +
+          escapeHtml(r.pm || "\u2014") + "</td>" +
         "<td>" + escapeHtml(r.state) + "</td>" +
         '<td class="is-district">' + escapeHtml(r.district) + "</td>" +
-        '<td class="muted">' + escapeHtml(r.items) + "</td>" +
-        cellsHtml(r.requisition, types) +
-        cellsHtml(r.delivery, types) +
-        cellsHtml(r.utilisation, types) +
-        cellsHtml(r.balance, types, true) +
+        cellsHtml(r.requisition, types, "req") +
+        cellsHtml(r.delivery, types, "del") +
+        cellsHtml(r.utilisation, types, "use") +
+        cellsHtml(r.balance, types, "bal") +
         '<td class="cell-remark-col" title="' + escapeHtml(r.remark || "") + '">' +
           escapeHtml(r.remark || "") + "</td>" +
+        '<td class="col-act">' +
+          (mayUse
+            ? '<button type="button" class="btn btn-ghost btn-xs" data-aw-use="' +
+              escapeHtml(r.monthKey) + '" data-aw-where="' + escapeHtml(r.district) +
+              '">Record use</button>'
+            : "") +
+        "</td>" +
       "</tr>";
     }).join("");
 
@@ -2827,7 +2987,6 @@ window.AWARD_CONFIG = {
   var stockKind = "utilised";
 
   function canSetOpening() { return isHoAdmin() || isAppAdmin(); }
-  function canRecordUse()  { return placesIMayRecord().length > 0; }
 
   /* Which districts somebody may record against. A manager records for their
      own division; the COO, Head Office and administrators for anywhere,
@@ -2846,53 +3005,102 @@ window.AWARD_CONFIG = {
     });
   }
 
-  function openStockModal(kind) {
+  // Whether this district is one of theirs to record against.
+  function canUseHere(district) {
+    var d = String(district || "").trim().toLowerCase();
+    return placesIMayRecord().some(function (p) {
+      return String(p.district).trim().toLowerCase() === d;
+    });
+  }
+
+  /* Where a utilisation is being recorded, taken from the row it was opened
+     from. Null for opening stock, which is entered for a district that may
+     have no row in the sheet yet and so has to be chosen. */
+  var stockCtx = null;
+
+  function openStockModal(kind, ctx) {
     stockKind = kind;
     returnFocusTo = document.activeElement;
 
     var opening = kind === "opening";
+
+    /* A utilisation already knows where and when it happened: it is the
+       district and the month of the row it was opened from. Asking for them
+       again in four dropdowns was four chances to record it against the
+       wrong place, for no information the page did not already have. */
+    stockCtx = null;
+    if (!opening) {
+      var where = placesIMayRecord().filter(function (p) {
+        return String(p.district).trim().toLowerCase() ===
+               String((ctx && ctx.district) || "").trim().toLowerCase();
+      })[0];
+      if (!where || !ctx.month) return;        // not theirs, or no month
+      stockCtx = { state: where.state, division: where.division,
+                   district: where.district, month: ctx.month };
+    }
+
     el.stockHeading.textContent = opening ? "Opening stock" : "Record utilisation";
     el.stockSub.textContent = opening
       ? "What the district already held before any of this was recorded. Entered once."
-      : "Awards handed out. This comes off the district's stock.";
+      : "Awards handed out. This comes off what the district is holding.";
     el.stockFLabel.textContent = opening
       ? "How many it was holding" : "How many were given out";
     el.stockSave.textContent = opening ? "Set opening stock" : "Record";
 
-    var places = placesIMayRecord();
-    var states = [];
-    places.forEach(function (p) { if (states.indexOf(p.state) === -1) states.push(p.state); });
+    el.stockPlace.hidden = !opening;
+    el.stockWhere.hidden = opening;
+    if (stockCtx) {
+      el.stockWhere.innerHTML =
+        '<b>' + escapeHtml(stockCtx.district) + "</b>" +
+        '<span>' + escapeHtml(stockCtx.division) + ", " + escapeHtml(stockCtx.state) +
+        "</span>" +
+        '<em>' + escapeHtml(monthLabelOf(stockCtx.month)) + "</em>";
+    }
 
-    fillSelect(el.stockFState, states.sort(), "Select state",
-      function (n) { return n; }, function (n) { return n; });
-    el.stockFDivision.innerHTML = '<option value="">Select a state first</option>';
-    el.stockFDivision.disabled = true;
-    el.stockFDistrict.innerHTML = '<option value="">Select a division first</option>';
-    el.stockFDistrict.disabled = true;
-    if (states.length === 1) { el.stockFState.value = states[0]; stockDivisionsFor(); }
-
-    // The months of the year on screen, so a figure cannot land in a year
-    // nobody is looking at.
     var fy = Number(el.stockYear.value) || fyStartOf(new Date());
     if (opening) {
+      var places = placesIMayRecord();
+      var states = [];
+      places.forEach(function (p) {
+        if (states.indexOf(p.state) === -1) states.push(p.state);
+      });
+      fillSelect(el.stockFState, states.sort(), "Select state",
+        function (n) { return n; }, function (n) { return n; });
+      el.stockFDivision.innerHTML = '<option value="">Select a state first</option>';
+      el.stockFDivision.disabled = true;
+      el.stockFDistrict.innerHTML = '<option value="">Select a division first</option>';
+      el.stockFDistrict.disabled = true;
+      if (states.length === 1) { el.stockFState.value = states[0]; stockDivisionsFor(); }
+
       /* March of the year the year begins in - the same date the import
          writes. The unique index that stops a district being given two
          opening figures includes the date, so a different one here would
          slip past it and the stock would be counted twice. */
       el.stockFMonth.innerHTML =
         '<option value="' + fy + '-03">Before ' + escapeHtml(fyLabel(fy)) + '</option>';
-    } else {
-      el.stockFMonth.innerHTML = fyMonthKeys(fy).map(function (k) {
-        return '<option value="' + k + '">' + escapeHtml(monthLabelOf(k)) + '</option>';
-      }).join("");
-      var thisMonth = monthKeyOf(new Date());
-      if (fyMonthKeys(fy).indexOf(thisMonth) !== -1) el.stockFMonth.value = thisMonth;
     }
 
+    /* What the district is holding that month, beside each award. A
+       utilisation cannot be larger than this, so the figure it has to fit
+       inside is on screen while it is being typed rather than only in the
+       refusal afterwards. */
+    var held = stockCtx ? balanceAt(stockCtx.district, stockCtx.month) : null;
+
     el.stockLines.innerHTML = awardTypes.map(function (t) {
-      return '<div class="stock-line"><label>' + escapeHtml(t.name) + '</label>' +
+      var have = held ? (held[t.id] || 0) : null;
+      var none = have === 0;
+      return '<div class="stock-line' + (none ? " is-empty" : "") + '">' +
+             "<label>" + escapeHtml(t.name) +
+               (held
+                 ? '<span class="hint">' +
+                   (have ? escapeHtml(have.toLocaleString()) + " in stock"
+                         : "none in stock") + "</span>"
+                 : "") +
+             "</label>" +
              '<input type="number" class="mono stock-qty" data-type="' + escapeHtml(t.id) +
-             '" min="0" max="1000000" step="1" placeholder="0" /></div>';
+             '" data-have="' + (held ? have : "") + '" min="0" max="' +
+             (held ? have : 1000000) + '" step="1" placeholder="0"' +
+             (none ? " disabled" : "") + " /></div>";
     }).join("");
 
     el.stockNote.value = "";
@@ -2902,7 +3110,10 @@ window.AWARD_CONFIG = {
     document.addEventListener("keydown", onStockKeydown);
     scrollLockedAt = window.scrollY;
     document.body.style.overflow = "hidden";
-    el.stockFState.focus();
+    var first = opening
+      ? el.stockFState
+      : el.stockLines.querySelector(".stock-qty:not([disabled])");
+    (first || el.stockSave).focus();
   }
 
   function closeStockModal() {
@@ -2987,14 +3198,28 @@ window.AWARD_CONFIG = {
   }
 
   function saveStock() {
-    var state = el.stockFState.value;
-    var division = el.stockFDivision.value;
-    var district = el.stockFDistrict.value;
-    var month = el.stockFMonth.value;
+    var state, division, district, month;
 
-    if (!state || !division || !district) {
-      setFieldError(null, "stock-qty-error", "Choose where this stock is.");
-      return;
+    if (stockKind === "opening") {
+      state = el.stockFState.value;
+      division = el.stockFDivision.value;
+      district = el.stockFDistrict.value;
+      month = el.stockFMonth.value;
+      if (!state || !division || !district) {
+        setFieldError(null, "stock-qty-error", "Choose where this stock is.");
+        return;
+      }
+    } else {
+      // The row it was opened from says where and when.
+      if (!stockCtx) {
+        setFieldError(null, "stock-qty-error",
+          "Open this from the month you are recording against.");
+        return;
+      }
+      state = stockCtx.state;
+      division = stockCtx.division;
+      district = stockCtx.district;
+      month = stockCtx.month;
     }
 
     var rows = [];
@@ -3005,6 +3230,21 @@ window.AWARD_CONFIG = {
       var n = Number(raw);
       if (!Number.isInteger(n) || n < 1) {
         if (!fault) fault = "Quantities are whole numbers of 1 or more.";
+        return;
+      }
+      /* Nothing can be given out that is not held. Checked here against the
+         figure shown beside the box as well as against every month after it
+         below, because this is the one the person is looking at. */
+      var have = input.getAttribute("data-have");
+      if (have !== "" && n > Number(have)) {
+        if (!fault) {
+          var mine = awardTypes.filter(function (a) {
+            return Number(a.id) === Number(input.getAttribute("data-type"));
+          })[0] || {};
+          fault = district + " is holding " + Number(have).toLocaleString() + " " +
+                  (mine.name || "of that award") + " in " + monthLabelOf(month) +
+                  ", so it cannot give out " + n.toLocaleString() + ".";
+        }
         return;
       }
       rows.push({

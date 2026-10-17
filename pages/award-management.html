@@ -20,19 +20,9 @@
       </span>
     </div>
 
-    <div class="aw-topbar">
-      <nav class="aw-tabs" role="tablist" aria-label="Award Management">
-        <button type="button" role="tab" id="aw-tab-stock" class="aw-tab is-active"
-                data-aw-tab="stock" aria-controls="aw-panel-stock" aria-selected="true">
-          Stock Management
-        </button>
-      </nav>
-      <div class="aw-topbar-right">
-        <button type="button" id="refresh-btn" class="btn btn-ghost btn-sm">Refresh</button>
-      </div>
-    </div>
-
-    <div id="aw-panel-stock" class="aw-panel" role="tabpanel" aria-labelledby="aw-tab-stock">
+    <!-- There was a tab bar above this with one tab in it, named the same
+         as the heading directly underneath. It said nothing twice. -->
+    <div class="aw-body">
 
       <div class="aw-page-header">
         <div>
@@ -40,10 +30,13 @@
           <p>Award stock requested from the districts</p>
           <p class="aw-standing" id="standing-note" hidden></p>
         </div>
-        <button type="button" id="new-req-btn" class="btn btn-primary">
-          <i class="aw-icon" data-aw-icon="plus" aria-hidden="true"></i>
-          New Requisition
-        </button>
+        <div class="aw-page-actions">
+          <button type="button" id="refresh-btn" class="btn btn-ghost btn-sm">Refresh</button>
+          <button type="button" id="new-req-btn" class="btn btn-primary">
+            <i class="aw-icon" data-aw-icon="plus" aria-hidden="true"></i>
+            New Requisition
+          </button>
+        </div>
       </div>
 
       <nav class="aw-subtabs" role="tablist" aria-label="Stock Management views">
@@ -128,12 +121,13 @@
               <th scope="col" class="num">Quantity</th>
               <th scope="col">Submitted</th>
               <th scope="col">Status</th>
+              <th scope="col">Log</th>
               <th scope="col"><span class="sr-only">Review</span></th>
             </tr>
           </thead>
           <tbody id="requisitions-body">
             <tr class="placeholder-row">
-              <td colspan="9">Loading requisitions…</td>
+              <td colspan="10">Loading requisitions…</td>
             </tr>
           </tbody>
           <tfoot id="requisitions-foot" hidden>
@@ -174,14 +168,10 @@
               <label for="stock-district">District</label>
               <select id="stock-district"><option value="">All districts</option></select>
             </div>
-            <label class="stock-all" id="stock-all-wrap">
-              <input type="checkbox" id="stock-all" />
-              Show every district
-            </label>
             <div class="stock-actions">
-              <button type="button" id="stock-use" class="btn btn-primary btn-sm">
-                <i class="aw-icon" data-aw-icon="plus" aria-hidden="true"></i>
-                Record utilisation
+              <button type="button" id="stock-fetch" class="btn btn-primary btn-sm">
+                <i class="aw-icon" data-aw-icon="search" aria-hidden="true"></i>
+                Fetch
               </button>
               <button type="button" id="stock-open" class="btn btn-ghost btn-sm" hidden>
                 Opening stock
@@ -212,11 +202,12 @@
                   <th scope="col">Awards</th>
                   <th scope="col" class="num">Quantity</th>
                   <th scope="col">Status</th>
+                  <th scope="col">Log</th>
                   <th scope="col"><span class="sr-only">Action</span></th>
                 </tr>
               </thead>
               <tbody id="delivery-body">
-                <tr class="placeholder-row"><td colspan="8">Loading…</td></tr>
+                <tr class="placeholder-row"><td colspan="9">Loading…</td></tr>
               </tbody>
             </table>
           </div>
@@ -447,7 +438,12 @@
             <span id="stock-banner-text"></span>
           </div>
 
-          <div class="grid">
+          <!-- Where and when, when it has to be asked. A utilisation is
+               recorded from the row it belongs to, so it already knows both
+               and shows them instead (#stock-where). -->
+          <p class="stock-where" id="stock-where" hidden></p>
+
+          <div class="grid" id="stock-place">
             <div class="field">
               <label for="stock-f-state">State <span class="req" aria-hidden="true">*</span></label>
               <select id="stock-f-state"></select>
