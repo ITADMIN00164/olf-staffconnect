@@ -1166,3 +1166,13 @@
 .award-page .stock-all input { accent-color: var(--accent); }
 .award-page .stock-all-inline { display: block; margin-top: 10px; cursor: pointer; }
 .award-page .stock-all-inline input { margin-right: 6px; accent-color: var(--accent); }
+
+/* The remark column, last in the sheet. Kept narrow: it is a note, not a
+   field, and a long one should not push the numbers off the screen. */
+.award-page #stock-table td.cell-remark-col {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-muted);
+  font-style: italic;
+}

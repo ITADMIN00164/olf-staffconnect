@@ -1142,8 +1142,16 @@ window.olfGeography = async function () {
         const isPM = /^program implementation\s*[-–]?\s*pm$/
             .test(String(r["Dept"] || "").trim().toLowerCase().replace(/\s+/g, " "));
         if (isPM) {
+            // A division can have more than one - Amravati has two and
+            // Chhatrapati Sambhajinagar three. Naming only the first would
+            // leave the others off a column that is supposed to say who
+            // manages the place.
             for (const dv of divisions) {
-                if (!pmOfDivision.has(dv)) pmOfDivision.set(dv, String(r.Name || "").trim());
+                const name = String(r.Name || "").trim();
+                if (!name) continue;
+                const list = pmOfDivision.get(dv) || [];
+                if (!list.includes(name)) list.push(name);
+                pmOfDivision.set(dv, list);
             }
         }
 
@@ -1164,7 +1172,8 @@ window.olfGeography = async function () {
             if (!districts.size) continue;
             divisions.push({
                 name: division,
-                pm: pmOfDivision.get(division) || "",
+                pm: (pmOfDivision.get(division) || []).join(", "),
+                pms: pmOfDivision.get(division) || [],
                 districts: [...districts].sort((a, b) => a.localeCompare(b))
             });
         }

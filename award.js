@@ -2482,7 +2482,9 @@ window.AWARD_CONFIG = {
       if (stageOf(row) === "received" && row.received_at) {
         events.push({ district: district, month: monthKeyOf(row.received_at),
                       column: "delivery", sign: 1,
-                      quantities: quantitiesOf(row, "dispatched") });
+                      quantities: quantitiesOf(row, "dispatched"),
+                      // what was said when it arrived, or when it was sent
+                      note: row.receipt_note || row.ho_remark || "" });
       }
     });
 
@@ -2497,7 +2499,8 @@ window.AWARD_CONFIG = {
         month: monthKeyOf(m.occurred_on),
         column: m.kind === "utilised" ? "utilisation" : "other",
         sign: m.kind === "utilised" ? -1 : 1,
-        quantities: q
+        quantities: q,
+        note: m.note || ""
       });
     });
 
@@ -2531,15 +2534,18 @@ window.AWARD_CONFIG = {
       });
 
       rows.push(Object.assign({}, place, {
-        month: "Carry forward", monthKey: "", items: "Inventory",
+        month: "Carry forward", monthKey: "", items: "Inventory", remark: "",
         requisition: {}, delivery: {}, utilisation: {},
         balance: Object.assign({}, balance)
       }));
 
       months.forEach(function (key) {
         var cell = { requisition: {}, delivery: {}, utilisation: {}, other: {} };
+        var notes = [];
         mine.forEach(function (e) {
-          if (e.month === key) addInto(cell[e.column], e.quantities);
+          if (e.month !== key) return;
+          addInto(cell[e.column], e.quantities);
+          if (e.note && notes.indexOf(e.note) === -1) notes.push(e.note);
         });
 
         addInto(balance, cell.delivery);
@@ -2553,7 +2559,8 @@ window.AWARD_CONFIG = {
           requisition: cell.requisition,
           delivery: cell.delivery,
           utilisation: cell.utilisation,
-          balance: Object.assign({}, balance)
+          balance: Object.assign({}, balance),
+          remark: notes.join(" · ")
         }));
       });
     });
@@ -2772,6 +2779,7 @@ window.AWARD_CONFIG = {
           return '<th colspan="' + (types.length + 1) + '" class="grp grp-' + i + '">' +
                  escapeHtml(g) + "</th>";
         }).join("") +
+        '<th rowspan="2">Remark</th>' +
       "</tr><tr>" +
         [0, 1, 2, 3].map(function (i) {
           return types.map(function (t) {
@@ -2792,6 +2800,8 @@ window.AWARD_CONFIG = {
         cellsHtml(r.delivery, types) +
         cellsHtml(r.utilisation, types) +
         cellsHtml(r.balance, types, true) +
+        '<td class="cell-remark-col" title="' + escapeHtml(r.remark || "") + '">' +
+          escapeHtml(r.remark || "") + "</td>" +
       "</tr>";
     }).join("");
 
