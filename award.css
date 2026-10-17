@@ -1270,6 +1270,32 @@
 .award-page #stock-table thead th.col-use { background: var(--warn); }
 .award-page #stock-table thead th.col-bal { background: var(--graphite-deep); }
 
+/* The two columns that say which row this is stay put while the twenty
+   columns of figures scroll under them. Without this, scrolling right to
+   read the balance left every row looking identical - a column of numbers
+   with nothing to say whose they were. Fixed widths, because a sticky
+   column has to know where the one before it ends. */
+.award-page #stock-table th.col-month,
+.award-page #stock-table td.col-month { position: sticky; left: 0; width: 104px;
+                                        min-width: 104px; }
+.award-page #stock-table th.col-district,
+.award-page #stock-table td.col-district { position: sticky; left: 104px; width: 132px;
+                                           min-width: 132px; }
+.award-page #stock-table td.col-month,
+.award-page #stock-table td.col-district {
+  background: var(--surface);
+  z-index: 1;
+  border-right: 1px solid var(--border);
+}
+.award-page #stock-table th.col-month,
+.award-page #stock-table th.col-district { z-index: 3; }
+/* The row's own colour has to win over the plain white above, or a frozen
+   cell reads as a different row from the one it belongs to. */
+.award-page #stock-table tr.is-carry td.col-month,
+.award-page #stock-table tr.is-carry td.col-district { background: var(--surface-alt); }
+.award-page #stock-table tbody tr:hover td.col-month,
+.award-page #stock-table tbody tr:hover td.col-district { background: var(--accent-soft); }
+
 .award-page #stock-table td.num { text-align: right; font-family: var(--font-mono); }
 .award-page #stock-table td.col-req { background: #FAFBFC; }
 .award-page #stock-table td.col-del { background: #F4FBF6; color: var(--good); }
@@ -1294,7 +1320,8 @@
   color: var(--text-soft);
 }
 .award-page #stock-table td.muted { color: var(--text-muted); }
-.award-page #stock-table td.col-act { text-align: right; }
+.award-page #stock-table td.col-act { text-align: right; white-space: nowrap; }
+.award-page #stock-table td.col-act .btn + .btn { margin-left: 5px; }
 .award-page #stock-table td.col-act .btn { visibility: hidden; }
 /* The button appears on the row the pointer is on: one per month per
    district is four hundred buttons, and all of them showing at once is a

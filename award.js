@@ -88,14 +88,9 @@ window.AWARD_CONFIG = {
     stockFetch: document.getElementById("stock-fetch"),
     stockWhere: document.getElementById("stock-where"),
     stockPlace: document.getElementById("stock-place"),
-    stockOpen: document.getElementById("stock-open"),
     stockModal: document.getElementById("stock-modal"),
     stockHeading: document.getElementById("stock-heading"),
     stockSub: document.getElementById("stock-sub"),
-    stockFState: document.getElementById("stock-f-state"),
-    stockFDivision: document.getElementById("stock-f-division"),
-    stockFDistrict: document.getElementById("stock-f-district"),
-    stockFMonth: document.getElementById("stock-f-month"),
     stockFLabel: document.getElementById("stock-f-label"),
     stockLines: document.getElementById("stock-lines"),
     stockNote: document.getElementById("stock-note"),
@@ -467,9 +462,12 @@ window.AWARD_CONFIG = {
     switch (stageOf(row)) {
       case "approved":     return ["acknowledge", "reject"];
       case "acknowledged": return ["dispatch", "hold", "reject"];
-      // On hold is waiting, not refusing. It can go either way once the
-      // stock question is settled.
-      case "on_hold":      return ["dispatch", "resume", "reject"];
+      /* On hold is waiting, not refusing. Nothing is sent from here: the
+         hold has to be lifted first, so the row says out loud that whatever
+         it was waiting for has been settled. Dispatching straight out of a
+         hold left the hold standing as the last thing anybody had said
+         about it. */
+      case "on_hold":      return ["resume", "reject"];
       // Once it has been sent there is nothing left for HO to do and nothing
       // left to withhold; the next move belongs to the requester.
       default:             return [];
@@ -777,6 +775,11 @@ window.AWARD_CONFIG = {
       var panel = document.getElementById(tab.getAttribute("aria-controls"));
       if (panel) panel.hidden = !on;
     });
+
+    /* The count belongs to the list of requisitions. On the stock sheet it
+       sat in the corner saying "3 items" about something that was not on
+       screen. */
+    if (el.rowPill) el.rowPill.hidden = name !== "requisition";
   }
 
   function wireTabList(buttons, attr) {
@@ -1311,7 +1314,7 @@ window.AWARD_CONFIG = {
       patch.issue_by = null;
       patch.issue_at = null;
       patch.issue_note = null;
-      from = stageOf(row);                 // dispatchable from acknowledged or on_hold
+      from = "acknowledged";               // never straight out of a hold
 
     } else if (action === "receive") {
       patch.receipt_note = remark || null;
@@ -1526,18 +1529,17 @@ window.AWARD_CONFIG = {
     );
     el.hoConfirm.addEventListener("click", confirmHoAction);
 
-    el.stockOpen.addEventListener("click", function () { openStockModal("opening"); });
-
     /* Utilisation is recorded from the row it belongs to. The table is
        redrawn on every change, so the click is caught on the wrapper, which
        is not. */
     var stockWrap = document.getElementById("stock-table-wrap");
     if (stockWrap) {
       stockWrap.addEventListener("click", function (event) {
-        var btn = event.target.closest && event.target.closest("[data-aw-use]");
+        var btn = event.target.closest && event.target.closest("[data-aw-row-act]");
         if (!btn) return;
-        openStockModal("utilised", { district: btn.getAttribute("data-aw-where"),
-                                     month: btn.getAttribute("data-aw-use") });
+        openStockModal(btn.getAttribute("data-aw-row-act"),
+                       { district: btn.getAttribute("data-aw-where"),
+                         month: btn.getAttribute("data-aw-month") });
       });
     }
     el.stockSave.addEventListener("click", saveStock);
@@ -1556,9 +1558,6 @@ window.AWARD_CONFIG = {
     el.awardLines.addEventListener("input", function () {
       setFieldError(null, "award-type-error", "");
     });
-
-    el.stockFState.addEventListener("change", stockDivisionsFor);
-    el.stockFDivision.addEventListener("change", stockDistrictsFor);
 
     el.stockFetch.addEventListener("click", function () {
       stockShown = true;
@@ -2626,11 +2625,15 @@ window.AWARD_CONFIG = {
 
       // what arrived, which does
       if (stageOf(row) === "received" && row.received_at) {
+        /* No note. Head Office's dispatch remark used to land in the sheet's
+           Remark column, where "out for delivery from ho" sat against a
+           month of figures explaining nothing about them. What was said
+           about a parcel belongs on the requisition, which is where it is
+           said and where the log keeps it. This column is for what was said
+           about the stock itself. */
         events.push({ district: district, month: monthKeyOf(row.received_at),
                       column: "delivery", sign: 1,
-                      quantities: quantitiesOf(row, "dispatched"),
-                      // what was said when it arrived, or when it was sent
-                      note: row.receipt_note || row.ho_remark || "" });
+                      quantities: quantitiesOf(row, "dispatched") });
       }
     });
 
@@ -2847,7 +2850,6 @@ window.AWARD_CONFIG = {
       function (n) { return n; }, function (n) { return n; });
     stockFiltersFor(null);
 
-    el.stockOpen.hidden = !canSetOpening();
   }
 
   /* Whether the sheet has been asked for. It is not drawn on arrival: the
@@ -2942,8 +2944,9 @@ window.AWARD_CONFIG = {
 
     var head =
       "<thead><tr>" +
-        '<th rowspan="2">Month</th><th rowspan="2">PM</th><th rowspan="2">State</th>' +
-        '<th rowspan="2">District</th>' +
+        '<th rowspan="2" class="col-month">Month</th>' +
+        '<th rowspan="2" class="col-district">District</th>' +
+        '<th rowspan="2">State</th><th rowspan="2">PM</th>' +
         GROUPS.map(function (g) {
           return '<th colspan="' + (types.length + 1) + '" class="grp col-' + g.kind +
                  '">' + escapeHtml(g.label) + "</th>";
@@ -2964,12 +2967,13 @@ window.AWARD_CONFIG = {
       /* Nothing held is nothing to give out, so the button is not offered -
          the alternative is a dialog that can only refuse. */
       var mayUse = !carry && canUseHere(r.district) && sumOf(r.balance) > 0;
+      var maySet = canSetStock();
       return '<tr class="' + (carry ? "is-carry" : "") + '">' +
-        "<td>" + escapeHtml(r.month) + "</td>" +
+        '<td class="col-month">' + escapeHtml(r.month) + "</td>" +
+        '<td class="col-district is-district">' + escapeHtml(r.district) + "</td>" +
+        "<td>" + escapeHtml(r.state) + "</td>" +
         '<td class="col-pm" title="' + escapeHtml(r.pm || "") + '">' +
           escapeHtml(r.pm || "\u2014") + "</td>" +
-        "<td>" + escapeHtml(r.state) + "</td>" +
-        '<td class="is-district">' + escapeHtml(r.district) + "</td>" +
         cellsHtml(r.requisition, types, "req") +
         cellsHtml(r.delivery, types, "del") +
         cellsHtml(r.utilisation, types, "use") +
@@ -2977,16 +2981,20 @@ window.AWARD_CONFIG = {
         '<td class="cell-remark-col" title="' + escapeHtml(r.remark || "") + '">' +
           escapeHtml(r.remark || "") + "</td>" +
         '<td class="col-act">' +
-          (mayUse
-            ? '<button type="button" class="btn btn-ghost btn-xs" data-aw-use="' +
-              escapeHtml(r.monthKey) + '" data-aw-where="' + escapeHtml(r.district) +
-              '">Record use</button>'
-            : "") +
+          (mayUse ? rowActionHtml("utilised", "Record use", r) : "") +
+          (maySet ? rowActionHtml("set", "Set stock", r) : "") +
         "</td>" +
       "</tr>";
     }).join("");
 
     wrap.innerHTML = '<table id="stock-table">' + head + "<tbody>" + body + "</tbody></table>";
+  }
+
+  function rowActionHtml(kind, label, r) {
+    return '<button type="button" class="btn btn-ghost btn-xs" data-aw-row-act="' +
+           escapeHtml(kind) + '" data-aw-where="' + escapeHtml(r.district) +
+           '" data-aw-month="' + escapeHtml(r.monthKey) + '">' +
+           escapeHtml(label) + "</button>";
   }
 
   /* Block, District, NS, SU - the names the sheet uses, which are the award
@@ -3007,7 +3015,13 @@ window.AWARD_CONFIG = {
      Office and administrators. */
   var stockKind = "utilised";
 
-  function canSetOpening() { return isHoAdmin() || isAppAdmin(); }
+  /* Setting a district's figures by hand is an administrator's job and
+     nobody else's. It is how the first year's numbers get in - typed against
+     April and carried forward from there - and how a miscount is put right
+     afterwards. It writes an adjustment, not a new truth: the balance is
+     still added up from what moved, so the correction shows as a movement
+     like any other rather than quietly replacing the arithmetic. */
+  function canSetStock() { return isAppAdmin(); }
 
   /* Which districts somebody may record against. A manager records for their
      own division; the COO, Head Office and administrators for anywhere,
@@ -3040,88 +3054,76 @@ window.AWARD_CONFIG = {
   var stockCtx = null;
 
   function openStockModal(kind, ctx) {
-    stockKind = kind;
-    returnFocusTo = document.activeElement;
+    var setting = kind === "set";
+    if (setting && !canSetStock()) return;
 
-    var opening = kind === "opening";
-
-    /* A utilisation already knows where and when it happened: it is the
-       district and the month of the row it was opened from. Asking for them
-       again in four dropdowns was four chances to record it against the
-       wrong place, for no information the page did not already have. */
-    stockCtx = null;
-    if (!opening) {
-      var where = placesIMayRecord().filter(function (p) {
+    /* Where and when are the row's, not a form's. A utilisation is recorded
+       against the month it happened in; a figure is set against the month it
+       is being set for. Asking again in four dropdowns was four chances to
+       put it somewhere else. */
+    var where = placesIMayRecord().filter(function (p) {
+      return String(p.district).trim().toLowerCase() ===
+             String((ctx && ctx.district) || "").trim().toLowerCase();
+    })[0];
+    if (!where && setting) {
+      // An administrator may set any district's figures, whether or not they
+      // work that division.
+      where = stockPlaces().filter(function (p) {
         return String(p.district).trim().toLowerCase() ===
                String((ctx && ctx.district) || "").trim().toLowerCase();
       })[0];
-      if (!where || !ctx.month) return;        // not theirs, or no month
-      stockCtx = { state: where.state, division: where.division,
-                   district: where.district, month: ctx.month };
     }
-
-    el.stockHeading.textContent = opening ? "Opening stock" : "Record utilisation";
-    el.stockSub.textContent = opening
-      ? "What the district already held before any of this was recorded. Entered once."
-      : "Awards handed out. This comes off what the district is holding.";
-    el.stockFLabel.textContent = opening
-      ? "How many it was holding" : "How many were given out";
-    el.stockSave.textContent = opening ? "Set opening stock" : "Record";
-
-    el.stockPlace.hidden = !opening;
-    el.stockWhere.hidden = opening;
-    if (stockCtx) {
-      el.stockWhere.innerHTML =
-        '<b>' + escapeHtml(stockCtx.district) + "</b>" +
-        '<span>' + escapeHtml(stockCtx.division) + ", " + escapeHtml(stockCtx.state) +
-        "</span>" +
-        '<em>' + escapeHtml(monthLabelOf(stockCtx.month)) + "</em>";
-    }
+    if (!where) return;
 
     var fy = Number(el.stockYear.value) || fyStartOf(new Date());
-    if (opening) {
-      var places = placesIMayRecord();
-      var states = [];
-      places.forEach(function (p) {
-        if (states.indexOf(p.state) === -1) states.push(p.state);
-      });
-      fillSelect(el.stockFState, states.sort(), "Select state",
-        function (n) { return n; }, function (n) { return n; });
-      el.stockFDivision.innerHTML = '<option value="">Select a state first</option>';
-      el.stockFDivision.disabled = true;
-      el.stockFDistrict.innerHTML = '<option value="">Select a division first</option>';
-      el.stockFDistrict.disabled = true;
-      if (states.length === 1) { el.stockFState.value = states[0]; stockDivisionsFor(); }
+    var monthKey = (ctx && ctx.month) || "";
+    if (!setting && !monthKey) return;            // use is recorded in a month
 
-      /* March of the year the year begins in - the same date the import
-         writes. The unique index that stops a district being given two
-         opening figures includes the date, so a different one here would
-         slip past it and the stock would be counted twice. */
-      el.stockFMonth.innerHTML =
-        '<option value="' + fy + '-03">Before ' + escapeHtml(fyLabel(fy)) + '</option>';
-    }
+    stockKind = kind;
+    stockCtx = { state: where.state, division: where.division,
+                 district: where.district, month: monthKey, fy: fy,
+                 // The carry-forward row belongs to the March before the year
+                 // starts, which is where last year's closing figure sits.
+                 occurredOn: (monthKey || (fy + "-03")) + "-01" };
 
-    /* What the district is holding that month, beside each award. A
-       utilisation cannot be larger than this, so the figure it has to fit
-       inside is on screen while it is being typed rather than only in the
-       refusal afterwards. */
-    var held = stockCtx ? balanceAt(stockCtx.district, stockCtx.month) : null;
+    returnFocusTo = document.activeElement;
+
+    el.stockHeading.textContent = setting ? "Set stock" : "Record utilisation";
+    el.stockSub.textContent = setting
+      ? "What this district is holding at the end of this month. The " +
+        "difference is recorded as a correction, and carries forward."
+      : "Awards handed out. This comes off what the district is holding.";
+    el.stockFLabel.textContent = setting
+      ? "What it should be holding" : "How many were given out";
+    el.stockSave.textContent = setting ? "Set stock" : "Record";
+
+    el.stockWhere.innerHTML =
+      '<b>' + escapeHtml(stockCtx.district) + "</b>" +
+      '<span>' + escapeHtml(stockCtx.division || "") +
+        (stockCtx.division ? ", " : "") + escapeHtml(stockCtx.state) + "</span>" +
+      '<em>' + escapeHtml(monthKey ? monthLabelOf(monthKey)
+                                   : "Before " + fyLabel(fy)) + "</em>";
+
+    /* What the district is holding at that point. For a utilisation it is
+       the ceiling; for a figure being set it is what the boxes start at, so
+       an award nobody is changing is left exactly as it was. */
+    var held = balanceOn(stockCtx.district, fy, monthKey);
 
     el.stockLines.innerHTML = awardTypes.map(function (t) {
-      var have = held ? (held[t.id] || 0) : null;
-      var none = have === 0;
+      var have = held[t.id] || 0;
+      var none = !setting && have === 0;
       return '<div class="stock-line' + (none ? " is-empty" : "") + '">' +
              "<label>" + escapeHtml(t.name) +
-               (held
-                 ? '<span class="hint">' +
-                   (have ? escapeHtml(have.toLocaleString()) + " in stock"
-                         : "none in stock") + "</span>"
-                 : "") +
+               '<span class="hint">' +
+                 (have ? escapeHtml(have.toLocaleString()) + " in stock"
+                       : "none in stock") +
+               "</span>" +
              "</label>" +
              '<input type="number" class="mono stock-qty" data-type="' + escapeHtml(t.id) +
-             '" data-have="' + (held ? have : "") + '" min="0" max="' +
-             (held ? have : 1000000) + '" step="1" placeholder="0"' +
-             (none ? " disabled" : "") + " /></div>";
+             '" data-have="' + have + '" min="0"' +
+             (setting ? ' max="1000000" value="' + have + '"'
+                      : ' max="' + have + '" placeholder="0"') +
+             ' step="1"' + (none ? " disabled" : "") + " /></div>";
     }).join("");
 
     el.stockNote.value = "";
@@ -3131,9 +3133,7 @@ window.AWARD_CONFIG = {
     document.addEventListener("keydown", onStockKeydown);
     scrollLockedAt = window.scrollY;
     document.body.style.overflow = "hidden";
-    var first = opening
-      ? el.stockFState
-      : el.stockLines.querySelector(".stock-qty:not([disabled])");
+    var first = el.stockLines.querySelector(".stock-qty:not([disabled])");
     (first || el.stockSave).focus();
   }
 
@@ -3150,66 +3150,26 @@ window.AWARD_CONFIG = {
     if (e.key === "Escape") { e.stopPropagation(); closeStockModal(); }
   }
 
-  function stockDivisionsFor() {
-    var divs = [];
-    placesIMayRecord().forEach(function (p) {
-      if (p.state === el.stockFState.value && divs.indexOf(p.division) === -1) {
-        divs.push(p.division);
-      }
-    });
-    fillSelect(el.stockFDivision, divs.sort(), "Select division",
-      function (n) { return n; }, function (n) { return n; });
-    el.stockFDivision.disabled = !divs.length;
-    el.stockFDistrict.innerHTML = '<option value="">Select a division first</option>';
-    el.stockFDistrict.disabled = true;
-    if (divs.length === 1) { el.stockFDivision.value = divs[0]; stockDistrictsFor(); }
+  // One movement, ready to write.
+  function movementRow(kind, awardTypeId, quantity, note) {
+    return {
+      kind: kind,
+      state_name: stockCtx.state,
+      division_name: stockCtx.division || null,
+      district_name: stockCtx.district,
+      award_type_id: awardTypeId,
+      quantity: quantity,
+      occurred_on: stockCtx.occurredOn,
+      note: [note, el.stockNote.value.trim()].filter(Boolean).join(" \u00b7 ") || null,
+      recorded_by: (signedInUser() || {}).name || myEmail(),
+      recorded_email: myEmail() || null
+    };
   }
 
-  function stockDistrictsFor() {
-    var dists = placesIMayRecord().filter(function (p) {
-      return p.state === el.stockFState.value && p.division === el.stockFDivision.value;
-    }).map(function (p) { return p.district; });
-
-    fillSelect(el.stockFDistrict, dists.sort(), "Select district",
-      function (n) { return n; }, function (n) { return n; });
-    el.stockFDistrict.disabled = !dists.length;
-    if (dists.length === 1) el.stockFDistrict.value = dists[0];
-  }
-
-  /* What a district holds at the end of a month, which is what a utilisation
-     has to fit inside. */
-  /* What the months after this one would look like if these were recorded.
-     Checking only the month being edited is not enough: utilisation entered
-     against March, after April and May have already been accounted for, can
-     leave those months holding less than nothing - and the figure that goes
-     wrong is not the one being typed. */
-  function wouldGoNegative(district, monthKey, additions) {
-    var fy = fyStartOf(monthKey + "-01");
-    var pretend = stockMovements.concat(additions.map(function (a) {
-      return { kind: "utilised", district_name: district,
-               award_type_id: a.award_type_id, quantity: a.quantity,
-               occurred_on: a.occurred_on };
-    }));
-
-    var rows = stockRows(fy, allRequisitions, pretend,
-                         [{ state: "", division: "", district: district, pm: "" }]);
-
-    for (var i = 0; i < rows.length; i++) {
-      if (!rows[i].monthKey || rows[i].monthKey < monthKey) continue;
-      var balance = rows[i].balance;
-      var ids = Object.keys(balance);
-      for (var j = 0; j < ids.length; j++) {
-        if (balance[ids[j]] < 0) {
-          return { month: rows[i].monthKey, award_type_id: Number(ids[j]),
-                   short: -balance[ids[j]] };
-        }
-      }
-    }
-    return null;
-  }
-
-  function balanceAt(district, monthKey) {
-    var fy = fyStartOf(monthKey + "-01");
+  /* What the district holds at the end of a given month - or, for the empty
+     month key, what it carried into the year. This is what a utilisation has
+     to fit inside, and what a figure being set starts from. */
+  function balanceOn(district, fy, monthKey) {
     var rows = stockRows(fy, allRequisitions, stockMovements,
                          [{ state: "", division: "", district: district, pm: "" }]);
     for (var i = 0; i < rows.length; i++) {
@@ -3218,94 +3178,116 @@ window.AWARD_CONFIG = {
     return {};
   }
 
-  function saveStock() {
-    var state, division, district, month;
+  /* What the months from here on would look like if these movements were
+     recorded. Checking only the month being edited is not enough: a figure
+     set against April, after May and June have already been accounted for,
+     can leave those months holding less than nothing - and the number that
+     goes wrong is not the one being typed. */
+  function wouldGoNegative(district, fy, fromKey, movements) {
+    var pretend = stockMovements.concat(movements.map(function (m) {
+      return { kind: m.kind, district_name: district,
+               award_type_id: m.award_type_id, quantity: m.quantity,
+               occurred_on: m.occurred_on };
+    }));
 
-    if (stockKind === "opening") {
-      state = el.stockFState.value;
-      division = el.stockFDivision.value;
-      district = el.stockFDistrict.value;
-      month = el.stockFMonth.value;
-      if (!state || !division || !district) {
-        setFieldError(null, "stock-qty-error", "Choose where this stock is.");
-        return;
+    var rows = stockRows(fy, allRequisitions, pretend,
+                         [{ state: "", division: "", district: district, pm: "" }]);
+
+    for (var i = 0; i < rows.length; i++) {
+      // The carry-forward row counts only when the figure being set is the
+      // carry-forward itself; otherwise start at the month being edited.
+      var key = rows[i].monthKey;
+      if (fromKey ? (!key || key < fromKey) : false) continue;
+
+      var balance = rows[i].balance;
+      var ids = Object.keys(balance);
+      for (var j = 0; j < ids.length; j++) {
+        if (balance[ids[j]] < 0) {
+          return { month: key ? monthLabelOf(key) : "the carry forward",
+                   award_type_id: Number(ids[j]), short: -balance[ids[j]] };
+        }
       }
-    } else {
-      // The row it was opened from says where and when.
-      if (!stockCtx) {
-        setFieldError(null, "stock-qty-error",
-          "Open this from the month you are recording against.");
-        return;
-      }
-      state = stockCtx.state;
-      division = stockCtx.division;
-      district = stockCtx.district;
-      month = stockCtx.month;
+    }
+    return null;
+  }
+
+  function saveStock() {
+    if (!stockCtx) {
+      setFieldError(null, "stock-qty-error",
+        "Open this from the row you are recording against.");
+      return;
     }
 
+    var setting = stockKind === "set";
     var rows = [];
     var fault = "";
-    Array.prototype.forEach.call(el.stockLines.querySelectorAll(".stock-qty"), function (input) {
-      var raw = input.value.trim();
-      if (!raw) return;
-      var n = Number(raw);
-      if (!Number.isInteger(n) || n < 1) {
-        if (!fault) fault = "Quantities are whole numbers of 1 or more.";
-        return;
-      }
-      /* Nothing can be given out that is not held. Checked here against the
-         figure shown beside the box as well as against every month after it
-         below, because this is the one the person is looking at. */
-      var have = input.getAttribute("data-have");
-      if (have !== "" && n > Number(have)) {
-        if (!fault) {
-          var mine = awardTypes.filter(function (a) {
-            return Number(a.id) === Number(input.getAttribute("data-type"));
-          })[0] || {};
-          fault = district + " is holding " + Number(have).toLocaleString() + " " +
-                  (mine.name || "of that award") + " in " + monthLabelOf(month) +
-                  ", so it cannot give out " + n.toLocaleString() + ".";
+
+    Array.prototype.forEach.call(el.stockLines.querySelectorAll(".stock-qty"),
+      function (input) {
+        var raw = input.value.trim();
+        if (!raw) return;
+
+        var n = Number(raw);
+        var have = Number(input.getAttribute("data-have")) || 0;
+        var id = Number(input.getAttribute("data-type"));
+        var type = awardTypes.filter(function (a) {
+          return Number(a.id) === id;
+        })[0] || {};
+        var name = type.name || "that award";
+
+        if (setting) {
+          if (!Number.isInteger(n) || n < 0) {
+            if (!fault) fault = "Figures are whole numbers, nothing or more.";
+            return;
+          }
+          if (n === have) return;                 // nothing to record
+
+          /* The difference, not the figure. The balance is added up from
+             what moved, so a correction is a movement like any other - and
+             the sheet can still say how the number got there. */
+          rows.push(movementRow("adjustment", id, n - have,
+            name + ": " + have.toLocaleString() + " \u2192 " + n.toLocaleString()));
+
+        } else {
+          if (!Number.isInteger(n) || n < 1) {
+            if (!fault) fault = "Quantities are whole numbers of 1 or more.";
+            return;
+          }
+          if (n > have) {
+            if (!fault) {
+              fault = stockCtx.district + " is holding " + have.toLocaleString() +
+                      " " + name + " in " + monthLabelOf(stockCtx.month) +
+                      ", so it cannot give out " + n.toLocaleString() + ".";
+            }
+            return;
+          }
+          rows.push(movementRow("utilised", id, n, null));
         }
-        return;
-      }
-      rows.push({
-        kind: stockKind,
-        state_name: state, division_name: division, district_name: district,
-        award_type_id: Number(input.getAttribute("data-type")),
-        quantity: n,
-        occurred_on: month + "-01",
-        note: el.stockNote.value.trim() || null,
-        recorded_by: (signedInUser() || {}).name || myEmail(),
-        recorded_email: myEmail() || null
       });
-    });
 
     if (fault) { setFieldError(null, "stock-qty-error", fault); return; }
     if (!rows.length) {
-      setFieldError(null, "stock-qty-error", "Enter at least one quantity.");
+      setFieldError(null, "stock-qty-error", setting
+        ? "Nothing is different from what is already recorded."
+        : "Enter at least one quantity.");
       return;
     }
     setFieldError(null, "stock-qty-error", "");
 
-    /* Nothing can be given out that was never held. A negative balance is a
-       mistake being written down rather than caught. */
-    if (stockKind === "utilised") {
-      var trouble = wouldGoNegative(district, month, rows);
-      if (trouble) {
-        var type = awardTypes.filter(function (a) {
-          return Number(a.id) === trouble.award_type_id;
-        })[0] || {};
-        var here = trouble.month === month;
-        setFieldError(null, "stock-qty-error",
-          here
-            ? district + " was not holding that many " + (type.name || "of that award") +
-              " in " + monthLabelOf(month) + " - it is short by " + trouble.short + "."
-            : "That would leave " + district + " holding " + trouble.short + " fewer " +
-              (type.name || "of that award") + " than nothing by " +
-              monthLabelOf(trouble.month) + ". Something later has already been " +
-              "recorded against this stock.");
-        return;
-      }
+    /* Nothing can be given out that was never held, and no correction may
+       leave a later month holding less than nothing - the figure that goes
+       wrong is not always the one being typed. */
+    var trouble = wouldGoNegative(stockCtx.district, stockCtx.fy, stockCtx.month, rows);
+    if (trouble) {
+      var short = awardTypes.filter(function (a) {
+        return Number(a.id) === trouble.award_type_id;
+      })[0] || {};
+      setFieldError(null, "stock-qty-error",
+        "That would leave " + stockCtx.district + " holding " + trouble.short +
+        " fewer " + (short.name || "of that award") + " than nothing by " +
+        trouble.month + ". Something later has already been " +
+        "recorded against this stock.");
+      return;
     }
 
     el.stockSave.disabled = true;
@@ -3313,17 +3295,15 @@ window.AWARD_CONFIG = {
       .then(function (res) {
         el.stockSave.disabled = false;
         if (res.error) {
-          setFieldError(null, "stock-qty-error",
-            /duplicate|unique/i.test(res.error.message || "")
-              ? "An opening figure is already set for that district and award."
-              : "Could not save: " + res.error.message);
+          setFieldError(null, "stock-qty-error", "Could not save: " + res.error.message);
           reportError("save stock", res.error);
           return;
         }
+        var where = stockCtx.district;
         closeStockModal();
-        showListBanner((stockKind === "opening" ? "Opening stock set for "
-                                                : "Utilisation recorded for ") + district + ".");
-        loadStock(function () { renderStock(); });
+        showListBanner((stockKind === "set" ? "Stock set for "
+                                            : "Utilisation recorded for ") + where + ".");
+        loadStock(function () { stockShown = true; renderStock(); });
       })
       .catch(function (err) {
         el.stockSave.disabled = false;
