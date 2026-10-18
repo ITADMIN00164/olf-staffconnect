@@ -832,7 +832,7 @@ window.AWARD_CONFIG = {
         "<div><dt>Requested by</dt><dd>" + escapeHtml(row.requester_name || "—") +
           (row.requester_role ? ' <span class="chip-role">' +
              escapeHtml(row.requester_role) + "</span>" : "") + "</dd></div>" +
-        "<div><dt>Awards</dt><dd>" + awardsCellHtml(awardsOf(row)) + "</dd></div>" +
+        "<div><dt>Awards</dt><dd>" + awardsCellHtml(awardsOf(row), row) + "</dd></div>" +
         "<div><dt>Total</dt><dd>" + escapeHtml(Number(row.quantity).toLocaleString()) +
         "</dd></div>" +
         "<div><dt>For</dt><dd>" +
@@ -1051,7 +1051,7 @@ window.AWARD_CONFIG = {
     el.hoSummary.innerHTML =
       "<dl>" +
         "<div><dt>Requested by</dt><dd>" + escapeHtml(row.requester_name || "—") + "</dd></div>" +
-        "<div><dt>Awards</dt><dd>" + awardsCellHtml(awardsOf(row)) + "</dd></div>" +
+        "<div><dt>Awards</dt><dd>" + awardsCellHtml(awardsOf(row), row) + "</dd></div>" +
         "<div><dt>For</dt><dd>" +
           escapeHtml([p.district, p.division, p.state].filter(Boolean).join(", ")) +
         "</dd></div>" +
@@ -2203,7 +2203,7 @@ window.AWARD_CONFIG = {
           "<td>" + escapeHtml(p.division || "—") + "</td>" +
           "<td>" + escapeHtml(p.district || "—") + "</td>" +
           "<td>" + escapeHtml(row.requester_name) + "</td>" +
-          '<td class="cell-awards">' + awardsCellHtml(awards) + "</td>" +
+          '<td class="cell-awards">' + awardsCellHtml(awards, row) + "</td>" +
           '<td class="num">' + escapeHtml(row.quantity) + "</td>" +
           '<td class="cell-date muted">' + escapeHtml(formatTimestamp(row.created_at)) + "</td>" +
           "<td>" + statusCellHtml(row) + "</td>" +
@@ -2228,32 +2228,42 @@ window.AWARD_CONFIG = {
   function awardsOf(row) {
     if (row && row.items && row.items.length) {
       return row.items.map(function (it) {
-        return { name: it.name || it.code || "Award", quantity: Number(it.quantity) || 0 };
+        return { id: Number(it.award_type_id) || 0,
+                 name: it.name || it.code || "Award",
+                 quantity: Number(it.quantity) || 0 };
       });
     }
     if (row && row.award_types) {
-      return [{ name: row.award_types.name, quantity: Number(row.quantity) || 0 }];
+      return [{ id: Number(row.award_type_id) || 0,
+                name: row.award_types.name,
+                quantity: Number(row.quantity) || 0 }];
     }
     return [];
   }
 
-  // Says on the row itself when less was sent than was asked for.
-  function shortfallHtml(row) {
-    if (!row.dispatched_items || !row.dispatched_items.length) return "";
-    var asked = quantitiesOf(row, "items");
-    var sent = quantitiesOf(row, "dispatched");
-    var short = Object.keys(asked).filter(function (id) {
-      return (sent[id] || 0) < asked[id];
-    });
-    if (!short.length) return "";
-    return '<span class="cell-short">part-filled</span>';
-  }
-
-  function awardsCellHtml(awards) {
+  /* What a requisition asked for, and - once it has been sent - what
+     actually went, where the two differ. "15 of 16" says it on the award
+     itself; a badge reading "part-filled" beside it named the situation
+     without giving the figures. */
+  function awardsCellHtml(awards, row) {
     if (!awards.length) return "—";
+
+    var sent = row && row.dispatched_items && row.dispatched_items.length
+      ? quantitiesOf(row, "dispatched")
+      : null;
+
     return awards.map(function (a) {
-      return '<span class="type-chip">' + escapeHtml(a.name) +
-             '<b>' + escapeHtml(a.quantity.toLocaleString()) + "</b></span>";
+      var went = sent ? (sent[a.id] || 0) : a.quantity;
+      var short = sent && went < a.quantity;
+      return '<span class="type-chip' + (short ? " is-short" : "") + '"' +
+             (short ? ' title="' + escapeHtml(a.quantity - went) +
+                      ' fewer than asked for"' : "") + ">" +
+             escapeHtml(a.name) + "<b>" +
+             (short
+               ? escapeHtml(went.toLocaleString()) + " of " +
+                 escapeHtml(a.quantity.toLocaleString())
+               : escapeHtml(a.quantity.toLocaleString())) +
+             "</b></span>";
     }).join(" ");
   }
 
@@ -2375,7 +2385,7 @@ window.AWARD_CONFIG = {
         "<td>" + escapeHtml(p.division || "—") + "</td>" +
         "<td>" + escapeHtml(p.district || "—") + "</td>" +
         "<td>" + escapeHtml(row.requester_name || "—") + "</td>" +
-        '<td class="cell-awards">' + awardsCellHtml(awards) + shortfallHtml(row) + "</td>" +
+        '<td class="cell-awards">' + awardsCellHtml(awards, row) + "</td>" +
         '<td class="num">' + escapeHtml(Number(row.quantity).toLocaleString()) + "</td>" +
         "<td>" + statusCellHtml(row, true) + "</td>" +
         '<td class="cell-log-col">' + logCellHtml(row) + "</td>" +

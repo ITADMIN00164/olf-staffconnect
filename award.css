@@ -1224,17 +1224,12 @@
   color: var(--accent-ink);
 }
 
-/* Said where the requisition is listed, not only in the stock sheet. */
-.award-page .cell-short {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 700;
+/* Less went than was asked for: the chip says so, in amber, with both
+   figures. */
+.award-page .type-chip.is-short {
   background: var(--warn-soft);
+  border-color: var(--warn-soft-border);
   color: var(--warn);
-  border: 1px solid var(--warn-soft-border);
 }
 .award-page .stock-line .hint { font-weight: 400; color: var(--text-muted); font-size: 11px; }
 
