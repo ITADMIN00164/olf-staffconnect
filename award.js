@@ -2809,9 +2809,11 @@ window.AWARD_CONFIG = {
 
     var body = rows.map(function (r) {
       var carry = r.monthKey === "";
+      var happened = monthHasHappened(r.monthKey, fy);
       // Nothing held is nothing to give out.
-      var mayUse = !carry && canUseHere(r.district) && sumOf(r.balance) > 0;
-      var maySet = canSetStock();
+      var mayUse = !carry && happened && canUseHere(r.district) &&
+                   sumOf(r.balance) > 0;
+      var maySet = happened && canSetStock();
       return '<tr class="' + (carry ? "is-carry" : "") + '">' +
         '<td class="col-month">' + escapeHtml(r.month) + "</td>" +
         '<td class="col-district is-district">' + escapeHtml(r.district) + "</td>" +
@@ -2875,6 +2877,16 @@ window.AWARD_CONFIG = {
     });
   }
 
+  /* A month that has not arrived cannot have had anything given out in it,
+     and there is nothing to count in it either - the figures shown for it
+     are what the district will be holding if nothing else happens. The
+     carry forward is the March before the year, so it is settled as soon as
+     the year has started. */
+  function monthHasHappened(monthKey, fy) {
+    return monthKey ? monthKey <= monthKeyOf(new Date())
+                    : fy <= fyStartOf(new Date());
+  }
+
   // Whether this district is one of theirs to record against.
   function canUseHere(district) {
     var d = String(district || "").trim().toLowerCase();
@@ -2910,6 +2922,7 @@ window.AWARD_CONFIG = {
     var fy = Number(el.stockYear.value) || fyStartOf(new Date());
     var monthKey = (ctx && ctx.month) || "";
     if (!setting && !monthKey) return;            // use is recorded in a month
+    if (!monthHasHappened(monthKey, fy)) return;  // and not in a month to come
 
     stockKind = kind;
     stockCtx = { state: where.state, division: where.division,
