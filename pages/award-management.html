@@ -4,12 +4,12 @@
      fragment is not a document, and a <style> inside one does not survive
      tooling that rewrites HTML on the way out.
 
-     Stock Management is the section; Requisition is one view inside it, with
-     room beside it for the rest of stock. -->
+     Requisition, Delivery, Stock and Settings are views of one section;
+     which of them a person sees depends on what they may do. -->
 <div class="award-page">
 
-    <!-- Shown only when app.js still holds placeholder credentials, or the first
-         Supabase call fails outright. -->
+    <!-- Shown only when award.js still holds placeholder credentials, or the
+         first Supabase call fails outright. -->
     <div id="setup-banner" class="banner banner-error" hidden>
       <span class="banner-icon" aria-hidden="true">
         <i class="aw-icon" data-aw-icon="alert" aria-hidden="true"></i>
@@ -303,7 +303,6 @@
           </button>
 
           <p class="error" id="award-type-error" role="alert"></p>
-          <p class="error" id="quantity-error" role="alert"></p>
         </div>
 
 
@@ -387,7 +386,7 @@
           <!-- Only when dispatching: what is actually going, which the
                spreadsheet keeps apart from what was asked for. -->
           <div class="field field-wide" id="ho-lines-field" hidden>
-            <label id="ho-lines-label">How many are going</label>
+            <label>How many are going</label>
             <div class="award-lines" id="ho-lines"></div>
             <p class="error" id="ho-lines-error" role="alert"></p>
           </div>
@@ -422,10 +421,6 @@
         </div>
 
         <div class="aw-box-body">
-          <div id="stock-banner" class="banner" role="status" aria-live="polite" hidden>
-            <span id="stock-banner-text"></span>
-          </div>
-
           <!-- Where and when: the district and the month of the row this was
                opened from, shown rather than asked for again. -->
           <p class="stock-where" id="stock-where"></p>

@@ -3,7 +3,7 @@
  *
  *  Both values are meant to be public. The publishable key is the browser-side
  *  key and is safe to ship in frontend code; what actually guards the data is
- *  Row Level Security, defined in supabase/schema.sql.
+ *  Row Level Security, defined in the files under sql/.
  *
  *  NEVER put the secret / service_role key here, or the database password from
  *  the direct connection string. Either one bypasses RLS.
@@ -19,13 +19,9 @@ window.AWARD_CONFIG = {
 
 /* Award Management — the Staff Connect tab.
  *
- * Ported from the standalone page. Loaded after the Supabase UMD bundle that
- * index.html already pulls in for the other Supabase-backed pages; this one
- * talks to a different project, so it keeps its own client.
- *
- * The requester is no longer typed - it is whoever is signed in, taken from
- * their Employees record where there is one. The log stays append-only: RLS
- * grants select and insert only, so nothing here can edit or delete.
+ * Loaded after the Supabase UMD bundle index.html already pulls in; this tab
+ * talks to a different project, so it keeps its own client. Places, roles and
+ * people all come from the Employees directory, never from a table here.
  */
 (function () {
   "use strict";
@@ -52,11 +48,9 @@ window.AWARD_CONFIG = {
     form: document.getElementById("requisition-form"),
     district: document.getElementById("district"),
     reqWhere: document.getElementById("req-where"),
-    awardType: document.getElementById("award-type"),
     requesterName: document.getElementById("requester-name"),
     requesterWho: document.getElementById("requester-who"),
     requesterSub: document.getElementById("requester-sub"),
-    quantity: document.getElementById("quantity"),
     submitBtn: document.getElementById("submit-btn"),
     resetBtn: document.getElementById("reset-btn"),
     formBanner: document.getElementById("form-banner"),
@@ -87,7 +81,6 @@ window.AWARD_CONFIG = {
     stockDistrict: document.getElementById("stock-district"),
     stockFetch: document.getElementById("stock-fetch"),
     stockWhere: document.getElementById("stock-where"),
-    stockPlace: document.getElementById("stock-place"),
     stockModal: document.getElementById("stock-modal"),
     stockHeading: document.getElementById("stock-heading"),
     stockSub: document.getElementById("stock-sub"),
@@ -125,10 +118,8 @@ window.AWARD_CONFIG = {
   // Every requisition row we've loaded; filtering happens in the browser.
   var allRequisitions = [];
 
-  /* A requisition carries its own decision: status says where it stands,
-     and the decided_* columns say who settled it, when and why. They arrive
-     with the approvals migration; until it is run the row is read without
-     them and everything shows as pending. */
+  // Each migration adds columns; until it is run the row is read without
+  // them. See loadRequisitions for how each flag gets turned off.
   var hasApproval = true;
   var hasItems = true;        // false until the multiple-awards migration runs
   var hasFulfilment = true;   // false until the fulfilment migration runs
@@ -143,22 +134,15 @@ window.AWARD_CONFIG = {
           │          └── rejected ─┘
           └── declined
 
-     declined is the approver turning it down; rejected is HO being unable to
-     fulfil it. Two words, because they are two different events by different
-     people - one word would lose where it died.
-
-     Dispatch and receipt are likewise two events, not one. Head Office knows
-     it sent the award; only the person who asked for it knows whether it
-     arrived. Having HO mark something "delivered" was recording a fact
-     nobody at that desk could see. */
+     declined is the approver turning it down; rejected is Head Office unable
+     to fulfil it. Dispatch and receipt are likewise two events: Head Office
+     knows it sent the award, only the requester knows it arrived. */
   var STAGES = {
     submitted:    { label: "Pending",      tone: "pending",  open: true  },
     approved:     { label: "Approved",     tone: "approved", open: true  },
     acknowledged: { label: "Acknowledged", tone: "progress", open: true  },
     on_hold:      { label: "On hold",      tone: "held",     open: true  },
     dispatched:   { label: "Dispatched",   tone: "progress", open: true,
-                    // One event seen from two places: the requester is
-                    // waiting for it, Head Office is waiting to hear.
                     hoLabel: "Awaiting confirmation" },
     received:     { label: "Received",     tone: "done",     open: false,
                     hoLabel: "Delivered" },
@@ -166,10 +150,8 @@ window.AWARD_CONFIG = {
     rejected:     { label: "Rejected",     tone: "declined", open: false }
   };
 
-  /* The same state reads differently depending on who is looking. Receipt is
-     the requester confirming it arrived, which to Head Office is the
-     delivery completing - one fact, two vantage points, and neither word is
-     wrong from where it is said. */
+  // One state, two vantage points: receipt to the requester is delivery
+  // completing to Head Office.
   function stageLabel(row, forHo) {
     var stage = STAGES[stageOf(row)];
     return (forHo && stage.hoLabel) || stage.label;
@@ -180,14 +162,11 @@ window.AWARD_CONFIG = {
     return STAGES[key] ? key : "submitted";
   }
 
-  /* The approver's part, which the review dialog and the Status cell read. */
+  /* The approver's part. Anything not still submitted has been past an
+     approver, so it is read by what it is not - naming the stages meant each
+     new one had to be remembered here too. */
   function statusOf(row) {
     var d = stageOf(row);
-    /* Anything that is not still submitted has been past an approver, so it
-       is listed by what it is not rather than by naming the stages: naming
-       them meant on_hold was missed when it was added, and a requisition
-       already in Head Office's hands showed a Review button to an approver
-       who had long since approved it. */
     if (d !== "submitted") {
       return { decision: d === "declined" ? "declined" : "approved",
                by: row.decided_by, byRole: row.decided_by_role,
@@ -196,14 +175,9 @@ window.AWARD_CONFIG = {
     return { decision: null };
   }
 
-  /* Pending is not much use on its own - pending on whom, and for what?
-     Every open stage is waiting on somebody, and this says who, by name
-     where there is one and by the role that has to act where there is not.
-
-     For one still awaiting approval that means the levels above the one it
-     was raised at, in its own division, because that is exactly who is
-     allowed to touch it. A COO has no division, so none is named when they
-     are the only ones left. */
+  /* Who an open requisition is sitting with - by name where there is one,
+     by the role that has to act where there is not. A COO has no division,
+     so none is named when they are the only ones left. */
   function waitingOn(row) {
     switch (stageOf(row)) {
       case "submitted":
@@ -227,17 +201,9 @@ window.AWARD_CONFIG = {
     }
   }
 
-  /* Every step a requisition has been through, in the order it happened.
-
-     Read out of the log the row carries rather than pieced together from the
-     column each step writes. Those columns cannot hold a step that has no
-     column of its own - taking something off hold left no trace at all - and
-     they remember only the last time a step repeated, so a requisition held
-     twice looked like one held once. The log is appended to and never
-     rewritten: held, taken off hold, held again all stay, in that order.
-
-     Rows filed before the log existed fall back to their columns, which is
-     the best those rows can do. */
+  /* Every step a requisition has been through, in order. The log is appended
+     to and never rewritten, so a hold, a resume and a second hold all stay.
+     Rows filed before the log column existed fall back to their columns. */
   var STEP_WORDS = {
     raised:       { label: "Raised",         tone: "start" },
     approved:     { label: "Approved",       tone: "good"  },
@@ -286,16 +252,13 @@ window.AWARD_CONFIG = {
     return steps;
   }
 
-  // The patch a step writes, with the step added to the log - or without it,
-  // where the column is not there yet.
   function withLog(row, what, note, patch) {
     if (hasLog && what) patch.log = logEntry(row, what, note);
     return patch;
   }
 
-  /* What to add to the log when a step is taken. The columns beside it still
-     record the latest of each step, because the stock arithmetic reads them;
-     the log is the history, and it only ever grows. */
+  // The columns beside the log still record the latest of each step; the
+  // log is the history, and it only ever grows.
   function logEntry(row, what, note) {
     var log = (row && row.log && row.log.slice()) || [];
     log.push({
@@ -308,26 +271,18 @@ window.AWARD_CONFIG = {
     return log;
   }
 
-  /* ------------------------------------------------------------------
-     Who may raise a requisition, and who may decide on one.
-
-     Both come from the Department recorded against the person in Employees.
-     Four levels, and an approver has to sit above the level the requisition
-     was raised at:
+  /* Who may raise a requisition and who may decide on one, both from the
+     Department recorded in Employees. An approver has to sit above the level
+     it was raised at:
 
        4  COO   Program Implementation COO    decides on DM, PM and PO
        3  DM    Program Implementation Div    decides on PM and PO
        2  PM    Program Implementation PM     decides on PO
        1  PO    Program Implementation        raises only
 
-     Raising is for PO, PM and DM. The COO decides rather than asks.
-
-     The directory spells PO two ways - 94 people are plain "Program
-     Implementation" and one is "Program Implementation - PO" - so the
-     patterns are anchored and allow the separator rather than matching on a
-     prefix, which would have made every variant look like a PO. Anyone in
-     any other department, or in none, has no part in this.
-     ------------------------------------------------------------------ */
+     Raising is for PO, PM and DM; the COO decides rather than asks. The
+     directory spells PO both ways, hence the anchored patterns - a prefix
+     match would make every variant look like a PO. */
   var ROLE_PATTERNS = [
     { re: /^program implementation\s*[-–]?\s*coo$/, role: "COO", level: 4 },
     { re: /^program implementation\s*[-–]?\s*div$/, role: "DM",  level: 3 },
@@ -354,10 +309,8 @@ window.AWARD_CONFIG = {
     return null;
   }
 
-  /* The signed-in person's standing. Null for anyone outside Programme
-     Implementation, anyone with no Employees record at all (an admin
-     account, say), and anyone marked Inactive - a leaver should not be
-     raising or approving anything. */
+  /* Null for anyone outside Programme Implementation, anyone with no
+     Employees record, and anyone marked Inactive. */
   function myStanding() {
     var emp = window.__olfEmployee;
     if (!emp) return null;
@@ -377,19 +330,11 @@ window.AWARD_CONFIG = {
       .filter(Boolean);
   }
 
-  /* A requisition is decided by somebody responsible for the division it is
-     for. A PM in Pune has no business approving Nagpur's requests, and the
-     division is already on the requisition - it is where the award is going.
-
-     The COO is the exception, and the directory agrees: the one COO has no
-     division recorded, because the role is not a divisional one. Above the
-     divisions, so across all of them.
-
-     An approver whose own Division is blank covers nothing. Two of the five
-     DMs are in that position today; until their Division is filled in on the
-     Employees tab they will see no Review buttons. That is the honest
-     reading - the alternative, treating blank as everywhere, would handing
-     them the whole organisation on the strength of a missing field. */
+  /* An approver has to cover the division the requisition is for. The COO is
+     the exception - no division is recorded against the role, because it sits
+     above all of them. A blank Division on anyone else covers nothing, not
+     everything: until it is filled in on the Employees tab they see no Review
+     buttons. */
   function coversDivision(standing, row) {
     if (!standing) return false;
     if (standing.level >= 4) return true;            // the COO is org-wide
@@ -404,6 +349,8 @@ window.AWARD_CONFIG = {
     return false;
   }
 
+  // PO, PM and DM raise; the COO decides instead, and everyone else sees
+  // the list but not the button.
   function canRaise(standing)  { return !!standing && standing.level <= 3; }
 
   /* Legacy rows carry no level: they were filed before the role was
@@ -414,14 +361,8 @@ window.AWARD_CONFIG = {
     return n >= 1 && n <= 4 ? n : 1;
   }
 
-  /* ------------------------------------------------------------ HO
-
-     The people who fulfil requisitions, kept in award_admins and managed
-     from Settings. Matched on the signed-in address, lower-cased.
-
-     Staff Connect Admins can always reach Settings as well. Without that,
-     removing the last award admin would shut the door on the room the key
-     is kept in. */
+  /* Head Office: the people who fulfil requisitions, kept in award_admins
+     and managed from Settings. Matched on the signed-in address. */
   var hoAdmins = [];             // [{ email, name }]
   var hasAdmins = true;          // false until the fulfilment migration runs
 
@@ -444,14 +385,10 @@ window.AWARD_CONFIG = {
     return String((window.__olfUser || {}).role || "").toLowerCase() === "admin";
   }
 
-  /* Settings is for Staff Connect Admins alone. Head Office fulfils
-     requisitions; appointing who does that is a different job, and letting
-     them hold both meant somebody could add a colleague, or remove
-     themselves, with nobody above them involved.
-
-     It also ends the lock-out worry the other way round: Admins exist
-     independently of this list, so emptying the list can never shut the
-     door on the room the key is kept in. */
+  /* Settings is for Staff Connect Admins alone: Head Office fulfils
+     requisitions, appointing who does that is a different job. Admins exist
+     in Firestore, independently of this list, so emptying it can never lock
+     everybody out. */
   function canManageAdmins() { return isAppAdmin(); }
 
   /* What HO may do to a requisition at its current stage. Nothing before it
@@ -462,11 +399,8 @@ window.AWARD_CONFIG = {
     switch (stageOf(row)) {
       case "approved":     return ["acknowledge", "reject"];
       case "acknowledged": return ["dispatch", "hold", "reject"];
-      /* On hold is waiting, not refusing. Nothing is sent from here: the
-         hold has to be lifted first, so the row says out loud that whatever
-         it was waiting for has been settled. Dispatching straight out of a
-         hold left the hold standing as the last thing anybody had said
-         about it. */
+      // On hold is waiting, not refusing. Nothing is sent from here: the
+      // hold is lifted first, so the row says the blocker was settled.
       case "on_hold":      return ["resume", "reject"];
       // Once it has been sent there is nothing left for HO to do and nothing
       // left to withhold; the next move belongs to the requester.
@@ -474,13 +408,8 @@ window.AWARD_CONFIG = {
     }
   }
 
-  /* Confirming receipt belongs to whoever asked for it - they are the only
-     one who can see it arrive.
-
-     Matched on the address where the row has one. The rows filed before
-     addresses were recorded fall back to the name, which is weaker but is
-     all those rows carry; without it their requesters could never close
-     them. */
+  /* Matched on the address where the row has one; rows filed before
+     addresses were recorded fall back to the name, which is all they carry. */
   function isMine(row) {
     var mine = myEmail();
     var theirs = String((row && row.requester_email) || "").trim().toLowerCase();
@@ -491,17 +420,14 @@ window.AWARD_CONFIG = {
     return !!myName && myName === theirName;
   }
 
-  /* Whoever raised it, and nobody else. They are the one it was sent to and
-     the only one in a position to see it arrive - an approver sitting in
-     another office is no better placed than Head Office to say it did, and
-     letting them say so put a receipt against a parcel they never saw. */
+  // Whoever raised it, and nobody else: they are the only one who can see
+  // it arrive.
   function canConfirmReceipt(row) {
     return stageOf(row) === "dispatched" && isMine(row);
   }
 
-  /* Dispatched and nothing came. Without this the only move on a dispatched
-     requisition is to confirm it, so a lost parcel leaves the row open for
-     ever with nobody able to say so. */
+  // Dispatched and nothing came; otherwise a lost parcel leaves the row
+  // open for ever.
   function canReportIssue(row) {
     return stageOf(row) === "dispatched" && isMine(row);
   }
@@ -611,13 +537,9 @@ window.AWARD_CONFIG = {
       });
   }
 
-  /* The icons are drawn from here rather than written into the fragment.
-
-     Inline <svg> in a page fragment is a liability: Live Server treats a
-     fragment containing one as a document to inject its reload script into,
-     and with several of them the response comes back truncated - the form
-     went missing entirely. A fragment that is plain markup is served
-     untouched. Keeping them here also means one copy of each. */
+  /* Drawn from here rather than written into the fragment: Live Server
+     treats a fragment containing inline <svg> as a document to inject its
+     reload script into, and truncates the response. */
   var ICONS = {
     alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
            'stroke-width="2" stroke-linecap="round">' +
@@ -720,7 +642,6 @@ window.AWARD_CONFIG = {
     showTab(el.subtabs, "data-aw-subtab", "requisition");
     applyAccess();
 
-
     if (!window.supabase || typeof window.supabase.createClient !== "function") {
       showSetupBanner(
         "Check your internet connection — the page pulls the library from " +
@@ -736,14 +657,13 @@ window.AWARD_CONFIG = {
         PLACEHOLDER.test(cfg.SUPABASE_URL) ||
         PLACEHOLDER.test(cfg.SUPABASE_ANON_KEY)) {
       showSetupBanner(
-        "Open <code>app.js</code> and replace the two placeholder values at the " +
-        "top with your project's <strong>Project URL</strong> and " +
-        "<strong>anon public key</strong> (Supabase Dashboard → Project " +
-        "Settings → API), then reload this page. See " +
-        "<code>README.md</code> for the full setup steps."
+        "Open <code>award.js</code> and replace the two placeholder values at " +
+        "the top with your project's <strong>Project URL</strong> and " +
+        "<strong>publishable key</strong> (Supabase Dashboard → Project " +
+        "Settings → API), then reload this page."
       );
       disableForm();
-      placeholderRow("Waiting for Supabase credentials at the top of app.js.");
+      placeholderRow("Waiting for Supabase credentials at the top of award.js.");
       return;
     }
 
@@ -760,9 +680,8 @@ window.AWARD_CONFIG = {
 
   // ------------------------------------------------------------- the tabs
 
-  /* Two levels of them - Stock Management, and Requisition inside it - so
-     this works off each button's own attribute and the panel it names,
-     rather than a list that would have to be kept in step with the markup. */
+  /* Works off each button's own attribute and the panel it names, rather
+     than a list that would have to be kept in step with the markup. */
   function showTab(buttons, attr, name) {
     Array.prototype.forEach.call(buttons, function (tab) {
       var on = tab.getAttribute(attr) === name;
@@ -818,9 +737,7 @@ window.AWARD_CONFIG = {
     setFormStatus("");
     resetAwardLines();
 
-    /* Built each time it opens, from the directory as it stands now: a
-       person moved to another division between two requisitions should be
-       offered the new one, not the one that was loaded with the page. */
+    // Built each time it opens, from the directory as it stands now.
     fillMyDistricts();
 
     // Put back where the last one was for, if that is still on offer.
@@ -894,13 +811,9 @@ window.AWARD_CONFIG = {
     el.listBanner.hidden = false;
   }
 
-  /* ---------------------------------------------------------------- review
-
-     Deciding is its own dialog rather than a pair of buttons in the row: a
-     decision cannot be taken back, so it is worth a moment and a sentence.
-     Declining asks for a reason - being turned down without one is the
-     complaint that comes back. Approving may carry one and usually will not.
-  */
+  /* Review. A decision cannot be taken back, so it gets a dialog rather
+     than a button in the row. Declining asks for a reason; approving may
+     carry one. */
   var reviewing = null;          // the requisition under review
 
   function openReview(id) {
@@ -1030,16 +943,10 @@ window.AWARD_CONFIG = {
       });
   }
 
-  /* Raising is for PO, PM and DM. Everyone else - the COO, anyone outside
-     Programme Implementation, anyone without a record - sees the list but
-     not the button, and is told why instead of being left to wonder at a
-     greyed-out control. */
-  /* Delivery is HO's queue and Settings is where HO is decided, so neither
-     is shown to people they mean nothing to. Hidden rather than disabled: a
-     tab you may never open is clutter, not information. */
+  /* Delivery is Head Office's queue and Settings is where Head Office is
+     decided, so neither is shown to people they mean nothing to. Hidden
+     rather than disabled: a tab you may never open is clutter. */
   function applyAccess() {
-    // Delivery is the work; Settings is deciding who does the work. Held by
-    // different people on purpose.
     var show = { requisition: true, stock: true,
                  delivery: isHoAdmin(), settings: canManageAdmins() };
 
@@ -1098,12 +1005,9 @@ window.AWARD_CONFIG = {
     return " You decide on " + divs.join(" and ") + ".";
   }
 
-  /* --------------------------------------------------------- HO's moves
-
-     Acknowledging and delivering are a step forward and take a note only if
-     there is one to make. Rejecting ends the requisition, so it asks for a
-     reason - the requester is owed one, and it is the only record of why
-     nothing arrived. */
+  /* Head Office's moves. Acknowledging and dispatching take a note only if
+     there is one to make; rejecting ends the requisition, so it asks for a
+     reason. */
   var hoPending = null;          // { row, action } awaiting confirmation
 
   function mayDo(row, action) {
@@ -1389,10 +1293,8 @@ window.AWARD_CONFIG = {
       });
   }
 
-  /* ------------------------------------------------------------ Settings
-
-     Who fulfils requisitions. Staff Connect Admins only - the people on the
-     list do the fulfilling, not the appointing. */
+  /* Settings: who fulfils requisitions. The people on the list do the
+     fulfilling, not the appointing. */
   function renderAdmins() {
     if (!el.adminList) return;
 
@@ -1474,11 +1376,8 @@ window.AWARD_CONFIG = {
     }
     if (!who) return;
 
-    /* Taking the last one off leaves nobody able to fulfil anything, so it
-       says so rather than removing quietly. Asked through the shell's own
-       dialog, not window.confirm - the rest of Staff Connect does, and a
-       browser box in the middle of this would look like something had gone
-       wrong. */
+    // Taking the last one off leaves nobody able to fulfil anything, so it
+    // says so rather than removing quietly.
     var last = hoAdmins.length === 1;
     var ask = window.showAppConfirm ? window.showAppConfirm({
       title: last ? "Remove the last HO admin?" : "Remove from Head Office?",
@@ -1564,10 +1463,7 @@ window.AWARD_CONFIG = {
       renderStock();
     });
 
-    /* Changing a filter puts the sheet away again rather than redrawing it.
-       Four hundred rows should be asked for, not arrived at by touching a
-       dropdown - and a sheet that half-follows the filters is worse than one
-       that waits to be asked. */
+    // Changing a filter puts the sheet away rather than redrawing it.
     [el.stockYear, el.stockState, el.stockDivision, el.stockDistrict].forEach(function (sel) {
       sel.addEventListener("change", function () {
         if (sel === el.stockState || sel === el.stockDivision) stockFiltersFor(sel);
@@ -1662,22 +1558,12 @@ window.AWARD_CONFIG = {
 
   // -------------------------------------------------------- reference data
 
-  /* Where the organisation works, from the Employees directory rather than a
-     copy kept here. The shell builds the State -> Division -> District tree
-     once per page load; this just reads it, so changing the cascade is a
-     matter of correcting someone's record in the Employees tab. */
+  /* Where the organisation works, read from the Employees directory: the
+     shell builds the State -> Division -> District tree, this only reads it. */
   var geography = [];
 
   /* The districts this person may raise a requisition for: the ones in the
-     division or divisions recorded against them in Employees. A Programme
-     Officer in Pune asks for Pune's districts - choosing the state and the
-     division first was three dropdowns to arrive at the only answer the
-     directory would have given anyway, and a fourth chance to file against
-     somewhere they have nothing to do with.
-
-     Most people have one division. The few who have more - a manager
-     covering two - get every district of both, told apart by the heading
-     over them. */
+     division or divisions recorded against them in Employees. */
   function myPlaces() {
     var standing = myStanding();
     var mine = ((standing && standing.divisions) || []).map(function (d) {
@@ -1709,10 +1595,17 @@ window.AWARD_CONFIG = {
     var places = myPlaces();
     var standing = myStanding();
 
-    /* Nothing to file against is nothing to submit. Left enabled, the button
-       answers a missing Division with "Select a district", which is not the
-       problem and not something they can do anything about. */
+    // Nothing to file against is nothing to submit.
     if (el.submitBtn) el.submitBtn.disabled = !places.length;
+
+    /* The directory arrives after the page does, so opening the dialog in
+       that gap must not read as having nowhere to file. */
+    if (!geography.length) {
+      el.district.innerHTML = '<option value="">Loading…</option>';
+      el.district.disabled = true;
+      el.reqWhere.hidden = true;
+      return;
+    }
 
     if (!places.length) {
       el.district.innerHTML = '<option value="">Nothing to choose</option>';
@@ -1839,10 +1732,8 @@ window.AWARD_CONFIG = {
   }
 
   /* An award already on the requisition is taken out of the other lines'
-     lists, so the same one cannot be asked for twice - two lines of the same
-     award is a mistake every time, and catching it here is kinder than
-     refusing it on submit. The remove button hides when one line is left,
-     since there is nothing to go back to. */
+     lists: the same one twice is a mistake every time, and catching it here
+     beats refusing it on submit. */
   function syncAwardLines() {
     var lines = Array.prototype.slice.call(el.awardLines.querySelectorAll(".award-line"));
     var chosen = lines.map(function (l) { return l.querySelector(".award-line-type").value; });
@@ -1924,15 +1815,11 @@ window.AWARD_CONFIG = {
   function readForm() {
     clearFieldErrors();
 
-    /* Where it is for is recorded as the names that were chosen, not as ids
-       into this database's own tables: the directory covers districts those
-       tables have never heard of. For a log that cannot be edited the name is
-       the better record anyway - it keeps what was picked at the time instead
-       of following a row somebody renames later. */
-    /* The district is chosen; the state and the division come with it, out
-       of the filer's own record. They are still written onto the row rather
-       than looked up later - who may approve this depends on the division it
-       was for at the time, and people move. */
+    /* The district is chosen; the state and division come with it. All
+       three are recorded as names, not ids - the directory covers districts
+       this database has never heard of - and written onto the row rather
+       than looked up later, because who may approve this depends on the
+       division it was for at the time. */
     var where = myPlaceOf(el.district.value) || {};
 
     var values = {
@@ -1957,9 +1844,7 @@ window.AWARD_CONFIG = {
       requisition_date: todayLocalISO(),
     };
 
-    /* The first entry in the log. Every step after this appends to it, so the
-       history is on the row itself rather than inferred from which columns
-       happen to be filled in. */
+    // The first entry in the log; every step after this appends to it.
     if (hasLog) {
       values.log = [{
         at: new Date().toISOString(), what: "raised",
@@ -2112,40 +1997,24 @@ window.AWARD_CONFIG = {
 
   // ------------------------------------------------------------- load list
 
-  /* The log has to stay readable at every stage of the move off the old
-     lookup tables, whichever order the steps happen in:
-
-       state_name and the rest arrive with
-         sql/award-management-setup.sql
-       states and districts go with
-         sql/award-management-setup.sql
-
-     Asking for either when it is not there fails the whole query, so each is
-     tried once and switched off if the database says no. The two tests cannot
-     catch each other's message: "state_name" does not contain "states". */
+  /* Asking for a column that is not there fails the whole query, so each
+     migration's columns are tried once and switched off if the database says
+     no. Narrower tests come first: the fulfilment pattern would otherwise
+     swallow dispatched_items. */
   var hasNameColumns  = true;
-  var hasLookupTables = true;
 
   function loadRequisitions() {
     el.refreshBtn.disabled = true;
 
     db.from("requisitions")
-      // The names are what new rows carry; the joins are for the rows filed
-      // before this page recorded them, which still point at the old tables.
       .select("id, requester_name, quantity, requisition_date, status, created_at," +
               (hasNameColumns  ? " state_name, division_name, district_name," : "") +
-              (hasLookupTables ? " states ( code, name ), districts ( name )," : "") +
               (hasItems ? " items," : "") +
-              /* held_ and issue_ were written but never read back, so a
-                 requisition that had been on hold, or reported as never
-                 arrived, showed no sign of it after a refresh. */
               (hasFulfilment ? " acknowledged_by, acknowledged_at, dispatched_by," +
                                " dispatched_at, received_by, received_at, receipt_note," +
                                " rejected_by, rejected_at, ho_remark," +
                                " held_by, held_at, issue_by, issue_at, issue_note," : "") +
-              /* What Head Office actually sent. Also never read back, which
-                 left the stock sheet crediting a district with everything it
-                 asked for whenever it was sent less. */
+              // What Head Office actually sent, which the stock sheet reads.
               (hasSent ? " dispatched_items," : "") +
               (hasLog ? " log," : "") +
               (hasEmails ? " requester_email, decided_by_email, ho_by_email," : "") +
@@ -2181,7 +2050,8 @@ window.AWARD_CONFIG = {
             return;
           }
           if (hasFulfilment &&
-              /(acknowledged_|dispatched_|received_|receipt_note|rejected_|ho_remark|held_|issue_)/i.test(msg)) {
+              /(acknowledged_|dispatched_|received_|receipt_note|rejected_)/i.test(msg) ||
+              /(ho_remark|held_|issue_)/i.test(msg)) {
             hasFulfilment = false;            // fulfilment not migrated yet
             loadRequisitions();
             return;
@@ -2191,7 +2061,8 @@ window.AWARD_CONFIG = {
             loadRequisitions();
             return;
           }
-          if (hasApproval && /(requester_role|requester_level|decided_|decision_remark)/i.test(msg)) {
+          if (hasApproval &&
+              /(requester_role|requester_level|decided_|decision_remark)/i.test(msg)) {
             hasApproval = false;      // the approvals migration is not run yet
             showSetupBanner(
               "Approvals need one more migration - run " +
@@ -2202,12 +2073,6 @@ window.AWARD_CONFIG = {
             loadRequisitions();
             return;
           }
-          if (hasLookupTables && /(states|districts)/i.test(msg)) {
-            hasLookupTables = false;     // lookup tables gone - the names carry it
-            loadRequisitions();
-            return;
-          }
-
           placeholderRow("Could not load requisitions: " + msg);
           reportError("load requisitions", msg);
           return;
@@ -2229,27 +2094,18 @@ window.AWARD_CONFIG = {
       });
   }
 
-  /* Where a row says it is for. New rows carry the names; the ones filed
-     before that still point at this database's own tables, so both are read
-     and the newer answer wins. */
+  // Where a row says it is for, as the names it was filed with.
   function placeOf(row) {
     return {
-      state:    row.state_name    || (row.states    ? row.states.name    : ""),
+      state:    row.state_name    || "",
       division: row.division_name || "",
-      district: row.district_name || (row.districts ? row.districts.name : ""),
-      code:     row.states ? row.states.code : ""
+      district: row.district_name || ""
     };
   }
 
-  /* The filter dropdowns offer what the loaded rows actually contain - not
-     everything the directory knows - so nothing on offer can return nothing.
-     Each narrows the next: pick a state and only the divisions filed in it
-     remain. A selection that is still on offer survives the rebuild, because
-     fillSelect puts it back.
-
-     Award type is left alone. It has nothing to do with where a requisition
-     is for, and narrowing it would only hide types from someone looking for
-     them. */
+  /* The filters offer what the loaded rows contain, not everything the
+     directory knows, so nothing on offer can return nothing. Each narrows the
+     next; award type is left alone, since it has nothing to do with place. */
   function buildFilterOptions() {
     var stateFilter    = el.filterState.value;
     var divisionFilter = el.filterDivision.value;
@@ -2258,7 +2114,7 @@ window.AWARD_CONFIG = {
 
     allRequisitions.forEach(function (row) {
       var p = placeOf(row);
-      if (p.state) states[p.state] = p.code;
+      if (p.state) states[p.state] = true;
       awardsOf(row).forEach(function (a) { types[a.name] = true; });
 
       if (stateFilter && p.state !== stateFilter) return;
@@ -2295,8 +2151,11 @@ window.AWARD_CONFIG = {
       if (stateFilter && p.state !== stateFilter) return false;
       if (divisionFilter && p.division !== divisionFilter) return false;
       if (districtFilter && p.district !== districtFilter) return false;
-      if (typeFilter && awardsOf(row).every(function (a) { return a.name !== typeFilter; })) return false;
-      if (search && String(row.requester_name || "").toLowerCase().indexOf(search) === -1) return false;
+      if (typeFilter && awardsOf(row).every(function (a) {
+        return a.name !== typeFilter;
+      })) return false;
+      if (search && String(row.requester_name || "").toLowerCase()
+                      .indexOf(search) === -1) return false;
       // Filtered on the stage itself. Going through statusOf collapsed
       // every stage after approval into "approved", so choosing Dispatched
       // or Received could not tell them apart.
@@ -2326,8 +2185,7 @@ window.AWARD_CONFIG = {
 
       html +=
         "<tr>" +
-          '<td><span class="state-code" title="' + escapeHtml(stateName) + '">' +
-            escapeHtml(p.code || stateName) + "</span></td>" +
+          '<td><span class="state-code">' + escapeHtml(stateName) + "</span></td>" +
           "<td>" + escapeHtml(p.division || "—") + "</td>" +
           "<td>" + escapeHtml(p.district || "—") + "</td>" +
           "<td>" + escapeHtml(row.requester_name) + "</td>" +
@@ -2365,9 +2223,7 @@ window.AWARD_CONFIG = {
     return [];
   }
 
-  /* What is on its way, or arrived, where that differs from what was
-     asked for. A requisition that was part-filled should say so on its own
-     row rather than only in the stock sheet. */
+  // Says on the row itself when less was sent than was asked for.
   function shortfallHtml(row) {
     if (!row.dispatched_items || !row.dispatched_items.length) return "";
     var asked = quantitiesOf(row, "items");
@@ -2387,10 +2243,8 @@ window.AWARD_CONFIG = {
     }).join(" ");
   }
 
-  /* Where a requisition stands, and who it is sitting with. Just that: the
-     steps that got it there are a column of their own now. One cell holding
-     both the state and the whole history made the state hard to find, which
-     is the thing most people are looking for. */
+  // Where a requisition stands and who it is sitting with. The steps that
+  // got it there are a column of their own.
   function statusCellHtml(row, forHo) {
     var stage = STAGES[stageOf(row)];
     var waiting = waitingOn(row);
@@ -2401,9 +2255,8 @@ window.AWARD_CONFIG = {
                       "</span>" : "");
   }
 
-  /* The journey, in its own column: every step, who took it, when, and
-     anything they said about it. Coloured by what the step was, so a hold or
-     a rejection shows without having to be read. */
+  /* The journey: every step, who took it, when, and anything they said.
+     Coloured by what the step was. */
   function logCellHtml(row) {
     var steps = trailOf(row);
     if (!steps.length) return '<span class="log-none">\u2014</span>';
@@ -2420,8 +2273,7 @@ window.AWARD_CONFIG = {
              "</li>";
     }).join("") + "</ol>";
 
-    /* A remark on a row filed before the log carried notes would otherwise
-       disappear with the column it used to be read from. */
+    // A remark held only in a column, on a row whose log has no notes.
     var noted = steps.some(function (st) { return !!st.note; });
     var remark = row.issue_note || row.receipt_note || row.ho_remark ||
                  row.decision_remark || "";
@@ -2475,13 +2327,11 @@ window.AWARD_CONFIG = {
   function renderDelivery() {
     if (!el.deliveryBody) return;
 
-    /* Everything that has reached HO, open ones first. A dispatched
-       requisition stays here rather than vanishing: HO needs to see it turn
-       into Delivered when the requester confirms, which is the whole point
-       of them confirming. The settled ones sit underneath as the record. */
-    /* Ordered by what Head Office has to do next: waiting to be picked up,
-       then ready to send, then blocked, then sent and waiting on somebody
-       else, then finished. */
+    /* Everything that has reached Head Office, ordered by what they have to
+       do next: waiting to be picked up, ready to send, blocked, sent and
+       waiting on somebody else, then finished. A dispatched requisition
+       stays rather than vanishing - Head Office needs to see it turn into
+       Delivered. */
     var ORDER = { approved: 0, acknowledged: 1, on_hold: 2, dispatched: 3,
                   received: 4, rejected: 5 };
     var rows = allRequisitions.filter(function (r) {
@@ -2506,8 +2356,8 @@ window.AWARD_CONFIG = {
       var p = placeOf(row);
       var awards = awardsOf(row);
       return "<tr>" +
-        '<td><span class="state-code" title="' + escapeHtml(p.state) + '">' +
-          escapeHtml(p.code || p.state || "—") + "</span></td>" +
+        '<td><span class="state-code">' + escapeHtml(p.state || "—") +
+          "</span></td>" +
         "<td>" + escapeHtml(p.division || "—") + "</td>" +
         "<td>" + escapeHtml(p.district || "—") + "</td>" +
         "<td>" + escapeHtml(row.requester_name || "—") + "</td>" +
@@ -2523,18 +2373,12 @@ window.AWARD_CONFIG = {
   /* ==================================================================
      Stock
 
-       balance = opening + delivered - utilised (+/- corrections)
+       balance = delivered - utilised +/- corrections
 
-     carried month to month, per district, per award type. Nothing stores
-     the balance; it is added up from what happened each time it is shown.
-     A stored balance is a second copy of the truth, and the spreadsheet
-     this replaces shows the cost - one carry-forward row lost 62 units
-     between its delivery column and its balance, and the sheet it fed is
-     #REF! throughout.
-
-     A district gains stock when it confirms the award arrived - not when it
-     was asked for, and not when Head Office sent it. It holds stock when it
-     has it.
+     carried month to month, per district, per award type. Nothing stores the
+     balance; it is added up from what happened each time it is shown. A
+     district gains stock when it confirms the award arrived - not when it was
+     asked for, and not when Head Office sent it.
      ================================================================== */
 
   // The year runs April to March, so anything before April belongs to the
@@ -2581,9 +2425,9 @@ window.AWARD_CONFIG = {
     return key !== "" && key < (fyStart + "-04");
   }
 
-  /* The awards on a requisition, as a map of award type to quantity. What
-     Head Office dispatched where that was recorded, and what was asked for
-     where it was not - the older rows predate the distinction. */
+  /* The awards on a requisition as a map of type to quantity: what was
+     dispatched where that was recorded, what was asked for where it was
+     not. */
   function quantitiesOf(row, which) {
     var list = (which === "dispatched" && row.dispatched_items && row.dispatched_items.length)
       ? row.dispatched_items
@@ -2625,12 +2469,8 @@ window.AWARD_CONFIG = {
 
       // what arrived, which does
       if (stageOf(row) === "received" && row.received_at) {
-        /* No note. Head Office's dispatch remark used to land in the sheet's
-           Remark column, where "out for delivery from ho" sat against a
-           month of figures explaining nothing about them. What was said
-           about a parcel belongs on the requisition, which is where it is
-           said and where the log keeps it. This column is for what was said
-           about the stock itself. */
+        // No note: what was said about the parcel belongs on the
+        // requisition. The sheet's Remark column is for the stock itself.
         events.push({ district: district, month: monthKeyOf(row.received_at),
                       column: "delivery", sign: 1,
                       quantities: quantitiesOf(row, "dispatched") });
@@ -2667,10 +2507,7 @@ window.AWARD_CONFIG = {
     places.forEach(function (place) {
       var mine = events.filter(function (e) { return e.district === place.district; });
 
-      // Everything before April is one number: the carry forward. It is
-      // computed rather than typed, so a year's opening needs entering only
-      // once ever - the first year - and every year after follows from what
-      // actually happened.
+      // Everything before April is one number: the carry forward.
       var balance = {};
       mine.forEach(function (e) {
         if (e.sign && fyStartsBefore(e.month, fyStart)) {
@@ -2717,9 +2554,7 @@ window.AWARD_CONFIG = {
     return rows;
   }
 
-  /* Every district the directory knows, with the manager of its division -
-     the sheet lists a PM beside each district, and that is the PM of the
-     division it sits in. */
+  // Every district the directory knows, with the manager of its division.
   function stockPlaces() {
     var out = [];
     var seen = {};
@@ -2733,12 +2568,9 @@ window.AWARD_CONFIG = {
       });
     });
 
-    /* The directory is the only place this page takes its districts from -
-       the same list the requisition form offers, so the two can never
-       disagree about where a place is or who manages it. A district nobody
-       is posted to is not in it, and its stock has nowhere to sit; adding
-       one from a stock row instead would be a second source of places, and
-       two lists of the same thing drift. */
+    /* The directory is the only source of districts here, as it is for the
+       requisition form, so the two can never disagree. A district nobody is
+       posted to is not in it. */
     return out;
   }
 
@@ -2780,21 +2612,17 @@ window.AWARD_CONFIG = {
       var y = fyStartOf(r.created_at); if (y) years[y] = true;
     });
     stockMovements.forEach(function (m) {
-      /* Opening figures are dated the March before the year they open, so
-         counting them here would offer a year that holds nothing but a
-         number with no column to explain it. */
+      // Dated the March before the year they open, so they would offer a
+      // year holding nothing but a carried figure.
       if (m.kind === "opening") return;
       var y = fyStartOf(m.occurred_on); if (y) years[y] = true;
     });
     return Object.keys(years).map(Number).sort(function (a, b) { return b - a; });
   }
 
-  /* One group of cells - what was asked for, what arrived, what was given
-     out, or what is left. Each carries its group, so the sheet can be read
-     by colour: four groups of five numbers all in the same ink is what made
-     it hard to follow a column down. A figure of nothing is greyed, and a
-     negative one is red - it should never happen, and if it does it should be
-     the first thing seen. */
+  /* One group of cells, carrying its group so the sheet can be read by
+     colour. Nothing is greyed; a negative figure is red - it should never
+     happen, and should be seen first if it does. */
   function cellsHtml(map, types, kind) {
     var html = "";
     var cell = function (n, extra) {
@@ -2852,10 +2680,9 @@ window.AWARD_CONFIG = {
 
   }
 
-  /* Whether the sheet has been asked for. It is not drawn on arrival: the
-     tab opens on its filters, and the figures come when Fetch is pressed.
-     Thirty-five districts over twelve months is four hundred rows, and
-     landing in them before saying what you came for is no use to anybody. */
+  /* Whether the sheet has been asked for. The tab opens on its filters and
+     the figures come when Fetch is pressed - thirty-five districts over
+     twelve months is four hundred rows. */
   var stockShown = false;
 
   function renderStock() {
@@ -2900,13 +2727,10 @@ window.AWARD_CONFIG = {
     var types = awardTypes;
     var rows = stockRows(fy, allRequisitions, stockMovements, places);
 
-    /* Asking for a place is asking for it whether or not anything has
-       happened there - that is how a district with no stock yet is given an
-       opening figure. Asking for nothing in particular shows the districts
-       with something in them: on a quiet day the other four hundred rows are
-       all dashes, and they bury the handful that are not. Stock sitting in a
-       district counts as something; a balance is news even in a quiet
-       month. */
+    /* Asking for a place shows it whether or not anything has happened
+       there - that is how an empty district is given its first figures.
+       Asking for nothing in particular shows only the districts with
+       something in them, stock sitting there included. */
     var narrowed = !!(el.stockState.value || el.stockDivision.value ||
                       el.stockDistrict.value);
     if (!narrowed) {
@@ -2932,9 +2756,6 @@ window.AWARD_CONFIG = {
       return;
     }
 
-    /* The four groups of the sheet. There used to be an Items column
-       between District and these, saying "No. of Teachers" on every single
-       row - the same words four hundred times, which is not information. */
     var GROUPS = [
       { kind: "req", label: "Requisition" },
       { kind: "del", label: "Delivery" },
@@ -2964,8 +2785,7 @@ window.AWARD_CONFIG = {
 
     var body = rows.map(function (r) {
       var carry = r.monthKey === "";
-      /* Nothing held is nothing to give out, so the button is not offered -
-         the alternative is a dialog that can only refuse. */
+      // Nothing held is nothing to give out.
       var mayUse = !carry && canUseHere(r.district) && sumOf(r.balance) > 0;
       var maySet = canSetStock();
       return '<tr class="' + (carry ? "is-carry" : "") + '">' +
@@ -3006,26 +2826,17 @@ window.AWARD_CONFIG = {
     return code || t.name;
   }
 
-  /* Recording what went out, or what a district started with. One dialog:
-     the two differ only in the month they land in and what the number means,
-     so two would be the same form twice.
-
-     Utilisation belongs to whoever works the district - the people who hand
-     the awards out. Opening stock is a setting-up job, so it is kept to Head
-     Office and administrators. */
+  /* Recording what went out, or setting what a district holds. One dialog:
+     the two differ only in what the number means. */
   var stockKind = "utilised";
 
-  /* Setting a district's figures by hand is an administrator's job and
-     nobody else's. It is how the first year's numbers get in - typed against
-     April and carried forward from there - and how a miscount is put right
-     afterwards. It writes an adjustment, not a new truth: the balance is
-     still added up from what moved, so the correction shows as a movement
-     like any other rather than quietly replacing the arithmetic. */
+  /* Setting a district's figures by hand is an administrator's job: it is
+     how the first year's numbers get in, and how a miscount is put right. It
+     writes a correction, so the balance is still added up from what moved. */
   function canSetStock() { return isAppAdmin(); }
 
-  /* Which districts somebody may record against. A manager records for their
-     own division; the COO, Head Office and administrators for anywhere,
-     because they are the ones who see across divisions. */
+  /* Which districts somebody may record against: their own division, or
+     anywhere for the COO, Head Office and administrators. */
   function placesIMayRecord() {
     var all = stockPlaces();
     var standing = myStanding();
@@ -3057,10 +2868,7 @@ window.AWARD_CONFIG = {
     var setting = kind === "set";
     if (setting && !canSetStock()) return;
 
-    /* Where and when are the row's, not a form's. A utilisation is recorded
-       against the month it happened in; a figure is set against the month it
-       is being set for. Asking again in four dropdowns was four chances to
-       put it somewhere else. */
+    // Where and when are the row's, not a form's.
     var where = placesIMayRecord().filter(function (p) {
       return String(p.district).trim().toLowerCase() ===
              String((ctx && ctx.district) || "").trim().toLowerCase();
@@ -3104,9 +2912,8 @@ window.AWARD_CONFIG = {
       '<em>' + escapeHtml(monthKey ? monthLabelOf(monthKey)
                                    : "Before " + fyLabel(fy)) + "</em>";
 
-    /* What the district is holding at that point. For a utilisation it is
-       the ceiling; for a figure being set it is what the boxes start at, so
-       an award nobody is changing is left exactly as it was. */
+    /* What the district is holding at that point: the ceiling for a
+       utilisation, the starting figure for one being set. */
     var held = balanceOn(stockCtx.district, fy, monthKey);
 
     el.stockLines.innerHTML = awardTypes.map(function (t) {
@@ -3166,9 +2973,8 @@ window.AWARD_CONFIG = {
     };
   }
 
-  /* What the district holds at the end of a given month - or, for the empty
-     month key, what it carried into the year. This is what a utilisation has
-     to fit inside, and what a figure being set starts from. */
+  /* What the district holds at the end of a month - or, for the empty month
+     key, what it carried into the year. */
   function balanceOn(district, fy, monthKey) {
     var rows = stockRows(fy, allRequisitions, stockMovements,
                          [{ state: "", division: "", district: district, pm: "" }]);
@@ -3179,10 +2985,8 @@ window.AWARD_CONFIG = {
   }
 
   /* What the months from here on would look like if these movements were
-     recorded. Checking only the month being edited is not enough: a figure
-     set against April, after May and June have already been accounted for,
-     can leave those months holding less than nothing - and the number that
-     goes wrong is not the one being typed. */
+     recorded. Checking only the month being edited is not enough: the number
+     that goes wrong is not always the one being typed. */
   function wouldGoNegative(district, fy, fromKey, movements) {
     var pretend = stockMovements.concat(movements.map(function (m) {
       return { kind: m.kind, district_name: district,
@@ -3242,9 +3046,8 @@ window.AWARD_CONFIG = {
           }
           if (n === have) return;                 // nothing to record
 
-          /* The difference, not the figure. The balance is added up from
-             what moved, so a correction is a movement like any other - and
-             the sheet can still say how the number got there. */
+          // The difference, not the figure: the balance is added up from
+          // what moved.
           rows.push(movementRow("adjustment", id, n - have,
             name + ": " + have.toLocaleString() + " \u2192 " + n.toLocaleString()));
 
@@ -3274,9 +3077,7 @@ window.AWARD_CONFIG = {
     }
     setFieldError(null, "stock-qty-error", "");
 
-    /* Nothing can be given out that was never held, and no correction may
-       leave a later month holding less than nothing - the figure that goes
-       wrong is not always the one being typed. */
+    // No correction may leave a later month holding less than nothing.
     var trouble = wouldGoNegative(stockCtx.district, stockCtx.fy, stockCtx.month, rows);
     if (trouble) {
       var short = awardTypes.filter(function (a) {

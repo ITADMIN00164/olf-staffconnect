@@ -1,33 +1,15 @@
-/* Award Management - the styles for pages/award-management.html.
-
-   Every rule is scoped under .award-page: this began life as a standalone
-   page that styled body, table and :root, and unscoped it would restyle the
-   shell, the Employees table included. The tokens sit on .award-page rather
-   than :root for the same reason.
-
-   It lives here rather than in a <style> inside the fragment because a
-   fragment is not a document. Tooling that rewrites HTML on the way out -
-   Live Server injects a reload script into this one and truncates it - takes
-   the stylesheet with it, and the page arrives with its markup and none of
-   its looks. A .css file is served untouched, and is parsed once instead of
-   on every visit to the tab. */
-/* Award Management — plain CSS, no framework, no build step.
+/* Award Management — the styles for pages/award-management.html.
  *
- * Warm paper background, deep indigo as the single strong accent, serif
- * headings against a sans UI, and monospace for anything you'd read as a
- * value: codes, counts, dates.
+ * Every rule is scoped under .award-page, tokens included: unscoped, this
+ * would restyle the shell and the Employees table with it. Retheming is a
+ * token edit - change the values below and every button, chip, rule and
+ * focus ring follows.
  *
- * Retheming is a token edit: change the --accent-* values in :root below and
- * every button, rule, chip, focus ring and success banner follows.
+ * It lives here rather than in a <style> inside the fragment because a
+ * fragment is not a document: Live Server rewrites one on the way out and
+ * truncates it, stylesheet and all.
  */
 .award-page {
-  /* These are HO Plan & Review's values, so this tab reads as the same
-     product. It arrived as a standalone app in warm paper and Source Serif,
-     which looked like something bolted on. Every rule below is written
-     against tokens, so pointing the tokens at that page's palette re-themes
-     the lot without touching them.
-
-     They sit on .award-page, not :root, so nothing leaks back out. */
 
   /* surfaces */
   --bg: transparent;                 /* the shell paints the canvas */
@@ -41,14 +23,9 @@
   --text-soft: #5B6472;
   --text-muted: #8B909E;
 
-  /* Graphite structure, teal for anything you can act on. The structure -
-     table heads, the dark rules - is a near-black slate that stays out of
-     the way of the figures, and exactly one colour marks what is live: the
-     button, the tab you are on, the row under the pointer, a focused field.
-     Bronze read as another product; a bright blue shouted over the numbers.
-     Teal is quiet beside both, and it is not one of the three colours this
-     tab already uses to mean something (green arrived, amber waiting, red
-     refused). */
+  /* Graphite for structure, teal for anything you can act on. One live
+     colour, and it is not one of the three that already mean something here:
+     green arrived, amber waiting, red refused. */
   --graphite: #334155;
   --graphite-deep: #1E293B;
 
@@ -114,49 +91,6 @@
 }
 .award-page .mono { font-family: var(--font-mono); font-size: .92em;
 }
-/* ---------------------------------------------------------------- topbar */
-.award-page .topbar {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: 16px 0;
-  margin-bottom: 28px;
-}
-.award-page .topbar-inner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-.award-page .brand { display: flex; align-items: center; gap: 14px;
-}
-.award-page .brand-mark {
-  display: grid;
-  place-items: center;
-  width: 46px;
-  height: 46px;
-  flex: 0 0 46px;
-  border-radius: 13px;
-  background: var(--accent);
-  color: var(--accent-on);
-}
-.award-page .brand-mark svg { width: 24px; height: 24px;
-}
-.award-page .brand-text { display: flex; flex-direction: column; line-height: 1.2;
-}
-.award-page .brand-org {
-  font-size: .68rem;
-  font-weight: 600;
-  letter-spacing: .13em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-.award-page .brand-title {
-  font-family: var(--font-serif);
-  font-size: 1.5rem;
-  font-weight: 600;
-  letter-spacing: -.012em;
-  color: var(--text);
-}
 /* ----------------------------------------------------------------- cards */
 .award-page main.wrap { padding-bottom: 36px;
 }
@@ -168,12 +102,6 @@
   padding: 26px;
   margin-bottom: 24px;
 }
-.award-page .section-head {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  margin-bottom: 22px;
-}
 /* The little coloured bar to the left of each section title. */
 .award-page .rule {
   width: 4px;
@@ -182,24 +110,6 @@
   min-height: 34px;
   border-radius: 999px;
   background: var(--accent-line);
-}
-.award-page .rule-alt { background: var(--accent-2);
-}
-.award-page .section-head h2 {
-  margin: 0;
-  font-family: var(--font-serif);
-  font-size: 1.32rem;
-  font-weight: 600;
-  letter-spacing: -.012em;
-}
-.award-page .section-head-main {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 1;
-  min-width: 0;
-}
-.award-page .section-head > .btn { margin-left: auto; flex: 0 0 auto;
 }
 .award-page .pill {
   font-family: var(--font-mono);
@@ -212,8 +122,8 @@
   padding: 3px 11px;
   white-space: nowrap;
 }
-/* ---------------------------------------------------------------- fields */
-/* 260px tracks make six fields land on clean splits as the window grows:
+/* ---------------------------------------------------------------- fields
+   260px tracks make six fields land on clean splits as the window grows:
    3+3, then 4+2, then all six across. A smaller track size lands on a
    ragged 5+1 at common laptop widths. */
 .award-page .grid {
@@ -252,7 +162,9 @@
 /* :not(:focus) keeps this off a focused field. Without it this selector
    out-specifies the :focus rule below and eats the focus border whenever
    the pointer happens to rest on the field. */
-.award-page .field input:hover:not(:disabled):not(:focus), .award-page .field select:hover:not(:disabled):not(:focus) { border-color: var(--text-muted);
+.award-page .field input:hover:not(:disabled):not(:focus),
+.award-page .field select:hover:not(:disabled):not(:focus) {
+  border-color: var(--text-muted);
 }
 .award-page .field input:focus, .award-page .field select:focus {
   outline: none;
@@ -266,7 +178,9 @@
 }
 .award-page .field input.invalid, .award-page .field select.invalid { border-color: var(--danger);
 }
-.award-page .field input.invalid:focus, .award-page .field select.invalid:focus { box-shadow: 0 0 0 3px rgba(157, 47, 38, .13);
+.award-page .field input.invalid:focus,
+.award-page .field select.invalid:focus {
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, .13);
 }
 .award-page .error {
   margin: 6px 0 0;
@@ -309,7 +223,9 @@
   border-color: var(--accent);
   color: var(--accent-on);
 }
-.award-page .btn-primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover);
+.award-page .btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 .award-page .btn-primary:disabled { opacity: .55; cursor: progress;
 }
@@ -379,17 +295,14 @@
   overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  /* Not decoration: without it the whole page scrolls sideways. The
-     screen-reader-only label in the last column is position:absolute, and an
-     absolutely positioned element is only clipped by an ancestor that is
-     itself positioned - so it escaped this box, sat a thousand pixels to the
-     right of the window, and dragged the document out with it. */
+  /* Not decoration: the screen-reader-only label in the last column is
+     position:absolute, and only a positioned ancestor clips it. Without
+     this it escapes the box and the whole page scrolls sideways. */
   position: relative;
 }
 
-/* Belt and braces: nothing in this tab may make the page itself wider than
-   the space the shell gives it. A table that is too wide scrolls in its own
-   box, which is what the box is for. */
+/* Nothing here may make the page wider than the shell allows; a wide table
+   scrolls in its own box. */
 .award-page, .award-page .card, .award-page .aw-body,
 .award-page .aw-subpanel { min-width: 0; max-width: 100%; }
 .award-page table {
@@ -474,10 +387,6 @@
 }
 /* ----------------------------------------------------------------- phone */
 @media (max-width: 620px) {
-  .award-page .topbar { padding: 13px 0; margin-bottom: 18px;
-  }
-  .award-page .brand-title { font-size: 1.28rem;
-  }
   .award-page .card { padding: 18px;
   }
   .award-page .wrap { padding: 0 16px;
@@ -488,14 +397,10 @@
   }
   .award-page .form-actions .btn { flex: 1 1 auto; justify-content: center;
   }
-  .award-page .section-head > .btn { margin-left: 0;
-  }
 }
 
 /* Requested By - taken from the sign-in, so it is shown rather than typed.
-   No box and no avatar: a bordered rectangle makes it look like a field
-   waiting to be filled, and the initials only repeat the badge already in
-   the header. Name and role, set to sit level with the inputs beside it. */
+   No box: a bordered rectangle reads as a field waiting to be filled. */
 .award-page .who {
   display: flex;
   flex-direction: column;
@@ -503,26 +408,6 @@
   min-height: 44px;          /* level with the selects beside it */
   min-width: 0;
   line-height: 1.35;
-}
-
-.award-page .who-name,
-.award-page .who-sub {
-  display: block;
-  font-family: var(--font-sans);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.award-page .who-name {
-  font-size: 14.5px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.award-page .who-sub {
-  font-size: 11.5px;
-  color: var(--text-muted);
 }
 
 
@@ -534,20 +419,11 @@
   font-size: 13.5px;
 }
 
-.award-page .aw-empty-title {
-  font-family: var(--font-serif);
-  font-size: 16px;
-  color: var(--text);
-  margin: 0 0 6px;
-}
-
 .award-page .aw-empty p { margin: 0; }
 
-/* ---- the new requisition dialog ----------------------------------- */
-/* In the middle of the window, which is where a dialog belongs. It used to
-   be pinned to the top with the overlay itself scrolling, so a short form
-   opened against the ceiling and a long one took the page's scrollbar with
-   it. Now the box is centred and scrolls inside itself. */
+/* ---- the new requisition dialog -----------------------------------
+   Centred, and scrolling inside itself rather than taking the page's
+   scrollbar with it. */
 .award-page .aw-overlay {
   display: none;
   position: fixed;
@@ -617,8 +493,7 @@
   outline-offset: 1px;
 }
 
-/* The head stays put and the body scrolls, so the title and the buttons of
-   a long form are both always reachable. */
+/* The head stays put and the body scrolls. */
 .award-page .aw-box-head { flex: 0 0 auto; }
 .award-page .aw-box-body { padding: 18px; overflow-y: auto; }
 
@@ -628,7 +503,6 @@
 @media (max-width: 640px) {
   .award-page .aw-overlay { padding: 0; }
   .award-page .aw-box { border-radius: 0; min-height: 100%; max-height: 100%; }
-  .award-page .aw-head-actions { width: 100%; }
 }
 
 /* Six inputs in the dialog, so two columns divide evenly. Left to
@@ -672,13 +546,7 @@
 .award-page .banner-icon .aw-icon svg,
 .award-page .aw-box-close .aw-icon svg { width: 18px; height: 18px; }
 
-/* ======================================================================
-   Tabs and page header
-
-   Taken from HO Plan & Review so the two read as one app: an underline row
-   of sections across the top with the page actions on the right, a heading
-   under it, and a row of pills for the views inside the section.
-   ====================================================================== */
+/* ---- the page header and the views inside it --------------------- */
 
 /* ---- the heading ------------------------------------------------- */
 .award-page .aw-page-header {
@@ -742,10 +610,7 @@
 
 .award-page .aw-subtab:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-/* The table head: solid and dark, the way the rest of the app wears it,
-   and the same slate as the stock sheet so the two tabs read as one thing.
-   In the accent itself it was a bright blue band the width of the page,
-   shouting over the rows, which are what anyone is here to read. */
+/* Solid and dark, the same slate as the stock sheet. */
 .award-page #requisitions-table th,
 .award-page #delivery-table th {
   background: var(--graphite);
@@ -762,19 +627,20 @@
 /* The sort/row rules underneath assumed a pale head; keep the corners with
    the card now that it is dark. */
 .award-page #requisitions-table thead tr:first-child th:first-child,
-.award-page #delivery-table thead tr:first-child th:first-child { border-top-left-radius: var(--radius-sm); }
+.award-page #delivery-table thead tr:first-child th:first-child {
+  border-top-left-radius: var(--radius-sm);
+}
 .award-page #requisitions-table thead tr:first-child th:last-child,
-.award-page #delivery-table thead tr:first-child th:last-child  { border-top-right-radius: var(--radius-sm); }
+.award-page #delivery-table thead tr:first-child th:last-child {
+  border-top-right-radius: var(--radius-sm);
+}
 
 
 /* ======================================================================
    Finishing
    ====================================================================== */
 
-/* The section had three headings for one thing - Stock Management, then a
-   Requisition pill, then a Requisitions card head, each with its own rule
-   bar. The card's head goes; the count moves up beside the pill it belongs
-   to, which also stops a lone pill reading as a stray button. */
+/* The count sits beside the pills rather than over its own card head. */
 .award-page .aw-subtabs {
   align-items: center;
   border-bottom: 1px solid var(--border);
@@ -814,8 +680,7 @@
   border-top: 1px solid var(--border);
 }
 
-/* Rows: give the table a little more air and a clearer hover, now that the
-   head is solid and the card around it is tighter. */
+
 .award-page #requisitions-table td,
 .award-page #delivery-table td { padding: 11px 14px; }
 .award-page #requisitions-table tbody tr:hover,
@@ -846,9 +711,7 @@
   white-space: nowrap;
 }
 
-/* Five states, five colours, and each one means the same thing everywhere
-   it appears: grey is waiting on somebody, blue is moving, green is done,
-   amber is stopped, red is refused. */
+/* Grey waiting, teal moving, green done, amber stopped, red refused. */
 .award-page .chip-status.is-pending  { background: var(--surface-alt); color: var(--text-soft);
                                        border-color: var(--border-strong); }
 .award-page .chip-status.is-approved { background: var(--good-soft); color: var(--good);
@@ -856,10 +719,8 @@
 .award-page .chip-status.is-declined { background: var(--danger-soft); color: var(--danger);
                                        border-color: var(--danger-soft-border); }
 
-/* Who settled it, and what they said - under the chip, quiet. */
-.award-page .cell-by,
+/* What was said about it, under the chip and quiet. */
 .award-page .cell-remark { display: block; font-size: 11px; color: var(--text-muted); }
-.award-page .cell-by { margin-top: 3px; }
 .award-page .cell-remark {
   margin-top: 1px;
   max-width: 220px;
@@ -897,9 +758,9 @@
 .award-page .btn-danger:hover { filter: brightness(.93); }
 
 /* ---- the review dialog ------------------------------------------- */
-/* Where a requisition is being filed from - the filer's own division and
-   state, out of Employees. A line of fact above the one thing there is to
-   choose, not a field. */
+
+/* The filer's own division and state, out of Employees: a line of fact
+   above the one thing there is to choose. */
 .award-page .req-where {
   display: flex;
   flex-wrap: wrap;
@@ -1048,13 +909,9 @@
 }
 
 /* ---- the log column ----------------------------------------------
-   Every step a requisition has been through, in its own column. It used to
-   sit under the status chip in grey 10px type, where a hold and a rejection
-   looked exactly like being raised. Each step now carries the colour of what
-   it was, against a rule down the left so the sequence reads as a sequence. */
-/* Four awards on one row is four chips, and in a table that never wraps they
-   ran the width of a column and a half - which is what pushed the log off the
-   side of the screen. Here, and only here, text wraps. */
+   Every step a requisition has been through, each carrying the colour of
+   what it was, against a rule down the left. The table never wraps; here,
+   and only here, it does. */
 .award-page .cell-awards {
   white-space: normal;
   min-width: 178px;
@@ -1112,8 +969,7 @@
 .award-page .log-note.is-loose { margin-top: 5px; font-size: 11px; }
 .award-page .log-none { color: var(--text-muted); }
 
-/* Raised, moving, done, stopped, refused - the same five colours the status
-   chips use, so the two columns agree at a glance. */
+/* The same five colours the status chips use. */
 .award-page .log-step.is-start { border-left-color: var(--border-strong); }
 .award-page .log-step.is-move  { border-left-color: var(--accent-2); }
 .award-page .log-step.is-move  .log-what { color: var(--accent-ink); }
@@ -1173,14 +1029,11 @@
   .award-page .admin-add-row .btn { margin-top: 0; }
 }
 
-/* On hold is waiting, not refusing - amber rather than red, and visibly not
-   the same thing as rejected. */
+/* On hold is waiting, not refusing: amber, not red. */
 .award-page .chip-status.is-held { background: var(--warn-soft); color: var(--warn);
                                   border-color: var(--warn-soft-border); }
 
-/* Who a requisition is sitting with. "Pending" alone says a thing is waiting
-   without saying on whom, which is the one thing anyone looking at it wants
-   to know. */
+/* Who a requisition is sitting with. */
 .award-page .cell-waiting {
   display: block;
   margin-top: 4px;
@@ -1193,10 +1046,7 @@
    Stock
    ====================================================================== */
 
-/* Year, place, and the two buttons - all sitting on one line, all ending at
-   the same height. The fields were different widths and the controls beside
-   them sat at three different heights, which is what made the row look
-   thrown together. */
+/* Year, place and the buttons on one line, all ending at the same height. */
 .award-page .stock-controls {
   display: flex;
   flex-wrap: wrap;
@@ -1234,9 +1084,7 @@
                                   font-size: 12.5px; }
 .award-page .stock-prompt b { color: var(--text); font-size: 14px; }
 
-/* The sheet is wide by nature - four groups of five columns. It scrolls
-   sideways, and the first columns stay put so a row never loses its
-   district. */
+/* Wide by nature: four groups of five columns, scrolling sideways. */
 .award-page #stock-table { border-collapse: separate; border-spacing: 0; min-width: 100%; }
 
 .award-page #stock-table th,
@@ -1259,22 +1107,17 @@
   z-index: 2;
 }
 
-/* The four groups say what they are by colour, and the colour means the
-   same thing it means everywhere else in the tab: grey for what was only
-   asked for, green for what arrived, amber for what was spent, blue for
-   what is left - which is the column the sheet exists to answer. Four
-   shades of the same bronze told them apart without saying anything about
-   them. */
+/* The four groups say what they are by colour: grey asked for, green
+   arrived, amber given out, graphite left - the column the sheet exists to
+   answer. */
 .award-page #stock-table thead th.col-req { background: #64748B; }
 .award-page #stock-table thead th.col-del { background: var(--good); }
 .award-page #stock-table thead th.col-use { background: var(--warn); }
 .award-page #stock-table thead th.col-bal { background: var(--graphite-deep); }
 
-/* The two columns that say which row this is stay put while the twenty
-   columns of figures scroll under them. Without this, scrolling right to
-   read the balance left every row looking identical - a column of numbers
-   with nothing to say whose they were. Fixed widths, because a sticky
-   column has to know where the one before it ends. */
+/* The two columns that say which row this is stay put while the figures
+   scroll under them. Fixed widths, because a sticky column has to know
+   where the one before it ends. */
 .award-page #stock-table th.col-month,
 .award-page #stock-table td.col-month { position: sticky; left: 0; width: 104px;
                                         min-width: 104px; }
@@ -1304,8 +1147,7 @@
                                       font-weight: 700; }
 .award-page #stock-table td.is-total { font-weight: 700;
                                        border-right: 1px solid var(--border-strong); }
-/* Nothing is nothing, in any column: a sheet of bold zeroes reads as if
-   something happened everywhere. */
+/* Nothing is nothing, in any column. */
 .award-page #stock-table td.is-nil { color: var(--text-muted); font-weight: 400; }
 /* Should never happen. If it does, it is the first thing to see. */
 .award-page #stock-table td.is-neg { background: var(--danger-soft); color: var(--danger);
@@ -1323,14 +1165,12 @@
 .award-page #stock-table td.col-act { text-align: right; white-space: nowrap; }
 .award-page #stock-table td.col-act .btn + .btn { margin-left: 5px; }
 .award-page #stock-table td.col-act .btn { visibility: hidden; }
-/* The button appears on the row the pointer is on: one per month per
-   district is four hundred buttons, and all of them showing at once is a
-   wall. Keyboard focus brings it back, so it is not mouse-only. */
+/* On the row the pointer is on: four hundred buttons at once is a wall.
+   Keyboard focus brings it back. */
 .award-page #stock-table tbody tr:hover td.col-act .btn,
 .award-page #stock-table td.col-act .btn:focus-visible { visibility: visible; }
 
-/* The carry-forward row opens each district, so it reads as a heading for
-   the block of months under it. */
+/* The carry-forward row opens each district. */
 .award-page #stock-table tr.is-carry td {
   background: var(--surface-alt);
   font-weight: 600;
@@ -1356,13 +1196,11 @@
 }
 .award-page .stock-line label { font-size: 13px; color: var(--text); }
 .award-page .stock-line label .hint { display: block; }
-/* Nothing held, nothing to give out: the box is there so the award is still
-   listed, but it cannot be typed in. */
+/* Nothing held, nothing to give out. */
 .award-page .stock-line.is-empty label { color: var(--text-muted); }
 .award-page .stock-line.is-empty input { background: var(--surface-alt); cursor: not-allowed; }
 
-/* Where and when a utilisation is being recorded - the row it was opened
-   from, shown rather than asked for again. */
+/* Where and when, from the row this was opened from. */
 .award-page .stock-where {
   margin: 0 0 16px;
   padding: 11px 14px;
@@ -1386,19 +1224,7 @@
   color: var(--accent-ink);
 }
 
-/* Said once, where the button used to be: utilisation is recorded against a
-   month, so it is recorded from that month's row. */
-.award-page .stock-howto {
-  margin: 0;
-  padding-bottom: 7px;
-  max-width: 260px;
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--text-muted);
-}
-
-/* A requisition that was part-filled says so where it is listed, not only in
-   the stock sheet. */
+/* Said where the requisition is listed, not only in the stock sheet. */
 .award-page .cell-short {
   display: inline-block;
   margin-left: 6px;
@@ -1413,8 +1239,7 @@
 .award-page .stock-line .hint { font-weight: 400; color: var(--text-muted); font-size: 11px; }
 
 
-/* The remark column, last in the sheet. Kept narrow: it is a note, not a
-   field, and a long one should not push the numbers off the screen. */
+/* Kept narrow: a long note should not push the numbers off the screen. */
 .award-page #stock-table td.cell-remark-col {
   max-width: 180px;
   overflow: hidden;
