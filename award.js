@@ -671,7 +671,7 @@ window.AWARD_CONFIG = {
     if (!db) db = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
     wireEvents();
-    loadAdmins(function () { applyAccess(); renderTable(); });
+    loadAdmins(function () { applyAccess(); renderRows(); });
     loadStock(function () { refreshStockControls(); renderStock(); });
     loadGeography();
     loadAwardTypes();
@@ -1361,7 +1361,7 @@ window.AWARD_CONFIG = {
         }
         el.adminEmail.value = "";
         el.adminName.value = "";
-        loadAdmins(function () { renderAdmins(); applyAccess(); renderTable(); });
+        loadAdmins(function () { renderAdmins(); applyAccess(); renderRows(); });
       })
       .catch(function (err) {
         el.adminAdd.disabled = false;
@@ -1396,7 +1396,7 @@ window.AWARD_CONFIG = {
       db.from("award_admins").delete().eq("id", id)
         .then(function (res) {
           if (res.error) { reportError("remove an HO admin", res.error); return; }
-          loadAdmins(function () { renderAdmins(); applyAccess(); renderTable(); });
+          loadAdmins(function () { renderAdmins(); applyAccess(); renderRows(); });
         })
         .catch(function (err) { reportError("remove an HO admin", err); });
     });
@@ -1501,14 +1501,22 @@ window.AWARD_CONFIG = {
       syncAwardLines();
     });
 
-    // One listener on the body rather than one per row, since the rows are
-    // thrown away and rebuilt on every render.
-    el.tbody.addEventListener("click", function (event) {
-      var review = event.target.closest ? event.target.closest("[data-aw-review]") : null;
-      if (review) { openReview(review.getAttribute("data-aw-review")); return; }
+    /* One listener per table body rather than one per row, since the rows
+       are thrown away and rebuilt on every render. Both tables draw the same
+       buttons: the requisition list and Head Office's queue are two views of
+       one set of rows, and an action offered in either has to work in
+       either. */
+    [el.tbody, el.deliveryBody].forEach(function (body) {
+      if (!body) return;
+      body.addEventListener("click", function (event) {
+        if (!event.target.closest) return;
 
-      var ho = event.target.closest ? event.target.closest("[data-aw-ho]") : null;
-      if (ho) startHoAction(ho.getAttribute("data-aw-row"), ho.getAttribute("data-aw-ho"));
+        var review = event.target.closest("[data-aw-review]");
+        if (review) { openReview(review.getAttribute("data-aw-review")); return; }
+
+        var ho = event.target.closest("[data-aw-ho]");
+        if (ho) startHoAction(ho.getAttribute("data-aw-row"), ho.getAttribute("data-aw-ho"));
+      });
     });
 
     Array.prototype.forEach.call(
@@ -2136,6 +2144,12 @@ window.AWARD_CONFIG = {
 
     fillSelect(el.filterType, Object.keys(types).sort(), "All types",
       function (name) { return name; }, function (name) { return name; });
+  }
+
+  // Both views of the same rows: the list, and Head Office's queue.
+  function renderRows() {
+    renderTable();
+    renderDelivery();
   }
 
   function renderTable() {
