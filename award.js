@@ -3256,13 +3256,11 @@ window.AWARD_CONFIG = {
     return { error: 'no month called "' + raw + '"' };
   }
 
-  /* Nothing means leave it alone; a dash or a nought mean nought. The two
-     are different answers, so a sheet of mostly-empty cells changes only
-     what was actually typed into. */
+  /* A line replaces the month it names, so an empty cell is not silence -
+     it is nothing held, the same as a dash or a nought. */
   function parseFigureCell(text) {
     var raw = String(text || "").trim();
-    if (!raw) return { skip: true };
-    if (/^[-\u2013\u2014]$/.test(raw)) return { value: 0 };
+    if (!raw || /^[-\u2013\u2014]$/.test(raw)) return { value: 0 };
 
     var cleaned = raw.replace(/[,\s\u00a0]/g, "");
     if (!/^\d+$/.test(cleaned)) {
@@ -3278,9 +3276,10 @@ window.AWARD_CONFIG = {
            where.toLowerCase().replace(/[^a-z0-9]+/g, "-") + ".csv";
   }
 
-  /* The sheet as it stands, for the districts on screen. Only the months
-     that have happened: a month still to come cannot be filled in, here or
-     by hand. */
+  /* The sheet as it stands, for the districts on screen: April to March,
+     every month of the year, whether anything has happened in it or not.
+     The places are the staff directory's - the same ones the sheet and the
+     requisition form read. */
   function stockTemplate(fy, places, types) {
     var head = ["Month", "District", "State", "Division"];
     CSV_GROUPS.forEach(function (g) {
@@ -3297,7 +3296,6 @@ window.AWARD_CONFIG = {
 
     places.forEach(function (place) {
       stockRows(fy, allRequisitions, stockMovements, [place])
-        .filter(function (row) { return monthHasHappened(row.monthKey, fy); })
         .forEach(function (row) {
           var line = [row.month, row.district, row.state, place.division || ""];
           CSV_GROUPS.forEach(function (g) {
@@ -3348,7 +3346,8 @@ window.AWARD_CONFIG = {
   /* What a file would change, worked out without changing anything. Every
      reason a figure cannot be taken is kept, named by the line it was on. */
   function readStockImport(text, fy) {
-    var out = { edits: {}, problems: [], unchanged: 0, districts: {}, rows: 0 };
+    var out = { edits: {}, problems: [], unchanged: 0, cleared: 0,
+                districts: {}, rows: 0 };
     var rows = parseCsv(text);
     if (!rows.length) {
       out.problems.push({ line: 0, why: "The file is empty." });
@@ -3427,12 +3426,6 @@ window.AWARD_CONFIG = {
           " is not in " + fyLabel(fy) + ", which is the year on screen" });
         return;
       }
-      if (!monthHasHappened(month.key, fy)) {
-        out.problems.push({ line: line, why: monthLabelOf(month.key) +
-          " has not happened yet" });
-        return;
-      }
-
       var at = place.district + "\u0000" + month.key;
       if (seen[at]) {
         out.problems.push({ line: line, why: place.district + " and " +
@@ -3442,31 +3435,55 @@ window.AWARD_CONFIG = {
       }
       seen[at] = line;
 
+      /* The template carries every month of the year, so one still to come
+         arrives empty and has nothing to answer for. Only a figure typed
+         into it is worth turning away. */
+      var typedInto = columns.some(function (c, at2) {
+        return c && c.what === "figure" && String(row[at2] || "").trim() !== "";
+      });
+      if (!monthHasHappened(month.key, fy)) {
+        if (typedInto) {
+          out.problems.push({ line: line, why: monthLabelOf(month.key) +
+            " has not happened yet" });
+        }
+        return;
+      }
+
       var carry = month.key === "";
       columns.forEach(function (column, at2) {
         if (!column || column.what !== "figure") return;
 
-        var cell = parseFigureCell(row[at2]);
-        if (cell.skip) return;
+        /* The carry forward is one opening balance; every other month is the
+           three that are recorded. A column this row cannot set is passed
+           over in silence when it is empty - the template leaves it so - and
+           complained about only when something was typed into it. */
+        var raw = String(row[at2] || "").trim();
+        if (carry !== (column.col === "bal")) {
+          if (raw) {
+            out.problems.push({ line: line, why: carry
+              ? "the carry forward holds one opening balance, so " +
+                escapeNothing(rows[0][at2]) + " cannot be set on it"
+              : escapeNothing(rows[0][at2]) + " is added up from what moved, " +
+                "so it cannot be typed on a month" });
+          }
+          return;
+        }
+
+        var cell = parseFigureCell(raw);
         if (cell.error) {
           out.problems.push({ line: line, why: cell.error + ", under " +
             escapeNothing(rows[0][at2]) });
           return;
         }
 
-        if (carry !== (column.col === "bal")) {
-          out.problems.push({ line: line, why: carry
-            ? "the carry forward holds one opening balance, so " +
-              escapeNothing(rows[0][at2]) + " cannot be set on it"
-            : escapeNothing(rows[0][at2]) + " is added up from what moved, " +
-              "so it cannot be typed on a month" });
+        var have = recordedFigure(place.district, fy, month.key,
+                                  column.col, column.typeId);
+        if (cell.value === have) {
+          if (raw) out.unchanged += 1;
           return;
         }
 
-        var have = recordedFigure(place.district, fy, month.key,
-                                  column.col, column.typeId);
-        if (cell.value === have) { out.unchanged += 1; return; }
-
+        if (!cell.value) out.cleared += 1;
         out.edits[editKey(place.district, month.key, column.col, column.typeId)] =
           cell.value;
         out.districts[place.district] = true;
@@ -3546,6 +3563,13 @@ window.AWARD_CONFIG = {
       said.push(result.rows + (result.rows === 1 ? " line read" : " lines read"));
       if (result.unchanged) {
         said.push(result.unchanged + " already matching");
+      }
+      /* Said on its own, because this is the half of replacing that is easy
+         to do by accident: an empty cell takes what was there away. */
+      if (result.cleared) {
+        said.push(result.cleared +
+          (result.cleared === 1 ? " figure cleared to nothing"
+                                : " figures cleared to nothing"));
       }
       if (result.replaced) {
         said.push(result.replaced +
