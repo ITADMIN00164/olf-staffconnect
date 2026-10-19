@@ -3225,63 +3225,66 @@ window.AWARD_CONFIG = {
     var inMonth = function (key) {
       return monthKey ? key === monthKey : fyStartsBefore(key, fy);
     };
+    var none = function () {
+      return { requisition: {}, delivery: {}, utilisation: {}, other: {} };
+    };
 
     var entries = [];
 
-    allRequisitions.filter(mine).forEach(function (row) {
-      if (inMonth(monthKeyOf(row.created_at))) {
-        entries.push({
-          at: row.created_at, column: "requisition",
-          what: "Raised", who: row.requester_name || "",
-          quantities: quantitiesOf(row, "items"),
-          note: stageLabel(row, false)
-        });
-      }
-      if (stageOf(row) === "received" && inMonth(monthKeyOf(row.received_at))) {
-        entries.push({
-          at: row.received_at, column: "delivery",
-          what: "Arrived", who: row.received_by || row.requester_name || "",
-          quantities: quantitiesOf(row, "dispatched"),
-          note: row.receipt_note || ""
-        });
-      }
-    });
+    /* A requisition and the delivery it turned into are one line, not two:
+       what was asked for sits beside what actually came, so a part-filled
+       one reads as sixteen asked and fifteen arrived rather than as two rows
+       to be matched up by eye.
 
-    stockMovements.filter(mine).forEach(function (m) {
-      if (!inMonth(monthKeyOf(m.occurred_on))) return;
-      var kind = MOVEMENT_KINDS[m.kind] || MOVEMENT_KINDS.adjustment;
-      var q = {};
-      q[Number(m.award_type_id)] = Number(m.quantity) || 0;
+       One raised in a month and received in another belongs to both,
+       carrying only the half that happened in each. */
+    allRequisitions.filter(mine).forEach(function (row) {
+      var raisedHere = inMonth(monthKeyOf(row.created_at));
+      var cameHere = stageOf(row) === "received" &&
+                     inMonth(monthKeyOf(row.received_at));
+      if (!raisedHere && !cameHere) return;
+
+      var cells = none();
+      if (raisedHere) cells.requisition = quantitiesOf(row, "items");
+      if (cameHere) cells.delivery = quantitiesOf(row, "dispatched");
 
       entries.push({
-        at: m.created_at || m.occurred_on,
-        column: kind.column,
-        what: m.kind === "utilised" ? "Given out" : "Typed in",
-        who: m.recorded_by || "",
-        quantities: q,
-        note: m.note || ""
+        sort: 0,
+        at: raisedHere ? row.created_at : row.received_at,
+        what: raisedHere ? "Raised" : "Arrived",
+        who: row.requester_name || "",
+        note: raisedHere ? stageLabel(row, false)
+                         : "raised " + formatTimestamp(row.created_at),
+        cells: cells
       });
     });
 
-    /* Ordered the way the sheet reads - everything asked for, then what
-       arrived, then what went out - and by date inside each. The clock alone
-       would not do: a utilisation is recorded against a month rather than a
-       day, so it carries the first of the month and would sort ahead of the
-       delivery it came out of. */
-    var order = { requisition: 0, delivery: 1, utilisation: 2, other: 3 };
+    // Utilisation and figures typed in stand on their own: no requisition
+    // lies behind them.
+    stockMovements.filter(mine).forEach(function (m) {
+      if (!inMonth(monthKeyOf(m.occurred_on))) return;
+      var kind = MOVEMENT_KINDS[m.kind] || MOVEMENT_KINDS.adjustment;
+      var cells = none();
+      cells[kind.column][Number(m.award_type_id)] = Number(m.quantity) || 0;
+
+      entries.push({
+        sort: m.kind === "utilised" ? 1 : 2,
+        at: m.created_at || m.occurred_on,
+        what: m.kind === "utilised" ? "Given out" : "Typed in",
+        who: m.recorded_by || "",
+        note: m.note || "",
+        cells: cells
+      });
+    });
+
+    /* Requisitions first, then what was given out, then anything typed in -
+       the way the sheet reads across. By date inside each, which is as far
+       as the clock can be trusted: a utilisation is recorded against a month
+       rather than a day. */
     return entries.sort(function (a, b) {
-      return (order[a.column] - order[b.column]) ||
-             String(a.at).localeCompare(String(b.at));
+      return (a.sort - b.sort) || String(a.at).localeCompare(String(b.at));
     });
   }
-
-  /* The groups of the sheet, in the order they read across it. */
-  var DETAIL_GROUPS = [
-    { column: "requisition", label: "Requisition", kind: "req" },
-    { column: "delivery",    label: "Delivery",    kind: "del" },
-    { column: "utilisation", label: "Utilisation", kind: "use" },
-    { column: "other",       label: "Corrections", kind: "bal" }
-  ];
 
   function openBreakdown(district, monthKey) {
     var fy = Number(el.stockYear.value) || fyStartOf(new Date());
@@ -3294,9 +3297,8 @@ window.AWARD_CONFIG = {
       (monthKey ? monthLabelOf(monthKey) : "Before " + fyLabel(fy));
 
     el.detailSub.textContent = entries.length
-      ? (entries.length === 1 ? "One thing happened here"
-                              : entries.length + " things happened here") +
-        ", and what each of them was."
+      ? (entries.length === 1 ? "One line" : entries.length + " lines") +
+        " behind this month, and the month itself at the foot."
       : "Nothing was recorded against this month.";
 
     /* The same table, for one month. Each thing that happened takes a row,
@@ -3307,11 +3309,9 @@ window.AWARD_CONFIG = {
     var totals = { requisition: {}, delivery: {}, utilisation: {}, other: {} };
 
     var body = entries.map(function (e) {
-      addInto(totals[e.column], e.quantities);
-
-      var only = function (column) {
-        return e.column === column ? e.quantities : {};
-      };
+      Object.keys(totals).forEach(function (column) {
+        addInto(totals[column], e.cells[column]);
+      });
 
       return '<tr class="detail-line">' +
         '<td class="detail-what"><b>' + escapeHtml(e.what) + "</b>" +
@@ -3319,9 +3319,9 @@ window.AWARD_CONFIG = {
           "<time>" + escapeHtml(formatTimestamp(e.at)) + "</time>" +
           (e.note ? "<em>" + escapeHtml(e.note) + "</em>" : "") +
         "</td>" +
-        cellsHtml(only("requisition"), types, "req", {}, false) +
-        cellsHtml(only("delivery"), types, "del", {}, false) +
-        cellsHtml(only("utilisation"), types, "use", {}, false) +
+        cellsHtml(e.cells.requisition, types, "req", {}, false) +
+        cellsHtml(e.cells.delivery, types, "del", {}, false) +
+        cellsHtml(e.cells.utilisation, types, "use", {}, false) +
         cellsHtml({}, types, "bal", {}, false) +
       "</tr>";
     }).join("");
