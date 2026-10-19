@@ -3251,7 +3251,8 @@ window.AWARD_CONFIG = {
       entries.push({
         sort: 0,
         at: raisedHere ? row.created_at : row.received_at,
-        what: raisedHere ? "Raised" : "Arrived",
+        what: raisedHere ? "Requisition" : "Delivery",
+        when: formatTimestamp(raisedHere ? row.created_at : row.received_at),
         who: row.requester_name || "",
         note: raisedHere ? stageLabel(row, false)
                          : "raised " + formatTimestamp(row.created_at),
@@ -3267,10 +3268,13 @@ window.AWARD_CONFIG = {
       var cells = none();
       cells[kind.column][Number(m.award_type_id)] = Number(m.quantity) || 0;
 
+      /* A movement is stamped to a month, not to a minute: occurred_on is
+         the first of it. Showing a clock time there invents one. */
       entries.push({
         sort: m.kind === "utilised" ? 1 : 2,
-        at: m.created_at || m.occurred_on,
-        what: m.kind === "utilised" ? "Given out" : "Typed in",
+        at: m.occurred_on,
+        what: m.kind === "utilised" ? "Utilisation" : "Entered by hand",
+        when: monthLabelOf(monthKeyOf(m.occurred_on)),
         who: m.recorded_by || "",
         note: m.note || "",
         cells: cells
@@ -3286,6 +3290,25 @@ window.AWARD_CONFIG = {
     });
   }
 
+  // "4 requisitions and 2 utilisations", in the order the lines come.
+  function countsPhrase(entries) {
+    var order = [];
+    var count = {};
+    entries.forEach(function (e) {
+      if (!count[e.what]) { count[e.what] = 0; order.push(e.what); }
+      count[e.what] += 1;
+    });
+
+    var parts = order.map(function (what) {
+      var n = count[what];
+      var name = what.toLowerCase();
+      var plural = n === 1 || name === "entered by hand" ? name : name + "s";
+      return n + " " + plural;
+    });
+    if (parts.length === 1) return parts[0];
+    return parts.slice(0, -1).join(", ") + " and " + parts[parts.length - 1];
+  }
+
   function openBreakdown(district, monthKey) {
     var fy = Number(el.stockYear.value) || fyStartOf(new Date());
     var entries = monthBreakdown(district, monthKey, fy);
@@ -3297,8 +3320,8 @@ window.AWARD_CONFIG = {
       (monthKey ? monthLabelOf(monthKey) : "Before " + fyLabel(fy));
 
     el.detailSub.textContent = entries.length
-      ? (entries.length === 1 ? "One line" : entries.length + " lines") +
-        " behind this month, and the month itself at the foot."
+      ? countsPhrase(entries) + " behind this month. The last line is the " +
+        "month itself, as the sheet shows it."
       : "Nothing was recorded against this month.";
 
     /* The same table, for one month. Each thing that happened takes a row,
@@ -3308,6 +3331,17 @@ window.AWARD_CONFIG = {
        that was clicked to get here. */
     var totals = { requisition: {}, delivery: {}, utilisation: {}, other: {} };
 
+    /* A line touches one group, or two when a requisition and the delivery
+       it turned into sit together. The groups it does not touch are left
+       empty rather than filled with a row of dashes, so the eye goes
+       straight to the figures that are there. */
+    var group = function (map, kind) {
+      return Object.keys(map).length
+        ? cellsHtml(map, types, kind, {}, false)
+        : '<td class="num col-' + kind + ' is-blank" colspan="' +
+          (types.length + 1) + '"></td>';
+    };
+
     var body = entries.map(function (e) {
       Object.keys(totals).forEach(function (column) {
         addInto(totals[column], e.cells[column]);
@@ -3316,13 +3350,13 @@ window.AWARD_CONFIG = {
       return '<tr class="detail-line">' +
         '<td class="detail-what"><b>' + escapeHtml(e.what) + "</b>" +
           (e.who ? "<span>" + escapeHtml(e.who) + "</span>" : "") +
-          "<time>" + escapeHtml(formatTimestamp(e.at)) + "</time>" +
+          "<time>" + escapeHtml(e.when) + "</time>" +
           (e.note ? "<em>" + escapeHtml(e.note) + "</em>" : "") +
         "</td>" +
-        cellsHtml(e.cells.requisition, types, "req", {}, false) +
-        cellsHtml(e.cells.delivery, types, "del", {}, false) +
-        cellsHtml(e.cells.utilisation, types, "use", {}, false) +
-        cellsHtml({}, types, "bal", {}, false) +
+        group(e.cells.requisition, "req") +
+        group(e.cells.delivery, "del") +
+        group(e.cells.utilisation, "use") +
+        group({}, "bal") +
       "</tr>";
     }).join("");
 

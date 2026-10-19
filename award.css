@@ -1110,6 +1110,12 @@
 /* The four groups say what they are by colour: grey asked for, green
    arrived, amber given out, graphite left - the column the sheet exists to
    answer. */
+/* Two rows of head, so the second has to stop below the first: pinned at
+   nought, the award names cover the bands they belong to. */
+.award-page #stock-table thead th.grp { height: 30px; padding-top: 0;
+                                        padding-bottom: 0; }
+.award-page #stock-table thead tr:nth-child(2) th { top: 30px; }
+
 .award-page #stock-table thead th.col-req { background: #64748B; }
 .award-page #stock-table thead th.col-del { background: var(--good); }
 .award-page #stock-table thead th.col-use { background: var(--warn); }
@@ -1213,7 +1219,7 @@
                             min-width: 100%; }
 .award-page #detail-table th,
 .award-page #detail-table td {
-  padding: 7px 10px;
+  padding: 7px 8px;
   font-size: 12px;
   white-space: nowrap;
   border-bottom: 1px solid var(--border);
@@ -1229,6 +1235,10 @@
   top: 0;
   z-index: 2;
 }
+.award-page #detail-table thead th.grp { height: 30px; padding-top: 0;
+                                        padding-bottom: 0; }
+.award-page #detail-table thead tr:nth-child(2) th { top: 30px; }
+
 .award-page #detail-table thead th.col-req { background: #64748B; }
 .award-page #detail-table thead th.col-del { background: var(--good); }
 .award-page #detail-table thead th.col-use { background: var(--warn); }
@@ -1243,6 +1253,8 @@
 .award-page #detail-table td.is-total { font-weight: 700;
                                         border-right: 1px solid var(--border-strong); }
 .award-page #detail-table td.is-nil { color: var(--text-muted); font-weight: 400; }
+/* A group this line has nothing in: its colour, and no figures. */
+.award-page #detail-table td.is-blank { border-right: 1px solid var(--border-strong); }
 .award-page #detail-table td.is-neg { background: var(--danger-soft); color: var(--danger);
                                       font-weight: 700; }
 
@@ -1276,8 +1288,9 @@
                                            font-weight: 700; }
 .award-page #detail-table tr.is-final td.detail-what { background: var(--surface-alt); }
 
-/* Wide enough for twenty columns of figures, and it scrolls inside. */
-.award-page #detail-modal .aw-box { width: 1120px; }
+/* Wide enough for all twenty columns at once: scrolling sideways to see
+   the balance beside what was asked for defeats the thing. */
+.award-page #detail-modal .aw-box { width: min(1400px, 94vw); }
 .award-page #detail-body .table-scroll { max-height: 58vh; }
 
 /* What is waiting to be saved, and the two ways out of it. */
