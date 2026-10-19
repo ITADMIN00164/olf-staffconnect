@@ -3344,14 +3344,39 @@ window.AWARD_CONFIG = {
     });
 
     /* The balance is not one of the things that happened - it is where they
-       leave the district. Shown last, as the sheet shows it. */
+       leave the district. The sum that arrives at it is written out line by
+       line, so the last figure does not have to be taken on trust. */
     body += '<tr class="detail-group col-bal"><th colspan="' + (types.length + 2) +
             '">Stock balance</th></tr>';
+
     if (monthKey) {
+      var months = fyMonthKeys(fy);
+      var before = months.indexOf(monthKey) > 0
+        ? monthLabelOf(months[months.indexOf(monthKey) - 1])
+        : "before " + fyLabel(fy);
+
+      var totalOf = function (column) {
+        var sum = {};
+        entries.filter(function (e) { return e.column === column; })
+               .forEach(function (e) { addInto(sum, e.quantities); });
+        return sum;
+      };
+      var corrections = totalOf("other");
+
       body += '<tr class="detail-line"><td class="detail-what">' +
-              "<b>Carried in</b><time>from the month before</time></td>" +
-              figures(carriedIn) + "</tr>";
+              "<b>Brought forward</b><time>what " + escapeHtml(before) +
+              " left</time></td>" + figures(carriedIn) + "</tr>" +
+              '<tr class="detail-line is-step"><td class="detail-what">' +
+              "<b>Add what arrived</b></td>" + figures(totalOf("delivery")) + "</tr>" +
+              '<tr class="detail-line is-step"><td class="detail-what">' +
+              "<b>Less what was given out</b></td>" +
+              figures(totalOf("utilisation")) + "</tr>" +
+              (sumOf(corrections)
+                ? '<tr class="detail-line is-step"><td class="detail-what">' +
+                  "<b>Figures set by hand</b></td>" + figures(corrections) + "</tr>"
+                : "");
     }
+
     body += '<tr class="detail-line is-final"><td class="detail-what"><b>' +
             (monthKey ? "Left at the end of " + escapeHtml(monthLabelOf(monthKey))
                       : "Carried into " + escapeHtml(fyLabel(fy))) +

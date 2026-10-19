@@ -1285,6 +1285,9 @@
 .award-page .detail-what em { font-family: var(--font-sans); font-style: italic; }
 
 .award-page .detail-sum td { background: var(--surface-alt); font-weight: 600; }
+/* The steps of the sum, quieter than the figure they arrive at. */
+.award-page .detail-line.is-step td { color: var(--text-soft); }
+.award-page .detail-line.is-step .detail-what b { font-weight: 500; }
 .award-page .detail-line.is-final td { background: #EEF2F6; font-weight: 700; }
 .award-page .detail-table tbody tr:hover td { background: var(--accent-soft); }
 .award-page .detail-table tbody tr.detail-group:hover th { background: transparent; }
