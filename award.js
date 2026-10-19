@@ -49,6 +49,12 @@ window.AWARD_CONFIG = {
     district: document.getElementById("district"),
     reqWhere: document.getElementById("req-where"),
     reqStock: document.getElementById("req-stock"),
+    stockTemplate: document.getElementById("stock-template"),
+    stockImport: document.getElementById("stock-import"),
+    stockFile: document.getElementById("stock-file"),
+    importModal: document.getElementById("import-modal"),
+    importSub: document.getElementById("import-sub"),
+    importBody: document.getElementById("import-body"),
     requesterName: document.getElementById("requester-name"),
     requesterWho: document.getElementById("requester-who"),
     requesterSub: document.getElementById("requester-sub"),
@@ -560,7 +566,13 @@ window.AWARD_CONFIG = {
            '<path d="M6 6l12 12M18 6L6 18"/></svg>',
     search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
             'stroke-width="2" stroke-linecap="round">' +
-            '<circle cx="11" cy="11" r="6"/><path d="m16 16 4.5 4.5"/></svg>'
+            '<circle cx="11" cy="11" r="6"/><path d="m16 16 4.5 4.5"/></svg>',
+    download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+              'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+              '<path d="M12 4v10m0 0 4-4m-4 4-4-4M5 18h14"/></svg>',
+    upload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+            'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+            '<path d="M12 20V10m0 0 4 4m-4-4-4 4M5 5h14"/></svg>'
   };
 
   function paintIcons() {
@@ -1525,6 +1537,24 @@ window.AWARD_CONFIG = {
     });
 
     el.newReqBtn.addEventListener("click", openRequisitionModal);
+
+    if (el.stockTemplate) {
+      el.stockTemplate.addEventListener("click", downloadStockTemplate);
+    }
+    if (el.stockImport) {
+      el.stockImport.addEventListener("click", function () { el.stockFile.click(); });
+    }
+    if (el.stockFile) {
+      el.stockFile.addEventListener("change", function () {
+        importStockFile(this.files && this.files[0]);
+        this.value = "";              // the same file again still counts
+      });
+    }
+    if (el.importModal) {
+      el.importModal.addEventListener("click", function (event) {
+        if (event.target.closest("[data-aw-close-import]")) closeImportResult();
+      });
+    }
 
     el.district.addEventListener("change", function () {
       setFieldError(null, "district-error", "");
@@ -2818,6 +2848,8 @@ window.AWARD_CONFIG = {
       function (n) { return n; }, function (n) { return n; });
     stockFiltersFor(null);
 
+    if (el.stockTemplate) el.stockTemplate.hidden = !canSetStock();
+    if (el.stockImport) el.stockImport.hidden = !canSetStock();
   }
 
   /* Whether the sheet has been asked for. The tab opens on its filters and
@@ -3110,6 +3142,494 @@ window.AWARD_CONFIG = {
         note: null
       };
     }).filter(Boolean);
+  }
+
+
+  /* ------------------------------------------------- a year at a time
+
+     Setting a district's figures one cell at a time is fine for a correction
+     and hopeless for a year that has to be keyed in from a workbook. The
+     sheet goes out as a file, comes back filled, and lands as the same
+     unsaved edits typing would have made - so Save is still the one thing
+     that writes, and the sheet still shows every change before it does. */
+
+  var CSV_GROUPS = [
+    { col: "req", label: "Requisition" },
+    { col: "del", label: "Delivery" },
+    { col: "use", label: "Utilisation" },
+    { col: "bal", label: "Balance" }
+  ];
+
+  function csvField(value) {
+    var text = value === null || value === undefined ? "" : String(value);
+    return /[",\r\n;\t]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+  }
+
+  // RFC 4180, plus the delimiter a spreadsheet chose for its locale.
+  function parseCsv(text) {
+    var body = String(text || "").replace(/^\uFEFF/, "");
+    var head = body.split(/\r?\n/)[0] || "";
+    var delim = [",", ";", "\t"].reduce(function (best, d) {
+      return head.split(d).length > head.split(best).length ? d : best;
+    }, ",");
+
+    var rows = [], row = [], field = "", quoted = false, i = 0;
+    while (i < body.length) {
+      var c = body.charAt(i);
+      if (quoted) {
+        if (c === '"' && body.charAt(i + 1) === '"') { field += '"'; i += 2; continue; }
+        if (c === '"') { quoted = false; i += 1; continue; }
+        field += c; i += 1; continue;
+      }
+      if (c === '"') { quoted = true; i += 1; continue; }
+      if (c === delim) { row.push(field); field = ""; i += 1; continue; }
+      if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; i += 1; continue; }
+      if (c === "\r") { i += 1; continue; }
+      field += c; i += 1;
+    }
+    if (field !== "" || row.length) { row.push(field); rows.push(row); }
+
+    return rows.filter(function (r) {
+      return r.some(function (v) { return String(v).trim() !== ""; });
+    });
+  }
+
+  function normalHeader(text) {
+    return String(text || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  }
+
+  /* Every spelling of a column that means something, so a header typed by
+     hand or renamed by a spreadsheet still finds its place. */
+  function csvColumnMap(types) {
+    var map = {};
+    map["month"] = { what: "month" };
+    map["district"] = { what: "district" };
+
+    CSV_GROUPS.forEach(function (g) {
+      types.forEach(function (t) {
+        var names = [shortType(t), t.code, t.name];
+        [g.label, g.col].forEach(function (lead) {
+          names.forEach(function (name) {
+            if (!name) return;
+            map[normalHeader(lead + " " + name)] =
+              { what: "figure", col: g.col, typeId: Number(t.id) };
+          });
+        });
+      });
+    });
+    return map;
+  }
+
+  function parseMonthCell(text) {
+    var raw = String(text || "").trim();
+    if (!raw || /^(carry|opening|brought)/i.test(raw)) return { key: "" };
+
+    var pad = function (n) { return String(Number(n)).padStart(2, "0"); };
+    var m = raw.match(/^(\d{4})[-\/.](\d{1,2})(?:[-\/.]\d{1,2})?$/);
+    if (m && Number(m[2]) >= 1 && Number(m[2]) <= 12) {
+      return { key: m[1] + "-" + pad(m[2]) };
+    }
+
+    /* A spreadsheet may have turned the month into a date. The day is always
+       the first, so whichever number is not 1 is the month - and when
+       neither is, there is no telling which way round it meant. */
+    m = raw.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/);
+    if (m) {
+      var a = Number(m[1]), b = Number(m[2]);
+      if (a === 1 && b >= 1 && b <= 12) return { key: m[3] + "-" + pad(b) };
+      if (b === 1 && a >= 1 && a <= 12) return { key: m[3] + "-" + pad(a) };
+      return { error: 'cannot tell which number is the month in "' + raw +
+                      '" - write it as ' + MONTH_NAMES[3] + "'" +
+                      String(m[3]).slice(2) };
+    }
+
+    m = raw.match(/^([A-Za-z]{3,9})[^0-9]*(\d{2,4})$/);
+    if (m) {
+      var want = m[1].slice(0, 3).toLowerCase();
+      for (var i = 0; i < MONTH_NAMES.length; i++) {
+        if (MONTH_NAMES[i].toLowerCase() === want) {
+          var year = Number(m[2]);
+          return { key: (year < 100 ? 2000 + year : year) + "-" + pad(i + 1) };
+        }
+      }
+    }
+    return { error: 'no month called "' + raw + '"' };
+  }
+
+  /* Nothing means leave it alone; a dash or a nought mean nought. The two
+     are different answers, so a sheet of mostly-empty cells changes only
+     what was actually typed into. */
+  function parseFigureCell(text) {
+    var raw = String(text || "").trim();
+    if (!raw) return { skip: true };
+    if (/^[-\u2013\u2014]$/.test(raw)) return { value: 0 };
+
+    var cleaned = raw.replace(/[,\s\u00a0]/g, "");
+    if (!/^\d+$/.test(cleaned)) {
+      return { error: '"' + raw + '" is not a whole number' };
+    }
+    return { value: Number(cleaned) };
+  }
+
+  function stockFileName(fy) {
+    var where = el.stockDistrict.value || el.stockDivision.value ||
+                el.stockState.value || "all districts";
+    return "award-stock-" + fyLabel(fy) + "-" +
+           where.toLowerCase().replace(/[^a-z0-9]+/g, "-") + ".csv";
+  }
+
+  /* The sheet as it stands, for the districts on screen. Only the months
+     that have happened: a month still to come cannot be filled in, here or
+     by hand. */
+  function stockTemplate(fy, places, types) {
+    var head = ["Month", "District", "State", "Division"];
+    CSV_GROUPS.forEach(function (g) {
+      types.forEach(function (t) { head.push(g.label + " " + shortType(t)); });
+    });
+
+    var lines = [head];
+    var figures = function (row, group) {
+      return types.map(function (t) {
+        var n = (row[EDIT_COLUMNS[group].column] || {})[t.id] || 0;
+        return n ? String(n) : "";
+      });
+    };
+
+    places.forEach(function (place) {
+      stockRows(fy, allRequisitions, stockMovements, [place])
+        .filter(function (row) { return monthHasHappened(row.monthKey, fy); })
+        .forEach(function (row) {
+          var line = [row.month, row.district, row.state, place.division || ""];
+          CSV_GROUPS.forEach(function (g) {
+            /* The carry forward is one opening balance and nothing else;
+               every other month is the three that are recorded. Blank is
+               what the import reads as "not mine to change". */
+            var typed = row.monthKey === "" ? g.col === "bal" : g.col !== "bal";
+            line = line.concat(typed ? figures(row, g.col)
+                                     : types.map(function () { return ""; }));
+          });
+          lines.push(line);
+        });
+    });
+
+    return lines.map(function (line) {
+      return line.map(csvField).join(",");
+    }).join("\r\n");
+  }
+
+  function downloadStockTemplate() {
+    if (!canSetStock()) return;
+
+    var fy = Number(el.stockYear.value) || fyStartOf(new Date());
+    var places = visibleStockPlaces();
+    if (!places.length) { showStockEditError("No districts match."); return; }
+
+    // The byte order mark is what makes a spreadsheet read it as UTF-8.
+    var blob = new Blob(["\uFEFF" + stockTemplate(fy, places, awardTypes)],
+                        { type: "text/csv;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement("a");
+    link.href = url;
+    link.download = stockFileName(fy);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+  }
+
+  function visibleStockPlaces() {
+    return stockPlaces().filter(function (p) {
+      return (!el.stockState.value    || p.state === el.stockState.value) &&
+             (!el.stockDivision.value || p.division === el.stockDivision.value) &&
+             (!el.stockDistrict.value || p.district === el.stockDistrict.value);
+    });
+  }
+
+  /* What a file would change, worked out without changing anything. Every
+     reason a figure cannot be taken is kept, named by the line it was on. */
+  function readStockImport(text, fy) {
+    var out = { edits: {}, problems: [], unchanged: 0, districts: {}, rows: 0 };
+    var rows = parseCsv(text);
+    if (!rows.length) {
+      out.problems.push({ line: 0, why: "The file is empty." });
+      return out;
+    }
+
+    var map = csvColumnMap(awardTypes);
+    var columns = rows[0].map(function (h) { return map[normalHeader(h)] || null; });
+    var monthAt = columns.findIndex(function (c) { return c && c.what === "month"; });
+    var districtAt = columns.findIndex(function (c) { return c && c.what === "district"; });
+
+    if (monthAt < 0 || districtAt < 0) {
+      out.problems.push({ line: 1, why:
+        "The first line has to name the columns, and must include Month and " +
+        "District. Download the template and fill that in." });
+      return out;
+    }
+    if (!columns.some(function (c) { return c && c.what === "figure"; })) {
+      out.problems.push({ line: 1, why:
+        "No column of figures was recognised. They are named like " +
+        '"Requisition ' + shortType(awardTypes[0] || { code: "Block" }) + '".' });
+      return out;
+    }
+
+    var known = {};
+    var ambiguous = {};
+    stockPlaces().forEach(function (p) {
+      var key = p.district.trim().toLowerCase();
+      if (known[key]) ambiguous[key] = true;
+      known[key] = p;
+    });
+
+    var seen = {};
+    var months = fyMonthKeys(fy);
+
+    rows.slice(1).forEach(function (row, index) {
+      var line = index + 2;
+      out.rows += 1;
+
+      /* A line with the wrong number of fields has had something shift along
+         it - a thousands comma typed without quotes around it, most likely -
+         and every figure after the shift would land in the wrong column. */
+      if (row.length !== rows[0].length) {
+        out.problems.push({ line: line, why: "this line has " + row.length +
+          (row.length === 1 ? " field" : " fields") + " where the first line " +
+          "has " + rows[0].length + ". A number with a comma in it needs " +
+          'quotes around it, like "1,250".' });
+        return;
+      }
+
+      var name = String(row[districtAt] || "").trim();
+      var place = known[name.toLowerCase()];
+      if (!name) {
+        out.problems.push({ line: line, why: "no district on this line" });
+        return;
+      }
+      if (!place) {
+        out.problems.push({ line: line, why: '"' + name +
+          '" is not a district in the staff directory' });
+        return;
+      }
+      if (ambiguous[name.toLowerCase()]) {
+        out.problems.push({ line: line, why: '"' + name +
+          '" is the name of more than one district, so there is no telling ' +
+          "which this is" });
+        return;
+      }
+
+      var month = parseMonthCell(row[monthAt]);
+      if (month.error) {
+        out.problems.push({ line: line, why: month.error });
+        return;
+      }
+      if (month.key && months.indexOf(month.key) === -1) {
+        out.problems.push({ line: line, why: monthLabelOf(month.key) +
+          " is not in " + fyLabel(fy) + ", which is the year on screen" });
+        return;
+      }
+      if (!monthHasHappened(month.key, fy)) {
+        out.problems.push({ line: line, why: monthLabelOf(month.key) +
+          " has not happened yet" });
+        return;
+      }
+
+      var at = place.district + "\u0000" + month.key;
+      if (seen[at]) {
+        out.problems.push({ line: line, why: place.district + " and " +
+          (month.key ? monthLabelOf(month.key) : "the carry forward") +
+          " are on line " + seen[at] + " as well" });
+        return;
+      }
+      seen[at] = line;
+
+      var carry = month.key === "";
+      columns.forEach(function (column, at2) {
+        if (!column || column.what !== "figure") return;
+
+        var cell = parseFigureCell(row[at2]);
+        if (cell.skip) return;
+        if (cell.error) {
+          out.problems.push({ line: line, why: cell.error + ", under " +
+            escapeNothing(rows[0][at2]) });
+          return;
+        }
+
+        if (carry !== (column.col === "bal")) {
+          out.problems.push({ line: line, why: carry
+            ? "the carry forward holds one opening balance, so " +
+              escapeNothing(rows[0][at2]) + " cannot be set on it"
+            : escapeNothing(rows[0][at2]) + " is added up from what moved, " +
+              "so it cannot be typed on a month" });
+          return;
+        }
+
+        var have = recordedFigure(place.district, fy, month.key,
+                                  column.col, column.typeId);
+        if (cell.value === have) { out.unchanged += 1; return; }
+
+        out.edits[editKey(place.district, month.key, column.col, column.typeId)] =
+          cell.value;
+        out.districts[place.district] = true;
+      });
+    });
+
+    return out;
+  }
+
+  function escapeNothing(text) {
+    return String(text || "that column").trim() || "that column";
+  }
+
+  function importStockFile(file) {
+    if (!canSetStock() || !file) return;
+
+    var reader = new FileReader();
+    reader.onerror = function () {
+      showImportResult(null, "That file could not be read.");
+    };
+    reader.onload = function () {
+      var fy = Number(el.stockYear.value) || fyStartOf(new Date());
+      var was = countPendingEdits();
+      var result;
+      try {
+        result = readStockImport(String(reader.result || ""), fy);
+      } catch (err) {
+        showImportResult(null, "That file could not be read: " + messageOf(err));
+        return;
+      }
+
+      var count = Object.keys(result.edits).length;
+      if (count) {
+        pendingEdits = result.edits;
+
+        /* Everything about to be saved has to be on screen, so a file that
+           reaches past the filters opens them. */
+        var hidden = Object.keys(result.districts).filter(function (d) {
+          return !visibleStockPlaces().some(function (p) { return p.district === d; });
+        });
+        if (hidden.length) {
+          el.stockState.value = ""; el.stockDivision.value = "";
+          el.stockDistrict.value = "";
+          stockFiltersFor(null);
+          result.opened = hidden.length;
+        }
+        stockShown = true;
+      }
+
+      result.replaced = count && was ? was : 0;
+      showStockEditError("");
+      renderStock();
+      showImportResult(result, null);
+    };
+    reader.readAsText(file);
+  }
+
+  function showImportResult(result, failure) {
+    var lines = [];
+    var sub;
+
+    if (failure) {
+      sub = "Nothing was changed.";
+      lines.push('<p class="import-bad">' + escapeHtml(failure) + "</p>");
+    } else {
+      var count = Object.keys(result.edits).length;
+      var districts = Object.keys(result.districts).length;
+
+      sub = count
+        ? (count === 1 ? "One figure is" : count + " figures are") +
+          " waiting in the sheet across " +
+          (districts === 1 ? "one district" : districts + " districts") +
+          ". Nothing is saved until you press Save changes."
+        : "Nothing in the file is different from what is already recorded.";
+
+      var said = [];
+      said.push(result.rows + (result.rows === 1 ? " line read" : " lines read"));
+      if (result.unchanged) {
+        said.push(result.unchanged + " already matching");
+      }
+      if (result.replaced) {
+        said.push(result.replaced +
+          (result.replaced === 1 ? " unsaved figure replaced"
+                                 : " unsaved figures replaced"));
+      }
+      if (result.opened) {
+        said.push("filters cleared to show " + result.opened +
+          (result.opened === 1 ? " district" : " districts") + " the file reaches");
+      }
+      lines.push('<p class="import-said">' + escapeHtml(said.join(" \u00b7 ")) + "</p>");
+
+      var trouble = count ? negativeAfterImport() : null;
+      if (trouble) {
+        lines.push('<p class="import-bad">' + escapeHtml(trouble) + "</p>");
+      }
+
+      if (result.problems.length) {
+        lines.push("<h4>" + (result.problems.length === 1
+          ? "One line was left out"
+          : result.problems.length + " lines were left out") + "</h4>");
+        lines.push('<ul class="import-problems">' +
+          result.problems.slice(0, 50).map(function (p) {
+            return "<li><b>" + (p.line ? "Line " + p.line : "The file") +
+                   "</b> " + escapeHtml(p.why) + "</li>";
+          }).join("") +
+          (result.problems.length > 50
+            ? "<li><b>and " + (result.problems.length - 50) + " more</b></li>"
+            : "") +
+          "</ul>");
+      }
+    }
+
+    el.importSub.textContent = sub;
+    el.importBody.innerHTML = lines.join("");
+
+    returnFocusTo = document.activeElement;
+    el.importModal.classList.add("is-open");
+    document.addEventListener("keydown", onImportKeydown);
+    scrollLockedAt = window.scrollY;
+    document.body.style.overflow = "hidden";
+    el.importModal.querySelector("[data-aw-close-import]").focus();
+  }
+
+  // Said here as well as on Save, so it is known before the file is trusted.
+  function negativeAfterImport() {
+    var fy = Number(el.stockYear.value) || fyStartOf(new Date());
+    var moves = pendingMovements(fy);
+    var districts = {};
+    moves.forEach(function (m) { districts[m.district_name] = true; });
+
+    var trouble = null;
+    Object.keys(districts).some(function (district) {
+      var mine = moves.filter(function (m) { return m.district_name === district; });
+      var earliest = mine.map(function (m) { return m.occurred_on; }).sort()[0];
+      var from = earliest.slice(0, 7) === fy + "-03" ? "" : earliest.slice(0, 7);
+      var bad = wouldGoNegative(district, fy, from, mine);
+      if (bad) { trouble = { district: district, bad: bad }; return true; }
+      return false;
+    });
+    if (!trouble) return "";
+
+    var type = awardTypes.filter(function (a) {
+      return Number(a.id) === trouble.bad.award_type_id;
+    })[0] || {};
+    return "Saving these would leave " + trouble.district + " holding " +
+           trouble.bad.short + " fewer " + (type.name || "of that award") +
+           " than nothing by " + trouble.bad.month + ". Put that right in the " +
+           "sheet before saving.";
+  }
+
+  function closeImportResult() {
+    el.importModal.classList.remove("is-open");
+    document.removeEventListener("keydown", onImportKeydown);
+    document.body.style.overflow = "";
+    if (scrollLockedAt !== null) {
+      window.scrollTo(0, scrollLockedAt);
+      scrollLockedAt = null;
+    }
+    if (returnFocusTo && typeof returnFocusTo.focus === "function") returnFocusTo.focus();
+  }
+
+  function onImportKeydown(event) {
+    if (event.key === "Escape") closeImportResult();
   }
 
   function startCellEdit(cell) {

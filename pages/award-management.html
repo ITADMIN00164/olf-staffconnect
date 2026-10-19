@@ -200,6 +200,18 @@
               <select id="stock-district"><option value="">All districts</option></select>
             </div>
             <div class="stock-actions">
+              <!-- A year of figures at once, for whoever may set them. The
+                   file is the sheet as it stands, so what comes back is
+                   measured against what is already recorded. -->
+              <button type="button" id="stock-template" class="btn btn-ghost btn-sm" hidden>
+                <i class="aw-icon" data-aw-icon="download" aria-hidden="true"></i>
+                Template
+              </button>
+              <button type="button" id="stock-import" class="btn btn-ghost btn-sm" hidden>
+                <i class="aw-icon" data-aw-icon="upload" aria-hidden="true"></i>
+                Import
+              </button>
+              <input type="file" id="stock-file" accept=".csv,text/csv" hidden />
               <button type="button" id="stock-fetch" class="btn btn-primary btn-sm">
                 <i class="aw-icon" data-aw-icon="search" aria-hidden="true"></i>
                 Fetch
@@ -322,6 +334,34 @@
         </button>
       </div>
     </form>        </div>
+      </div>
+    </div>
+
+    <!-- What a file changed, and what it could not. Shown before anything is
+         written: the figures land in the sheet as unsaved edits, and Save is
+         still the thing that writes them. -->
+    <div class="aw-overlay" id="import-modal">
+      <div class="aw-overlay-backdrop" data-aw-close-import></div>
+
+      <div class="aw-box aw-box-sm" role="dialog" aria-modal="true"
+           aria-labelledby="import-heading">
+        <div class="aw-box-head">
+          <span class="rule rule-accent" aria-hidden="true"></span>
+          <div class="aw-box-heading">
+            <h2 id="import-heading">Imported</h2>
+            <p class="aw-box-sub" id="import-sub"></p>
+          </div>
+          <button type="button" class="aw-box-close" data-aw-close-import
+                  aria-label="Close">
+            <i class="aw-icon" data-aw-icon="close" aria-hidden="true"></i>
+          </button>
+        </div>
+
+        <div class="aw-box-body" id="import-body"></div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-primary" data-aw-close-import>Close</button>
+        </div>
       </div>
     </div>
 
