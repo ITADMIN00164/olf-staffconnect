@@ -2846,32 +2846,12 @@ window.AWARD_CONFIG = {
       return;
     }
 
-    var GROUPS = [
-      { kind: "req", label: "Requisition" },
-      { kind: "del", label: "Delivery" },
-      { kind: "use", label: "Utilisation" },
-      { kind: "bal", label: "Stock Balance" }
-    ];
-
-    var head =
-      "<thead><tr>" +
+    var head = groupHeadHtml(types, { before:
         '<th rowspan="2" class="col-month">Month</th>' +
         '<th rowspan="2" class="col-district">District</th>' +
-        '<th rowspan="2">State</th><th rowspan="2">PM</th>' +
-        GROUPS.map(function (g) {
-          return '<th colspan="' + (types.length + 1) + '" class="grp col-' + g.kind +
-                 '">' + escapeHtml(g.label) + "</th>";
-        }).join("") +
-        '<th rowspan="2">Remark</th>' +
-        '<th rowspan="2" class="col-act"><span class="sr-only">Record</span></th>' +
-      "</tr><tr>" +
-        GROUPS.map(function (g) {
-          return types.map(function (t) {
-            return '<th class="num col-' + g.kind + '">' + escapeHtml(shortType(t)) +
-                   "</th>";
-          }).join("") + '<th class="num col-' + g.kind + ' is-total">Total</th>';
-        }).join("") +
-      "</tr></thead>";
+        '<th rowspan="2">State</th><th rowspan="2">PM</th>' },
+      '<th rowspan="2">Remark</th>' +
+      '<th rowspan="2" class="col-act"><span class="sr-only">Record</span></th>');
 
     var body = rows.map(function (r) {
       var carry = r.monthKey === "";
@@ -2937,6 +2917,34 @@ window.AWARD_CONFIG = {
   function hasAnything(r) {
     return !!(sumOf(r.requisition) || sumOf(r.delivery) || sumOf(r.utilisation) ||
               (r.monthKey === "" && sumOf(r.balance)));
+  }
+
+  /* The four groups of the sheet, in the order they read across it. The
+     breakdown is the same table for one month, so it reads from the same
+     list. */
+  var GROUPS = [
+    { kind: "req", label: "Requisition",   column: "requisition" },
+    { kind: "del", label: "Delivery",      column: "delivery" },
+    { kind: "use", label: "Utilisation",   column: "utilisation" },
+    { kind: "bal", label: "Stock Balance", column: "balance" }
+  ];
+
+  /* The two-row head both tables wear: a band per group, the award columns
+     under it. `lead` is whatever columns come first, which differ. */
+  function groupHeadHtml(types, lead, trail) {
+    return "<thead><tr>" + lead.before +
+      GROUPS.map(function (g) {
+        return '<th colspan="' + (types.length + 1) + '" class="grp col-' + g.kind +
+               '">' + escapeHtml(g.label) + "</th>";
+      }).join("") + (trail || "") +
+      "</tr><tr>" +
+      GROUPS.map(function (g) {
+        return types.map(function (t) {
+          return '<th class="num col-' + g.kind + '">' + escapeHtml(shortType(t)) +
+                 "</th>";
+        }).join("") + '<th class="num col-' + g.kind + ' is-total">Total</th>';
+      }).join("") +
+      "</tr></thead>";
   }
 
   function rowActionHtml(kind, label, r) {
@@ -3255,8 +3263,15 @@ window.AWARD_CONFIG = {
       });
     });
 
+    /* Ordered the way the sheet reads - everything asked for, then what
+       arrived, then what went out - and by date inside each. The clock alone
+       would not do: a utilisation is recorded against a month rather than a
+       day, so it carries the first of the month and would sort ahead of the
+       delivery it came out of. */
+    var order = { requisition: 0, delivery: 1, utilisation: 2, other: 3 };
     return entries.sort(function (a, b) {
-      return String(a.at).localeCompare(String(b.at));
+      return (order[a.column] - order[b.column]) ||
+             String(a.at).localeCompare(String(b.at));
     });
   }
 
@@ -3272,6 +3287,7 @@ window.AWARD_CONFIG = {
     var fy = Number(el.stockYear.value) || fyStartOf(new Date());
     var entries = monthBreakdown(district, monthKey, fy);
     var types = awardTypes;
+    var left = balanceOn(district, fy, monthKey);
 
     returnFocusTo = document.activeElement;
     el.detailHeading.textContent = district + " \u00b7 " +
@@ -3283,60 +3299,49 @@ window.AWARD_CONFIG = {
         ", and what each of them was."
       : "Nothing was recorded against this month.";
 
-    var figures = function (map, extra) {
-      var html = "";
-      types.forEach(function (t) {
-        var n = map[t.id] || 0;
-        html += '<td class="num' + (n ? "" : " is-nil") +
-                (n < 0 ? " is-neg" : "") + '">' +
-                (n ? escapeHtml(n.toLocaleString()) : "\u2013") + "</td>";
-      });
-      var total = sumOf(map);
-      return html + '<td class="num is-total' + (extra || "") + '">' +
-             (total ? escapeHtml(total.toLocaleString()) : "\u2013") + "</td>";
-    };
+    /* The same table, for one month. Each thing that happened takes a row,
+       its figures sitting under the group they belong to; the balance walks
+       down beside them, so a row says what the district was holding once
+       that had happened. The last row is the month itself - the very row
+       that was clicked to get here. */
+    var totals = { requisition: {}, delivery: {}, utilisation: {}, other: {} };
 
-    var head = "<thead><tr><th>What</th>" +
-      types.map(function (t) {
-        return '<th class="num">' + escapeHtml(shortType(t)) + "</th>";
-      }).join("") + '<th class="num">Total</th></tr></thead>';
+    var body = entries.map(function (e) {
+      addInto(totals[e.column], e.quantities);
 
-    var body = "";
+      var only = function (column) {
+        return e.column === column ? e.quantities : {};
+      };
 
-    DETAIL_GROUPS.forEach(function (group) {
-      var mine = entries.filter(function (e) { return e.column === group.column; });
-      if (!mine.length) return;
+      return '<tr class="detail-line">' +
+        '<td class="detail-what"><b>' + escapeHtml(e.what) + "</b>" +
+          (e.who ? "<span>" + escapeHtml(e.who) + "</span>" : "") +
+          "<time>" + escapeHtml(formatTimestamp(e.at)) + "</time>" +
+          (e.note ? "<em>" + escapeHtml(e.note) + "</em>" : "") +
+        "</td>" +
+        cellsHtml(only("requisition"), types, "req", {}, false) +
+        cellsHtml(only("delivery"), types, "del", {}, false) +
+        cellsHtml(only("utilisation"), types, "use", {}, false) +
+        cellsHtml({}, types, "bal", {}, false) +
+      "</tr>";
+    }).join("");
 
-      var sum = {};
-      mine.forEach(function (e) { addInto(sum, e.quantities); });
+    body += '<tr class="detail-line is-final">' +
+      '<td class="detail-what"><b>' +
+        escapeHtml(monthKey ? monthLabelOf(monthKey) : "Carried into " + fyLabel(fy)) +
+      "</b><time>the row this came from</time></td>" +
+      cellsHtml(totals.requisition, types, "req", {}, false) +
+      cellsHtml(totals.delivery, types, "del", {}, false) +
+      cellsHtml(totals.utilisation, types, "use", {}, false) +
+      cellsHtml(left, types, "bal", {}, false) +
+    "</tr>";
 
-      body += '<tr class="detail-group col-' + group.kind + '">' +
-                '<th colspan="' + (types.length + 2) + '">' +
-                  escapeHtml(group.label) +
-                  (mine.length > 1
-                     ? '<span class="detail-count">' + mine.length + "</span>"
-                     : "") +
-                "</th></tr>";
-
-      mine.forEach(function (e) {
-        body += '<tr class="detail-line">' +
-                  '<td class="detail-what"><b>' + escapeHtml(e.what) + "</b>" +
-                    (e.who ? "<span>" + escapeHtml(e.who) + "</span>" : "") +
-                    "<time>" + escapeHtml(formatTimestamp(e.at)) + "</time>" +
-                    (e.note ? '<em>' + escapeHtml(e.note) + "</em>" : "") +
-                  "</td>" + figures(e.quantities) +
-                "</tr>";
-      });
-
-      if (mine.length > 1) {
-        body += '<tr class="detail-sum"><td>Total</td>' +
-                figures(sum, " is-strong") + "</tr>";
-      }
-    });
-
-    el.detailBody.innerHTML =
-      '<div class="table-scroll"><table class="detail-table">' +
-      head + "<tbody>" + body + "</tbody></table></div>";
+    el.detailBody.innerHTML = entries.length
+      ? '<div class="table-scroll"><table id="detail-table">' +
+        groupHeadHtml(types, { before: '<th rowspan="2" class="detail-what">What</th>' }) +
+        "<tbody>" + body + "</tbody></table></div>"
+      : '<p class="aw-empty-line">Nothing was recorded against this month. ' +
+        "The figures beside it are what carried in from before.</p>";
 
     el.detailModal.classList.add("is-open");
     document.addEventListener("keydown", onDetailKeydown);
