@@ -3256,11 +3256,14 @@ window.AWARD_CONFIG = {
     return { error: 'no month called "' + raw + '"' };
   }
 
-  /* A line replaces the month it names, so an empty cell is not silence -
-     it is nothing held, the same as a dash or a nought. */
+  /* A figure in the file replaces what is recorded for that cell. An empty
+     one is not an answer - it is a cell nobody filled in - so what is there
+     is left alone. A dash or a nought are answers: they mean nothing held,
+     and will take a figure away. */
   function parseFigureCell(text) {
     var raw = String(text || "").trim();
-    if (!raw || /^[-\u2013\u2014]$/.test(raw)) return { value: 0 };
+    if (!raw) return { skip: true };
+    if (/^[-\u2013\u2014]$/.test(raw)) return { value: 0 };
 
     var cleaned = raw.replace(/[,\s\u00a0]/g, "");
     if (!/^\d+$/.test(cleaned)) {
@@ -3472,6 +3475,7 @@ window.AWARD_CONFIG = {
         }
 
         var cell = parseFigureCell(raw);
+        if (cell.skip) return;
         if (cell.error) {
           out.problems.push({ line: line, why: cell.error + ", under " +
             escapeNothing(rows[0][at2]) });
@@ -3480,10 +3484,7 @@ window.AWARD_CONFIG = {
 
         var have = recordedFigure(place.district, fy, month.key,
                                   column.col, column.typeId);
-        if (cell.value === have) {
-          if (raw) out.unchanged += 1;
-          return;
-        }
+        if (cell.value === have) { out.unchanged += 1; return; }
 
         if (!cell.value) out.cleared += 1;
         out.edits[editKey(place.district, month.key, column.col, column.typeId)] =
@@ -3566,12 +3567,11 @@ window.AWARD_CONFIG = {
       if (result.unchanged) {
         said.push(result.unchanged + " already matching");
       }
-      /* Said on its own, because this is the half of replacing that is easy
-         to do by accident: an empty cell takes what was there away. */
+      // A nought written in on purpose, which is the only thing that clears.
       if (result.cleared) {
         said.push(result.cleared +
-          (result.cleared === 1 ? " figure cleared to nothing"
-                                : " figures cleared to nothing"));
+          (result.cleared === 1 ? " figure set to nothing"
+                                : " figures set to nothing"));
       }
       if (result.replaced) {
         said.push(result.replaced +
