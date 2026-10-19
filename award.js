@@ -1434,11 +1434,30 @@ window.AWARD_CONFIG = {
     var stockWrap = document.getElementById("stock-table-wrap");
     if (stockWrap) {
       stockWrap.addEventListener("click", function (event) {
-        var btn = event.target.closest && event.target.closest("[data-aw-row-act]");
-        if (!btn) return;
-        openStockModal(btn.getAttribute("data-aw-row-act"),
-                       { district: btn.getAttribute("data-aw-where"),
-                         month: btn.getAttribute("data-aw-month") });
+        if (!event.target.closest) return;
+
+        var btn = event.target.closest("[data-aw-row-act]");
+        if (btn) {
+          openStockModal(btn.getAttribute("data-aw-row-act"),
+                         { district: btn.getAttribute("data-aw-where"),
+                           month: btn.getAttribute("data-aw-month") });
+          return;
+        }
+
+        if (event.target.id === "stock-edit-save")    { saveStockEdits(); return; }
+        if (event.target.id === "stock-edit-discard") { discardStockEdits(); return; }
+
+        var cell = event.target.closest("td.is-editable");
+        if (cell) startCellEdit(cell);
+      });
+
+      // The same cells by keyboard, since a sheet is filled in by typing.
+      stockWrap.addEventListener("keydown", function (event) {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        var cell = event.target.closest && event.target.closest("td.is-editable");
+        if (!cell || cell.querySelector("input")) return;
+        event.preventDefault();
+        startCellEdit(cell);
       });
     }
     el.stockSave.addEventListener("click", saveStock);
@@ -2659,16 +2678,28 @@ window.AWARD_CONFIG = {
 
   /* One group of cells, carrying its group so the sheet can be read by
      colour. Nothing is greyed; a negative figure is red - it should never
-     happen, and should be seen first if it does. */
-  function cellsHtml(map, types, kind) {
+     happen, and should be seen first if it does.
+
+     An administrator types into the three groups that are recorded; the
+     balance is worked out and the totals add up, so neither takes a figure.
+     The cell says which district, month, column and award it stands for, so
+     the editor does not have to be told. */
+  function cellsHtml(map, types, kind, r, editable) {
     var html = "";
-    var cell = function (n, extra) {
+    var cell = function (n, extra, edit) {
+      var pending = edit && hasPendingEdit(r.district, r.monthKey, kind, edit);
       return '<td class="num col-' + kind + (n ? "" : " is-nil") +
-             (n < 0 ? " is-neg" : "") + extra + '">' +
-             (n ? escapeHtml(n.toLocaleString()) : "\u2013") + "</td>";
+             (n < 0 ? " is-neg" : "") + (edit ? " is-editable" : "") +
+             (pending ? " is-pending" : "") + extra + '"' +
+             (edit ? ' data-edit="' + kind + '" data-type="' + escapeHtml(edit) +
+                     '" data-month="' + escapeHtml(r.monthKey) +
+                     '" data-where="' + escapeHtml(r.district) + '" tabindex="0"' : "") +
+             ">" + (n ? escapeHtml(n.toLocaleString()) : "\u2013") + "</td>";
     };
-    types.forEach(function (t) { html += cell(map[t.id] || 0, ""); });
-    return html + cell(sumOf(map), " is-total");
+    types.forEach(function (t) {
+      html += cell(map[t.id] || 0, "", editable ? String(t.id) : null);
+    });
+    return html + cell(sumOf(map), " is-total", null);
   }
 
   /* The filters narrow each other, the same way the requisition form does:
@@ -2762,7 +2793,10 @@ window.AWARD_CONFIG = {
     }
 
     var types = awardTypes;
-    var rows = stockRows(fy, allRequisitions, stockMovements, places);
+    // Drawn with the unsaved edits in it, so every balance below one of them
+    // follows along as it is typed.
+    var rows = stockRows(fy, allRequisitions,
+                         stockMovements.concat(pendingMovements(fy)), places);
 
     /* Asking for a place shows it whether or not anything has happened
        there - that is how an empty district is given its first figures.
@@ -2826,27 +2860,41 @@ window.AWARD_CONFIG = {
       // Nothing held is nothing to give out.
       var mayUse = !carry && happened && canUseHere(r.district) &&
                    sumOf(r.balance) > 0;
-      var maySet = happened && canSetStock();
+      /* An administrator types the three recorded groups straight into the
+         sheet. The carry forward has none of them - it is one opening
+         figure - so there the balance itself is what gets typed. */
+      var mayEdit = happened && canSetStock();
       return '<tr class="' + (carry ? "is-carry" : "") + '">' +
         '<td class="col-month">' + escapeHtml(r.month) + "</td>" +
         '<td class="col-district is-district">' + escapeHtml(r.district) + "</td>" +
         "<td>" + escapeHtml(r.state) + "</td>" +
         '<td class="col-pm" title="' + escapeHtml(r.pm || "") + '">' +
           escapeHtml(r.pm || "\u2014") + "</td>" +
-        cellsHtml(r.requisition, types, "req") +
-        cellsHtml(r.delivery, types, "del") +
-        cellsHtml(r.utilisation, types, "use") +
-        cellsHtml(r.balance, types, "bal") +
+        cellsHtml(r.requisition, types, "req", r, mayEdit && !carry) +
+        cellsHtml(r.delivery, types, "del", r, mayEdit && !carry) +
+        cellsHtml(r.utilisation, types, "use", r, mayEdit && !carry) +
+        cellsHtml(r.balance, types, "bal", r, mayEdit && carry) +
         '<td class="cell-remark-col" title="' + escapeHtml(r.remark || "") + '">' +
           escapeHtml(r.remark || "") + "</td>" +
         '<td class="col-act">' +
           (mayUse ? rowActionHtml("utilised", "Record use", r) : "") +
-          (maySet ? rowActionHtml("set", "Set stock", r) : "") +
         "</td>" +
       "</tr>";
     }).join("");
 
-    wrap.innerHTML = '<table id="stock-table">' + head + "<tbody>" + body + "</tbody></table>";
+    var waiting = countPendingEdits();
+    wrap.innerHTML =
+      '<div class="stock-editbar" id="stock-editbar"' + (waiting ? "" : " hidden") + ">" +
+        "<span>" + (waiting === 1 ? "One figure changed"
+                                  : waiting + " figures changed") +
+        ", not saved yet.</span>" +
+        '<button type="button" class="btn btn-ghost btn-sm" id="stock-edit-discard">' +
+          "Discard</button>" +
+        '<button type="button" class="btn btn-primary btn-sm" id="stock-edit-save">' +
+          "Save changes</button>" +
+      "</div>" +
+      '<p class="error" id="stock-edit-error" hidden role="alert"></p>' +
+      '<table id="stock-table">' + head + "<tbody>" + body + "</tbody></table>";
   }
 
   function rowActionHtml(kind, label, r) {
@@ -2898,6 +2946,224 @@ window.AWARD_CONFIG = {
   function monthHasHappened(monthKey, fy) {
     return monthKey ? monthKey <= monthKeyOf(new Date())
                     : fy <= fyStartOf(new Date());
+  }
+
+  /* ------------------------------------------------------------ editing
+
+     An administrator types figures straight into the sheet. Nothing is
+     written as it is typed: the edits are held here, the sheet is added up
+     with them included so every balance below follows along, and one Save
+     writes them all.
+
+     What is held is the figure the cell should read, not the difference.
+     The difference is worked out against what is recorded at the moment of
+     saving, so an edit made while somebody else was recording a utilisation
+     does not quietly undo theirs. */
+  var pendingEdits = {};
+
+  var EDIT_COLUMNS = {
+    req: { column: "requisition", kind: "requisition", word: "requisition" },
+    del: { column: "delivery",    kind: "delivery",    word: "delivery" },
+    use: { column: "utilisation", kind: "utilised",    word: "utilisation" },
+    bal: { column: "balance",     kind: "adjustment",  word: "opening stock" }
+  };
+
+  function editKey(district, monthKey, col, typeId) {
+    return [district, monthKey, col, typeId].join("\u0000");
+  }
+
+  function hasPendingEdit(district, monthKey, col, typeId) {
+    return Object.prototype.hasOwnProperty.call(
+      pendingEdits, editKey(district, monthKey, col, typeId));
+  }
+
+  function countPendingEdits() { return Object.keys(pendingEdits).length; }
+
+  /* What the sheet reads for one cell as it stands in the database, which is
+     what an edit is measured against. */
+  function recordedFigure(district, fy, monthKey, col, typeId) {
+    var rows = stockRows(fy, allRequisitions, stockMovements,
+                         [{ state: "", division: "", district: district, pm: "" }]);
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].monthKey === monthKey) {
+        return (rows[i][EDIT_COLUMNS[col].column] || {})[typeId] || 0;
+      }
+    }
+    return 0;
+  }
+
+  /* The edits as movements, so the sheet can be drawn with them in it before
+     any of them is saved. */
+  function pendingMovements(fy) {
+    return Object.keys(pendingEdits).map(function (key) {
+      var parts = key.split("\u0000");
+      var district = parts[0], monthKey = parts[1], col = parts[2], typeId = parts[3];
+      var want = pendingEdits[key];
+      var have = recordedFigure(district, fy, monthKey, col, typeId);
+      if (want === have) return null;
+
+      return {
+        kind: EDIT_COLUMNS[col].kind,
+        state_name: null, division_name: null, district_name: district,
+        award_type_id: Number(typeId),
+        quantity: want - have,
+        occurred_on: (monthKey || (fy + "-03")) + "-01",
+        note: null
+      };
+    }).filter(Boolean);
+  }
+
+  function startCellEdit(cell) {
+    if (cell.querySelector("input")) return;
+
+    var was = cell.textContent.trim();
+    var shown = was === "\u2013" ? "" : was.replace(/,/g, "");
+    cell.classList.add("is-editing");
+    cell.innerHTML = '<input type="number" class="cell-input mono" step="1" ' +
+                     'min="0" max="1000000" value="' + escapeHtml(shown) + '" />';
+
+    var input = cell.querySelector("input");
+    input.focus();
+    input.select();
+
+    var done = function (commit) {
+      if (!cell.classList.contains("is-editing")) return;
+      cell.classList.remove("is-editing");
+      if (commit) commitCellEdit(cell, input.value);
+      else renderStock();
+    };
+
+    input.addEventListener("blur", function () { done(true); });
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter")      { e.preventDefault(); done(true); }
+      else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); done(false); }
+      else if (e.key === "Tab")    { done(true); }   // the browser moves on
+    });
+  }
+
+  function commitCellEdit(cell, raw) {
+    var district = cell.getAttribute("data-where");
+    var monthKey = cell.getAttribute("data-month");
+    var col      = cell.getAttribute("data-edit");
+    var typeId   = cell.getAttribute("data-type");
+    var fy = Number(el.stockYear.value) || fyStartOf(new Date());
+
+    var text = String(raw || "").trim();
+    var n = text === "" ? 0 : Number(text);
+    if (!Number.isInteger(n) || n < 0) {
+      // Drawn first: the sheet is rebuilt whole, error line included.
+      renderStock();
+      showStockEditError("Figures are whole numbers, nothing or more.");
+      return;
+    }
+
+    var key = editKey(district, monthKey, col, typeId);
+    if (n === recordedFigure(district, fy, monthKey, col, typeId)) delete pendingEdits[key];
+    else pendingEdits[key] = n;
+
+    showStockEditError("");
+    renderStock();
+  }
+
+  function discardStockEdits() {
+    pendingEdits = {};
+    showStockEditError("");
+    renderStock();
+  }
+
+  function showStockEditError(message) {
+    var bar = document.getElementById("stock-edit-error");
+    if (!bar) return;
+    bar.textContent = message || "";
+    bar.hidden = !message;
+  }
+
+  /* One insert for the lot. The differences are worked out here rather than
+     when each cell was typed, so they are measured against what the database
+     holds now. */
+  function saveStockEdits() {
+    var fy = Number(el.stockYear.value) || fyStartOf(new Date());
+    var moves = pendingMovements(fy);
+    if (!moves.length) { discardStockEdits(); return; }
+
+    var districts = {};
+    moves.forEach(function (m) { districts[m.district_name] = true; });
+
+    var trouble = null;
+    Object.keys(districts).some(function (district) {
+      var mine = moves.filter(function (m) { return m.district_name === district; });
+      var earliest = mine.map(function (m) { return m.occurred_on; }).sort()[0];
+      var from = earliest.slice(0, 7) === fy + "-03" ? "" : earliest.slice(0, 7);
+      var bad = wouldGoNegative(district, fy, from, mine);
+      if (bad) { trouble = { district: district, bad: bad }; return true; }
+      return false;
+    });
+
+    if (trouble) {
+      var short = awardTypes.filter(function (a) {
+        return Number(a.id) === trouble.bad.award_type_id;
+      })[0] || {};
+      showStockEditError(
+        "That would leave " + trouble.district + " holding " + trouble.bad.short +
+        " fewer " + (short.name || "of that award") + " than nothing by " +
+        trouble.bad.month + ".");
+      return;
+    }
+
+    var places = stockPlaces();
+    var rows = moves.map(function (m) {
+      var place = places.filter(function (p) {
+        return p.district === m.district_name;
+      })[0] || {};
+      var type = awardTypes.filter(function (a) {
+        return Number(a.id) === m.award_type_id;
+      })[0] || {};
+      var col = Object.keys(EDIT_COLUMNS).filter(function (c) {
+        return EDIT_COLUMNS[c].kind === m.kind;
+      })[0];
+
+      return {
+        kind: m.kind,
+        state_name: place.state || "",
+        division_name: place.division || null,
+        district_name: m.district_name,
+        award_type_id: m.award_type_id,
+        quantity: m.quantity,
+        occurred_on: m.occurred_on,
+        note: (type.name || "Award") + " " + EDIT_COLUMNS[col].word + ": " +
+              (m.quantity > 0 ? "+" : "") + m.quantity.toLocaleString(),
+        recorded_by: (signedInUser() || {}).name || myEmail(),
+        recorded_email: myEmail() || null
+      };
+    });
+
+    var bar = document.getElementById("stock-edit-save");
+    if (bar) bar.disabled = true;
+
+    db.from("award_stock_movements").insert(rows).select("id")
+      .then(function (res) {
+        if (bar) bar.disabled = false;
+        if (res.error) {
+          var msg = res.error.message || "";
+          showStockEditError(/kind_check|quantity_sane/i.test(msg)
+            ? "Figures typed by hand need sql/award-stock-manual.sql run in " +
+              "the Supabase SQL editor first."
+            : "Could not save: " + msg);
+          reportError("save stock edits", res.error);
+          return;
+        }
+        pendingEdits = {};
+        loadStock(function () {
+          stockShown = true;
+          renderStock();
+          showListBanner(rows.length === 1 ? "One figure saved."
+                                           : rows.length + " figures saved.");
+        });
+      })
+      .catch(function (err) {
+        if (bar) bar.disabled = false;
+        showStockEditError("Could not save: " + messageOf(err));
+      });
   }
 
   // Whether this district is one of theirs to record against.

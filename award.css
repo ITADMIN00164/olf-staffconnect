@@ -1162,6 +1162,50 @@
   color: var(--text-soft);
 }
 .award-page #stock-table td.muted { color: var(--text-muted); }
+/* The cells an administrator types into. White against the group's tint, so
+   what is typed and what is worked out are told apart at a glance. */
+.award-page #stock-table td.is-editable {
+  background: var(--surface);
+  cursor: text;
+  outline-offset: -2px;
+}
+.award-page #stock-table td.is-editable:hover { background: var(--accent-soft); }
+.award-page #stock-table td.is-editable:focus-visible { outline: 2px solid var(--accent); }
+.award-page #stock-table td.is-editing { padding: 2px 4px; background: var(--surface); }
+.award-page #stock-table td.is-pending {
+  background: var(--warn-soft);
+  box-shadow: inset 2px 0 0 var(--warn);
+  font-weight: 700;
+}
+.award-page #stock-table .cell-input {
+  width: 100%;
+  padding: 4px 6px;
+  text-align: right;
+  font-size: 12px;
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--text);
+}
+.award-page #stock-table .cell-input:focus { outline: none;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, .15); }
+
+/* What is waiting to be saved, and the two ways out of it. */
+.award-page .stock-editbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  background: var(--warn-soft);
+  border: 1px solid var(--warn-soft-border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--warn);
+}
+.award-page .stock-editbar span { font-weight: 600; margin-right: auto; }
+.award-page #stock-edit-error { margin: 0 0 12px; }
+
 .award-page #stock-table td.col-act { text-align: right; white-space: nowrap; }
 .award-page #stock-table td.col-act .btn + .btn { margin-left: 5px; }
 .award-page #stock-table td.col-act .btn { visibility: hidden; }
