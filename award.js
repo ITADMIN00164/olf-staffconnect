@@ -3286,6 +3286,18 @@ window.AWARD_CONFIG = {
       types.forEach(function (t) { head.push(g.label + " " + shortType(t)); });
     });
 
+    /* The sheet draws a district under every division the directory posts
+       anybody to, but what it is holding is one figure either way - stock is
+       kept by district. So the file names it once. */
+    var once = [];
+    var already = {};
+    places.forEach(function (p) {
+      var key = p.district.trim().toLowerCase();
+      if (already[key]) return;
+      already[key] = true;
+      once.push(p);
+    });
+
     var lines = [head];
     var figures = function (row, group) {
       return types.map(function (t) {
@@ -3294,7 +3306,7 @@ window.AWARD_CONFIG = {
       });
     };
 
-    places.forEach(function (place) {
+    once.forEach(function (place) {
       stockRows(fy, allRequisitions, stockMovements, [place])
         .forEach(function (row) {
           var line = [row.month, row.state, place.division || "", row.district];
@@ -3373,11 +3385,8 @@ window.AWARD_CONFIG = {
     }
 
     var known = {};
-    var ambiguous = {};
     stockPlaces().forEach(function (p) {
-      var key = p.district.trim().toLowerCase();
-      if (known[key]) ambiguous[key] = true;
-      known[key] = p;
+      known[p.district.trim().toLowerCase()] = p;
     });
 
     var seen = {};
@@ -3409,13 +3418,6 @@ window.AWARD_CONFIG = {
           '" is not a district in the staff directory' });
         return;
       }
-      if (ambiguous[name.toLowerCase()]) {
-        out.problems.push({ line: line, why: '"' + name +
-          '" is the name of more than one district, so there is no telling ' +
-          "which this is" });
-        return;
-      }
-
       var month = parseMonthCell(row[monthAt]);
       if (month.error) {
         out.problems.push({ line: line, why: month.error });
