@@ -774,6 +774,22 @@
   font-size: 13px;
   color: var(--text-soft);
 }
+.award-page .req-where span { display: inline-flex; align-items: baseline; gap: 6px; }
+.award-page .req-where span + span::before {
+  content: "";
+  width: 1px;
+  height: 11px;
+  margin-right: 9px;
+  background: var(--accent-soft-border);
+}
+.award-page .req-where i {
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
 .award-page .req-where b { font-size: 14.5px; color: var(--text); }
 .award-page .req-where.is-bad {
   display: block;
@@ -782,6 +798,60 @@
   color: var(--danger);
   line-height: 1.5;
 }
+
+/* What the district is holding, under the district that was chosen. The
+   balance column of the sheet, in the colours it wears there. */
+.award-page .req-stock {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.award-page .req-stock.is-quiet { color: var(--text-soft); font-size: 12.5px; }
+.award-page .req-stock-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  color: var(--text-soft);
+}
+.award-page .req-stock-head b { color: var(--text); }
+.award-page .req-stock-head span {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.award-page .req-stock-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.award-page .req-stock-table th,
+.award-page .req-stock-table td {
+  padding: 6px 8px;
+  font-size: 12px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+}
+.award-page .req-stock-table th {
+  background: var(--graphite-deep);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.award-page .req-stock-table th:first-child { border-top-left-radius: var(--radius-sm); }
+.award-page .req-stock-table th:last-child { border-top-right-radius: var(--radius-sm); }
+.award-page .req-stock-table td {
+  font-family: var(--font-mono);
+  background: #EEF2F6;
+  color: var(--graphite-deep);
+  font-weight: 600;
+  border-bottom: 0;
+}
+.award-page .req-stock-table td.is-total { font-weight: 700; }
+.award-page .req-stock-table td.is-nil { color: var(--text-muted); font-weight: 400; }
+.award-page .req-stock-table td.is-neg { background: var(--danger-soft); color: var(--danger); }
 
 .award-page .aw-box-sm { width: 560px; }
 

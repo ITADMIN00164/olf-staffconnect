@@ -48,6 +48,7 @@ window.AWARD_CONFIG = {
     form: document.getElementById("requisition-form"),
     district: document.getElementById("district"),
     reqWhere: document.getElementById("req-where"),
+    reqStock: document.getElementById("req-stock"),
     requesterName: document.getElementById("requester-name"),
     requesterWho: document.getElementById("requester-who"),
     requesterSub: document.getElementById("requester-sub"),
@@ -676,7 +677,9 @@ window.AWARD_CONFIG = {
 
     wireEvents();
     loadAdmins(function () { applyAccess(); renderRows(); });
-    loadStock(function () { refreshStockControls(); renderStock(); });
+    loadStock(function () {
+      refreshStockControls(); renderStock(); renderReqStock();
+    });
     loadGeography();
     loadAwardTypes();
     loadRequisitions();
@@ -746,6 +749,7 @@ window.AWARD_CONFIG = {
 
     // Put back where the last one was for, if that is still on offer.
     if (lastPlace) el.district.value = lastPlace.district;
+    renderReqStock();
 
     el.modal.classList.add("is-open");
     document.addEventListener("keydown", onModalKeydown);
@@ -1522,6 +1526,11 @@ window.AWARD_CONFIG = {
 
     el.newReqBtn.addEventListener("click", openRequisitionModal);
 
+    el.district.addEventListener("change", function () {
+      setFieldError(null, "district-error", "");
+      renderReqStock();
+    });
+
     el.awardAdd.addEventListener("click", addAwardLine);
 
     // The lines are rebuilt as they are added and removed, so the listeners
@@ -1676,13 +1685,21 @@ window.AWARD_CONFIG = {
       }
     });
 
+    // Said in words, so there is no guessing which name is which.
+    var states = [];
+    divisions.forEach(function (d) {
+      if (states.indexOf(d.state) < 0) states.push(d.state);
+    });
+    var pair = function (label, value) {
+      return "<span><i>" + label + "</i><b>" + escapeHtml(value) + "</b></span>";
+    };
+
     el.reqWhere.hidden = false;
     el.reqWhere.className = "req-where";
-    el.reqWhere.innerHTML = divisions.length === 1
-      ? "<b>" + escapeHtml(divisions[0].division) + "</b><span>" +
-        escapeHtml(divisions[0].state) + "</span>"
-      : "<b>" + escapeHtml(divisions.map(function (d) { return d.division; }).join(", ")) +
-        "</b><span>your divisions</span>";
+    el.reqWhere.innerHTML =
+      pair(states.length === 1 ? "State" : "States", states.join(", ")) +
+      pair(divisions.length === 1 ? "Division" : "Divisions",
+           divisions.map(function (d) { return d.division; }).join(", "));
 
     var html = '<option value="">Select district</option>';
     if (divisions.length === 1) {
@@ -1706,6 +1723,42 @@ window.AWARD_CONFIG = {
 
     // One district and nothing to decide: choose it.
     if (places.length === 1) el.district.value = places[0].district;
+    renderReqStock();
+  }
+
+  /* What the district is holding as things stand - the sheet's balance
+     column for one district, as at this month. Shown before anything is
+     asked for, since how much to ask for depends on it. */
+  function renderReqStock() {
+    if (!el.reqStock) return;
+
+    var district = String(el.district.value || "").trim();
+    if (!district) { el.reqStock.hidden = true; return; }
+
+    el.reqStock.hidden = false;
+
+    if (!hasStock || !awardTypes.length) {
+      el.reqStock.className = "req-stock is-quiet";
+      el.reqStock.textContent = "What " + district + " is holding is not " +
+        "available yet.";
+      return;
+    }
+
+    var monthKey = monthKeyOf(new Date());
+    var held = balanceOn(district, fyStartOf(new Date()), monthKey);
+
+    el.reqStock.className = "req-stock";
+    el.reqStock.innerHTML =
+      '<p class="req-stock-head">In stock at <b>' + escapeHtml(district) +
+        "</b><span>as at " + escapeHtml(monthLabelOf(monthKey)) + "</span></p>" +
+      '<table class="req-stock-table"><thead><tr>' +
+        awardTypes.map(function (t) {
+          return '<th class="num col-bal">' + escapeHtml(shortType(t)) + "</th>";
+        }).join("") +
+        '<th class="num col-bal is-total">Total</th>' +
+      "</tr></thead><tbody><tr>" +
+        cellsHtml(held, awardTypes, "bal", {}, false) +
+      "</tr></tbody></table>";
   }
 
   function loadGeography() {
