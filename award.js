@@ -2968,10 +2968,10 @@ window.AWARD_CONFIG = {
   var pendingEdits = {};
 
   var EDIT_COLUMNS = {
-    req: { column: "requisition", kind: "requisition", word: "requisition" },
-    del: { column: "delivery",    kind: "delivery",    word: "delivery" },
-    use: { column: "utilisation", kind: "utilised",    word: "utilisation" },
-    bal: { column: "balance",     kind: "adjustment",  word: "opening stock" }
+    req: { column: "requisition", kind: "requisition" },
+    del: { column: "delivery",    kind: "delivery" },
+    use: { column: "utilisation", kind: "utilised" },
+    bal: { column: "balance",     kind: "adjustment" }
   };
 
   function editKey(district, monthKey, col, typeId) {
@@ -3121,13 +3121,12 @@ window.AWARD_CONFIG = {
       var place = places.filter(function (p) {
         return p.district === m.district_name;
       })[0] || {};
-      var type = awardTypes.filter(function (a) {
-        return Number(a.id) === m.award_type_id;
-      })[0] || {};
-      var col = Object.keys(EDIT_COLUMNS).filter(function (c) {
-        return EDIT_COLUMNS[c].kind === m.kind;
-      })[0];
-
+      /* No note. The Remark column is for what somebody wrote about the
+         stock, and a typed figure writes a movement for the difference -
+         noting each one turned the column into a changelog, where typing 88
+         and taking it off again left "+88 · -88" against a month in which
+         nothing had happened. Who typed it and when is on the movement
+         itself. */
       return {
         kind: m.kind,
         state_name: place.state || "",
@@ -3136,8 +3135,7 @@ window.AWARD_CONFIG = {
         award_type_id: m.award_type_id,
         quantity: m.quantity,
         occurred_on: m.occurred_on,
-        note: (type.name || "Award") + " " + EDIT_COLUMNS[col].word + ": " +
-              (m.quantity > 0 ? "+" : "") + m.quantity.toLocaleString(),
+        note: null,
         recorded_by: (signedInUser() || {}).name || myEmail(),
         recorded_email: myEmail() || null
       };
