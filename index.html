@@ -2331,6 +2331,17 @@
             .dtp { width: 100%; max-width: 340px; }
         }
     </style>
+
+<!-- Award Management's styles. They live in a file rather than inside
+     pages/award-management.html because a page fragment is not a document:
+     a <style> in one does not survive tooling that rewrites HTML on its way
+     out, and the page then arrives with its markup and none of its looks.
+     Every rule in it is scoped under .award-page, so it touches nothing
+     else. -->
+<!-- The ?v= is bumped whenever award.css or award.js changes: without it
+     a browser keeps the copy it already has, and the tab carries on
+     behaving as it did before the change. -->
+<link rel="stylesheet" href="award.css?v=2026-10-19t">
 </head>
 <body>
 
@@ -2506,6 +2517,9 @@
             <button class="nav-item" data-page="pos" id="posNavBtn" onclick="navigate('pos')" title="Field Review System" hidden>
                 <span class="icon">📍</span><span class="label">Field Review System</span>
             </button>
+            <button class="nav-item" data-page="award-management" onclick="navigate('award-management')" title="Award Management">
+                <span class="icon">🏆</span><span class="label">Award Management</span>
+            </button>
             <button class="nav-item" data-page="gr" onclick="navigate('gr')" title="GRs & Circulars">
                 <span class="icon">📜</span><span class="label">GRs & Circulars</span>
             </button>
@@ -2623,5 +2637,6 @@
 <script src="pos-supabase.js"></script>
 <script src="pos.js"></script>
 <script src="pos-review.js"></script>
+<script src="award.js?v=2026-10-19t"></script>
 </body>
 </html>

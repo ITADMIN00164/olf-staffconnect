@@ -1072,9 +1072,129 @@ window.olfStaffDirectory = async function () {
     return list;
 };
 
+/* ====================================
+   WHERE THE ORGANISATION WORKS
+
+   State -> Division -> District, built from the Employees records rather
+   than kept in a second place that has to be remembered. Only Inactive
+   staff are skipped: a district nobody is posted to any more should stop
+   being offered.
+
+   Three spellings in the directory do not match the district they mean.
+   Each was checked against the division it sits under - Beed is in
+   Chhatrapati Sambhajinagar, Raigad in Konkan, Sangli in Pune - and is
+   mapped here rather than corrected in Firestore, so nothing is rewritten
+   in production and the fix stays in one visible place.
+
+   A state with no districts is left out: it cannot carry a requisition, so
+   offering it only strands whoever picks it. Delhi is the live example.
+
+   Fetched once per page load and cached, like the directory above.
+==================================== */
+
+const DISTRICT_RENAMES = {
+    "bid":        "Beed",
+    "raigarh mh": "Raigad"     // Raigarh is a Chhattisgarh district; this is Raigad
+};
+
+/* Districts as the award form should offer them.
+
+   A municipal corporation is part of its district, not a district of its
+   own, so "Sangli - MC" and "Pune - MC" are both filed under the district
+   they sit in. That is a rule rather than a list because the directory
+   gains these as it grows - Pune - MC appeared after the first three were
+   written down, and a list would have missed it.
+
+   It stays a rule about "- MC" specifically, not about suffixes generally:
+   "Janjgir - Champa" is a real district name, and dropping what follows the
+   dash would rename it. "Raigarh MH" stays in the map above for the same
+   reason - taking off the MH leaves Raigarh, which is a different district
+   in a different state. */
+function tidyDistrict(name) {
+    const trimmed = String(name || "").trim().replace(/\s*[-–]?\s*MC$/i, "").trim();
+    return DISTRICT_RENAMES[trimmed.toLowerCase()] || trimmed;
+}
+
+let orgGeography = null;
+
+window.olfGeography = async function () {
+    if (orgGeography) return orgGeography;
+
+    const snapshot = await getDocs(collection(db, "Employees"));
+
+    // state -> division -> Set(district)
+    const tree = new Map();
+
+    /* Who manages each division, for the stock sheet's PM column. A
+       Programme Manager covers one division, so the division is the link -
+       the sheet lists a PM beside every district, and that is the PM of the
+       division the district sits in. */
+    const pmOfDivision = new Map();
+
+    snapshot.forEach(d => {
+        const r = d.data();
+        if (!isActiveEmployee(r)) return;
+
+        const states    = splitMulti(r["State"]);
+        const divisions = splitMulti(r["Division"]);
+        const districts = splitMulti(r["District"]).map(tidyDistrict);
+
+        const isPM = /^program implementation\s*[-–]?\s*pm$/
+            .test(String(r["Dept"] || "").trim().toLowerCase().replace(/\s+/g, " "));
+        if (isPM) {
+            // A division can have more than one - Amravati has two and
+            // Chhatrapati Sambhajinagar three. Naming only the first would
+            // leave the others off a column that is supposed to say who
+            // manages the place.
+            for (const dv of divisions) {
+                const name = String(r.Name || "").trim();
+                if (!name) continue;
+                const list = pmOfDivision.get(dv) || [];
+                if (!list.includes(name)) list.push(name);
+                pmOfDivision.set(dv, list);
+            }
+        }
+
+        for (const st of states) {
+            if (!tree.has(st)) tree.set(st, new Map());
+            const byDiv = tree.get(st);
+            for (const dv of divisions) {
+                if (!byDiv.has(dv)) byDiv.set(dv, new Set());
+                districts.forEach(dt => byDiv.get(dv).add(dt));
+            }
+        }
+    });
+
+    const out = [];
+    for (const [state, byDiv] of tree) {
+        const divisions = [];
+        for (const [division, districts] of byDiv) {
+            if (!districts.size) continue;
+            divisions.push({
+                name: division,
+                pm: (pmOfDivision.get(division) || []).join(", "),
+                pms: pmOfDivision.get(division) || [],
+                districts: [...districts].sort((a, b) => a.localeCompare(b))
+            });
+        }
+        if (!divisions.length) continue;        // nothing selectable under it
+        divisions.sort((a, b) => a.name.localeCompare(b.name));
+        out.push({ name: state, divisions });
+    }
+    out.sort((a, b) => a.name.localeCompare(b.name));
+
+    orgGeography = out;
+    return out;
+};
+
 async function getPageHtml(page) {
     if (pageFragments.has(page)) return pageFragments.get(page);
-    const res  = await fetch(`pages/${page}.html`);
+    // Revalidate rather than trust the browser's copy. These fragments carry
+    // their own <style>, so a stale one shows new markup with old styling -
+    // which looks like a broken page rather than a cached one. Hosting already
+    // sends no-cache for HTML, so in production this costs a 304 and nothing
+    // more; locally it is the difference between seeing an edit and not.
+    const res  = await fetch(`pages/${page}.html`, { cache: "no-cache" });
     const html = await res.text();
     pageFragments.set(page, html);
     return html;
@@ -1202,6 +1322,14 @@ window.navigate = async function (page) {
         }
         if (window.SmartGoals && typeof window.SmartGoals.mount === "function") {
             window.SmartGoals.mount();
+        }
+    }
+
+    else if (page === "award-management") {
+        // award.js reads window.__olfUser / window.__olfEmployee itself for the
+        // requester, so there is nothing to inject here.
+        if (window.AwardManagement && typeof window.AwardManagement.mount === "function") {
+            window.AwardManagement.mount();
         }
     }
 
