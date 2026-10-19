@@ -3230,9 +3230,9 @@ window.AWARD_CONFIG = {
       if (inMonth(monthKeyOf(row.created_at))) {
         entries.push({
           at: row.created_at, column: "requisition",
-          what: "Requisition raised", who: row.requester_name || "",
+          what: "Raised", who: row.requester_name || "",
           quantities: quantitiesOf(row, "items"),
-          note: STAGES[stageOf(row)] ? STAGES[stageOf(row)].label : ""
+          note: stageLabel(row, false)
         });
       }
       if (stageOf(row) === "received" && inMonth(monthKeyOf(row.received_at))) {
@@ -3266,49 +3266,100 @@ window.AWARD_CONFIG = {
     });
   }
 
-  var COLUMN_WORDS = { requisition: "Requisition", delivery: "Delivery",
-                       utilisation: "Utilisation", other: "Correction" };
+  /* The groups of the sheet, in the order they read across it. */
+  var DETAIL_GROUPS = [
+    { column: "requisition", label: "Requisition", kind: "req" },
+    { column: "delivery",    label: "Delivery",    kind: "del" },
+    { column: "utilisation", label: "Utilisation", kind: "use" },
+    { column: "other",       label: "Corrections", kind: "bal" }
+  ];
 
   function openBreakdown(district, monthKey) {
     var fy = Number(el.stockYear.value) || fyStartOf(new Date());
     var entries = monthBreakdown(district, monthKey, fy);
+    var types = awardTypes;
 
     returnFocusTo = document.activeElement;
     el.detailHeading.textContent = district + " \u00b7 " +
       (monthKey ? monthLabelOf(monthKey) : "Before " + fyLabel(fy));
-    el.detailSub.textContent = entries.length === 1
-      ? "One thing happened here."
-      : entries.length + " things happened here, in order.";
 
-    if (!entries.length) {
-      el.detailBody.innerHTML =
-        '<p class="aw-empty-line">Nothing has been recorded against this ' +
-        "month. The figures beside it are what carried in from before.</p>";
-    } else {
-      el.detailBody.innerHTML =
-        '<ul class="detail-list">' + entries.map(function (e) {
-          var awards = awardTypes.filter(function (t) {
-            return e.quantities[t.id];
-          }).map(function (t) {
-            var n = e.quantities[t.id];
-            return '<span class="type-chip">' + escapeHtml(shortType(t)) +
-                   "<b>" + (n > 0 ? "" : "") + escapeHtml(n.toLocaleString()) +
-                   "</b></span>";
-          }).join(" ");
+    var carriedIn = monthKey ? balanceBefore(district, fy, monthKey) : {};
+    var left = balanceOn(district, fy, monthKey);
 
-          return '<li class="detail-row is-' + escapeHtml(e.column) + '">' +
-                   '<span class="detail-col">' +
-                     escapeHtml(COLUMN_WORDS[e.column] || e.column) + "</span>" +
-                   '<span class="detail-what"><b>' + escapeHtml(e.what) + "</b>" +
-                     (e.who ? '<span>' + escapeHtml(e.who) + "</span>" : "") +
-                     '<time>' + escapeHtml(formatTimestamp(e.at)) + "</time>" +
-                   "</span>" +
-                   '<span class="detail-awards">' + (awards || "\u2014") + "</span>" +
-                   (e.note ? '<span class="detail-note">' + escapeHtml(e.note) +
-                             "</span>" : "") +
-                 "</li>";
-        }).join("") + "</ul>";
+    el.detailSub.textContent = entries.length
+      ? (entries.length === 1 ? "One thing happened here"
+                              : entries.length + " things happened here") +
+        ", and what each of them was."
+      : "Nothing was recorded against this month.";
+
+    var figures = function (map, extra) {
+      var html = "";
+      types.forEach(function (t) {
+        var n = map[t.id] || 0;
+        html += '<td class="num' + (n ? "" : " is-nil") +
+                (n < 0 ? " is-neg" : "") + '">' +
+                (n ? escapeHtml(n.toLocaleString()) : "\u2013") + "</td>";
+      });
+      var total = sumOf(map);
+      return html + '<td class="num is-total' + (extra || "") + '">' +
+             (total ? escapeHtml(total.toLocaleString()) : "\u2013") + "</td>";
+    };
+
+    var head = "<thead><tr><th>What</th>" +
+      types.map(function (t) {
+        return '<th class="num">' + escapeHtml(shortType(t)) + "</th>";
+      }).join("") + '<th class="num">Total</th></tr></thead>';
+
+    var body = "";
+
+    DETAIL_GROUPS.forEach(function (group) {
+      var mine = entries.filter(function (e) { return e.column === group.column; });
+      if (!mine.length) return;
+
+      var sum = {};
+      mine.forEach(function (e) { addInto(sum, e.quantities); });
+
+      body += '<tr class="detail-group col-' + group.kind + '">' +
+                '<th colspan="' + (types.length + 2) + '">' +
+                  escapeHtml(group.label) +
+                  (mine.length > 1
+                     ? '<span class="detail-count">' + mine.length + "</span>"
+                     : "") +
+                "</th></tr>";
+
+      mine.forEach(function (e) {
+        body += '<tr class="detail-line">' +
+                  '<td class="detail-what"><b>' + escapeHtml(e.what) + "</b>" +
+                    (e.who ? "<span>" + escapeHtml(e.who) + "</span>" : "") +
+                    "<time>" + escapeHtml(formatTimestamp(e.at)) + "</time>" +
+                    (e.note ? '<em>' + escapeHtml(e.note) + "</em>" : "") +
+                  "</td>" + figures(e.quantities) +
+                "</tr>";
+      });
+
+      if (mine.length > 1) {
+        body += '<tr class="detail-sum"><td>Total</td>' +
+                figures(sum, " is-strong") + "</tr>";
+      }
+    });
+
+    /* The balance is not one of the things that happened - it is where they
+       leave the district. Shown last, as the sheet shows it. */
+    body += '<tr class="detail-group col-bal"><th colspan="' + (types.length + 2) +
+            '">Stock balance</th></tr>';
+    if (monthKey) {
+      body += '<tr class="detail-line"><td class="detail-what">' +
+              "<b>Carried in</b><time>from the month before</time></td>" +
+              figures(carriedIn) + "</tr>";
     }
+    body += '<tr class="detail-line is-final"><td class="detail-what"><b>' +
+            (monthKey ? "Left at the end of " + escapeHtml(monthLabelOf(monthKey))
+                      : "Carried into " + escapeHtml(fyLabel(fy))) +
+            "</b></td>" + figures(left, " is-strong") + "</tr>";
+
+    el.detailBody.innerHTML =
+      '<div class="table-scroll"><table class="detail-table">' +
+      head + "<tbody>" + body + "</tbody></table></div>";
 
     el.detailModal.classList.add("is-open");
     document.addEventListener("keydown", onDetailKeydown);

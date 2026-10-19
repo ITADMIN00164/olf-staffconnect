@@ -1206,50 +1206,84 @@
 }
 .award-page .stock-howto b { color: var(--text-soft); font-weight: 600; }
 
-/* What a month's figures are made of, one line per thing that happened,
-   each carrying the colour of the column it lands in. */
-.award-page .detail-list { list-style: none; margin: 0; padding: 0; display: grid;
-                           gap: 8px; }
-.award-page .detail-row {
-  display: grid;
-  grid-template-columns: 94px minmax(0, 1fr) auto;
-  gap: 6px 12px;
-  align-items: baseline;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-}
-.award-page .detail-row.is-requisition { border-left-color: #64748B; }
-.award-page .detail-row.is-delivery    { border-left-color: var(--good); }
-.award-page .detail-row.is-utilisation { border-left-color: var(--warn); }
-.award-page .detail-row.is-other       { border-left-color: var(--accent); }
-
-.award-page .detail-col {
+/* The breakdown reads the way the sheet does: the same award columns, the
+   things that happened grouped under the column each lands in, and the
+   balance last. */
+.award-page .detail-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.award-page .detail-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--graphite);
+  color: #fff;
   font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  text-align: left;
+  padding: 8px 10px;
+  white-space: nowrap;
+}
+.award-page .detail-table th.num, .award-page .detail-table td.num {
+  text-align: right;
+  font-family: var(--font-mono);
+}
+.award-page .detail-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.award-page .detail-table td.is-nil { color: var(--text-muted); }
+.award-page .detail-table td.is-total { font-weight: 700; }
+.award-page .detail-table td.is-strong { color: var(--graphite-deep); }
+.award-page .detail-table td.is-neg { color: var(--danger); font-weight: 700; }
+
+.award-page .detail-group th {
+  padding: 10px 10px 5px;
+  text-align: left;
+  font-size: 10.5px;
   font-weight: 700;
   letter-spacing: .06em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  border-bottom: 2px solid currentColor;
 }
-.award-page .detail-what { font-size: 13px; color: var(--text-soft); min-width: 0; }
-.award-page .detail-what b { color: var(--text); }
-.award-page .detail-what span::before { content: " b7"; margin: 0 5px; }
-.award-page .detail-what time { display: block; font-family: var(--font-mono);
-                                font-size: 10.5px; color: var(--text-muted); }
-.award-page .detail-awards { text-align: right; white-space: normal; max-width: 230px; }
-.award-page .detail-note {
-  grid-column: 2 / -1;
-  font-size: 11.5px;
-  font-style: italic;
-  color: var(--text-muted);
+.award-page .detail-group.col-req th { color: #64748B; }
+.award-page .detail-group.col-del th { color: var(--good); }
+.award-page .detail-group.col-use th { color: var(--warn); }
+.award-page .detail-group.col-bal th { color: var(--graphite-deep); }
+.award-page .detail-count {
+  display: inline-block;
+  margin-left: 7px;
+  min-width: 17px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: currentColor;
+  color: var(--surface);
+  text-align: center;
+  font-size: 10px;
 }
 
-@media (max-width: 640px) {
-  .award-page .detail-row { grid-template-columns: 1fr; }
-  .award-page .detail-awards { text-align: left; }
+/* The tab's tables never wrap; this one has sentences in a column, so here
+   it does. */
+.award-page .detail-table td { white-space: normal; }
+.award-page .detail-table td.num { white-space: nowrap; }
+.award-page .detail-what { min-width: 180px; }
+
+/* A long month keeps the dialog a sensible height and scrolls inside it. */
+.award-page #detail-body .table-scroll { max-height: 56vh; border: 1px solid var(--border); }
+.award-page .detail-what b { font-weight: 600; color: var(--text); }
+.award-page .detail-what span::before { content: "·"; margin: 0 5px;
+                                        color: var(--text-muted); }
+.award-page .detail-what span { color: var(--text-soft); }
+.award-page .detail-what time,
+.award-page .detail-what em {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-style: normal;
+  color: var(--text-muted);
 }
+.award-page .detail-what em { font-family: var(--font-sans); font-style: italic; }
+
+.award-page .detail-sum td { background: var(--surface-alt); font-weight: 600; }
+.award-page .detail-line.is-final td { background: #EEF2F6; font-weight: 700; }
+.award-page .detail-table tbody tr:hover td { background: var(--accent-soft); }
+.award-page .detail-table tbody tr.detail-group:hover th { background: transparent; }
 
 /* What is waiting to be saved, and the two ways out of it. */
 .award-page .stock-editbar {
