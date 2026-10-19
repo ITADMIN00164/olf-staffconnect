@@ -2884,6 +2884,12 @@ window.AWARD_CONFIG = {
 
     var waiting = countPendingEdits();
     wrap.innerHTML =
+      (canSetStock()
+        ? '<p class="stock-howto">Click a cell with a line under it to type a ' +
+          "figure — <b>Requisition</b>, <b>Delivery</b> and <b>Utilisation</b> " +
+          "on any month that has happened, and the opening <b>Balance</b> on the " +
+          "carry-forward row. The rest is added up.</p>"
+        : "") +
       '<div class="stock-editbar" id="stock-editbar"' + (waiting ? "" : " hidden") + ">" +
         "<span>" + (waiting === 1 ? "One figure changed"
                                   : waiting + " figures changed") +
