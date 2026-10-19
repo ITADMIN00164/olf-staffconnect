@@ -3281,7 +3281,7 @@ window.AWARD_CONFIG = {
      The places are the staff directory's - the same ones the sheet and the
      requisition form read. */
   function stockTemplate(fy, places, types) {
-    var head = ["Month", "District", "State", "Division"];
+    var head = ["Month", "State", "Division", "District"];
     CSV_GROUPS.forEach(function (g) {
       types.forEach(function (t) { head.push(g.label + " " + shortType(t)); });
     });
@@ -3297,7 +3297,7 @@ window.AWARD_CONFIG = {
     places.forEach(function (place) {
       stockRows(fy, allRequisitions, stockMovements, [place])
         .forEach(function (row) {
-          var line = [row.month, row.district, row.state, place.division || ""];
+          var line = [row.month, row.state, place.division || "", row.district];
           CSV_GROUPS.forEach(function (g) {
             /* The carry forward is one opening balance and nothing else;
                every other month is the three that are recorded. Blank is
