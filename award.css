@@ -1285,10 +1285,6 @@
 .award-page .detail-what em { font-family: var(--font-sans); font-style: italic; }
 
 .award-page .detail-sum td { background: var(--surface-alt); font-weight: 600; }
-/* The steps of the sum, quieter than the figure they arrive at. */
-.award-page .detail-line.is-step td { color: var(--text-soft); }
-.award-page .detail-line.is-step .detail-what b { font-weight: 500; }
-.award-page .detail-line.is-final td { background: #EEF2F6; font-weight: 700; }
 .award-page .detail-table tbody tr:hover td { background: var(--accent-soft); }
 .award-page .detail-table tbody tr.detail-group:hover th { background: transparent; }
 
@@ -1347,51 +1343,6 @@
   padding: 4px 0;
 }
 .award-page .stock-line label { font-size: 13px; color: var(--text); }
-
-/* A month filled in by hand reads the way the sheet does: one row per award,
-   the three figures that are typed, and the balance they come to. */
-.award-page .award-lines.is-grid { display: grid; gap: 2px; }
-.award-page .stock-grid-head,
-.award-page .stock-line.is-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1.6fr) repeat(4, minmax(64px, 0.8fr));
-  gap: 8px;
-  align-items: center;
-}
-.award-page .stock-grid-head span {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  text-align: right;
-  padding-bottom: 4px;
-}
-.award-page .stock-grid-head span:first-child { text-align: left; }
-.award-page .stock-line.is-row label { font-size: 12.5px; }
-.award-page .stock-line.is-row input { text-align: right; padding: 7px 9px; }
-.award-page .stock-bal {
-  text-align: right;
-  padding: 7px 9px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--graphite-deep);
-  background: #EEF2F6;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-}
-.award-page .stock-bal.is-neg { background: var(--danger-soft); color: var(--danger);
-                                border-color: var(--danger-soft-border); }
-
-@media (max-width: 640px) {
-  .award-page .stock-grid-head { display: none; }
-  .award-page .stock-line.is-row { grid-template-columns: 1fr 1fr; }
-  .award-page .stock-line.is-row label { grid-column: 1 / -1; }
-}
-.award-page .stock-line label .hint { display: block; }
-/* Nothing held, nothing to give out. */
-.award-page .stock-line.is-empty label { color: var(--text-muted); }
-.award-page .stock-line.is-empty input { background: var(--surface-alt); cursor: not-allowed; }
 
 /* Where and when, from the row this was opened from. */
 .award-page .stock-where {

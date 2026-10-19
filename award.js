@@ -1442,8 +1442,7 @@ window.AWARD_CONFIG = {
 
         var btn = event.target.closest("[data-aw-row-act]");
         if (btn) {
-          openStockModal(btn.getAttribute("data-aw-row-act"),
-                         { district: btn.getAttribute("data-aw-where"),
+          openStockModal({ district: btn.getAttribute("data-aw-where"),
                            month: btn.getAttribute("data-aw-month") });
           return;
         }
@@ -1490,7 +1489,6 @@ window.AWARD_CONFIG = {
     // this the message sits there contradicting what is now on screen.
     el.stockLines.addEventListener("input", function () {
       setFieldError(null, "stock-qty-error", "");
-      retotalStock();
     });
     el.hoLines.addEventListener("input", function () {
       setFieldError(null, "ho-lines-error", "");
@@ -2957,10 +2955,6 @@ window.AWARD_CONFIG = {
     return code || t.name;
   }
 
-  /* Recording what went out, or setting what a district holds. One dialog:
-     the two differ only in what the number means. */
-  var stockKind = "utilised";
-
   /* Setting a district's figures by hand is an administrator's job: it is
      how the first year's numbers get in, and how a miscount is put right. It
      writes a correction, so the balance is still added up from what moved. */
@@ -3283,9 +3277,6 @@ window.AWARD_CONFIG = {
     el.detailHeading.textContent = district + " \u00b7 " +
       (monthKey ? monthLabelOf(monthKey) : "Before " + fyLabel(fy));
 
-    var carriedIn = monthKey ? balanceBefore(district, fy, monthKey) : {};
-    var left = balanceOn(district, fy, monthKey);
-
     el.detailSub.textContent = entries.length
       ? (entries.length === 1 ? "One thing happened here"
                               : entries.length + " things happened here") +
@@ -3343,45 +3334,6 @@ window.AWARD_CONFIG = {
       }
     });
 
-    /* The balance is not one of the things that happened - it is where they
-       leave the district. The sum that arrives at it is written out line by
-       line, so the last figure does not have to be taken on trust. */
-    body += '<tr class="detail-group col-bal"><th colspan="' + (types.length + 2) +
-            '">Stock balance</th></tr>';
-
-    if (monthKey) {
-      var months = fyMonthKeys(fy);
-      var before = months.indexOf(monthKey) > 0
-        ? monthLabelOf(months[months.indexOf(monthKey) - 1])
-        : "before " + fyLabel(fy);
-
-      var totalOf = function (column) {
-        var sum = {};
-        entries.filter(function (e) { return e.column === column; })
-               .forEach(function (e) { addInto(sum, e.quantities); });
-        return sum;
-      };
-      var corrections = totalOf("other");
-
-      body += '<tr class="detail-line"><td class="detail-what">' +
-              "<b>Brought forward</b><time>what " + escapeHtml(before) +
-              " left</time></td>" + figures(carriedIn) + "</tr>" +
-              '<tr class="detail-line is-step"><td class="detail-what">' +
-              "<b>Add what arrived</b></td>" + figures(totalOf("delivery")) + "</tr>" +
-              '<tr class="detail-line is-step"><td class="detail-what">' +
-              "<b>Less what was given out</b></td>" +
-              figures(totalOf("utilisation")) + "</tr>" +
-              (sumOf(corrections)
-                ? '<tr class="detail-line is-step"><td class="detail-what">' +
-                  "<b>Figures set by hand</b></td>" + figures(corrections) + "</tr>"
-                : "");
-    }
-
-    body += '<tr class="detail-line is-final"><td class="detail-what"><b>' +
-            (monthKey ? "Left at the end of " + escapeHtml(monthLabelOf(monthKey))
-                      : "Carried into " + escapeHtml(fyLabel(fy))) +
-            "</b></td>" + figures(left, " is-strong") + "</tr>";
-
     el.detailBody.innerHTML =
       '<div class="table-scroll"><table class="detail-table">' +
       head + "<tbody>" + body + "</tbody></table></div>";
@@ -3419,31 +3371,19 @@ window.AWARD_CONFIG = {
      have no row in the sheet yet and so has to be chosen. */
   var stockCtx = null;
 
-  function openStockModal(kind, ctx) {
-    var setting = kind === "set";
-    if (setting && !canSetStock()) return;
-
+  function openStockModal(ctx) {
     // Where and when are the row's, not a form's.
     var where = placesIMayRecord().filter(function (p) {
       return String(p.district).trim().toLowerCase() ===
              String((ctx && ctx.district) || "").trim().toLowerCase();
     })[0];
-    if (!where && setting) {
-      // An administrator may set any district's figures, whether or not they
-      // work that division.
-      where = stockPlaces().filter(function (p) {
-        return String(p.district).trim().toLowerCase() ===
-               String((ctx && ctx.district) || "").trim().toLowerCase();
-      })[0];
-    }
     if (!where) return;
 
     var fy = Number(el.stockYear.value) || fyStartOf(new Date());
     var monthKey = (ctx && ctx.month) || "";
-    if (!setting && !monthKey) return;            // use is recorded in a month
+    if (!monthKey) return;                        // use is recorded in a month
     if (!monthHasHappened(monthKey, fy)) return;  // and not in a month to come
 
-    stockKind = kind;
     stockCtx = { state: where.state, division: where.division,
                  district: where.district, month: monthKey, fy: fy,
                  // The carry-forward row belongs to the March before the year
@@ -3452,75 +3392,35 @@ window.AWARD_CONFIG = {
 
     returnFocusTo = document.activeElement;
 
-    var carry = !monthKey;
-
-    el.stockHeading.textContent = !setting ? "Record utilisation"
-      : carry ? "Opening stock" : "Set this month's figures";
-    el.stockSub.textContent = !setting
-      ? "Awards handed out. This comes off what the district is holding."
-      : carry
-        ? "What the district was holding before the year started. It carries " +
-          "into April and every month after."
-        : "What the sheet should read for this month. The balance follows " +
-          "from what arrived and what was given out.";
-    el.stockFLabel.textContent = !setting ? "How many were given out"
-      : carry ? "What it was holding" : "Figures for this month";
-    el.stockSave.textContent = setting ? "Save figures" : "Record";
+    el.stockHeading.textContent = "Record utilisation";
+    el.stockSub.textContent =
+      "Awards handed out. This comes off what the district is holding.";
+    el.stockFLabel.textContent = "How many were given out";
+    el.stockSave.textContent = "Record";
 
     el.stockWhere.innerHTML =
       '<b>' + escapeHtml(stockCtx.district) + "</b>" +
       '<span>' + escapeHtml(stockCtx.division || "") +
         (stockCtx.division ? ", " : "") + escapeHtml(stockCtx.state) + "</span>" +
-      '<em>' + escapeHtml(monthKey ? monthLabelOf(monthKey)
-                                   : "Before " + fyLabel(fy)) + "</em>";
+      '<em>' + escapeHtml(monthLabelOf(monthKey)) + "</em>";
 
-    /* What the sheet reads for this month now. An administrator types over
-       these; everyone else is giving out awards, and only needs to know how
-       many there are to give. */
+    // What there is to give out, which is the ceiling for what is typed.
     var held = balanceOn(stockCtx.district, fy, monthKey);
-    var opening = carry ? {} : balanceBefore(stockCtx.district, fy, monthKey);
-    var figures = setting && !carry ? figuresOn(stockCtx.district, fy, monthKey) : null;
 
-    el.stockLines.classList.toggle("is-grid", !!figures);
-    el.stockLines.innerHTML = (figures
-      ? '<div class="stock-grid-head"><span></span><span>Requisition</span>' +
-        "<span>Delivery</span><span>Utilisation</span><span>Balance</span></div>"
-      : "") +
-      awardTypes.map(function (t) {
-        var have = held[t.id] || 0;
-
-        if (figures) {
-          return '<div class="stock-line is-row" data-type="' + escapeHtml(t.id) + '">' +
-                 "<label>" + escapeHtml(t.name) + "</label>" +
-                 ["requisition", "delivery", "utilisation"].map(function (col) {
-                   return '<input type="number" class="mono stock-fig" data-col="' + col +
-                          '" data-type="' + escapeHtml(t.id) +
-                          '" data-have="' + (figures[col][t.id] || 0) +
-                          '" min="0" max="1000000" step="1" value="' +
-                          (figures[col][t.id] || 0) + '" />';
-                 }).join("") +
-                 '<output class="stock-bal mono" data-type="' + escapeHtml(t.id) +
-                 '" data-opening="' + (opening[t.id] || 0) + '">' +
-                 escapeHtml(have.toLocaleString()) + "</output>" +
-                 "</div>";
-        }
-
-        var none = !setting && have === 0;
-        return '<div class="stock-line' + (none ? " is-empty" : "") + '">' +
-               "<label>" + escapeHtml(t.name) +
-                 '<span class="hint">' +
-                   (have ? escapeHtml(have.toLocaleString()) + " in stock"
-                         : "none in stock") +
-                 "</span>" +
-               "</label>" +
-               '<input type="number" class="mono stock-qty" data-type="' + escapeHtml(t.id) +
-               '" data-have="' + have + '" min="0"' +
-               (setting ? ' max="1000000" value="' + have + '"'
-                        : ' max="' + have + '" placeholder="0"') +
-               ' step="1"' + (none ? " disabled" : "") + " /></div>";
-      }).join("");
-
-    if (figures) retotalStock();
+    el.stockLines.innerHTML = awardTypes.map(function (t) {
+      var have = held[t.id] || 0;
+      return '<div class="stock-line' + (have ? "" : " is-empty") + '">' +
+             "<label>" + escapeHtml(t.name) +
+               '<span class="hint">' +
+                 (have ? escapeHtml(have.toLocaleString()) + " in stock"
+                       : "none in stock") +
+               "</span>" +
+             "</label>" +
+             '<input type="number" class="mono stock-qty" data-type="' + escapeHtml(t.id) +
+             '" data-have="' + have + '" min="0" max="' + have +
+             '" step="1" placeholder="0"' + (have ? "" : " disabled") +
+             " /></div>";
+    }).join("");
 
     el.stockNote.value = "";
     setFieldError(null, "stock-qty-error", "");
@@ -3545,52 +3445,6 @@ window.AWARD_CONFIG = {
   function onStockKeydown(e) {
     if (e.key === "Escape") { e.stopPropagation(); closeStockModal(); }
   }
-
-  /* The balance each award would carry out of the month, as the figures
-     are typed. What it opened with, plus what arrived, less what went out -
-     the same arithmetic the sheet does, said back while there is still time
-     to correct it. */
-  function retotalStock() {
-    Array.prototype.forEach.call(el.stockLines.querySelectorAll(".stock-bal"),
-      function (out) {
-        var id = out.getAttribute("data-type");
-        var at = function (col) {
-          var box = el.stockLines.querySelector(
-            '.stock-fig[data-col="' + col + '"][data-type="' + id + '"]');
-          var n = Number(String((box && box.value) || "").trim());
-          return Number.isFinite(n) ? n : 0;
-        };
-        var n = Number(out.getAttribute("data-opening")) + at("delivery") -
-                at("utilisation");
-        out.textContent = n.toLocaleString();
-        out.classList.toggle("is-neg", n < 0);
-      });
-  }
-
-  /* What the sheet reads for one month, so the boxes open on the figures
-     already there rather than on nothing. */
-  function figuresOn(district, fy, monthKey) {
-    var rows = stockRows(fy, allRequisitions, stockMovements,
-                         [{ state: "", division: "", district: district, pm: "" }]);
-    for (var i = 0; i < rows.length; i++) {
-      if (rows[i].monthKey === monthKey) {
-        return { requisition: rows[i].requisition,
-                 delivery: rows[i].delivery,
-                 utilisation: rows[i].utilisation };
-      }
-    }
-    return { requisition: {}, delivery: {}, utilisation: {} };
-  }
-
-  // What it carried into the month, which is the month before's balance.
-  function balanceBefore(district, fy, monthKey) {
-    var keys = fyMonthKeys(fy);
-    var at = keys.indexOf(monthKey);
-    return balanceOn(district, fy, at > 0 ? keys[at - 1] : "");
-  }
-
-  var FIGURE_KINDS = { requisition: "requisition", delivery: "delivery",
-                       utilisation: "utilised" };
 
   // One movement, ready to write.
   function movementRow(kind, awardTypeId, quantity, note) {
@@ -3657,87 +3511,41 @@ window.AWARD_CONFIG = {
       return;
     }
 
-    var setting = stockKind === "set";
     var rows = [];
     var fault = "";
 
-    var whole = function (input) {
-      var raw = String(input.value || "").trim();
-      if (!raw) return 0;
-      var n = Number(raw);
-      return Number.isInteger(n) && n >= 0 ? n : null;
-    };
     var nameOf = function (id) {
       var t = awardTypes.filter(function (a) { return Number(a.id) === Number(id); })[0];
       return (t && t.name) || "that award";
     };
 
-    /* A month filled in by hand. Each box says what the sheet should read,
-       and what is written is the difference between that and what it reads
-       now - so a figure typed over a real requisition adds to it rather than
-       pretending the requisition never happened. */
-    var grid = el.stockLines.querySelectorAll(".stock-fig");
-    if (grid.length) {
-      Array.prototype.forEach.call(grid, function (input) {
-        var n = whole(input);
-        var id = Number(input.getAttribute("data-type"));
-        var col = input.getAttribute("data-col");
+    Array.prototype.forEach.call(el.stockLines.querySelectorAll(".stock-qty"),
+      function (input) {
+        var raw = String(input.value || "").trim();
+        if (!raw) return;
 
-        if (n === null) {
-          if (!fault) fault = "Figures are whole numbers, nothing or more.";
+        var n = Number(raw);
+        var have = Number(input.getAttribute("data-have")) || 0;
+        var id = Number(input.getAttribute("data-type"));
+
+        if (!Number.isInteger(n) || n < 1) {
+          if (!fault) fault = "Quantities are whole numbers of 1 or more.";
           return;
         }
-        var have = Number(input.getAttribute("data-have")) || 0;
-        if (n === have) return;                   // nothing to record
-
-        rows.push(movementRow(FIGURE_KINDS[col], id, n - have,
-          nameOf(id) + " " + col + ": " + have.toLocaleString() +
-          " \u2192 " + n.toLocaleString()));
-      });
-
-    } else {
-      Array.prototype.forEach.call(el.stockLines.querySelectorAll(".stock-qty"),
-        function (input) {
-          var raw = String(input.value || "").trim();
-          if (!raw) return;
-
-          var n = whole(input);
-          var have = Number(input.getAttribute("data-have")) || 0;
-          var id = Number(input.getAttribute("data-type"));
-
-          if (setting) {
-            if (n === null) {
-              if (!fault) fault = "Figures are whole numbers, nothing or more.";
-              return;
-            }
-            if (n === have) return;
-            rows.push(movementRow("adjustment", id, n - have,
-              nameOf(id) + ": " + have.toLocaleString() + " \u2192 " +
-              n.toLocaleString()));
-
-          } else {
-            if (n === null || n < 1) {
-              if (!fault) fault = "Quantities are whole numbers of 1 or more.";
-              return;
-            }
-            if (n > have) {
-              if (!fault) {
-                fault = stockCtx.district + " is holding " + have.toLocaleString() +
-                        " " + nameOf(id) + " in " + monthLabelOf(stockCtx.month) +
-                        ", so it cannot give out " + n.toLocaleString() + ".";
-              }
-              return;
-            }
-            rows.push(movementRow("utilised", id, n, null));
+        if (n > have) {
+          if (!fault) {
+            fault = stockCtx.district + " is holding " + have.toLocaleString() +
+                    " " + nameOf(id) + " in " + monthLabelOf(stockCtx.month) +
+                    ", so it cannot give out " + n.toLocaleString() + ".";
           }
-        });
-    }
+          return;
+        }
+        rows.push(movementRow("utilised", id, n, null));
+      });
 
     if (fault) { setFieldError(null, "stock-qty-error", fault); return; }
     if (!rows.length) {
-      setFieldError(null, "stock-qty-error", setting
-        ? "Nothing is different from what is already recorded."
-        : "Enter at least one quantity.");
+      setFieldError(null, "stock-qty-error", "Enter at least one quantity.");
       return;
     }
     setFieldError(null, "stock-qty-error", "");
@@ -3772,8 +3580,7 @@ window.AWARD_CONFIG = {
         }
         var where = stockCtx.district;
         closeStockModal();
-        showListBanner((stockKind === "set" ? "Stock set for "
-                                            : "Utilisation recorded for ") + where + ".");
+        showListBanner("Utilisation recorded for " + where + ".");
         loadStock(function () { stockShown = true; renderStock(); });
       })
       .catch(function (err) {
