@@ -1246,16 +1246,20 @@
 .award-page .detail-group.col-del th { color: var(--good); }
 .award-page .detail-group.col-use th { color: var(--warn); }
 .award-page .detail-group.col-bal th { color: var(--graphite-deep); }
+/* How many of them there were. The background cannot be currentColor while
+   the text sets its own colour - the background resolves against the new
+   one, and the pill came out white on white. */
 .award-page .detail-count {
   display: inline-block;
   margin-left: 7px;
-  min-width: 17px;
-  padding: 1px 6px;
+  min-width: 18px;
+  padding: 0 6px;
+  border: 1px solid currentColor;
   border-radius: 999px;
-  background: currentColor;
-  color: var(--surface);
+  background: var(--surface);
   text-align: center;
   font-size: 10px;
+  line-height: 15px;
 }
 
 /* The tab's tables never wrap; this one has sentences in a column, so here
