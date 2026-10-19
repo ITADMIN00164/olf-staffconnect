@@ -82,6 +82,10 @@ window.AWARD_CONFIG = {
     stockFetch: document.getElementById("stock-fetch"),
     stockWhere: document.getElementById("stock-where"),
     stockModal: document.getElementById("stock-modal"),
+    detailModal: document.getElementById("detail-modal"),
+    detailHeading: document.getElementById("detail-heading"),
+    detailSub: document.getElementById("detail-sub"),
+    detailBody: document.getElementById("detail-body"),
     stockHeading: document.getElementById("stock-heading"),
     stockSub: document.getElementById("stock-sub"),
     stockFLabel: document.getElementById("stock-f-label"),
@@ -1447,8 +1451,21 @@ window.AWARD_CONFIG = {
         if (event.target.id === "stock-edit-save")    { saveStockEdits(); return; }
         if (event.target.id === "stock-edit-discard") { discardStockEdits(); return; }
 
+        /* A cell that takes a figure is for typing in, and it has to be
+           asked about before the row it sits in: the row carries the
+           breakdown, so looking for that first would mean a cell could
+           never be reached. */
         var cell = event.target.closest("td.is-editable");
-        if (cell) startCellEdit(cell);
+        if (cell) { startCellEdit(cell); return; }
+
+        /* The button at the end, or anywhere else on a row with something
+           behind it - the sheet is wide enough that the button is often off
+           the side of the screen. */
+        var detail = event.target.closest("[data-aw-detail]");
+        if (detail) {
+          openBreakdown(detail.getAttribute("data-aw-where"),
+                        detail.getAttribute("data-aw-detail"));
+        }
       });
 
       // The same cells by keyboard, since a sheet is filled in by typing.
@@ -1464,6 +1481,10 @@ window.AWARD_CONFIG = {
     Array.prototype.forEach.call(
       el.stockModal.querySelectorAll("[data-aw-close-stock]"),
       function (n) { n.addEventListener("click", closeStockModal); }
+    );
+    Array.prototype.forEach.call(
+      el.detailModal.querySelectorAll("[data-aw-close-detail]"),
+      function (n) { n.addEventListener("click", closeBreakdown); }
     );
     // A complaint about a figure should not outlive the figure. Without
     // this the message sits there contradicting what is now on screen.
@@ -2864,7 +2885,12 @@ window.AWARD_CONFIG = {
          sheet. The carry forward has none of them - it is one opening
          figure - so there the balance itself is what gets typed. */
       var mayEdit = happened && canSetStock();
-      return '<tr class="' + (carry ? "is-carry" : "") + '">' +
+      var tellable = hasAnything(r);
+      return '<tr class="' + (carry ? "is-carry" : "") +
+             (tellable ? " is-tellable" : "") + '"' +
+             (tellable ? ' data-aw-detail="' + escapeHtml(r.monthKey) +
+                         '" data-aw-where="' + escapeHtml(r.district) + '"' : "") +
+             ">" +
         '<td class="col-month">' + escapeHtml(r.month) + "</td>" +
         '<td class="col-district is-district">' + escapeHtml(r.district) + "</td>" +
         "<td>" + escapeHtml(r.state) + "</td>" +
@@ -2877,6 +2903,11 @@ window.AWARD_CONFIG = {
         '<td class="cell-remark-col" title="' + escapeHtml(r.remark || "") + '">' +
           escapeHtml(r.remark || "") + "</td>" +
         '<td class="col-act">' +
+          (tellable
+            ? '<button type="button" class="btn btn-ghost btn-xs" ' +
+              'data-aw-detail="' + escapeHtml(r.monthKey) + '" data-aw-where="' +
+              escapeHtml(r.district) + '">Breakdown</button>'
+            : "") +
           (mayUse ? rowActionHtml("utilised", "Record use", r) : "") +
         "</td>" +
       "</tr>";
@@ -2901,6 +2932,13 @@ window.AWARD_CONFIG = {
       "</div>" +
       '<p class="error" id="stock-edit-error" hidden role="alert"></p>' +
       '<table id="stock-table">' + head + "<tbody>" + body + "</tbody></table>";
+  }
+
+  // A row with nothing in any of its own columns has nothing to break down;
+  // its balance is only what carried in from an earlier month.
+  function hasAnything(r) {
+    return !!(sumOf(r.requisition) || sumOf(r.delivery) || sumOf(r.utilisation) ||
+              (r.monthKey === "" && sumOf(r.balance)));
   }
 
   function rowActionHtml(kind, label, r) {
@@ -3168,6 +3206,128 @@ window.AWARD_CONFIG = {
         if (bar) bar.disabled = false;
         showStockEditError("Could not save: " + messageOf(err));
       });
+  }
+
+  /* ---------------------------------------------------------- breakdown
+
+     A month's figure is often several things added together - two
+     requisitions raised in the same month show as one number, and there is
+     no way to tell from the sheet which. This lists what went into it:
+     every requisition, arrival, utilisation and typed figure behind the row,
+     in the order it happened. */
+  function monthBreakdown(district, monthKey, fy) {
+    var want = String(district || "").trim().toLowerCase();
+    var mine = function (row) {
+      return String(row.district_name || "").trim().toLowerCase() === want;
+    };
+    var inMonth = function (key) {
+      return monthKey ? key === monthKey : fyStartsBefore(key, fy);
+    };
+
+    var entries = [];
+
+    allRequisitions.filter(mine).forEach(function (row) {
+      if (inMonth(monthKeyOf(row.created_at))) {
+        entries.push({
+          at: row.created_at, column: "requisition",
+          what: "Requisition raised", who: row.requester_name || "",
+          quantities: quantitiesOf(row, "items"),
+          note: STAGES[stageOf(row)] ? STAGES[stageOf(row)].label : ""
+        });
+      }
+      if (stageOf(row) === "received" && inMonth(monthKeyOf(row.received_at))) {
+        entries.push({
+          at: row.received_at, column: "delivery",
+          what: "Arrived", who: row.received_by || row.requester_name || "",
+          quantities: quantitiesOf(row, "dispatched"),
+          note: row.receipt_note || ""
+        });
+      }
+    });
+
+    stockMovements.filter(mine).forEach(function (m) {
+      if (!inMonth(monthKeyOf(m.occurred_on))) return;
+      var kind = MOVEMENT_KINDS[m.kind] || MOVEMENT_KINDS.adjustment;
+      var q = {};
+      q[Number(m.award_type_id)] = Number(m.quantity) || 0;
+
+      entries.push({
+        at: m.created_at || m.occurred_on,
+        column: kind.column,
+        what: m.kind === "utilised" ? "Given out" : "Typed in",
+        who: m.recorded_by || "",
+        quantities: q,
+        note: m.note || ""
+      });
+    });
+
+    return entries.sort(function (a, b) {
+      return String(a.at).localeCompare(String(b.at));
+    });
+  }
+
+  var COLUMN_WORDS = { requisition: "Requisition", delivery: "Delivery",
+                       utilisation: "Utilisation", other: "Correction" };
+
+  function openBreakdown(district, monthKey) {
+    var fy = Number(el.stockYear.value) || fyStartOf(new Date());
+    var entries = monthBreakdown(district, monthKey, fy);
+
+    returnFocusTo = document.activeElement;
+    el.detailHeading.textContent = district + " \u00b7 " +
+      (monthKey ? monthLabelOf(monthKey) : "Before " + fyLabel(fy));
+    el.detailSub.textContent = entries.length === 1
+      ? "One thing happened here."
+      : entries.length + " things happened here, in order.";
+
+    if (!entries.length) {
+      el.detailBody.innerHTML =
+        '<p class="aw-empty-line">Nothing has been recorded against this ' +
+        "month. The figures beside it are what carried in from before.</p>";
+    } else {
+      el.detailBody.innerHTML =
+        '<ul class="detail-list">' + entries.map(function (e) {
+          var awards = awardTypes.filter(function (t) {
+            return e.quantities[t.id];
+          }).map(function (t) {
+            var n = e.quantities[t.id];
+            return '<span class="type-chip">' + escapeHtml(shortType(t)) +
+                   "<b>" + (n > 0 ? "" : "") + escapeHtml(n.toLocaleString()) +
+                   "</b></span>";
+          }).join(" ");
+
+          return '<li class="detail-row is-' + escapeHtml(e.column) + '">' +
+                   '<span class="detail-col">' +
+                     escapeHtml(COLUMN_WORDS[e.column] || e.column) + "</span>" +
+                   '<span class="detail-what"><b>' + escapeHtml(e.what) + "</b>" +
+                     (e.who ? '<span>' + escapeHtml(e.who) + "</span>" : "") +
+                     '<time>' + escapeHtml(formatTimestamp(e.at)) + "</time>" +
+                   "</span>" +
+                   '<span class="detail-awards">' + (awards || "\u2014") + "</span>" +
+                   (e.note ? '<span class="detail-note">' + escapeHtml(e.note) +
+                             "</span>" : "") +
+                 "</li>";
+        }).join("") + "</ul>";
+    }
+
+    el.detailModal.classList.add("is-open");
+    document.addEventListener("keydown", onDetailKeydown);
+    scrollLockedAt = window.scrollY;
+    document.body.style.overflow = "hidden";
+    el.detailModal.querySelector("[data-aw-close-detail]").focus();
+  }
+
+  function closeBreakdown() {
+    el.detailModal.classList.remove("is-open");
+    document.removeEventListener("keydown", onDetailKeydown);
+    document.body.style.overflow = "";
+    if (scrollLockedAt !== null) { window.scrollTo(0, scrollLockedAt); scrollLockedAt = null; }
+    if (returnFocusTo && typeof returnFocusTo.focus === "function") returnFocusTo.focus();
+    returnFocusTo = null;
+  }
+
+  function onDetailKeydown(e) {
+    if (e.key === "Escape") { e.stopPropagation(); closeBreakdown(); }
   }
 
   // Whether this district is one of theirs to record against.
