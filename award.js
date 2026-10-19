@@ -1450,6 +1450,7 @@ window.AWARD_CONFIG = {
     // this the message sits there contradicting what is now on screen.
     el.stockLines.addEventListener("input", function () {
       setFieldError(null, "stock-qty-error", "");
+      retotalStock();
     });
     el.hoLines.addEventListener("input", function () {
       setFieldError(null, "ho-lines-error", "");
@@ -2477,6 +2478,17 @@ window.AWARD_CONFIG = {
 
   /* Every movement of stock, flattened to one shape so the running total
      does not have to care where each came from. */
+  /* Which column a movement is reported in, and which way it moves the
+     balance. A requisition is reported and nothing else: asking for an award
+     does not put one in the cupboard. */
+  var MOVEMENT_KINDS = {
+    requisition: { column: "requisition", sign: 0 },
+    delivery:    { column: "delivery",    sign: 1 },
+    utilised:    { column: "utilisation", sign: -1 },
+    opening:     { column: "other",       sign: 1 },
+    adjustment:  { column: "other",       sign: 1 }
+  };
+
   function stockEvents(requisitions, movements) {
     var events = [];
 
@@ -2506,12 +2518,13 @@ window.AWARD_CONFIG = {
       if (!district) return;
       var q = {};
       q[Number(m.award_type_id)] = Number(m.quantity) || 0;
+      var kind = MOVEMENT_KINDS[m.kind] || MOVEMENT_KINDS.adjustment;
 
       events.push({
         district: district,
         month: monthKeyOf(m.occurred_on),
-        column: m.kind === "utilised" ? "utilisation" : "other",
-        sign: m.kind === "utilised" ? -1 : 1,
+        column: kind.column,
+        sign: kind.sign,
         quantities: q,
         note: m.note || ""
       });
@@ -2933,14 +2946,20 @@ window.AWARD_CONFIG = {
 
     returnFocusTo = document.activeElement;
 
-    el.stockHeading.textContent = setting ? "Set stock" : "Record utilisation";
-    el.stockSub.textContent = setting
-      ? "What this district is holding at the end of this month. The " +
-        "difference is recorded as a correction, and carries forward."
-      : "Awards handed out. This comes off what the district is holding.";
-    el.stockFLabel.textContent = setting
-      ? "What it should be holding" : "How many were given out";
-    el.stockSave.textContent = setting ? "Set stock" : "Record";
+    var carry = !monthKey;
+
+    el.stockHeading.textContent = !setting ? "Record utilisation"
+      : carry ? "Opening stock" : "Set this month's figures";
+    el.stockSub.textContent = !setting
+      ? "Awards handed out. This comes off what the district is holding."
+      : carry
+        ? "What the district was holding before the year started. It carries " +
+          "into April and every month after."
+        : "What the sheet should read for this month. The balance follows " +
+          "from what arrived and what was given out.";
+    el.stockFLabel.textContent = !setting ? "How many were given out"
+      : carry ? "What it was holding" : "Figures for this month";
+    el.stockSave.textContent = setting ? "Save figures" : "Record";
 
     el.stockWhere.innerHTML =
       '<b>' + escapeHtml(stockCtx.district) + "</b>" +
@@ -2949,26 +2968,53 @@ window.AWARD_CONFIG = {
       '<em>' + escapeHtml(monthKey ? monthLabelOf(monthKey)
                                    : "Before " + fyLabel(fy)) + "</em>";
 
-    /* What the district is holding at that point: the ceiling for a
-       utilisation, the starting figure for one being set. */
+    /* What the sheet reads for this month now. An administrator types over
+       these; everyone else is giving out awards, and only needs to know how
+       many there are to give. */
     var held = balanceOn(stockCtx.district, fy, monthKey);
+    var opening = carry ? {} : balanceBefore(stockCtx.district, fy, monthKey);
+    var figures = setting && !carry ? figuresOn(stockCtx.district, fy, monthKey) : null;
 
-    el.stockLines.innerHTML = awardTypes.map(function (t) {
-      var have = held[t.id] || 0;
-      var none = !setting && have === 0;
-      return '<div class="stock-line' + (none ? " is-empty" : "") + '">' +
-             "<label>" + escapeHtml(t.name) +
-               '<span class="hint">' +
-                 (have ? escapeHtml(have.toLocaleString()) + " in stock"
-                       : "none in stock") +
-               "</span>" +
-             "</label>" +
-             '<input type="number" class="mono stock-qty" data-type="' + escapeHtml(t.id) +
-             '" data-have="' + have + '" min="0"' +
-             (setting ? ' max="1000000" value="' + have + '"'
-                      : ' max="' + have + '" placeholder="0"') +
-             ' step="1"' + (none ? " disabled" : "") + " /></div>";
-    }).join("");
+    el.stockLines.classList.toggle("is-grid", !!figures);
+    el.stockLines.innerHTML = (figures
+      ? '<div class="stock-grid-head"><span></span><span>Requisition</span>' +
+        "<span>Delivery</span><span>Utilisation</span><span>Balance</span></div>"
+      : "") +
+      awardTypes.map(function (t) {
+        var have = held[t.id] || 0;
+
+        if (figures) {
+          return '<div class="stock-line is-row" data-type="' + escapeHtml(t.id) + '">' +
+                 "<label>" + escapeHtml(t.name) + "</label>" +
+                 ["requisition", "delivery", "utilisation"].map(function (col) {
+                   return '<input type="number" class="mono stock-fig" data-col="' + col +
+                          '" data-type="' + escapeHtml(t.id) +
+                          '" data-have="' + (figures[col][t.id] || 0) +
+                          '" min="0" max="1000000" step="1" value="' +
+                          (figures[col][t.id] || 0) + '" />';
+                 }).join("") +
+                 '<output class="stock-bal mono" data-type="' + escapeHtml(t.id) +
+                 '" data-opening="' + (opening[t.id] || 0) + '">' +
+                 escapeHtml(have.toLocaleString()) + "</output>" +
+                 "</div>";
+        }
+
+        var none = !setting && have === 0;
+        return '<div class="stock-line' + (none ? " is-empty" : "") + '">' +
+               "<label>" + escapeHtml(t.name) +
+                 '<span class="hint">' +
+                   (have ? escapeHtml(have.toLocaleString()) + " in stock"
+                         : "none in stock") +
+                 "</span>" +
+               "</label>" +
+               '<input type="number" class="mono stock-qty" data-type="' + escapeHtml(t.id) +
+               '" data-have="' + have + '" min="0"' +
+               (setting ? ' max="1000000" value="' + have + '"'
+                        : ' max="' + have + '" placeholder="0"') +
+               ' step="1"' + (none ? " disabled" : "") + " /></div>";
+      }).join("");
+
+    if (figures) retotalStock();
 
     el.stockNote.value = "";
     setFieldError(null, "stock-qty-error", "");
@@ -2993,6 +3039,52 @@ window.AWARD_CONFIG = {
   function onStockKeydown(e) {
     if (e.key === "Escape") { e.stopPropagation(); closeStockModal(); }
   }
+
+  /* The balance each award would carry out of the month, as the figures
+     are typed. What it opened with, plus what arrived, less what went out -
+     the same arithmetic the sheet does, said back while there is still time
+     to correct it. */
+  function retotalStock() {
+    Array.prototype.forEach.call(el.stockLines.querySelectorAll(".stock-bal"),
+      function (out) {
+        var id = out.getAttribute("data-type");
+        var at = function (col) {
+          var box = el.stockLines.querySelector(
+            '.stock-fig[data-col="' + col + '"][data-type="' + id + '"]');
+          var n = Number(String((box && box.value) || "").trim());
+          return Number.isFinite(n) ? n : 0;
+        };
+        var n = Number(out.getAttribute("data-opening")) + at("delivery") -
+                at("utilisation");
+        out.textContent = n.toLocaleString();
+        out.classList.toggle("is-neg", n < 0);
+      });
+  }
+
+  /* What the sheet reads for one month, so the boxes open on the figures
+     already there rather than on nothing. */
+  function figuresOn(district, fy, monthKey) {
+    var rows = stockRows(fy, allRequisitions, stockMovements,
+                         [{ state: "", division: "", district: district, pm: "" }]);
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].monthKey === monthKey) {
+        return { requisition: rows[i].requisition,
+                 delivery: rows[i].delivery,
+                 utilisation: rows[i].utilisation };
+      }
+    }
+    return { requisition: {}, delivery: {}, utilisation: {} };
+  }
+
+  // What it carried into the month, which is the month before's balance.
+  function balanceBefore(district, fy, monthKey) {
+    var keys = fyMonthKeys(fy);
+    var at = keys.indexOf(monthKey);
+    return balanceOn(district, fy, at > 0 ? keys[at - 1] : "");
+  }
+
+  var FIGURE_KINDS = { requisition: "requisition", delivery: "delivery",
+                       utilisation: "utilised" };
 
   // One movement, ready to write.
   function movementRow(kind, awardTypeId, quantity, note) {
@@ -3063,47 +3155,77 @@ window.AWARD_CONFIG = {
     var rows = [];
     var fault = "";
 
-    Array.prototype.forEach.call(el.stockLines.querySelectorAll(".stock-qty"),
-      function (input) {
-        var raw = input.value.trim();
-        if (!raw) return;
+    var whole = function (input) {
+      var raw = String(input.value || "").trim();
+      if (!raw) return 0;
+      var n = Number(raw);
+      return Number.isInteger(n) && n >= 0 ? n : null;
+    };
+    var nameOf = function (id) {
+      var t = awardTypes.filter(function (a) { return Number(a.id) === Number(id); })[0];
+      return (t && t.name) || "that award";
+    };
 
-        var n = Number(raw);
-        var have = Number(input.getAttribute("data-have")) || 0;
+    /* A month filled in by hand. Each box says what the sheet should read,
+       and what is written is the difference between that and what it reads
+       now - so a figure typed over a real requisition adds to it rather than
+       pretending the requisition never happened. */
+    var grid = el.stockLines.querySelectorAll(".stock-fig");
+    if (grid.length) {
+      Array.prototype.forEach.call(grid, function (input) {
+        var n = whole(input);
         var id = Number(input.getAttribute("data-type"));
-        var type = awardTypes.filter(function (a) {
-          return Number(a.id) === id;
-        })[0] || {};
-        var name = type.name || "that award";
+        var col = input.getAttribute("data-col");
 
-        if (setting) {
-          if (!Number.isInteger(n) || n < 0) {
-            if (!fault) fault = "Figures are whole numbers, nothing or more.";
-            return;
-          }
-          if (n === have) return;                 // nothing to record
-
-          // The difference, not the figure: the balance is added up from
-          // what moved.
-          rows.push(movementRow("adjustment", id, n - have,
-            name + ": " + have.toLocaleString() + " \u2192 " + n.toLocaleString()));
-
-        } else {
-          if (!Number.isInteger(n) || n < 1) {
-            if (!fault) fault = "Quantities are whole numbers of 1 or more.";
-            return;
-          }
-          if (n > have) {
-            if (!fault) {
-              fault = stockCtx.district + " is holding " + have.toLocaleString() +
-                      " " + name + " in " + monthLabelOf(stockCtx.month) +
-                      ", so it cannot give out " + n.toLocaleString() + ".";
-            }
-            return;
-          }
-          rows.push(movementRow("utilised", id, n, null));
+        if (n === null) {
+          if (!fault) fault = "Figures are whole numbers, nothing or more.";
+          return;
         }
+        var have = Number(input.getAttribute("data-have")) || 0;
+        if (n === have) return;                   // nothing to record
+
+        rows.push(movementRow(FIGURE_KINDS[col], id, n - have,
+          nameOf(id) + " " + col + ": " + have.toLocaleString() +
+          " \u2192 " + n.toLocaleString()));
       });
+
+    } else {
+      Array.prototype.forEach.call(el.stockLines.querySelectorAll(".stock-qty"),
+        function (input) {
+          var raw = String(input.value || "").trim();
+          if (!raw) return;
+
+          var n = whole(input);
+          var have = Number(input.getAttribute("data-have")) || 0;
+          var id = Number(input.getAttribute("data-type"));
+
+          if (setting) {
+            if (n === null) {
+              if (!fault) fault = "Figures are whole numbers, nothing or more.";
+              return;
+            }
+            if (n === have) return;
+            rows.push(movementRow("adjustment", id, n - have,
+              nameOf(id) + ": " + have.toLocaleString() + " \u2192 " +
+              n.toLocaleString()));
+
+          } else {
+            if (n === null || n < 1) {
+              if (!fault) fault = "Quantities are whole numbers of 1 or more.";
+              return;
+            }
+            if (n > have) {
+              if (!fault) {
+                fault = stockCtx.district + " is holding " + have.toLocaleString() +
+                        " " + nameOf(id) + " in " + monthLabelOf(stockCtx.month) +
+                        ", so it cannot give out " + n.toLocaleString() + ".";
+              }
+              return;
+            }
+            rows.push(movementRow("utilised", id, n, null));
+          }
+        });
+    }
 
     if (fault) { setFieldError(null, "stock-qty-error", fault); return; }
     if (!rows.length) {
@@ -3133,7 +3255,12 @@ window.AWARD_CONFIG = {
       .then(function (res) {
         el.stockSave.disabled = false;
         if (res.error) {
-          setFieldError(null, "stock-qty-error", "Could not save: " + res.error.message);
+          var msg = res.error.message || "";
+          setFieldError(null, "stock-qty-error",
+            /kind_check|quantity_sane/i.test(msg)
+              ? "Figures typed by hand need sql/award-stock-manual.sql run in " +
+                "the Supabase SQL editor first."
+              : "Could not save: " + msg);
           reportError("save stock", res.error);
           return;
         }
