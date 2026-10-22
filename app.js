@@ -1138,6 +1138,8 @@ window.olfGeography = async function () {
             name:      String(r.Name || "").trim(),
             isPM:      /^program implementation\s*[-–]?\s*pm$/
                            .test(String(r["Dept"] || "").trim().toLowerCase().replace(/\s+/g, " ")),
+            isDM:      /^program implementation\s*[-–]?\s*div$/
+                           .test(String(r["Dept"] || "").trim().toLowerCase().replace(/\s+/g, " ")),
             states:    keys(splitMulti(r["State"])),
             divisions: keys(splitMulti(r["Division"])),
             districts: keys(splitMulti(r["District"]).map(tidyDistrict))
@@ -1214,6 +1216,10 @@ window.olfGeography = async function () {
         spotsOf(dt).some(s => covers(p, s.state, s.division))));
     const pmsOfDivision = (st, dv) => nameList(people.filter(p =>
         p.isPM && p.name && covers(p, st, dv)));
+    /* With no PM in post, the Divisional Manager stands in, and the column
+       says so rather than passing them off as the PM. */
+    const interimOf = (st, dv) => nameList(people.filter(p =>
+        p.isDM && p.name && covers(p, st, dv))).map(n => n + " (interim DM)");
 
     const out = [];
     for (const [state, byDiv] of tree) {
@@ -1222,6 +1228,7 @@ window.olfGeography = async function () {
             const sorted = [...districts].map(k => shown.get(k))
                 .sort((a, b) => a.localeCompare(b));
             const pms = pmsOfDivision(state, division);
+            const cover = pms.length ? pms : interimOf(state, division);
             const byDistrict = {};
             for (const k of districts) {
                 const who = pmsOfDistrict(k);
@@ -1229,7 +1236,7 @@ window.olfGeography = async function () {
             }
             divisions.push({
                 name: shown.get(division),
-                pm: pms.join(", "),
+                pm: cover.join(", "),
                 pms: pms,
                 pmByDistrict: byDistrict,
                 districts: sorted
