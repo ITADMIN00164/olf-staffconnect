@@ -1779,45 +1779,64 @@ function empValues(emp, key) {
     return v ? [v] : [];
 }
 
-function empMatchesFilters(emp) {
+function empMatchesFilters(emp, except) {
     return EMP_FILTERS.every(f => {
         const want = empFilter[f.key];
-        if (!want) return true;
+        if (!want || f.key === except) return true;
         const have = empValues(emp, f.key);
         return want === EMP_BLANK ? have.length === 0 : have.includes(want);
     });
+}
+
+/* Each drop-down offers what is left once every OTHER filter has been
+   applied, so the lists narrow as you choose: pick a state and the divisions
+   and districts are only that state's. A drop-down leaves its own choice out
+   of its own pool, so it can still be changed. Each option carries how many
+   people it would show. */
+function empPool(key) {
+    const seen = new Map();
+    let blank = 0;
+    employees.forEach(emp => {
+        if (!empMatchesFilters(emp, key)) return;
+        const vals = empValues(emp, key);
+        if (!vals.length) blank++;
+        vals.forEach(v => seen.set(v, (seen.get(v) || 0) + 1));
+    });
+    return { seen, blank };
 }
 
 function buildEmpFilters() {
     const box = document.getElementById("empFilters");
     if (!box) return;
 
-    const parts = EMP_FILTERS.map(f => {
-        const seen = new Set();
-        let hasBlank = false;
-        employees.forEach(emp => {
-            const vals = empValues(emp, f.key);
-            if (!vals.length) hasBlank = true;
-            vals.forEach(v => seen.add(v));
+    // A choice that another filter has since made impossible is dropped, and
+    // that can in turn empty another, so go round until nothing changes.
+    for (let again = true, n = 0; again && n < EMP_FILTERS.length + 1; n++) {
+        again = false;
+        EMP_FILTERS.forEach(f => {
+            const want = empFilter[f.key];
+            if (!want) return;
+            const { seen, blank } = empPool(f.key);
+            if (want === EMP_BLANK ? !blank : !seen.has(want)) { delete empFilter[f.key]; again = true; }
         });
-        const options = [...seen].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+    }
 
-        if (empFilter[f.key] && empFilter[f.key] !== EMP_BLANK && !seen.has(empFilter[f.key])) {
-            delete empFilter[f.key];       // the value it named is gone
-        }
+    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+    box.innerHTML = EMP_FILTERS.map(f => {
+        const { seen, blank } = empPool(f.key);
         const chosen = empFilter[f.key] || "";
+        const options = [...seen.keys()].sort(collator.compare);
 
         return `<div class="emp-filter${chosen ? " is-set" : ""}">
             <label for="empf-${f.key}">${f.label}</label>
             <select id="empf-${f.key}" data-filter="${f.key}">
                 <option value="">All</option>
-                ${hasBlank ? `<option value="${EMP_BLANK}"${chosen === EMP_BLANK ? " selected" : ""}>(blank)</option>` : ""}
-                ${options.map(v => `<option value="${escHtml(v)}"${v === chosen ? " selected" : ""}>${escHtml(v)}</option>`).join("")}
+                ${blank ? `<option value="${EMP_BLANK}"${chosen === EMP_BLANK ? " selected" : ""}>(blank) · ${blank}</option>` : ""}
+                ${options.map(v => `<option value="${escHtml(v)}"${v === chosen ? " selected" : ""}>${escHtml(v)} · ${seen.get(v)}</option>`).join("")}
             </select>
         </div>`;
-    });
+    }).join("");
 
-    box.innerHTML = parts.join("");
     syncEmpFilterBar();
 }
 
