@@ -1136,6 +1136,8 @@ window.olfGeography = async function () {
         if (!isActiveEmployee(r)) return;
         people.push({
             name:      String(r.Name || "").trim(),
+            email:     String(r.Email || "").trim().toLowerCase(),
+            boss:      String(r["Reporting manager"] || r["Reporting Manager"] || "").trim().toLowerCase(),
             isPM:      /^program implementation\s*[-–]?\s*pm$/
                            .test(String(r["Dept"] || "").trim().toLowerCase().replace(/\s+/g, " ")),
             isDM:      /^program implementation\s*[-–]?\s*div$/
@@ -1231,6 +1233,17 @@ window.olfGeography = async function () {
     const interimOf = (st, dv) => nameList(people.filter(p =>
         p.isDM && p.name && covers(p, st, dv))).map(n => n + " (interim DM)");
 
+    /* Whom the staff posted to a district report to is the plainest answer to
+       who manages it, and it reaches a district the manager's own record does
+       not list: Begusarai's team reports to the Pune DM, whose State says
+       Maharashtra. Used only where no PM is in post. */
+    const byEmail = new Map(people.filter(p => p.email).map(p => [p.email, p]));
+    const interimByReport = dt => nameList(people
+        .filter(p => p.districts.length === 1 && p.districts[0] === dt && p.boss)
+        .map(p => byEmail.get(p.boss))
+        .filter(b => b && b.isDM && b.name))
+        .map(n => n + " (interim DM)");
+
     const out = [];
     for (const [state, byDiv] of tree) {
         const divisions = [];
@@ -1241,7 +1254,8 @@ window.olfGeography = async function () {
             const cover = pms.length ? pms : interimOf(state, division);
             const byDistrict = {};
             for (const k of districts) {
-                const who = pmsOfDistrict(k);
+                let who = pmsOfDistrict(k);
+                if (!who.length && !pms.length) who = interimByReport(k);
                 if (who.length) byDistrict[shown.get(k)] = who.join(", ");
             }
             divisions.push({
