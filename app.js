@@ -77,6 +77,7 @@ let newsRefreshInterval = null;
  * @param {Object} details  - action-specific payload (see callers below)
  */
 async function logAudit(action, details = {}) {
+    if (String(action).startsWith("employee-")) { orgGeography = null; staffDirectory = null; }
     try {
         await addDoc(collection(db, "audittrail"), {
             action,
@@ -1116,9 +1117,15 @@ function tidyDistrict(name) {
 }
 
 let orgGeography = null;
+let orgGeographyAt = 0;
+
+/* Re-read after a minute, and straight away after any change made here. A
+   person marked Inactive in one tab must leave the stock sheet in the next
+   visit, not at the next page load. */
+const GEOGRAPHY_FRESH_MS = 60 * 1000;
 
 window.olfGeography = async function () {
-    if (orgGeography) return orgGeography;
+    if (orgGeography && Date.now() - orgGeographyAt < GEOGRAPHY_FRESH_MS) return orgGeography;
 
     const snapshot = await getDocs(collection(db, "Employees"));
 
@@ -1136,9 +1143,13 @@ window.olfGeography = async function () {
         if (!isActiveEmployee(r)) return;
         people.push({
             name:      String(r.Name || "").trim(),
+            email:     String(r.Email || "").trim().toLowerCase(),
+            boss:      String(r["Reporting manager"] || r["Reporting Manager"] || "").trim().toLowerCase(),
             isPM:      /^program implementation\s*[-–]?\s*pm$/
                            .test(String(r["Dept"] || "").trim().toLowerCase().replace(/\s+/g, " ")),
             isDM:      /^program implementation\s*[-–]?\s*div$/
+                           .test(String(r["Dept"] || "").trim().toLowerCase().replace(/\s+/g, " ")),
+            isCOO:     /^program implementation\s*[-–]?\s*coo$/
                            .test(String(r["Dept"] || "").trim().toLowerCase().replace(/\s+/g, " ")),
             states:    keys(splitMulti(r["State"])),
             divisions: keys(splitMulti(r["Division"])),
@@ -1215,21 +1226,33 @@ window.olfGeography = async function () {
         }
     }
 
-    /* Who manages a place. A PM counts for a district only if they list it
-       and cover a state and division it sits in, so one who lists a district
-       from another state is not named against it. Where no PM lists the
-       district, the division's own PMs are shown. */
+    /* Who manages a district, first match wins:
+         1. a PM who lists the district, in the state it sits in - a PM is given
+            districts, and one may cross a division line to take one;
+         2. no PM, so the DM - the one the district's staff report to, then any
+            DM covering its state and division - as "(interim DM)";
+         3. no DM either, so the COO, as "(interim COO)".
+       A division's other PMs are not stood in: a PM manages the districts they
+       are given, not whatever else sits in the same division. */
     const covers = (p, st, dv) => p.states.includes(st) && p.divisions.includes(dv);
     const nameList = ps => [...new Set(ps.map(p => p.name))];
-    const pmsOfDistrict = dt => nameList(people.filter(p =>
-        p.isPM && p.name && p.districts.includes(dt) &&
-        spotsOf(dt).some(s => covers(p, s.state, s.division))));
-    const pmsOfDivision = (st, dv) => nameList(people.filter(p =>
-        p.isPM && p.name && covers(p, st, dv)));
-    /* With no PM in post, the Divisional Manager stands in, and the column
-       says so rather than passing them off as the PM. */
-    const interimOf = (st, dv) => nameList(people.filter(p =>
-        p.isDM && p.name && covers(p, st, dv))).map(n => n + " (interim DM)");
+    const byEmail = new Map(people.filter(p => p.email).map(p => [p.email, p]));
+    const managerOf = (dt, st, dv) => {
+        const pms = nameList(people.filter(p =>
+            p.isPM && p.name && p.districts.includes(dt) && p.states.includes(st)));
+        if (pms.length) return pms.join(", ");
+
+        const bosses = nameList(people
+            .filter(p => p.districts.length === 1 && p.districts[0] === dt && p.boss)
+            .map(p => byEmail.get(p.boss))
+            .filter(b => b && b.isDM && b.name));
+        const dms = bosses.length ? bosses
+            : nameList(people.filter(p => p.isDM && p.name && covers(p, st, dv)));
+        if (dms.length) return dms.map(n => n + " (interim DM)").join(", ");
+
+        return nameList(people.filter(p => p.isCOO && p.name))
+            .map(n => n + " (interim COO)").join(", ");
+    };
 
     const out = [];
     for (const [state, byDiv] of tree) {
@@ -1237,17 +1260,14 @@ window.olfGeography = async function () {
         for (const [division, districts] of byDiv) {
             const sorted = [...districts].map(k => shown.get(k))
                 .sort((a, b) => a.localeCompare(b));
-            const pms = pmsOfDivision(state, division);
-            const cover = pms.length ? pms : interimOf(state, division);
             const byDistrict = {};
             for (const k of districts) {
-                const who = pmsOfDistrict(k);
-                if (who.length) byDistrict[shown.get(k)] = who.join(", ");
+                const who = managerOf(k, state, division);
+                if (who) byDistrict[shown.get(k)] = who;
             }
             divisions.push({
                 name: shown.get(division),
-                pm: cover.join(", "),
-                pms: pms,
+                pm: "",
                 pmByDistrict: byDistrict,
                 districts: sorted
             });
@@ -1258,6 +1278,7 @@ window.olfGeography = async function () {
     out.sort((a, b) => a.name.localeCompare(b.name));
 
     orgGeography = out;
+    orgGeographyAt = Date.now();
     return out;
 };
 
