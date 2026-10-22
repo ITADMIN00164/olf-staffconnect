@@ -1636,6 +1636,9 @@ async function initEmployeesPage() {
     }
 
     if (addBtn)    addBtn.addEventListener("click", openAddModal);
+    // Each visit starts on current staff; the Status filter can be cleared to
+    // see everyone, or switched to Inactive.
+    empFilter = { Status: "Active" };
     if (searchBox) searchBox.addEventListener("input", renderEmployees);
     document.getElementById("tableHead")?.addEventListener("click", onEmpHeadClick);
     const filterBox = document.getElementById("empFilters");
