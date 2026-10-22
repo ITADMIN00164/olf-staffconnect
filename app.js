@@ -1122,73 +1122,103 @@ window.olfGeography = async function () {
 
     const snapshot = await getDocs(collection(db, "Employees"));
 
-    // state -> division -> Set(district)
-    const tree = new Map();
-
-    /* Who manages each division, for the stock sheet's PM column. A
-       Programme Manager covers one division, so the division is the link -
-       the sheet lists a PM beside every district, and that is the PM of the
-       division the district sits in. */
-    const pmOfDivision = new Map();
-    // The same, but for the districts the PM is actually posted to.
-    const pmOfDistrict = new Map();
-
+    const people = [];
     snapshot.forEach(d => {
         const r = d.data();
         if (!isActiveEmployee(r)) return;
-
-        const states    = splitMulti(r["State"]);
-        const divisions = splitMulti(r["Division"]);
-        const districts = splitMulti(r["District"]).map(tidyDistrict);
-
-        const isPM = /^program implementation\s*[-–]?\s*pm$/
-            .test(String(r["Dept"] || "").trim().toLowerCase().replace(/\s+/g, " "));
-        if (isPM) {
-            // A division can have more than one - Amravati has two and
-            // Chhatrapati Sambhajinagar three. Naming only the first would
-            // leave the others off a column that is supposed to say who
-            // manages the place.
-            const who = String(r.Name || "").trim();
-            if (who) {
-                for (const dt of districts) {
-                    const key = dt.toLowerCase();
-                    const l = pmOfDistrict.get(key) || [];
-                    if (!l.includes(who)) l.push(who);
-                    pmOfDistrict.set(key, l);
-                }
-            }
-            for (const dv of divisions) {
-                const name = String(r.Name || "").trim();
-                if (!name) continue;
-                const list = pmOfDivision.get(dv) || [];
-                if (!list.includes(name)) list.push(name);
-                pmOfDivision.set(dv, list);
-            }
-        }
-
-        for (const st of states) {
-            if (!tree.has(st)) tree.set(st, new Map());
-            const byDiv = tree.get(st);
-            for (const dv of divisions) {
-                if (!byDiv.has(dv)) byDiv.set(dv, new Set());
-                districts.forEach(dt => byDiv.get(dv).add(dt));
-            }
-        }
+        people.push({
+            name:      String(r.Name || "").trim(),
+            isPM:      /^program implementation\s*[-–]?\s*pm$/
+                           .test(String(r["Dept"] || "").trim().toLowerCase().replace(/\s+/g, " ")),
+            states:    splitMulti(r["State"]),
+            divisions: splitMulti(r["Division"]),
+            districts: splitMulti(r["District"]).map(tidyDistrict)
+        });
     });
+
+    /* A person posted to one state, one division and one district says
+       exactly where that district is. Someone covering several places lists
+       their states, divisions and districts side by side, and nothing says
+       which district sits in which state - crossing the three lists put
+       Begusarai under Maharashtra because a manager there also covers Bihar.
+       So the districts are placed by the people who name just one place;
+       a covering manager only places a district nobody is posted to. */
+    const placed = new Map();      // district(lower) -> Map("state|division" -> {state, division})
+    for (const p of people) {
+        if (p.states.length !== 1 || p.divisions.length !== 1 || p.districts.length !== 1) continue;
+        const key = p.districts[0].toLowerCase();
+        const where = placed.get(key) || new Map();
+        where.set(p.states[0] + "|" + p.divisions[0], { state: p.states[0], division: p.divisions[0] });
+        placed.set(key, where);
+    }
+
+    // state -> division -> Set(district)
+    const tree = new Map();
+    const put = (st, dv, dt) => {
+        if (!tree.has(st)) tree.set(st, new Map());
+        const byDiv = tree.get(st);
+        if (!byDiv.has(dv)) byDiv.set(dv, new Set());
+        byDiv.get(dv).add(dt);
+    };
+
+    const names = new Map();        // district(lower) -> display name
+    for (const p of people) p.districts.forEach(dt => { if (!names.has(dt.toLowerCase())) names.set(dt.toLowerCase(), dt); });
+
+    for (const [key, where] of placed) {
+        for (const w of where.values()) put(w.state, w.division, names.get(key));
+    }
+    for (const p of people) {
+        for (const dt of p.districts) {
+            if (placed.has(dt.toLowerCase())) continue;
+            for (const st of p.states) for (const dv of p.divisions) put(st, dv, dt);
+        }
+    }
+
+    /* Who manages a place. A PM counts for a district only if the district
+       sits in a state and division they cover, so a PM who lists a district
+       from another state is not named against it. */
+    const where = (dt) => {
+        const key = dt.toLowerCase();
+        if (placed.has(key)) return [...placed.get(key).values()];
+        const out = [];
+        for (const [st, byDiv] of tree) for (const [dv, set] of byDiv) if (set.has(dt)) out.push({ state: st, division: dv });
+        return out;
+    };
+    const pmsOfDistrict = (dt) => {
+        const spots = where(dt);
+        const list = [];
+        for (const p of people) {
+            if (!p.isPM || !p.name) continue;
+            const here = p.districts.some(x => x.toLowerCase() === dt.toLowerCase());
+            if (!here) continue;
+            if (!spots.some(s => p.states.includes(s.state) && p.divisions.includes(s.division))) continue;
+            if (!list.includes(p.name)) list.push(p.name);
+        }
+        return list;
+    };
+    const pmsOfDivision = (st, dv) => {
+        const list = [];
+        for (const p of people) {
+            if (p.isPM && p.name && p.states.includes(st) && p.divisions.includes(dv) && !list.includes(p.name)) list.push(p.name);
+        }
+        return list;
+    };
 
     const out = [];
     for (const [state, byDiv] of tree) {
         const divisions = [];
         for (const [division, districts] of byDiv) {
             if (!districts.size) continue;
+            const pms = pmsOfDivision(state, division);
+            const sorted = [...districts].sort((a, b) => a.localeCompare(b));
             divisions.push({
                 name: division,
-                pm: (pmOfDivision.get(division) || []).join(", "),
-                pms: pmOfDivision.get(division) || [],
-                pmByDistrict: Object.fromEntries([...districts]
-                    .filter(dt => pmOfDistrict.has(dt.toLowerCase()))
-                    .map(dt => [dt, pmOfDistrict.get(dt.toLowerCase()).join(", ")])),
-                districts: [...districts].sort((a, b) => a.localeCompare(b))
+                pm: pms.join(", "),
+                pms: pms,
+                pmByDistrict: Object.fromEntries(sorted
+                    .map(dt => [dt, pmsOfDistrict(dt).join(", ")])
+                    .filter(e => e[1])),
+                districts: sorted
             });
         }
         if (!divisions.length) continue;        // nothing selectable under it
