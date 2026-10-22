@@ -133,3 +133,22 @@
 .awm-view .pom-prompt-input { width: 100%; min-height: 110px; resize: vertical; padding: 11px 13px; border: 1px solid #e5e7eb; border-radius: 9px; font-size: 13.5px; font-family: inherit; color: #1a1d23; outline: none; }
 .awm-view .pom-prompt-input:focus { border-color: #4f8ef7; box-shadow: 0 0 0 3px rgba(79,142,247,0.1); }
 .awm-view .pom-prompt-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+
+/* Dressed to match the Stock Management card beside it. */
+.awm-view .pom-page {
+  max-width: none; height: auto; margin: 0 0 24px; padding: 26px;
+  background: #fff; border: 1px solid #E3E7EE; border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+  font-family: inherit;
+}
+.awm-view .pom-filter-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.awm-view .awm-ay { padding: 5px 12px; border-radius: 999px; background: #FFFBEB; border: 1px solid #FBE2B0; color: #B45309; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.awm-view .pom-select { min-width: 240px; padding: 10px 14px; border: 1px solid #E3E7EE; border-radius: 8px; box-shadow: none; font-size: 14px; }
+.awm-view .pom-card { border: 1px solid #E3E7EE; border-radius: 10px; box-shadow: none; }
+.awm-view .pom-table th { background: #F7F8FA; color: #8B909E; font-size: 11px; letter-spacing: .09em; padding: 12px 14px; border-bottom: 1px solid #E3E7EE; }
+.awm-view .pom-table td { padding: 13px 14px; font-size: 13.5px; border-bottom: 1px solid #EEF0F4; }
+.awm-view .pom-table.fixed td { padding: 11px 10px; font-size: 12.5px; }
+.awm-view .pom-table.fixed th { padding: 11px 10px; }
+.awm-view .pom-detail-head { margin-bottom: 16px; }
+.awm-view .pom-back-btn { padding: 8px 14px; border-radius: 8px; font-size: 13px; }
+.awm-view .pom-detail-select { padding: 8px 12px; border-radius: 8px; box-shadow: none; }

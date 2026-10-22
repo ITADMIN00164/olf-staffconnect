@@ -661,6 +661,8 @@ window.AWARD_CONFIG = {
     if (!stock || !awardView) return;
 
     stock.hidden = award;
+    var actions = document.getElementById("aw-stock-actions");
+    if (actions) actions.hidden = award;
     awardView.hidden = !award;
     Array.prototype.forEach.call(
       document.querySelectorAll(".award-page .aw-toptab"),

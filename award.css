@@ -1522,28 +1522,33 @@
 .award-page .qty-sep, .award-page .qty-got.is-none { color: #8a8f98; }
 #log-modal .cell-log { max-width: none; min-width: 0; }
 
-/* The two things the Test tab holds. */
-.award-page .aw-toptabs {
-  display: inline-flex;
-  gap: 4px;
-  padding: 4px;
-  margin: 0 0 18px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+/* The two things the Test tab holds: tabs on the left, the stock actions on
+   the right, one rule underneath. */
+.award-page .aw-topbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 0 0 20px;
+  border-bottom: 1px solid var(--border);
 }
+.award-page .aw-toptabs { display: flex; gap: 30px; }
 .award-page .aw-toptab {
-  padding: 8px 18px;
+  position: relative;
+  padding: 10px 2px 13px;
+  margin-bottom: -1px;
   border: 0;
-  border-radius: 9px;
-  background: transparent;
+  border-bottom: 3px solid transparent;
+  background: none;
   font-family: var(--font-sans);
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 700;
-  color: var(--text-soft);
+  color: var(--text-muted);
   cursor: pointer;
   white-space: nowrap;
-  transition: background .15s, color .15s;
+  transition: color .15s, border-color .15s;
 }
-.award-page .aw-toptab:hover { color: var(--accent-ink); }
-.award-page .aw-toptab.is-active { background: var(--accent); color: #fff; }
+.award-page .aw-toptab:hover { color: var(--text); }
+.award-page .aw-toptab.is-active { color: var(--accent-ink); border-bottom-color: var(--accent); }
+.award-page .aw-top-actions { display: flex; align-items: center; gap: 10px; padding-bottom: 9px; }

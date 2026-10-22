@@ -20,30 +20,24 @@
       </span>
     </div>
 
-    <!-- There was a tab bar above this with one tab in it, named the same
-         as the heading directly underneath. It said nothing twice. -->
-    <nav class="aw-toptabs" role="tablist" aria-label="Test">
-      <button type="button" role="tab" class="aw-toptab is-active" data-aw-top="stock" aria-selected="true">Stock Management</button>
-      <button type="button" role="tab" class="aw-toptab" data-aw-top="award" aria-selected="false" tabindex="-1">Award Management</button>
-    </nav>
+    <!-- The Test tab: Stock Management and Award Management, with the stock
+         actions on the right while Stock Management is showing. -->
+    <div class="aw-topbar">
+      <nav class="aw-toptabs" role="tablist" aria-label="Test">
+        <button type="button" role="tab" class="aw-toptab is-active" data-aw-top="stock" aria-selected="true">Stock Management</button>
+        <button type="button" role="tab" class="aw-toptab" data-aw-top="award" aria-selected="false" tabindex="-1">Award Management</button>
+      </nav>
+      <div class="aw-top-actions" id="aw-stock-actions">
+        <button type="button" id="refresh-btn" class="btn btn-ghost btn-sm">Refresh</button>
+        <button type="button" id="new-req-btn" class="btn btn-primary btn-sm">
+          <i class="aw-icon" data-aw-icon="plus" aria-hidden="true"></i>
+          New Requisition
+        </button>
+      </div>
+    </div>
 
     <div id="aw-view-stock">
     <div class="aw-body">
-
-      <div class="aw-page-header">
-        <div>
-          <h1>Stock Management</h1>
-          <p>Award stock requested from the districts</p>
-          <p class="aw-standing" id="standing-note" hidden></p>
-        </div>
-        <div class="aw-page-actions">
-          <button type="button" id="refresh-btn" class="btn btn-ghost btn-sm">Refresh</button>
-          <button type="button" id="new-req-btn" class="btn btn-primary">
-            <i class="aw-icon" data-aw-icon="plus" aria-hidden="true"></i>
-            New Requisition
-          </button>
-        </div>
-      </div>
 
       <nav class="aw-subtabs" role="tablist" aria-label="Stock Management views">
         <button type="button" role="tab" id="aw-subtab-requisition" class="aw-subtab is-active"
@@ -150,11 +144,6 @@
       <div id="aw-subpanel-delivery" class="aw-subpanel" role="tabpanel"
            aria-labelledby="aw-subtab-delivery" hidden>
         <section class="card">
-          <div class="aw-panel-head">
-            <h3>Approved and waiting</h3>
-            <p>Requisitions that have been approved and are now yours to
-               acknowledge, deliver, or reject.</p>
-          </div>
           <div class="table-scroll">
             <table id="delivery-table">
               <thead>
@@ -181,12 +170,6 @@
       <div id="aw-subpanel-stock" class="aw-subpanel" role="tabpanel"
            aria-labelledby="aw-subtab-stock" hidden>
         <section class="card">
-          <div class="aw-panel-head">
-            <h3>Stock</h3>
-            <p>What each district is holding. Opening, what arrived, what was
-               given out, and what carries into the next month. Nothing here is
-               typed twice - the balance is added up from what happened.</p>
-          </div>
 
           <div class="stock-controls">
             <div class="field field-sm">
@@ -234,9 +217,6 @@
         <section class="card">
           <div class="aw-panel-head">
             <h3>Head Office</h3>
-            <p>Who acknowledges and dispatches approved requisitions. They see
-               the Delivery tab; nobody else does. Only Staff Connect
-               administrators can change this list.</p>
           </div>
 
           <div class="admin-add-row">
@@ -266,13 +246,6 @@
          award-manage.js. -->
     <div id="aw-view-award" class="awm-view" hidden>
       <div class="pom-page">
-        <div class="pom-header">
-          <div>
-            <div class="pom-title">🏆 Award Management</div>
-            <div class="pom-subtitle">One Stop Solution For Awards Data</div>
-          </div>
-          <div class="pom-badge">AY 2026-27</div>
-        </div>
     <div id="awmManageView" style="display:flex; flex-direction:column; flex:1; min-height:0;">
 
     <!-- ── LIST VIEW ── -->
@@ -281,6 +254,7 @@
             <select id="awmDistrict" class="pom-select">
                 <option value="">Select District</option>
             </select>
+            <span class="awm-ay">AY 2026-27</span>
         </div>
 
         <div class="pom-card">
