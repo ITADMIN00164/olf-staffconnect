@@ -1149,6 +1149,8 @@ window.olfGeography = async function () {
                            .test(String(r["Dept"] || "").trim().toLowerCase().replace(/\s+/g, " ")),
             isDM:      /^program implementation\s*[-–]?\s*div$/
                            .test(String(r["Dept"] || "").trim().toLowerCase().replace(/\s+/g, " ")),
+            isCOO:     /^program implementation\s*[-–]?\s*coo$/
+                           .test(String(r["Dept"] || "").trim().toLowerCase().replace(/\s+/g, " ")),
             states:    keys(splitMulti(r["State"])),
             divisions: keys(splitMulti(r["Division"])),
             districts: keys(splitMulti(r["District"]).map(tidyDistrict))
@@ -1224,32 +1226,33 @@ window.olfGeography = async function () {
         }
     }
 
-    /* Who manages a place. A PM counts for a district only if they list it
-       and cover a state and division it sits in, so one who lists a district
-       from another state is not named against it. Where no PM lists the
-       district, the division's own PMs are shown. */
+    /* Who manages a district, first match wins:
+         1. a PM who lists the district, in the state it sits in - a PM is given
+            districts, and one may cross a division line to take one;
+         2. no PM, so the DM - the one the district's staff report to, then any
+            DM covering its state and division - as "(interim DM)";
+         3. no DM either, so the COO, as "(interim COO)".
+       A division's other PMs are not stood in: a PM manages the districts they
+       are given, not whatever else sits in the same division. */
     const covers = (p, st, dv) => p.states.includes(st) && p.divisions.includes(dv);
     const nameList = ps => [...new Set(ps.map(p => p.name))];
-    const pmsOfDistrict = dt => nameList(people.filter(p =>
-        p.isPM && p.name && p.districts.includes(dt) &&
-        spotsOf(dt).some(s => covers(p, s.state, s.division))));
-    const pmsOfDivision = (st, dv) => nameList(people.filter(p =>
-        p.isPM && p.name && covers(p, st, dv)));
-    /* With no PM in post, the Divisional Manager stands in, and the column
-       says so rather than passing them off as the PM. */
-    const interimOf = (st, dv) => nameList(people.filter(p =>
-        p.isDM && p.name && covers(p, st, dv))).map(n => n + " (interim DM)");
-
-    /* Whom the staff posted to a district report to is the plainest answer to
-       who manages it, and it reaches a district the manager's own record does
-       not list: Begusarai's team reports to the Pune DM, whose State says
-       Maharashtra. Used only where no PM is in post. */
     const byEmail = new Map(people.filter(p => p.email).map(p => [p.email, p]));
-    const interimByReport = dt => nameList(people
-        .filter(p => p.districts.length === 1 && p.districts[0] === dt && p.boss)
-        .map(p => byEmail.get(p.boss))
-        .filter(b => b && b.isDM && b.name))
-        .map(n => n + " (interim DM)");
+    const managerOf = (dt, st, dv) => {
+        const pms = nameList(people.filter(p =>
+            p.isPM && p.name && p.districts.includes(dt) && p.states.includes(st)));
+        if (pms.length) return pms.join(", ");
+
+        const bosses = nameList(people
+            .filter(p => p.districts.length === 1 && p.districts[0] === dt && p.boss)
+            .map(p => byEmail.get(p.boss))
+            .filter(b => b && b.isDM && b.name));
+        const dms = bosses.length ? bosses
+            : nameList(people.filter(p => p.isDM && p.name && covers(p, st, dv)));
+        if (dms.length) return dms.map(n => n + " (interim DM)").join(", ");
+
+        return nameList(people.filter(p => p.isCOO && p.name))
+            .map(n => n + " (interim COO)").join(", ");
+    };
 
     const out = [];
     for (const [state, byDiv] of tree) {
@@ -1257,18 +1260,14 @@ window.olfGeography = async function () {
         for (const [division, districts] of byDiv) {
             const sorted = [...districts].map(k => shown.get(k))
                 .sort((a, b) => a.localeCompare(b));
-            const pms = pmsOfDivision(state, division);
-            const cover = pms.length ? pms : interimOf(state, division);
             const byDistrict = {};
             for (const k of districts) {
-                let who = pmsOfDistrict(k);
-                if (!who.length && !pms.length) who = interimByReport(k);
-                if (who.length) byDistrict[shown.get(k)] = who.join(", ");
+                const who = managerOf(k, state, division);
+                if (who) byDistrict[shown.get(k)] = who;
             }
             divisions.push({
                 name: shown.get(division),
-                pm: cover.join(", "),
-                pms: pms,
+                pm: "",
                 pmByDistrict: byDistrict,
                 districts: sorted
             });
