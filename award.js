@@ -2774,7 +2774,18 @@ window.AWARD_CONFIG = {
     return rows;
   }
 
-  // Every district the directory knows, with the manager of its division.
+  /* Who manages the place, one name to a line. A stand-in is marked so it is
+     not read as the post-holder: the name, then an "interim" badge. */
+  function pmHtml(text) {
+    if (!text) return "—";
+    return String(text).split(", ").map(function (one) {
+      var m = one.match(/^(.*?)\s*\((interim [^)]+)\)$/i);
+      return '<span class="pm-one">' + escapeHtml(m ? m[1] : one) +
+        (m ? ' <em class="pm-interim">' + escapeHtml(m[2]) + "</em>" : "") + "</span>";
+    }).join("");
+  }
+
+  // Every district the directory knows, with who manages it.
   function stockPlaces() {
     var out = [];
     var seen = {};
@@ -3020,7 +3031,7 @@ window.AWARD_CONFIG = {
         '<td class="col-district is-district">' + escapeHtml(r.district) + "</td>" +
         "<td>" + escapeHtml(r.state) + "</td>" +
         '<td class="col-pm" title="' + escapeHtml(r.pm || "") + '">' +
-          escapeHtml(r.pm || "\u2014") + "</td>" +
+          pmHtml(r.pm) + "</td>" +
         cellsHtml(r.requisition, types, "req", r, mayEdit && !carry) +
         cellsHtml(r.delivery, types, "del", r, mayEdit && !carry) +
         cellsHtml(r.utilisation, types, "use", r, mayEdit && !carry) +

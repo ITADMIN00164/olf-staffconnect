@@ -1229,13 +1229,26 @@
 .award-page #stock-table td.is-neg { background: var(--danger-soft); color: var(--danger);
                                      font-weight: 700; }
 .award-page #stock-table td.is-district { font-weight: 600; }
-/* A division can have two or three managers, and their names together ran
-   wider than four columns of figures. The full list is on the cell. */
+/* The name is shown whole, wrapped rather than cut off, one to a line. */
 .award-page #stock-table td.col-pm {
-  max-width: 170px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  min-width: 200px;
+  white-space: normal;
   color: var(--text-soft);
+}
+.award-page #stock-table .pm-one { display: block; line-height: 1.35; }
+.award-page #stock-table .pm-interim {
+  display: inline-block;
+  margin-left: 2px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--warn-soft, #FEF3C7);
+  border: 1px solid var(--warn-soft-border, #FBE2B0);
+  color: var(--warn, #92400E);
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  white-space: nowrap;
 }
 .award-page #stock-table td.muted { color: var(--text-muted); }
 /* The cells an administrator types into. White was meant to tell them from
