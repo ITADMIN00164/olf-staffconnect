@@ -78,16 +78,26 @@
 
     <div class="card">
         <div class="table-toolbar">
-            <input
-                type="text"
-                id="searchBox"
-                class="search-input"
-                placeholder="🔍  Search by name, department, location…">
+            <div class="toolbar-left">
+                <input
+                    type="text"
+                    id="searchBox"
+                    class="search-input"
+                    placeholder="🔍  Search by name, department, location…">
+                <button type="button" class="btn-filters" id="empFiltersBtn" aria-expanded="false">
+                    <span class="btn-filters-ico">⛃</span> Filters
+                    <span class="btn-filters-count" id="empFiltersCount" hidden></span>
+                </button>
+            </div>
             <div class="toolbar-right">
                 <div class="table-meta" id="tableMeta"></div>
                 <button class="btn-excel" id="downloadExcelBtn">⬇ Download Excel</button>
             </div>
         </div>
+
+        <!-- One drop-down per column worth narrowing by; built from the records. -->
+        <div class="emp-filters" id="empFilters" hidden></div>
+        <div class="emp-chips" id="empChips" hidden></div>
 
         <div class="table-wrap">
             <table>

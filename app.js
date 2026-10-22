@@ -1637,6 +1637,11 @@ async function initEmployeesPage() {
 
     if (addBtn)    addBtn.addEventListener("click", openAddModal);
     if (searchBox) searchBox.addEventListener("input", renderEmployees);
+    document.getElementById("tableHead")?.addEventListener("click", onEmpHeadClick);
+    const filterBox = document.getElementById("empFilters");
+    if (filterBox) filterBox.addEventListener("change", onEmpFilterChange);
+    document.getElementById("empChips")?.addEventListener("click", onEmpFilterClick);
+    document.getElementById("empFiltersBtn")?.addEventListener("click", onEmpFiltersToggle);
     if (closeBtn)  closeBtn.addEventListener("click", closeModal);
     if (closeBtn2) closeBtn2.addEventListener("click", closeModal);
     if (excelBtn)  excelBtn.addEventListener("click", downloadExcel);
@@ -1674,6 +1679,7 @@ async function loadEmployees() {
         await deriveSchema();
         const snapshot = await getDocs(collection(db, "Employees"));
         snapshot.forEach(d => employees.push({ id: d.id, ...d.data() }));
+        buildEmpFilters();
         renderEmployees();
     } catch (err) {
         console.error(err);
@@ -1740,6 +1746,188 @@ function showMultiFor(empId, key) {
     });
 }
 
+/* ====================================
+   FILTERS AND SORTING
+
+   A drop-down for each column worth narrowing by, built from what the
+   records hold so there is nothing to keep in step. They combine with each
+   other and with the search box. Division and District hold several values
+   in one cell, so a person matches when any one of them is the chosen one.
+
+   Headers sort on a click: ascending, then descending, then back to the
+   order the records came in. Blank cells always go last, whichever way.
+==================================== */
+
+const EMP_FILTERS = [
+    { key: "Dept",        label: "Department"  },
+    { key: "Designation", label: "Designation" },
+    { key: "Status",      label: "Status"      },
+    { key: "State",       label: "State"       },
+    { key: "Division",    label: "Division",    multi: true },
+    { key: "District",    label: "District",    multi: true },
+    { key: "Location",    label: "Location"    }
+];
+const EMP_BLANK = "__blank__";
+
+let empFilter = {};                    // key -> chosen value
+let empSort   = { key: "", dir: 1 };   // key "" = the order records came in
+
+function empValues(emp, key) {
+    if (key === "Status") return [isActiveEmployee(emp) ? "Active" : "Inactive"];
+    if (EMP_FILTERS.some(f => f.key === key && f.multi) || key === "Block") return splitMulti(emp[key]);
+    const v = String(emp[key] || "").trim();
+    return v ? [v] : [];
+}
+
+function empMatchesFilters(emp, except) {
+    return EMP_FILTERS.every(f => {
+        const want = empFilter[f.key];
+        if (!want || f.key === except) return true;
+        const have = empValues(emp, f.key);
+        return want === EMP_BLANK ? have.length === 0 : have.includes(want);
+    });
+}
+
+/* Each drop-down offers what is left once every OTHER filter has been
+   applied, so the lists narrow as you choose: pick a state and the divisions
+   and districts are only that state's. A drop-down leaves its own choice out
+   of its own pool, so it can still be changed. Each option carries how many
+   people it would show. */
+function empPool(key) {
+    const seen = new Map();
+    let blank = 0;
+    employees.forEach(emp => {
+        if (!empMatchesFilters(emp, key)) return;
+        const vals = empValues(emp, key);
+        if (!vals.length) blank++;
+        vals.forEach(v => seen.set(v, (seen.get(v) || 0) + 1));
+    });
+    return { seen, blank };
+}
+
+function buildEmpFilters() {
+    const box = document.getElementById("empFilters");
+    if (!box) return;
+
+    // A choice that another filter has since made impossible is dropped, and
+    // that can in turn empty another, so go round until nothing changes.
+    for (let again = true, n = 0; again && n < EMP_FILTERS.length + 1; n++) {
+        again = false;
+        EMP_FILTERS.forEach(f => {
+            const want = empFilter[f.key];
+            if (!want) return;
+            const { seen, blank } = empPool(f.key);
+            if (want === EMP_BLANK ? !blank : !seen.has(want)) { delete empFilter[f.key]; again = true; }
+        });
+    }
+
+    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+    box.innerHTML = EMP_FILTERS.map(f => {
+        const { seen, blank } = empPool(f.key);
+        const chosen = empFilter[f.key] || "";
+        const options = [...seen.keys()].sort(collator.compare);
+
+        return `<div class="emp-filter${chosen ? " is-set" : ""}">
+            <label for="empf-${f.key}">${f.label}</label>
+            <select id="empf-${f.key}" data-filter="${f.key}">
+                <option value="">All</option>
+                ${blank ? `<option value="${EMP_BLANK}"${chosen === EMP_BLANK ? " selected" : ""}>(blank) · ${blank}</option>` : ""}
+                ${options.map(v => `<option value="${escHtml(v)}"${v === chosen ? " selected" : ""}>${escHtml(v)} · ${seen.get(v)}</option>`).join("")}
+            </select>
+        </div>`;
+    }).join("");
+
+    syncEmpFilterBar();
+}
+
+let empFiltersOpen = false;
+
+/* The panel, its button and the chips of what is applied, kept in step. The
+   chips stay up while the panel is shut, so nothing is filtered out of sight. */
+function syncEmpFilterBar() {
+    const box   = document.getElementById("empFilters");
+    const btn   = document.getElementById("empFiltersBtn");
+    const count = document.getElementById("empFiltersCount");
+    const chips = document.getElementById("empChips");
+    const keys  = Object.keys(empFilter);
+
+    if (box) box.hidden = !empFiltersOpen;
+    if (btn) btn.setAttribute("aria-expanded", String(!!box && !box.hidden));
+    if (count) { count.hidden = !keys.length; count.textContent = keys.length; }
+
+    if (chips) {
+        chips.hidden = !keys.length;
+        chips.innerHTML = keys.map(k => {
+            const f = EMP_FILTERS.find(x => x.key === k);
+            const v = empFilter[k] === EMP_BLANK ? "(blank)" : empFilter[k];
+            return `<span class="emp-chip"><i>${f.label}:</i> ${escHtml(v)}
+                <button type="button" data-drop-filter="${k}" title="Remove" aria-label="Remove ${f.label} filter">✕</button></span>`;
+        }).join("") + (keys.length > 1
+            ? `<button type="button" class="emp-filter-clear" data-clear-filters>Clear all</button>` : "");
+    }
+}
+
+function empSortValue(emp, key) {
+    if (key === "__id") return emp.id;
+    if (key === "Status") return isActiveEmployee(emp) ? "Active" : "Inactive";
+    if (MULTI_VALUE_FIELDS[key]) return splitMulti(emp[key]).join("; ");
+    return String(emp[key] || "").trim();
+}
+
+function sortEmployees(list) {
+    if (!empSort.key) return list;
+    const { key, dir } = empSort;
+    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+    return list.slice().sort((a, b) => {
+        const x = empSortValue(a, key), y = empSortValue(b, key);
+        if (!x && !y) return 0;
+        if (!x) return 1;
+        if (!y) return -1;
+        return dir * collator.compare(x, y);
+    });
+}
+
+function onEmpHeadClick(e) {
+    const th = e.target.closest("th[data-sort]");
+    if (!th) return;
+    const key = th.dataset.sort;
+    if (empSort.key !== key)      empSort = { key, dir: 1 };
+    else if (empSort.dir === 1)   empSort = { key, dir: -1 };
+    else                          empSort = { key: "", dir: 1 };
+    renderEmployees();
+}
+
+function onEmpFilterChange(e) {
+    const sel = e.target.closest("select[data-filter]");
+    if (!sel) return;
+    if (sel.value) empFilter[sel.dataset.filter] = sel.value;
+    else delete empFilter[sel.dataset.filter];
+    buildEmpFilters();
+    renderEmployees();
+}
+
+function onEmpFilterClick(e) {
+    const drop = e.target.closest("[data-drop-filter]");
+    if (drop) delete empFilter[drop.dataset.dropFilter];
+    else if (e.target.closest("[data-clear-filters]")) empFilter = {};
+    else return;
+    buildEmpFilters();
+    renderEmployees();
+}
+
+function onEmpFiltersToggle() {
+    empFiltersOpen = !empFiltersOpen;
+    syncEmpFilterBar();
+}
+
+function sortableTh(key, label, cls) {
+    const on = empSort.key === key;
+    const mark = on ? (empSort.dir === 1 ? "▲" : "▼") : "⇅";
+    return `<th class="${cls} is-sortable${on ? " is-sorted" : ""}" data-sort="${key}"
+        aria-sort="${on ? (empSort.dir === 1 ? "ascending" : "descending") : "none"}"
+        title="Sort by ${label}">${label}<span class="sort-mark">${mark}</span></th>`;
+}
+
 function renderEmployees() {
     const searchBox = document.getElementById("searchBox");
     const tableHead = document.getElementById("tableHead");
@@ -1749,9 +1937,15 @@ function renderEmployees() {
     if (!tableHead || !tableEl) return;
 
     const search   = searchBox?.value.trim().toLowerCase() || "";
-    const filtered = employees.filter(emp => JSON.stringify(emp).toLowerCase().includes(search));
+    const filtered = sortEmployees(employees.filter(emp =>
+        empMatchesFilters(emp) && JSON.stringify(emp).toLowerCase().includes(search)));
 
-    if (metaEl) metaEl.textContent = `${filtered.length} record${filtered.length !== 1 ? "s" : ""}`;
+    if (metaEl) {
+        const narrowed = search || Object.keys(empFilter).length;
+        metaEl.textContent = narrowed
+            ? `${filtered.length} of ${employees.length} records`
+            : `${filtered.length} record${filtered.length !== 1 ? "s" : ""}`;
+    }
 
     const tableCols = getTableColumns();
     const colCount  = tableCols.length + 1 + (currentRole === "Admin" ? 1 : 0);
@@ -1759,11 +1953,10 @@ function renderEmployees() {
     tableHead.innerHTML = `
         <tr>
             ${currentRole === "Admin" ? `<th class="col-actions">Actions</th>` : ""}
-            <th class="col-id">ID</th>
+            ${sortableTh("__id", "ID", "col-id")}
             ${tableCols.map(key => {
                 const field = schemaFields.find(f => f.key === key);
-                const label = field ? field.label : key;
-                return `<th class="${colClass(key)}">${label}</th>`;
+                return sortableTh(key, field ? field.label : key, colClass(key));
             }).join("")}
         </tr>
     `;
@@ -1773,7 +1966,7 @@ function renderEmployees() {
             <tr><td colspan="${colCount}">
                 <div class="empty-state">
                     <div class="empty-icon">🔍</div>
-                    No employees match your search.
+                    No employees match your search or filters.
                 </div>
             </td></tr>
         `;
