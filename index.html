@@ -1215,6 +1215,43 @@
 
         .table-wrap { width: 100%; overflow-x: auto; }
 
+        .emp-filters {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            gap: 10px 12px;
+            margin: -4px 0 16px;
+        }
+        .emp-filter { display: flex; flex-direction: column; gap: 4px; min-width: 150px; }
+        .emp-filter label {
+            font-size: 11px; font-weight: 600; color: #6b7280;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .emp-filter select {
+            padding: 7px 28px 7px 10px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 13px;
+            font-family: inherit;
+            background: #fff;
+            color: #374151;
+            max-width: 220px;
+            outline: none;
+        }
+        .emp-filter select:focus { border-color: #4f8ef7; box-shadow: 0 0 0 3px rgba(79,142,247,0.1); }
+        .emp-filter.is-set select { border-color: #4f8ef7; background: #f5f8ff; }
+        .emp-filter-clear {
+            border: none; background: none; color: #4f8ef7; cursor: pointer;
+            font: inherit; font-size: 13px; font-weight: 600; padding: 8px 4px;
+        }
+        .emp-filter-clear:hover { text-decoration: underline; }
+
+        th.is-sortable { cursor: pointer; user-select: none; }
+        th.is-sortable:hover { color: #374151; background: #f3f4f6; }
+        th.is-sortable .sort-mark { margin-left: 5px; font-size: 10px; color: #c5c9d1; }
+        th.is-sorted { color: #4f8ef7; }
+        th.is-sorted .sort-mark { color: #4f8ef7; }
+
         table { border-collapse: collapse; white-space: nowrap; }
         thead tr { border-bottom: 2px solid #f3f4f6; }
 

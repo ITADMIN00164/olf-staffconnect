@@ -1637,6 +1637,12 @@ async function initEmployeesPage() {
 
     if (addBtn)    addBtn.addEventListener("click", openAddModal);
     if (searchBox) searchBox.addEventListener("input", renderEmployees);
+    document.getElementById("tableHead")?.addEventListener("click", onEmpHeadClick);
+    const filterBox = document.getElementById("empFilters");
+    if (filterBox) {
+        filterBox.addEventListener("change", onEmpFilterChange);
+        filterBox.addEventListener("click", onEmpFilterClick);
+    }
     if (closeBtn)  closeBtn.addEventListener("click", closeModal);
     if (closeBtn2) closeBtn2.addEventListener("click", closeModal);
     if (excelBtn)  excelBtn.addEventListener("click", downloadExcel);
@@ -1674,6 +1680,7 @@ async function loadEmployees() {
         await deriveSchema();
         const snapshot = await getDocs(collection(db, "Employees"));
         snapshot.forEach(d => employees.push({ id: d.id, ...d.data() }));
+        buildEmpFilters();
         renderEmployees();
     } catch (err) {
         console.error(err);
@@ -1740,6 +1747,136 @@ function showMultiFor(empId, key) {
     });
 }
 
+/* ====================================
+   FILTERS AND SORTING
+
+   A drop-down for each column worth narrowing by, built from what the
+   records hold so there is nothing to keep in step. They combine with each
+   other and with the search box. Division and District hold several values
+   in one cell, so a person matches when any one of them is the chosen one.
+
+   Headers sort on a click: ascending, then descending, then back to the
+   order the records came in. Blank cells always go last, whichever way.
+==================================== */
+
+const EMP_FILTERS = [
+    { key: "Dept",        label: "Department"  },
+    { key: "Designation", label: "Designation" },
+    { key: "Status",      label: "Status"      },
+    { key: "State",       label: "State"       },
+    { key: "Division",    label: "Division",    multi: true },
+    { key: "District",    label: "District",    multi: true },
+    { key: "Location",    label: "Location"    }
+];
+const EMP_BLANK = "__blank__";
+
+let empFilter = {};                    // key -> chosen value
+let empSort   = { key: "", dir: 1 };   // key "" = the order records came in
+
+function empValues(emp, key) {
+    if (key === "Status") return [isActiveEmployee(emp) ? "Active" : "Inactive"];
+    if (EMP_FILTERS.some(f => f.key === key && f.multi) || key === "Block") return splitMulti(emp[key]);
+    const v = String(emp[key] || "").trim();
+    return v ? [v] : [];
+}
+
+function empMatchesFilters(emp) {
+    return EMP_FILTERS.every(f => {
+        const want = empFilter[f.key];
+        if (!want) return true;
+        const have = empValues(emp, f.key);
+        return want === EMP_BLANK ? have.length === 0 : have.includes(want);
+    });
+}
+
+function buildEmpFilters() {
+    const box = document.getElementById("empFilters");
+    if (!box) return;
+
+    const parts = EMP_FILTERS.map(f => {
+        const seen = new Set();
+        let hasBlank = false;
+        employees.forEach(emp => {
+            const vals = empValues(emp, f.key);
+            if (!vals.length) hasBlank = true;
+            vals.forEach(v => seen.add(v));
+        });
+        const options = [...seen].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+
+        if (empFilter[f.key] && empFilter[f.key] !== EMP_BLANK && !seen.has(empFilter[f.key])) {
+            delete empFilter[f.key];       // the value it named is gone
+        }
+        const chosen = empFilter[f.key] || "";
+
+        return `<div class="emp-filter${chosen ? " is-set" : ""}">
+            <label for="empf-${f.key}">${f.label}</label>
+            <select id="empf-${f.key}" data-filter="${f.key}">
+                <option value="">All</option>
+                ${hasBlank ? `<option value="${EMP_BLANK}"${chosen === EMP_BLANK ? " selected" : ""}>(blank)</option>` : ""}
+                ${options.map(v => `<option value="${escHtml(v)}"${v === chosen ? " selected" : ""}>${escHtml(v)}</option>`).join("")}
+            </select>
+        </div>`;
+    });
+
+    const any = Object.keys(empFilter).length > 0;
+    box.innerHTML = parts.join("") +
+        (any ? `<button type="button" class="emp-filter-clear" data-clear-filters>Clear filters</button>` : "");
+}
+
+function empSortValue(emp, key) {
+    if (key === "__id") return emp.id;
+    if (key === "Status") return isActiveEmployee(emp) ? "Active" : "Inactive";
+    if (MULTI_VALUE_FIELDS[key]) return splitMulti(emp[key]).join("; ");
+    return String(emp[key] || "").trim();
+}
+
+function sortEmployees(list) {
+    if (!empSort.key) return list;
+    const { key, dir } = empSort;
+    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+    return list.slice().sort((a, b) => {
+        const x = empSortValue(a, key), y = empSortValue(b, key);
+        if (!x && !y) return 0;
+        if (!x) return 1;
+        if (!y) return -1;
+        return dir * collator.compare(x, y);
+    });
+}
+
+function onEmpHeadClick(e) {
+    const th = e.target.closest("th[data-sort]");
+    if (!th) return;
+    const key = th.dataset.sort;
+    if (empSort.key !== key)      empSort = { key, dir: 1 };
+    else if (empSort.dir === 1)   empSort = { key, dir: -1 };
+    else                          empSort = { key: "", dir: 1 };
+    renderEmployees();
+}
+
+function onEmpFilterChange(e) {
+    const sel = e.target.closest("select[data-filter]");
+    if (!sel) return;
+    if (sel.value) empFilter[sel.dataset.filter] = sel.value;
+    else delete empFilter[sel.dataset.filter];
+    buildEmpFilters();
+    renderEmployees();
+}
+
+function onEmpFilterClick(e) {
+    if (!e.target.closest("[data-clear-filters]")) return;
+    empFilter = {};
+    buildEmpFilters();
+    renderEmployees();
+}
+
+function sortableTh(key, label, cls) {
+    const on = empSort.key === key;
+    const mark = on ? (empSort.dir === 1 ? "▲" : "▼") : "⇅";
+    return `<th class="${cls} is-sortable${on ? " is-sorted" : ""}" data-sort="${key}"
+        aria-sort="${on ? (empSort.dir === 1 ? "ascending" : "descending") : "none"}"
+        title="Sort by ${label}">${label}<span class="sort-mark">${mark}</span></th>`;
+}
+
 function renderEmployees() {
     const searchBox = document.getElementById("searchBox");
     const tableHead = document.getElementById("tableHead");
@@ -1749,9 +1886,15 @@ function renderEmployees() {
     if (!tableHead || !tableEl) return;
 
     const search   = searchBox?.value.trim().toLowerCase() || "";
-    const filtered = employees.filter(emp => JSON.stringify(emp).toLowerCase().includes(search));
+    const filtered = sortEmployees(employees.filter(emp =>
+        empMatchesFilters(emp) && JSON.stringify(emp).toLowerCase().includes(search)));
 
-    if (metaEl) metaEl.textContent = `${filtered.length} record${filtered.length !== 1 ? "s" : ""}`;
+    if (metaEl) {
+        const narrowed = search || Object.keys(empFilter).length;
+        metaEl.textContent = narrowed
+            ? `${filtered.length} of ${employees.length} records`
+            : `${filtered.length} record${filtered.length !== 1 ? "s" : ""}`;
+    }
 
     const tableCols = getTableColumns();
     const colCount  = tableCols.length + 1 + (currentRole === "Admin" ? 1 : 0);
@@ -1759,11 +1902,10 @@ function renderEmployees() {
     tableHead.innerHTML = `
         <tr>
             ${currentRole === "Admin" ? `<th class="col-actions">Actions</th>` : ""}
-            <th class="col-id">ID</th>
+            ${sortableTh("__id", "ID", "col-id")}
             ${tableCols.map(key => {
                 const field = schemaFields.find(f => f.key === key);
-                const label = field ? field.label : key;
-                return `<th class="${colClass(key)}">${label}</th>`;
+                return sortableTh(key, field ? field.label : key, colClass(key));
             }).join("")}
         </tr>
     `;
@@ -1773,7 +1915,7 @@ function renderEmployees() {
             <tr><td colspan="${colCount}">
                 <div class="empty-state">
                     <div class="empty-icon">🔍</div>
-                    No employees match your search.
+                    No employees match your search or filters.
                 </div>
             </td></tr>
         `;
