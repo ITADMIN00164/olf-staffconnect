@@ -1639,10 +1639,9 @@ async function initEmployeesPage() {
     if (searchBox) searchBox.addEventListener("input", renderEmployees);
     document.getElementById("tableHead")?.addEventListener("click", onEmpHeadClick);
     const filterBox = document.getElementById("empFilters");
-    if (filterBox) {
-        filterBox.addEventListener("change", onEmpFilterChange);
-        filterBox.addEventListener("click", onEmpFilterClick);
-    }
+    if (filterBox) filterBox.addEventListener("change", onEmpFilterChange);
+    document.getElementById("empChips")?.addEventListener("click", onEmpFilterClick);
+    document.getElementById("empFiltersBtn")?.addEventListener("click", onEmpFiltersToggle);
     if (closeBtn)  closeBtn.addEventListener("click", closeModal);
     if (closeBtn2) closeBtn2.addEventListener("click", closeModal);
     if (excelBtn)  excelBtn.addEventListener("click", downloadExcel);
@@ -1818,9 +1817,35 @@ function buildEmpFilters() {
         </div>`;
     });
 
-    const any = Object.keys(empFilter).length > 0;
-    box.innerHTML = parts.join("") +
-        (any ? `<button type="button" class="emp-filter-clear" data-clear-filters>Clear filters</button>` : "");
+    box.innerHTML = parts.join("");
+    syncEmpFilterBar();
+}
+
+let empFiltersOpen = false;
+
+/* The panel, its button and the chips of what is applied, kept in step. The
+   chips stay up while the panel is shut, so nothing is filtered out of sight. */
+function syncEmpFilterBar() {
+    const box   = document.getElementById("empFilters");
+    const btn   = document.getElementById("empFiltersBtn");
+    const count = document.getElementById("empFiltersCount");
+    const chips = document.getElementById("empChips");
+    const keys  = Object.keys(empFilter);
+
+    if (box) box.hidden = !empFiltersOpen;
+    if (btn) btn.setAttribute("aria-expanded", String(!!box && !box.hidden));
+    if (count) { count.hidden = !keys.length; count.textContent = keys.length; }
+
+    if (chips) {
+        chips.hidden = !keys.length;
+        chips.innerHTML = keys.map(k => {
+            const f = EMP_FILTERS.find(x => x.key === k);
+            const v = empFilter[k] === EMP_BLANK ? "(blank)" : empFilter[k];
+            return `<span class="emp-chip"><i>${f.label}:</i> ${escHtml(v)}
+                <button type="button" data-drop-filter="${k}" title="Remove" aria-label="Remove ${f.label} filter">✕</button></span>`;
+        }).join("") + (keys.length > 1
+            ? `<button type="button" class="emp-filter-clear" data-clear-filters>Clear all</button>` : "");
+    }
 }
 
 function empSortValue(emp, key) {
@@ -1863,10 +1888,17 @@ function onEmpFilterChange(e) {
 }
 
 function onEmpFilterClick(e) {
-    if (!e.target.closest("[data-clear-filters]")) return;
-    empFilter = {};
+    const drop = e.target.closest("[data-drop-filter]");
+    if (drop) delete empFilter[drop.dataset.dropFilter];
+    else if (e.target.closest("[data-clear-filters]")) empFilter = {};
+    else return;
     buildEmpFilters();
     renderEmployees();
+}
+
+function onEmpFiltersToggle() {
+    empFiltersOpen = !empFiltersOpen;
+    syncEmpFilterBar();
 }
 
 function sortableTh(key, label, cls) {
