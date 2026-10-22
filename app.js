@@ -1122,78 +1122,121 @@ window.olfGeography = async function () {
 
     const snapshot = await getDocs(collection(db, "Employees"));
 
-    // state -> division -> Set(district)
-    const tree = new Map();
+    /* The directory is typed by hand, so the same place turns up as "Pune",
+       "pune" and "Pune " . They are one place; the first spelling seen is the
+       one shown. */
+    const norm = s => String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
+    const shown = new Map();
+    const say = s => { const k = norm(s); if (!shown.has(k)) shown.set(k, s.replace(/\s+/g, " ").trim()); return k; };
+    const keys = list => [...new Set(list.map(say))];
 
-    /* Who manages each division, for the stock sheet's PM column. A
-       Programme Manager covers one division, so the division is the link -
-       the sheet lists a PM beside every district, and that is the PM of the
-       division the district sits in. */
-    const pmOfDivision = new Map();
-    // The same, but for the districts the PM is actually posted to.
-    const pmOfDistrict = new Map();
-
+    const people = [];
     snapshot.forEach(d => {
         const r = d.data();
         if (!isActiveEmployee(r)) return;
-
-        const states    = splitMulti(r["State"]);
-        const divisions = splitMulti(r["Division"]);
-        const districts = splitMulti(r["District"]).map(tidyDistrict);
-
-        const isPM = /^program implementation\s*[-–]?\s*pm$/
-            .test(String(r["Dept"] || "").trim().toLowerCase().replace(/\s+/g, " "));
-        if (isPM) {
-            // A division can have more than one - Amravati has two and
-            // Chhatrapati Sambhajinagar three. Naming only the first would
-            // leave the others off a column that is supposed to say who
-            // manages the place.
-            const who = String(r.Name || "").trim();
-            if (who) {
-                for (const dt of districts) {
-                    const key = dt.toLowerCase();
-                    const l = pmOfDistrict.get(key) || [];
-                    if (!l.includes(who)) l.push(who);
-                    pmOfDistrict.set(key, l);
-                }
-            }
-            for (const dv of divisions) {
-                const name = String(r.Name || "").trim();
-                if (!name) continue;
-                const list = pmOfDivision.get(dv) || [];
-                if (!list.includes(name)) list.push(name);
-                pmOfDivision.set(dv, list);
-            }
-        }
-
-        for (const st of states) {
-            if (!tree.has(st)) tree.set(st, new Map());
-            const byDiv = tree.get(st);
-            for (const dv of divisions) {
-                if (!byDiv.has(dv)) byDiv.set(dv, new Set());
-                districts.forEach(dt => byDiv.get(dv).add(dt));
-            }
-        }
+        people.push({
+            name:      String(r.Name || "").trim(),
+            isPM:      /^program implementation\s*[-–]?\s*pm$/
+                           .test(String(r["Dept"] || "").trim().toLowerCase().replace(/\s+/g, " ")),
+            states:    keys(splitMulti(r["State"])),
+            divisions: keys(splitMulti(r["Division"])),
+            districts: keys(splitMulti(r["District"]).map(tidyDistrict))
+        });
     });
+
+    /* Where each district is. Someone covering several places lists their
+       states, divisions and districts side by side and nothing says which
+       goes with which - crossing the three lists put Begusarai under
+       Maharashtra because a manager there also covers Bihar. So a district is
+       placed by what can be known for certain, strongest first:
+         1. a person with one state, one division and one district;
+         2. a person with one state and one division and several districts,
+            for any district step 1 has not already placed - a list typed by
+            hand is where a stray district slips in;
+         3. lists of equal length, read in step: the first state, division
+            and district belong together;
+         4. only for a district nobody above names, the crossing of what is
+            listed, which is the best there is.
+       A district placed at an earlier step is not placed by a later one. */
+    const placed = new Map();      // district -> Map("state|division" -> {state, division})
+    const place = (map, dt, st, dv) => {
+        const at = map.get(dt) || new Map();
+        at.set(st + "|" + dv, { state: st, division: dv });
+        map.set(dt, at);
+    };
+    for (const p of people) {
+        if (p.states.length === 1 && p.divisions.length === 1 && p.districts.length === 1) {
+            place(placed, p.districts[0], p.states[0], p.divisions[0]);
+        }
+    }
+    const byOne = new Set(placed.keys());
+    for (const p of people) {
+        if (p.states.length === 1 && p.divisions.length === 1 && p.districts.length > 1) {
+            p.districts.forEach(dt => { if (!byOne.has(dt)) place(placed, dt, p.states[0], p.divisions[0]); });
+        }
+    }
+    for (const p of people) {
+        if (p.states.length > 1 && p.states.length === p.divisions.length &&
+            p.states.length === p.districts.length) {
+            p.districts.forEach((dt, i) => {
+                if (!placed.has(dt)) place(placed, dt, p.states[i], p.divisions[i]);
+            });
+        }
+    }
+    const guessed = new Map();
+    for (const p of people) {
+        for (const dt of p.districts) {
+            if (placed.has(dt)) continue;
+            for (const st of p.states) for (const dv of p.divisions) place(guessed, dt, st, dv);
+        }
+    }
+    const spotsOf = dt => [...(placed.get(dt) || guessed.get(dt) || new Map()).values()];
+
+    // state -> division -> Set(district)
+    const tree = new Map();
+    for (const dt of new Set([...placed.keys(), ...guessed.keys()])) {
+        for (const w of spotsOf(dt)) {
+            if (!tree.has(w.state)) tree.set(w.state, new Map());
+            const byDiv = tree.get(w.state);
+            if (!byDiv.has(w.division)) byDiv.set(w.division, new Set());
+            byDiv.get(w.division).add(dt);
+        }
+    }
+
+    /* Who manages a place. A PM counts for a district only if they list it
+       and cover a state and division it sits in, so one who lists a district
+       from another state is not named against it. Where no PM lists the
+       district, the division's own PMs are shown. */
+    const covers = (p, st, dv) => p.states.includes(st) && p.divisions.includes(dv);
+    const nameList = ps => [...new Set(ps.map(p => p.name))];
+    const pmsOfDistrict = dt => nameList(people.filter(p =>
+        p.isPM && p.name && p.districts.includes(dt) &&
+        spotsOf(dt).some(s => covers(p, s.state, s.division))));
+    const pmsOfDivision = (st, dv) => nameList(people.filter(p =>
+        p.isPM && p.name && covers(p, st, dv)));
 
     const out = [];
     for (const [state, byDiv] of tree) {
         const divisions = [];
         for (const [division, districts] of byDiv) {
-            if (!districts.size) continue;
+            const sorted = [...districts].map(k => shown.get(k))
+                .sort((a, b) => a.localeCompare(b));
+            const pms = pmsOfDivision(state, division);
+            const byDistrict = {};
+            for (const k of districts) {
+                const who = pmsOfDistrict(k);
+                if (who.length) byDistrict[shown.get(k)] = who.join(", ");
+            }
             divisions.push({
-                name: division,
-                pm: (pmOfDivision.get(division) || []).join(", "),
-                pms: pmOfDivision.get(division) || [],
-                pmByDistrict: Object.fromEntries([...districts]
-                    .filter(dt => pmOfDistrict.has(dt.toLowerCase()))
-                    .map(dt => [dt, pmOfDistrict.get(dt.toLowerCase()).join(", ")])),
-                districts: [...districts].sort((a, b) => a.localeCompare(b))
+                name: shown.get(division),
+                pm: pms.join(", "),
+                pms: pms,
+                pmByDistrict: byDistrict,
+                districts: sorted
             });
         }
-        if (!divisions.length) continue;        // nothing selectable under it
         divisions.sort((a, b) => a.name.localeCompare(b.name));
-        out.push({ name: state, divisions });
+        out.push({ name: shown.get(state), divisions });
     }
     out.sort((a, b) => a.name.localeCompare(b.name));
 
