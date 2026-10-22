@@ -3,7 +3,8 @@
    A copy of the one on the POM page, kept apart from pom.js so the two can be
    changed separately: everything lives inside this function, the handlers its
    markup calls are prefixed awm, and its elements carry awm ids. It reads and
-   writes the same award data through the same service. */
+   writes the award records in the database. Only a picture upload still goes
+   to the old Apps Script service, because the pictures stay in Google Drive. */
 (function () {
 
 const API_URL =
@@ -47,6 +48,147 @@ const LOCK_MSG = "This record is locked after verification. Please contact admin
 function currentUser() {
   const u = window.__olfUser;
   return (u && (u.email || u.name)) || resolvedEmail || "";
+}
+
+// ===============================
+// DATABASE (Supabase)
+// The records live in public.award_records, not in the Google Sheet. Only the
+// image upload still goes to the old Apps Script service, because the pictures
+// stay in Google Drive.
+// ===============================
+const SB_URL = "https://rpnxpkwcpsbxswnowuhx.supabase.co";
+const SB_KEY = "sb_publishable_60Ynb6EZ6Qc2GHrdqERwpw_dUdH3dKD";
+let hasRejected = false;      // true once the rejected column is seen on a row
+
+function sbHeaders(extra) {
+  return Object.assign({ apikey: SB_KEY, Authorization: "Bearer " + SB_KEY }, extra || {});
+}
+
+async function sbGet(path) {
+  const res = await fetch(`${SB_URL}/rest/v1/${path}`, { headers: sbHeaders() });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function sbSend(method, path, body) {
+  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    method,
+    headers: sbHeaders({ "Content-Type": "application/json", Prefer: "return=representation" }),
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+// A database row, in the shape the rest of this file was written for.
+function toRec(row) {
+  if ("rejected" in row) hasRejected = true;
+  return {
+    id: row.id,
+    month: row.month_label,
+    districtName: row.district_name,
+    fullName: row.full_name || "",
+    mobile: row.mobile || "",
+    email: row.email || "",
+    schoolName: row.school_name || "",
+    community: row.community || "",
+    circleName: row.circle_name || "",
+    blockName: row.block_name || "",
+    pmName: row.pm_name || "",
+    awardName: row.award_name || "",
+    awardCategory: row.award_category || "",
+    postLink: row.post_url || "",
+    postScore: row.post_score,
+    awarded: row.awarded ? "Yes" : "No",
+    awardedBy: row.awarded_by || "",
+    awardedDate: row.awarded_date || "",
+    folderLink: row.image_url || "",
+    uploadedBy: row.uploaded_by || "",
+    verified: row.rejected ? "Rejected" : (row.verified ? "Yes" : ""),
+    verifiedBy: row.verified_by || "",
+    description: row.description || "",
+    late: ""
+  };
+}
+
+const ORDER = "order=full_name.asc,award_name.asc,id.asc";
+
+async function dbDistrictRows(district) {
+  const rows = await sbGet(`award_records?district_name=eq.${encodeURIComponent(district)}&select=*&${ORDER}`);
+  return rows.map(toRec);
+}
+
+async function dbMonthRows(district, month) {
+  const rows = await sbGet(
+    `award_records?district_name=eq.${encodeURIComponent(district)}` +
+    `&month_label=eq.${encodeURIComponent(month)}&select=*&${ORDER}`
+  );
+  return rows.map(toRec);
+}
+
+// Every change is written down: who, what, when.
+function dbLog(id, action, note) {
+  sbSend("POST", "award_record_events", {
+    record_id: id, action, by_email: currentUser() || null,
+    by_name: nameFromEmail(currentUser()) || null, note: note || null
+  }).catch(e => console.warn("Could not log the change:", e));
+}
+
+// Where a decision (verified, rejected, or neither) is kept. The rejected
+// column is added by sql/award-records-rejected.sql.
+function decisionFields(verified) {
+  const f = { verified: verified === "Yes", verified_by: verified ? currentUser() : null };
+  if (hasRejected || verified === "Rejected") f.rejected = verified === "Rejected";
+  return f;
+}
+
+// What a saved row holds. Saving submits it again, so any decision is cleared.
+function savedFields(r) {
+  return Object.assign({
+    awarded: true,
+    awarded_by: r.awardedBy || null,
+    awarded_date: r.awardedDate || null,
+    image_url: r.folderLink || null,
+    drive_file_id: driveId(r.folderLink) || null,
+    uploaded_by: r.uploadedBy || null,
+    description: r.description || null,
+    updated_at: new Date().toISOString()
+  }, { verified: false, verified_by: null }, hasRejected ? { rejected: false } : {});
+}
+
+// The write is refused for a verified row, whatever this page believes: the
+// filter is applied by the database, so a stale page cannot overwrite one.
+async function dbSaveRows(rows) {
+  const locked = [];
+  await Promise.all(rows.map(async r => {
+    const done = await sbSend("PATCH", `award_records?id=eq.${r.id}&verified=eq.false`, savedFields(r));
+    if (!done.length) locked.push(r.fullName || "a record");
+    else dbLog(r.id, "saved");
+  }));
+  return { success: true, locked };
+}
+
+// Taking an award back clears what was entered. The row stays: it is the post
+// that existed. The picture is left in Drive.
+async function dbErase(r) {
+  const cleared = Object.assign({
+    awarded: false, awarded_by: null, awarded_date: null, image_url: null,
+    drive_file_id: null, uploaded_by: null, description: null,
+    verified: false, verified_by: null, updated_at: new Date().toISOString()
+  }, hasRejected ? { rejected: false } : {});
+  const done = await sbSend("PATCH", `award_records?id=eq.${r.id}&verified=eq.false`, cleared);
+  if (!done.length) throw new Error("This record is verified and locked.");
+  dbLog(r.id, "erased");
+  return {};
+}
+
+// Verify, reject or unlock: the one change a verifier makes.
+async function dbDecide(r, action) {
+  const fields = decisionFields(r.verified);
+  fields.updated_at = new Date().toISOString();
+  const done = await sbSend("PATCH", `award_records?id=eq.${r.id}`, fields);
+  if (!done.length) throw new Error("Record not found.");
+  dbLog(r.id, action);
 }
 
 // ===============================
@@ -145,17 +287,21 @@ async function loadVerifierStatus() {
 // LOAD FILTERS (district only)
 // ===============================
 async function loadFilters() {
-  // Re-query by id each time: initPomPageUI replaces the <select> (to rebind its
+  // Re-query by id each time: initAwardManageUI replaces the <select> (to rebind its
   // change handler), so a cached reference would point at a detached element.
   const dd0 = document.getElementById("awmDistrict");
   if (dd0) { dd0.disabled = true; dd0.innerHTML = '<option>⏳ Loading districts…</option>'; }
   try {
-    const res = await fetch(`${API_URL}?action=getFilters`);
-    const data = await res.json();
+    // One small read: every district and month that has records.
+    const rows = await sbGet("award_month_summary?select=district_name,month_label");
+    const months = Array.from(new Set(rows.map(r => r.month_label)));
+    const districts = Array.from(new Set(rows.map(r => r.district_name)))
+      .sort((a, b) => a.localeCompare(b));
+
     // Month order used by every page: labels that are not a month
     // (e.g. "Pending 2025-26") come first, in name order; real months
     // follow in calendar order.
-    allMonths = (data.months || []).slice().sort(function (a, b) {
+    allMonths = months.sort(function (a, b) {
       function key(x) {
         var p = String(x || "").split("-");
         var mi = MONTHS[p[0]], yr = parseInt(p[1], 10);
@@ -169,7 +315,7 @@ async function loadFilters() {
     if (dd) {
       dd.innerHTML =
         '<option value="">Select District</option>' +
-        (data.districts || []).map(d => `<option value="${d}">${d}</option>`).join("");
+        districts.map(d => `<option value="${d}">${d}</option>`).join("");
       dd.disabled = false;
     }
   } catch (e) {
@@ -180,14 +326,10 @@ async function loadFilters() {
   }
 }
 
-// Re-pull one month from the server (authoritative) and refresh the cache.
+// Re-pull one month from the database (authoritative) and refresh the cache.
 async function refetchMonth(month) {
   const district = document.getElementById("awmDistrict").value;
-  const res = await fetch(
-    `${API_URL}?action=getRecords&month=${encodeURIComponent(month)}&district=${encodeURIComponent(district)}`
-  );
-  const recs = await res.json();
-  monthCache[month] = Array.isArray(recs) ? recs : [];
+  monthCache[month] = await dbMonthRows(district, month);
 }
 
 // Pull the current month's authoritative records WITHOUT touching the cache.
@@ -195,11 +337,7 @@ async function refetchMonth(month) {
 // stale page can't verify/edit/erase something that changed underneath it.
 async function getFreshRecords() {
   const district = document.getElementById("awmDistrict").value;
-  const res = await fetch(
-    `${API_URL}?action=getRecords&month=${encodeURIComponent(selectedMonth)}&district=${encodeURIComponent(district)}`
-  );
-  const recs = await res.json();
-  return Array.isArray(recs) ? recs : [];
+  return dbMonthRows(district, selectedMonth);
 }
 
 // ===============================
@@ -226,15 +364,9 @@ async function loadDistrictSummary() {
   showLoader();
 
   try {
-    await Promise.all(
-      allMonths.map(async (m) => {
-        const res = await fetch(
-          `${API_URL}?action=getRecords&month=${encodeURIComponent(m)}&district=${encodeURIComponent(district)}`
-        );
-        const recs = await res.json();
-        monthCache[m] = Array.isArray(recs) ? recs : [];
-      })
-    );
+    const rows = await dbDistrictRows(district);
+    allMonths.forEach(m => { monthCache[m] = []; });
+    rows.forEach(r => { (monthCache[r.month] || (monthCache[r.month] = [])).push(r); });
     renderMonthTable();
   } catch (e) {
     console.error(e);
@@ -414,8 +546,7 @@ function recInAwardedData(r) {
 
 // Stable identity for matching the same row across a fresh re-fetch.
 function recKey(r) {
-  return [r.mobile, r.fullName, r.awardName, r.schoolName]
-    .map(x => String(x || "").trim().toLowerCase()).join("¦");
+  return String(r.id || "");
 }
 
 // Snapshot which records currently have a saved entry in Awarded Data, and reset
@@ -709,7 +840,7 @@ window.awmUploadImage = async function (index, file) {
       fileName: `${safeName}_${Date.now()}${ext}`,
       mimeType: file.type || "image/jpeg",
       data: dataUrl.split(",")[1],
-      replaceId: driveId(existingUrl)
+      replaceId: null
     };
 
     const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
@@ -866,10 +997,7 @@ async function decideRecord(index, decision) {   // decision: "Yes" (verify) | "
   try {
     // 1) Re-pull the month straight from the server (source of truth).
     const district = document.getElementById("awmDistrict").value;
-    const fresh = await (await fetch(
-      `${API_URL}?action=getRecords&month=${encodeURIComponent(selectedMonth)}&district=${encodeURIComponent(district)}`
-    )).json();
-    const freshArr = Array.isArray(fresh) ? fresh : [];
+    const freshArr = await getFreshRecords();
     const match = freshArr.find(f => recKey(f) === recKey(rec));
 
     // 2) No longer in Awarded Data → the user erased it. Do NOT re-insert.
@@ -893,12 +1021,7 @@ async function decideRecord(index, decision) {   // decision: "Yes" (verify) | "
     const decided = { ...match, verified: decision, verifiedBy: me };
     decided.late = isLate(decided, selectedMonth) ? "Yes" : "No";
 
-    const res = await fetch(API_URL, {
-      method: "POST",
-      body: JSON.stringify({ action: "saveRecords", records: [{ ...decided, _override: true }] })
-    });
-    const out = await res.json();
-    if (!out.success) throw new Error("Save failed");
+    await dbDecide(decided, decision === "Yes" ? "verified" : "rejected");
 
     // 4) Reflect the decision locally (adopt fresh data for this row).
     Object.assign(rec, decided);
@@ -952,12 +1075,7 @@ window.awmUnlockRecord = async function (index) {
 
     // Still present → clear the decision (back to Submitted / pending).
     const reopened = { ...match, verified: "", verifiedBy: "" };
-    const res = await fetch(API_URL, {
-      method: "POST",
-      body: JSON.stringify({ action: "saveRecords", records: [{ ...reopened, _override: true }] })
-    });
-    const out = await res.json();
-    if (!out.success) throw new Error("Save failed");
+    await dbDecide(reopened, "unlocked");
 
     Object.assign(rec, reopened);
     rec._existed = true; rec._dirty = false;
@@ -1043,12 +1161,7 @@ window.awmSaveSingleRecord = async function (index) {
     const eCell = document.getElementById("rowsave-" + index);
     if (eCell) eCell.innerHTML = '<span class="img-status">⏳ Erasing…</span>';
     try {
-      const res = await fetch(API_URL, {
-        method: "POST",
-        body: JSON.stringify({ action: "deleteRecords", records: [{ ...r }] })
-      });
-      const out = await res.json();
-      if (!out.success) throw new Error(out.error || "Delete failed");
+      const out = await dbErase(r);
 
       r.awardedBy = ""; r.awardedDate = ""; r.folderLink = "";
       r.uploadedBy = ""; r.description = ""; r.verified = ""; r.verifiedBy = ""; r.late = "";
@@ -1086,12 +1199,7 @@ window.awmSaveSingleRecord = async function (index) {
     r.verified = ""; r.verifiedBy = "";
     r.late = isLate(r, selectedMonth) ? "Yes" : "No";
 
-    const res = await fetch(API_URL, {
-      method: "POST",
-      body: JSON.stringify({ action: "saveRecords", records: [{ ...r }] })
-    });
-    const out = await res.json();
-    if (!out.success) throw new Error(out.error || "Save failed");
+    const out = await dbSaveRows([r]);
     if (out.locked && out.locked.length) {
       await showModal({ title: "Record is locked", message: LOCK_MSG,
         buttons: [{ label: "OK", value: true, variant: "primary" }] });
@@ -1214,22 +1322,13 @@ async function saveRecords() {
 
     // 1) Delete the flipped-to-"No" records (sheet row + image) first.
     if (toDelete.length) {
-      const delOut = await (await fetch(API_URL, {
-        method: "POST",
-        body: JSON.stringify({ action: "deleteRecords", records: toDelete })
-      })).json();
-      if (!delOut.success) throw new Error(delOut.error || "Delete failed");
-      if (delOut.imageDeleteFailed) imageDeleteFailed = true;
+      await Promise.all(toDelete.map(dbErase));
     }
 
     // 2) Save the awarded ("Yes") records.
     let result = { success: true, locked: [] };
     if (toSave.length) {
-      const saveUrl =
-        `${API_URL}?action=saveRecords&records=` +
-        encodeURIComponent(JSON.stringify(toSave));
-      result = await (await fetch(saveUrl)).json();
-      if (!result.success) throw new Error("Save failed");
+      result = await dbSaveRows(toSave);
     }
 
     // 3) Pull fresh server truth → reflects immediately, no page reload.
