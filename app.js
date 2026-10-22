@@ -1111,7 +1111,7 @@ const DISTRICT_RENAMES = {
    reason - taking off the MH leaves Raigarh, which is a different district
    in a different state. */
 function tidyDistrict(name) {
-    const trimmed = String(name || "").trim().replace(/\s*[-–]?\s*MC$/i, "").trim();
+    const trimmed = String(name || "").trim().replace(/(?:\s*[-–]\s*|\s+)MC$/i, "").trim();
     return DISTRICT_RENAMES[trimmed.toLowerCase()] || trimmed;
 }
 
@@ -1171,10 +1171,20 @@ window.olfGeography = async function () {
             place(placed, p.districts[0], p.states[0], p.divisions[0]);
         }
     }
-    const byOne = new Set(placed.keys());
-    for (const p of people) {
-        if (p.states.length === 1 && p.divisions.length === 1 && p.districts.length > 1) {
-            p.districts.forEach(dt => { if (!byOne.has(dt)) place(placed, dt, p.states[0], p.divisions[0]); });
+    /* Step 2 goes shortest list first. A Divisional Manager lists a good part
+       of the state, a PM only their own districts, and where the two disagree
+       it is the PM's shorter list that is right - Sukma is in Bastar, though
+       the Raipur division manager lists it too. */
+    const taken = new Map();       // district -> length of the list that placed it
+    const wide = people
+        .filter(p => p.states.length === 1 && p.divisions.length === 1 && p.districts.length > 1)
+        .sort((a, b) => a.districts.length - b.districts.length);
+    for (const p of wide) {
+        for (const dt of p.districts) {
+            if (placed.has(dt) && !taken.has(dt)) continue;       // step 1 already has it
+            if (taken.has(dt) && taken.get(dt) < p.districts.length) continue;
+            taken.set(dt, p.districts.length);
+            place(placed, dt, p.states[0], p.divisions[0]);
         }
     }
     for (const p of people) {
