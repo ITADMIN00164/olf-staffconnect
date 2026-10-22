@@ -1229,6 +1229,7 @@
         .btn-filters:hover { border-color: #c7d2fe; background: #f8faff; }
         .btn-filters[aria-expanded="true"] { border-color: #4f8ef7; background: #f5f8ff; color: #3a6fd1; }
         .btn-filters-ico { font-size: 14px; line-height: 1; }
+        .btn-filters-count[hidden] { display: none; }
         .btn-filters-count {
             min-width: 20px; height: 20px; padding: 0 6px;
             border-radius: 999px; background: #4f8ef7; color: #fff;
@@ -1238,26 +1239,29 @@
 
         .emp-filters {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 12px 14px;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            gap: 10px;
             margin: 0 0 14px;
-            padding: 14px 16px;
+            padding: 10px 12px 12px;
             background: #f8fafc;
             border: 1px solid #eef0f4;
             border-radius: 10px;
         }
+        @media (max-width: 1280px) { .emp-filters { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+        @media (max-width: 760px)  { .emp-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         .emp-filters[hidden], .emp-chips[hidden] { display: none; }
-        .emp-filter { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+        .emp-filter { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
         .emp-filter label {
-            font-size: 11px; font-weight: 600; color: #6b7280;
-            text-transform: uppercase; letter-spacing: 0.5px;
+            font-size: 10.5px; font-weight: 700; color: #8a93a3;
+            text-transform: uppercase; letter-spacing: 0.6px;
+            padding-left: 2px;
         }
         .emp-filter select {
             width: 100%;
-            padding: 8px 10px;
+            padding: 7px 8px;
             border: 1px solid #e5e7eb;
             border-radius: 8px;
-            font-size: 13px;
+            font-size: 12.5px;
             font-family: inherit;
             background: #fff;
             color: #374151;
