@@ -2721,7 +2721,7 @@ window.AWARD_CONFIG = {
       st.divisions.forEach(function (dv) {
         dv.districts.forEach(function (d) {
           seen[d.toLowerCase()] = true;
-          out.push({ state: st.name, division: dv.name, district: d, pm: dv.pm || "" });
+          out.push({ state: st.name, division: dv.name, district: d, pm: (dv.pmByDistrict && dv.pmByDistrict[d]) || dv.pm || "" });
         });
       });
     });

@@ -1130,6 +1130,8 @@ window.olfGeography = async function () {
        the sheet lists a PM beside every district, and that is the PM of the
        division the district sits in. */
     const pmOfDivision = new Map();
+    // The same, but for the districts the PM is actually posted to.
+    const pmOfDistrict = new Map();
 
     snapshot.forEach(d => {
         const r = d.data();
@@ -1146,6 +1148,15 @@ window.olfGeography = async function () {
             // Chhatrapati Sambhajinagar three. Naming only the first would
             // leave the others off a column that is supposed to say who
             // manages the place.
+            const who = String(r.Name || "").trim();
+            if (who) {
+                for (const dt of districts) {
+                    const key = dt.toLowerCase();
+                    const l = pmOfDistrict.get(key) || [];
+                    if (!l.includes(who)) l.push(who);
+                    pmOfDistrict.set(key, l);
+                }
+            }
             for (const dv of divisions) {
                 const name = String(r.Name || "").trim();
                 if (!name) continue;
@@ -1174,6 +1185,9 @@ window.olfGeography = async function () {
                 name: division,
                 pm: (pmOfDivision.get(division) || []).join(", "),
                 pms: pmOfDivision.get(division) || [],
+                pmByDistrict: Object.fromEntries([...districts]
+                    .filter(dt => pmOfDistrict.has(dt.toLowerCase()))
+                    .map(dt => [dt, pmOfDistrict.get(dt.toLowerCase()).join(", ")])),
                 districts: [...districts].sort((a, b) => a.localeCompare(b))
             });
         }
