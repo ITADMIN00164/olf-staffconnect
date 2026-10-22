@@ -77,6 +77,7 @@ let newsRefreshInterval = null;
  * @param {Object} details  - action-specific payload (see callers below)
  */
 async function logAudit(action, details = {}) {
+    if (String(action).startsWith("employee-")) { orgGeography = null; staffDirectory = null; }
     try {
         await addDoc(collection(db, "audittrail"), {
             action,
@@ -1116,9 +1117,15 @@ function tidyDistrict(name) {
 }
 
 let orgGeography = null;
+let orgGeographyAt = 0;
+
+/* Re-read after a minute, and straight away after any change made here. A
+   person marked Inactive in one tab must leave the stock sheet in the next
+   visit, not at the next page load. */
+const GEOGRAPHY_FRESH_MS = 60 * 1000;
 
 window.olfGeography = async function () {
-    if (orgGeography) return orgGeography;
+    if (orgGeography && Date.now() - orgGeographyAt < GEOGRAPHY_FRESH_MS) return orgGeography;
 
     const snapshot = await getDocs(collection(db, "Employees"));
 
@@ -1272,6 +1279,7 @@ window.olfGeography = async function () {
     out.sort((a, b) => a.name.localeCompare(b.name));
 
     orgGeography = out;
+    orgGeographyAt = Date.now();
     return out;
 };
 
