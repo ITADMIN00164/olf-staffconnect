@@ -648,9 +648,41 @@ window.AWARD_CONFIG = {
 
   // ------------------------------------------------------------- bootstrap
 
+  /* The Test tab holds two things: Stock Management, which is the rest of
+     this file, and Award Management, a copy of the POM page's view kept in
+     award-manage.js. That one starts the first time it is opened, since it
+     fetches the district list and nothing else needs it. */
+  var awardViewStarted = false;
+
+  function showTopView(which) {
+    var award = which === "award";
+    var stock = document.getElementById("aw-view-stock");
+    var awardView = document.getElementById("aw-view-award");
+    if (!stock || !awardView) return;
+
+    stock.hidden = award;
+    awardView.hidden = !award;
+    Array.prototype.forEach.call(
+      document.querySelectorAll(".award-page .aw-toptab"),
+      function (tab) {
+        var on = tab.getAttribute("data-aw-top") === which;
+        tab.classList.toggle("is-active", on);
+        tab.setAttribute("aria-selected", on ? "true" : "false");
+        tab.tabIndex = on ? 0 : -1;
+      }
+    );
+
+    if (award && !awardViewStarted && typeof window.initAwardManageUI === "function") {
+      awardViewStarted = true;
+      window.initAwardManageUI();
+    }
+  }
+
   function mount() {
     cacheElements();
     if (!el.form) return;        // the tab is not on screen
+
+    awardViewStarted = false;      // a fresh page has a fresh Award Management view
 
     allRequisitions = [];
     returnFocusTo = null;          // the node it pointed at is gone
@@ -1444,6 +1476,15 @@ window.AWARD_CONFIG = {
     el.form.dataset.awWired = "1";
 
     wireTabList(el.subtabs, "data-aw-subtab");
+
+    Array.prototype.forEach.call(
+      document.querySelectorAll(".award-page .aw-toptab"),
+      function (tab) {
+        tab.addEventListener("click", function () {
+          showTopView(tab.getAttribute("data-aw-top"));
+        });
+      }
+    );
 
     Array.prototype.forEach.call(
       el.hoModal.querySelectorAll("[data-aw-close-ho]"),

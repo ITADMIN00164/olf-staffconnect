@@ -22,6 +22,12 @@
 
     <!-- There was a tab bar above this with one tab in it, named the same
          as the heading directly underneath. It said nothing twice. -->
+    <nav class="aw-toptabs" role="tablist" aria-label="Test">
+      <button type="button" role="tab" class="aw-toptab is-active" data-aw-top="stock" aria-selected="true">Stock Management</button>
+      <button type="button" role="tab" class="aw-toptab" data-aw-top="award" aria-selected="false" tabindex="-1">Award Management</button>
+    </nav>
+
+    <div id="aw-view-stock">
     <div class="aw-body">
 
       <div class="aw-page-header">
@@ -253,6 +259,117 @@
         </section>
       </div>
     </div>
+    </div><!-- /#aw-view-stock -->
+
+    <!-- Award Management: the POM page's view of awards data, copied here. Its
+         styles are award-manage.css (scoped to .awm-view) and its behaviour is
+         award-manage.js. -->
+    <div id="aw-view-award" class="awm-view" hidden>
+      <div class="pom-page">
+        <div class="pom-header">
+          <div>
+            <div class="pom-title">🏆 Award Management</div>
+            <div class="pom-subtitle">One Stop Solution For Awards Data</div>
+          </div>
+          <div class="pom-badge">AY 2026-27</div>
+        </div>
+    <div id="awmManageView" style="display:flex; flex-direction:column; flex:1; min-height:0;">
+
+    <!-- ── LIST VIEW ── -->
+    <div id="awmListView">
+        <div class="pom-filter-card">
+            <select id="awmDistrict" class="pom-select">
+                <option value="">Select District</option>
+            </select>
+        </div>
+
+        <div class="pom-card">
+            <table class="pom-table centered">
+                <thead>
+                    <tr><th>Month</th><th>Total</th><th>Awarded In Time</th><th>Awarded Late</th><th>Pending</th><th>Total Awarded</th><th>Verified</th><th></th></tr>
+                </thead>
+                <tbody id="awmMonthBody">
+                    <tr><td colspan="8" class="pom-msg">Select a District to begin</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ── DETAIL VIEW ── -->
+    <div id="awmDetailWrap" style="display:none;">
+        <div class="pom-detail-head">
+            <button id="awmBackBtn" class="pom-back-btn">← Back</button>
+            <div class="pom-detail-filters">
+                <span class="pom-detail-filter-label">District</span>
+                <select id="awmDetailDistrict" class="pom-detail-select"></select>
+                <span class="pom-filter-sep"></span>
+                <span class="pom-detail-filter-label">Month</span>
+                <select id="awmDetailMonth" class="pom-detail-select"></select>
+            </div>
+            <button id="awmRefreshBtn" class="pom-back-btn pom-refresh-btn" title="Reload latest records">⟳ Refresh Records</button>
+        </div>
+
+        <div class="pom-card scroll">
+            <table class="pom-table fixed">
+                <colgroup>
+                    <col style="width:15%"><col style="width:12%"><col style="width:7%">
+                    <col style="width:11%"><col style="width:10%"><col style="width:8%">
+                    <col style="width:8%"><col style="width:9%"><col style="width:9%"><col style="width:8%">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>Name</th><th>Award</th><th>Awarded</th>
+                        <th>Awarded By</th><th>Date</th><th class="col-center">Image</th><th class="col-center">Description</th>
+                        <th class="col-center">Save</th><th class="col-center">Verify</th><th class="col-center">Unlock</th>
+                    </tr>
+                </thead>
+                <tbody id="awmTableBody">
+                    <tr><td colspan="10" style="text-align:center;color:#9ca3af;padding:28px;">No month selected</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    </div><!-- end pomManageView -->
+
+    <!-- ── Image popup ── -->
+    <div id="awmImgModal" class="pom-img-overlay">
+        <div class="pom-img-box">
+            <button id="awmImgClose" class="pom-img-close">✕</button>
+            <img id="awmImgEl" src="" alt="Award image">
+            <div id="awmImgLoading" class="pom-img-loading"><div class="pom-spinner"></div></div>
+            <div id="awmImgFallback" class="pom-img-fallback">
+                <div>Couldn't preview this image here.</div>
+                <a href="#" target="_blank" rel="noopener">Open in Google Drive ↗</a>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ── Loader, toasts, generic modal ── -->
+    <div id="awmLoader" class="pom-loader-overlay"><div class="pom-spinner"></div></div>
+    <div id="awmToasts" class="pom-toasts"></div>
+    <div id="awmModal" class="pom-modal-overlay">
+        <div class="pom-modal-box">
+            <div class="pom-modal-title" id="awmModalTitle"></div>
+            <div class="pom-modal-msg" id="awmModalMsg"></div>
+            <div class="pom-modal-actions" id="awmModalActions"></div>
+        </div>
+    </div>
+    <div id="awmPrompt" class="pom-prompt-overlay">
+        <div class="pom-prompt-box">
+            <div class="pom-prompt-title" id="awmPromptTitle">Description</div>
+            <textarea id="awmPromptInput" class="pom-prompt-input" placeholder="Write a description…"></textarea>
+            <div class="pom-prompt-actions">
+                <button id="awmPromptCancel" class="pmbtn cancel">Cancel</button>
+                <button id="awmPromptOk" class="pmbtn primary">Save</button>
+            </div>
+        </div>
+    </div>
+
+      </div>
+    </div>
+
 
     <!-- New requisition.
 
