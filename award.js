@@ -889,7 +889,7 @@ window.AWARD_CONFIG = {
         "<div><dt>Requested by</dt><dd>" + escapeHtml(row.requester_name || "—") +
           (row.requester_role ? ' <span class="chip-role">' +
              escapeHtml(row.requester_role) + "</span>" : "") + "</dd></div>" +
-        "<div><dt>Awards</dt><dd>" + awardsCellHtml(awardsOf(row), row) + "</dd></div>" +
+        "<div><dt>Levels</dt><dd>" + awardsCellHtml(awardsOf(row), row) + "</dd></div>" +
         "<div><dt>Total</dt><dd>" + escapeHtml(Number(row.quantity).toLocaleString()) +
         "</dd></div>" +
         "<div><dt>For</dt><dd>" +
@@ -1108,7 +1108,7 @@ window.AWARD_CONFIG = {
     el.hoSummary.innerHTML =
       "<dl>" +
         "<div><dt>Requested by</dt><dd>" + escapeHtml(row.requester_name || "—") + "</dd></div>" +
-        "<div><dt>Awards</dt><dd>" + awardsCellHtml(awardsOf(row), row) + "</dd></div>" +
+        "<div><dt>Levels</dt><dd>" + awardsCellHtml(awardsOf(row), row) + "</dd></div>" +
         "<div><dt>For</dt><dd>" +
           escapeHtml([p.district, p.division, p.state].filter(Boolean).join(", ")) +
         "</dd></div>" +
@@ -1124,8 +1124,9 @@ window.AWARD_CONFIG = {
       el.hoLines.innerHTML = awardTypes.filter(function (t) {
         return asked[t.id];
       }).map(function (t) {
-        return '<div class="stock-line"><label>' + escapeHtml(t.name) +
-               ' <span class="hint">asked for ' + escapeHtml(asked[t.id]) + '</span></label>' +
+        return '<div class="stock-line"><label>' + escapeHtml(levelLabel(t.name, t.code)) +
+               ' <span class="hint">asked for ' + escapeHtml(asked[t.id]) +
+               escapeHtml(askedSplit(row, t.id)) + '</span></label>' +
                '<input type="number" class="mono ho-qty" data-type="' + escapeHtml(t.id) +
                '" min="0" max="1000000" step="1" value="' + escapeHtml(asked[t.id]) + '" /></div>';
       }).join("");
@@ -1616,7 +1617,8 @@ window.AWARD_CONFIG = {
     // The lines are rebuilt as they are added and removed, so the listeners
     // sit on the container rather than on each one.
     el.awardLines.addEventListener("change", function (event) {
-      if (event.target.classList.contains("award-line-type")) {
+      if (event.target.classList.contains("award-line-type") ||
+          event.target.classList.contains("award-line-cat")) {
         setFieldError(null, "award-type-error", "");
         syncAwardLines();
       }
@@ -1885,19 +1887,29 @@ window.AWARD_CONFIG = {
   var awardTypes = [];
 
   function awardLineHtml() {
-    var opts = '<option value="">Select award type</option>';
+    var opts = '<option value="">Select level</option>';
     awardTypes.forEach(function (t) {
-      opts += '<option value="' + escapeHtml(t.id) + '">' + escapeHtml(t.name) + "</option>";
+      opts += '<option value="' + escapeHtml(t.id) + '">' +
+              escapeHtml(levelLabel(t.name, t.code)) + "</option>";
+    });
+    var cats = '<option value="">Select category</option>';
+    CATEGORY_CHOICES.forEach(function (c) {
+      cats += '<option value="' + escapeHtml(c) + '">' + escapeHtml(c) + "</option>";
     });
     return '<div class="award-line">' +
-             '<select class="award-line-type" aria-label="Award type">' + opts + "</select>" +
+             '<select class="award-line-type" aria-label="Level">' + opts + "</select>" +
+             '<select class="award-line-cat" aria-label="Category" hidden>' + cats + "</select>" +
              '<input type="number" class="award-line-qty mono" min="1" max="1000000" ' +
                     'step="1" placeholder="Qty" aria-label="Quantity" />' +
-             '<button type="button" class="award-line-remove" aria-label="Remove this award">' +
+             '<button type="button" class="award-line-remove" aria-label="Remove this level">' +
                '<i class="aw-icon" data-aw-icon="close" aria-hidden="true"></i>' +
              "</button>" +
+             '<input type="text" class="award-line-other" maxlength="60" hidden ' +
+                    'placeholder="What is it for?" aria-label="Other category" />' +
            "</div>";
   }
+
+  var MAX_LEVEL_LINES = 12;
 
   function addAwardLine() {
     el.awardLines.insertAdjacentHTML("beforeend", awardLineHtml());
@@ -1914,9 +1926,18 @@ window.AWARD_CONFIG = {
     syncAwardLines();
   }
 
-  /* An award already on the requisition is taken out of the other lines'
-     lists: the same one twice is a mistake every time, and catching it here
-     beats refusing it on submit. */
+  function typeById(id) {
+    for (var i = 0; i < awardTypes.length; i++) {
+      if (String(awardTypes[i].id) === String(id)) return awardTypes[i];
+    }
+    return null;
+  }
+
+  /* Keeps each line in step with what it says. Block and District ask for a
+     category, and "Other" asks for words. Nanhe Sitare and Shikshan Utsav
+     have neither, and can only be on the requisition once: the same one twice
+     is a mistake every time, and catching it here beats refusing it on submit.
+     Block and District may repeat, once for each category. */
   function syncAwardLines() {
     var lines = Array.prototype.slice.call(el.awardLines.querySelectorAll(".award-line"));
     var chosen = lines.map(function (l) { return l.querySelector(".award-line-type").value; });
@@ -1924,14 +1945,26 @@ window.AWARD_CONFIG = {
     lines.forEach(function (line, i) {
       var select = line.querySelector(".award-line-type");
       Array.prototype.forEach.call(select.options, function (opt) {
-        opt.disabled = opt.value !== "" && opt.value !== chosen[i] &&
-                       chosen.indexOf(opt.value) !== -1;
+        var t = opt.value === "" ? null : typeById(opt.value);
+        var single = t && !levelHasCategory(levelLabel(t.name, t.code));
+        opt.disabled = !!single && opt.value !== chosen[i] && chosen.indexOf(opt.value) !== -1;
       });
+
+      var type = typeById(chosen[i]);
+      var needsCategory = !!type && levelHasCategory(levelLabel(type.name, type.code));
+      var cat = line.querySelector(".award-line-cat");
+      var other = line.querySelector(".award-line-other");
+      cat.hidden = !needsCategory;
+      if (!needsCategory) cat.value = "";
+      other.hidden = !(needsCategory && cat.value === "Other");
+      if (other.hidden) other.value = "";
+      line.classList.toggle("has-category", needsCategory);
+      line.classList.toggle("has-other", !other.hidden);
+
       line.querySelector(".award-line-remove").hidden = lines.length < 2;
     });
 
-    // Nothing left to add once every award is on the requisition.
-    el.awardAdd.hidden = lines.length >= awardTypes.length;
+    el.awardAdd.hidden = lines.length >= MAX_LEVEL_LINES;
   }
 
   function readAwardLines() {
@@ -1940,11 +1973,13 @@ window.AWARD_CONFIG = {
       function (line) {
         var id = line.querySelector(".award-line-type").value;
         var qty = line.querySelector(".award-line-qty").value.trim();
-        var type = null;
-        for (var i = 0; i < awardTypes.length; i++) {
-          if (String(awardTypes[i].id) === String(id)) { type = awardTypes[i]; break; }
-        }
-        return { line: line, id: id, qty: qty, type: type };
+        var type = typeById(id);
+        var needs = !!type && levelHasCategory(levelLabel(type.name, type.code));
+        return {
+          line: line, id: id, qty: qty, type: type, needsCategory: needs,
+          category: needs ? line.querySelector(".award-line-cat").value : "",
+          other: needs ? line.querySelector(".award-line-other").value.trim() : ""
+        };
       }
     );
   }
@@ -1980,7 +2015,7 @@ window.AWARD_CONFIG = {
       .then(function (res) {
         if (res.error) {
           el.awardLines.innerHTML =
-            '<p class="error">Could not load award types.</p>';
+            '<p class="error">Could not load the levels.</p>';
           reportError("load award types", res.error);
           return;
         }
@@ -1988,7 +2023,7 @@ window.AWARD_CONFIG = {
         resetAwardLines();
       })
       .catch(function (err) {
-        el.awardLines.innerHTML = '<p class="error">Could not load award types.</p>';
+        el.awardLines.innerHTML = '<p class="error">Could not load the levels.</p>';
         reportError("load award types", err);
       });
   }
@@ -2055,33 +2090,46 @@ window.AWARD_CONFIG = {
     var items = [];
     var total = 0;
     var lineFault = "";
+    var seen = {};
 
     lines.forEach(function (l) {
       l.line.classList.remove("has-error");
       var n = Number(l.qty);
 
       if (!l.id) {
-        if (!lineFault) lineFault = "Choose an award on every line, or remove the empty one.";
+        if (!lineFault) lineFault = "Choose a level on every line, or remove the empty one.";
+      } else if (l.needsCategory && !l.category) {
+        if (!lineFault) lineFault = "Choose a category for every Block and District line.";
+      } else if (l.needsCategory && l.category === "Other" && !l.other) {
+        if (!lineFault) lineFault = "Say what the other category is.";
       } else if (!l.qty) {
-        if (!lineFault) lineFault = "Say how many of each award.";
+        if (!lineFault) lineFault = "Say how many for each level.";
       } else if (!Number.isInteger(n) || n < 1) {
         if (!lineFault) lineFault = "Quantities are whole numbers of 1 or more.";
       } else if (n > 1000000) {
         if (!lineFault) lineFault = "That quantity looks too large.";
+      } else if (seen[l.id + "|" + l.category + "|" + l.other.toLowerCase()]) {
+        if (!lineFault) lineFault = "The same level and category is on the requisition twice.";
       } else {
-        items.push({
+        seen[l.id + "|" + l.category + "|" + l.other.toLowerCase()] = true;
+        var item = {
           award_type_id: Number(l.id),
           code: l.type ? l.type.code : null,
-          name: l.type ? l.type.name : null,
+          name: l.type ? levelLabel(l.type.name, l.type.code) : null,
           quantity: n
-        });
+        };
+        if (l.needsCategory) {
+          item.category = l.category;
+          if (l.category === "Other") item.category_other = l.other;
+        }
+        items.push(item);
         total += n;
         return;
       }
       l.line.classList.add("has-error");
     });
 
-    if (!items.length && !lineFault) lineFault = "Add at least one award.";
+    if (!items.length && !lineFault) lineFault = "Add at least one level.";
 
     if (lineFault) {
       setFieldError(null, "award-type-error", lineFault);
@@ -2147,9 +2195,10 @@ window.AWARD_CONFIG = {
         };
 
         // Read before clearing: the message names the award type.
+        var first = values.items[0];
         var typeName = values.items.length === 1
-          ? values.items[0].name
-          : values.items.length + " awards";
+          ? first.name + (first.category ? " · " + (first.category_other || first.category) : "")
+          : "across " + values.items.length + " levels";
 
         resetAwardLines();
 
@@ -2317,7 +2366,7 @@ window.AWARD_CONFIG = {
     fillSelect(el.filterDistrict, Object.keys(districts).sort(), "All districts",
       function (name) { return name; }, function (name) { return name; });
 
-    fillSelect(el.filterType, Object.keys(types).sort(), "All types",
+    fillSelect(el.filterType, Object.keys(types).sort(), "All levels",
       function (name) { return name; }, function (name) { return name; });
   }
 
@@ -2400,20 +2449,70 @@ window.AWARD_CONFIG = {
     el.tfoot.hidden = false;
   }
 
+  /* ------------------------------------------------------------- levels
+
+     A requisition asks for stock at a level: Block, District, Nanhe Sitare
+     (NS) or Shikshan Utsav (SU). Block and District each split again by what
+     the awards are for - Academic, POM, or something else that is typed in.
+     The database still holds the four award types it always had; "POM Block"
+     is the Block level, and a row filed before categories existed was a POM
+     one, so that is what it reads as. */
+  var CATEGORY_CHOICES = ["Academic", "POM", "Other"];
+
+  function levelLabel(name, code) {
+    var n = String(name || "");
+    var c = String(code || "");
+    if (/block/i.test(c) || (!c && /block/i.test(n))) return "Block";
+    if (/district/i.test(c) || (!c && /district/i.test(n))) return "District";
+    return n || c || "Award";
+  }
+
+  function levelHasCategory(label) {
+    return label === "Block" || label === "District";
+  }
+
+  // What a line reads as: "Block · Academic", "District · Hindi Week", or just the level.
+  function awardChipLabel(a) {
+    if (!a.hasCategory) return a.name;
+    return a.name + " · " +
+      (a.category === "Other" ? (a.categoryOther || "Other") : a.category);
+  }
+
+  // What was asked for at a level, split by category, for where the split matters.
+  function askedSplit(row, id) {
+    var parts = awardsOf(row).filter(function (a) { return a.id === Number(id) && a.hasCategory; })
+      .map(function (a) { return awardChipLabel(a).replace(/^[^\u00b7]*\u00b7 /, "") + " " + a.quantity; });
+    return parts.length ? " (" + parts.join(", ") + ")" : "";
+  }
+
   /* What a requisition asks for. New rows carry a list; the ones filed
      before that asked for one award and are read from the join. */
   function awardsOf(row) {
+    var typeOf = function (id) {
+      for (var i = 0; i < awardTypes.length; i++) {
+        if (String(awardTypes[i].id) === String(id)) return awardTypes[i];
+      }
+      return null;
+    };
+    var make = function (id, name, code, quantity, category, other) {
+      var t = typeOf(id);
+      var label = levelLabel(name || (t && t.name), code || (t && t.code));
+      var has = levelHasCategory(label);
+      return { id: Number(id) || 0, name: label, quantity: quantity,
+               hasCategory: has,
+               category: has ? (category || "POM") : "",
+               categoryOther: has && category === "Other" ? (other || "") : "" };
+    };
+
     if (row && row.items && row.items.length) {
       return row.items.map(function (it) {
-        return { id: Number(it.award_type_id) || 0,
-                 name: it.name || it.code || "Award",
-                 quantity: Number(it.quantity) || 0 };
+        return make(it.award_type_id, it.name || it.code || "Award", it.code,
+                    Number(it.quantity) || 0, it.category, it.category_other);
       });
     }
     if (row && row.award_types) {
-      return [{ id: Number(row.award_type_id) || 0,
-                name: row.award_types.name,
-                quantity: Number(row.quantity) || 0 }];
+      return [make(row.award_type_id, row.award_types.name, row.award_types.code,
+                   Number(row.quantity) || 0, "POM", "")];
     }
     return [];
   }
@@ -2421,21 +2520,25 @@ window.AWARD_CONFIG = {
   /* What a requisition asked for, and - once it has been sent - what
      actually went, where the two differ. "15 of 16" says it on the award
      itself; a badge reading "part-filled" beside it named the situation
-     without giving the figures. */
+     without giving the figures. What goes out is counted per level, so the
+     comparison is only drawn where a level is on the requisition once. */
   function awardsCellHtml(awards, row) {
     if (!awards.length) return "—";
 
     var sent = row && row.dispatched_items && row.dispatched_items.length
       ? quantitiesOf(row, "dispatched")
       : null;
+    var lines = {};
+    awards.forEach(function (a) { lines[a.id] = (lines[a.id] || 0) + 1; });
 
     return awards.map(function (a) {
-      var went = sent ? (sent[a.id] || 0) : a.quantity;
-      var short = sent && went < a.quantity;
+      var comparable = sent && lines[a.id] === 1;
+      var went = comparable ? (sent[a.id] || 0) : a.quantity;
+      var short = comparable && went < a.quantity;
       return '<span class="type-chip' + (short ? " is-short" : "") + '"' +
              (short ? ' title="' + escapeHtml(a.quantity - went) +
                       ' fewer than asked for"' : "") + ">" +
-             escapeHtml(a.name) + "<b>" +
+             escapeHtml(awardChipLabel(a)) + "<b>" +
              (short
                ? escapeHtml(went.toLocaleString()) + " of " +
                  escapeHtml(a.quantity.toLocaleString())
@@ -3971,6 +4074,11 @@ window.AWARD_CONFIG = {
         who: row.requester_name || "",
         note: raisedHere ? stageLabel(row, false)
                          : "raised " + formatTimestamp(row.created_at),
+        levels: raisedHere
+          ? awardsOf(row).map(function (a) {
+              return awardChipLabel(a) + " " + a.quantity;
+            }).join(", ")
+          : "",
         cells: cells
       });
     });
@@ -4067,6 +4175,7 @@ window.AWARD_CONFIG = {
           (e.who ? "<span>" + escapeHtml(e.who) + "</span>" : "") +
           "<time>" + escapeHtml(e.when) + "</time>" +
           (e.note ? "<em>" + escapeHtml(e.note) + "</em>" : "") +
+          (e.levels ? '<span class="detail-levels">' + escapeHtml(e.levels) + "</span>" : "") +
         "</td>" +
         group(e.cells.requisition, "req") +
         group(e.cells.delivery, "del") +
@@ -4164,7 +4273,7 @@ window.AWARD_CONFIG = {
     el.stockLines.innerHTML = awardTypes.map(function (t) {
       var have = held[t.id] || 0;
       return '<div class="stock-line' + (have ? "" : " is-empty") + '">' +
-             "<label>" + escapeHtml(t.name) +
+             "<label>" + escapeHtml(levelLabel(t.name, t.code)) +
                '<span class="hint">' +
                  (have ? escapeHtml(have.toLocaleString()) + " in stock"
                        : "none in stock") +

@@ -1552,3 +1552,30 @@
 .award-page .aw-toptab:hover { color: var(--text); }
 .award-page .aw-toptab.is-active { color: var(--accent-ink); border-bottom-color: var(--accent); }
 .award-page .aw-top-actions { display: flex; align-items: center; gap: 10px; padding-bottom: 9px; }
+
+/* A level line: the level, then - for Block and District - what it is for,
+   then how many. "Other" gets a row of its own to be typed into. */
+.award-page .award-line {
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) 110px 32px;
+  grid-template-areas: "type type qty remove";
+}
+.award-page .award-line.has-category {
+  grid-template-areas: "type cat qty remove";
+}
+.award-page .award-line.has-other {
+  grid-template-areas: "type cat qty remove" "other other other other";
+}
+.award-page .award-line-type   { grid-area: type; }
+.award-page .award-line-cat    { grid-area: cat; }
+.award-page .award-line-qty    { grid-area: qty; }
+.award-page .award-line-remove { grid-area: remove; }
+.award-page .award-line-other  { grid-area: other; }
+.award-page .award-line-cat[hidden], .award-page .award-line-other[hidden] { display: none !important; }
+
+.award-page .detail-levels {
+  display: block;
+  margin-top: 3px;
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--accent-ink);
+}

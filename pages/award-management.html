@@ -101,8 +101,8 @@
           </select>
         </div>
         <div class="field field-sm">
-          <label for="filter-type">Filter by type</label>
-          <select id="filter-type"><option value="">All types</option></select>
+          <label for="filter-type">Filter by level</label>
+          <select id="filter-type"><option value="">All levels</option></select>
         </div>
         <div class="field field-sm">
           <label for="filter-search">Search requester</label>
@@ -117,7 +117,7 @@
               <th scope="col">Division</th>
               <th scope="col">District</th>
               <th scope="col">Requester</th>
-              <th scope="col">Type</th>
+              <th scope="col">Level</th>
               <th scope="col" class="num">Quantity</th>
               <th scope="col">Submitted</th>
               <th scope="col">Status</th>
@@ -152,7 +152,7 @@
                   <th scope="col">Division</th>
                   <th scope="col">District</th>
                   <th scope="col">Requester</th>
-                  <th scope="col">Awards</th>
+                  <th scope="col">Levels</th>
                   <th scope="col" class="num">Quantity</th>
                   <th scope="col">Status</th>
                   <th scope="col">Log</th>
@@ -398,15 +398,15 @@
         </div>
 
         <div class="field field-wide">
-          <label>Awards <span class="req" aria-hidden="true">*</span></label>
+          <label>Levels <span class="req" aria-hidden="true">*</span></label>
 
-          <!-- One line per award asked for. Built by award.js from the award
+          <!-- One line per level asked for. Built by award.js from the award
                types it loads, so there is nothing to keep in step here. -->
           <div class="award-lines" id="award-lines"></div>
 
           <button type="button" class="btn btn-ghost btn-sm award-add" id="award-add">
             <i class="aw-icon" data-aw-icon="plus" aria-hidden="true"></i>
-            Add another award
+            Add another level
           </button>
 
           <p class="error" id="award-type-error" role="alert"></p>
