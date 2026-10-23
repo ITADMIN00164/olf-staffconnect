@@ -1952,6 +1952,26 @@ window.AWARD_CONFIG = {
     var lines = Array.prototype.slice.call(el.awardLines.querySelectorAll(".award-line"));
     var chosen = lines.map(function (l) { return l.querySelector(".award-line-type").value; });
 
+    var needs = lines.map(function (l, i) {
+      var type = typeById(chosen[i]);
+      return !!type && levelHasCategory(levelLabel(type.name, type.code));
+    });
+
+    // First settle what each line holds. A line that holds a category an
+    // earlier line at the same level already has loses it: the earlier line
+    // keeps it. "Other" can be asked for more than once - each is its own
+    // words - so only Academic and POM are taken once.
+    var used = {};              // level id -> { category: true }
+    lines.forEach(function (line, i) {
+      var cat = line.querySelector(".award-line-cat");
+      cat.hidden = !needs[i];
+      if (!needs[i]) { cat.value = ""; return; }
+      var u = used[chosen[i]] || (used[chosen[i]] = {});
+      if (cat.value && cat.value !== "Other" && u[cat.value]) cat.value = "";
+      if (cat.value && cat.value !== "Other") u[cat.value] = true;
+    });
+
+    // Then what each line may still choose: nothing another line holds.
     lines.forEach(function (line, i) {
       var select = line.querySelector(".award-line-type");
       Array.prototype.forEach.call(select.options, function (opt) {
@@ -1960,15 +1980,22 @@ window.AWARD_CONFIG = {
         opt.disabled = !!single && opt.value !== chosen[i] && chosen.indexOf(opt.value) !== -1;
       });
 
-      var type = typeById(chosen[i]);
-      var needsCategory = !!type && levelHasCategory(levelLabel(type.name, type.code));
       var cat = line.querySelector(".award-line-cat");
       var other = line.querySelector(".award-line-other");
-      cat.hidden = !needsCategory;
-      if (!needsCategory) cat.value = "";
-      other.hidden = !(needsCategory && cat.value === "Other");
+
+      if (needs[i]) {
+        Array.prototype.forEach.call(cat.options, function (opt) {
+          var heldElsewhere = lines.some(function (l2, j) {
+            return j !== i && chosen[j] === chosen[i] &&
+                   l2.querySelector(".award-line-cat").value === opt.value;
+          });
+          opt.disabled = opt.value !== "" && opt.value !== "Other" && heldElsewhere;
+        });
+      }
+
+      other.hidden = !(needs[i] && cat.value === "Other");
       if (other.hidden) other.value = "";
-      line.classList.toggle("has-category", needsCategory);
+      line.classList.toggle("has-category", needs[i]);
       line.classList.toggle("has-other", !other.hidden);
 
       line.querySelector(".award-line-remove").hidden = lines.length < 2;
