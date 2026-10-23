@@ -90,6 +90,9 @@ window.AWARD_CONFIG = {
     stockWhere: document.getElementById("stock-where"),
     stockModal: document.getElementById("stock-modal"),
     detailModal: document.getElementById("detail-modal"),
+    levelsModal: document.getElementById("levels-modal"),
+    levelsSub: document.getElementById("levels-sub"),
+    levelsBody: document.getElementById("levels-body"),
     logModal: document.getElementById("log-modal"),
     logSub: document.getElementById("log-sub"),
     logBody: document.getElementById("log-body"),
@@ -1549,6 +1552,10 @@ window.AWARD_CONFIG = {
       function (n) { n.addEventListener("click", closeBreakdown); }
     );
     Array.prototype.forEach.call(
+      el.levelsModal.querySelectorAll("[data-aw-close-levels]"),
+      function (n) { n.addEventListener("click", closeLevels); }
+    );
+    Array.prototype.forEach.call(
       el.logModal.querySelectorAll("[data-aw-close-log]"),
       function (n) { n.addEventListener("click", closeLog); }
     );
@@ -1643,6 +1650,9 @@ window.AWARD_CONFIG = {
 
         var log = event.target.closest("[data-aw-log]");
         if (log) { openLog(log.getAttribute("data-aw-log")); return; }
+
+        var lv = event.target.closest("[data-aw-levels]");
+        if (lv) { openLevels(lv.getAttribute("data-aw-levels")); return; }
 
         var review = event.target.closest("[data-aw-review]");
         if (review) { openReview(review.getAttribute("data-aw-review")); return; }
@@ -2429,7 +2439,7 @@ window.AWARD_CONFIG = {
           "<td>" + escapeHtml(p.division || "—") + "</td>" +
           "<td>" + escapeHtml(p.district || "—") + "</td>" +
           "<td>" + escapeHtml(row.requester_name) + "</td>" +
-          '<td class="cell-awards">' + awardsCellHtml(awards, row) + "</td>" +
+          '<td class="cell-awards">' + levelsCellHtml(row) + "</td>" +
           '<td class="num">' + quantityCellHtml(row) + "</td>" +
           '<td class="cell-date muted">' + escapeHtml(formatTimestamp(row.created_at)) + "</td>" +
           "<td>" + statusCellHtml(row) + "</td>" +
@@ -2642,6 +2652,53 @@ window.AWARD_CONFIG = {
     return html;
   }
 
+  /* In the tables a requisition takes one line: the levels it asked for, named,
+     and a button for the detail. The level, category and quantity lines open in a
+     pop-up, the same way the log does. */
+  function levelsCellHtml(row) {
+    var awards = awardsOf(row);
+    if (!awards.length) return "\u2014";
+    var names = [];
+    awards.forEach(function (a) {
+      var m = /\(([A-Z]{2,})\)\s*$/.exec(a.name);
+      var n = m ? m[1] : a.name;
+      if (names.indexOf(n) === -1) names.push(n);
+    });
+    return '<span class="lvl-summary" title="' + escapeHtml(names.join(", ")) + '">' +
+             escapeHtml(names.join(" \u00b7 ")) + "</span>" +
+           '<button type="button" class="btn btn-ghost btn-xs" data-aw-levels="' +
+             escapeHtml(row.id) + '">View <span class="log-count">' + awards.length + "</span></button>";
+  }
+
+  function openLevels(id) {
+    var row = allRequisitions.filter(function (r) { return String(r.id) === String(id); })[0];
+    if (!row) return;
+    var p = placeOf(row);
+    el.levelsSub.textContent = [row.requester_name, p.district].filter(Boolean).join(" \u00b7 ") +
+      " \u00b7 " + stageLabel(row, false);
+    el.levelsBody.innerHTML =
+      '<div class="lvls-head"><span>Level</span><span>Category</span><span>Asked</span></div>' +
+      awardsCellHtml(awardsOf(row), row) +
+      '<p class="lvls-total">Delivered <b>' + escapeHtml(deliveredOf(row).toLocaleString()) +
+      '</b> of <b>' + escapeHtml((Number(row.quantity) || 0).toLocaleString()) + "</b> asked for</p>";
+    el.levelsModal.classList.add("is-open");
+    document.addEventListener("keydown", onLevelsKeydown);
+    scrollLockedAt = window.scrollY;
+    document.body.style.overflow = "hidden";
+    el.levelsModal.querySelector("[data-aw-close-levels]").focus();
+  }
+
+  function closeLevels() {
+    el.levelsModal.classList.remove("is-open");
+    document.removeEventListener("keydown", onLevelsKeydown);
+    document.body.style.overflow = "";
+    if (scrollLockedAt !== null) { window.scrollTo(0, scrollLockedAt); scrollLockedAt = null; }
+  }
+
+  function onLevelsKeydown(e) {
+    if (e.key === "Escape") { e.stopPropagation(); closeLevels(); }
+  }
+
   function openLog(id) {
     var row = allRequisitions.filter(function (r) { return String(r.id) === String(id); })[0];
     if (!row) return;
@@ -2744,7 +2801,7 @@ window.AWARD_CONFIG = {
         "<td>" + escapeHtml(p.division || "—") + "</td>" +
         "<td>" + escapeHtml(p.district || "—") + "</td>" +
         "<td>" + escapeHtml(row.requester_name || "—") + "</td>" +
-        '<td class="cell-awards">' + awardsCellHtml(awards, row) + "</td>" +
+        '<td class="cell-awards">' + levelsCellHtml(row) + "</td>" +
         '<td class="num">' + quantityCellHtml(row) + "</td>" +
         "<td>" + statusCellHtml(row, true) + "</td>" +
         '<td class="cell-log-col">' + logCellHtml(row) + "</td>" +

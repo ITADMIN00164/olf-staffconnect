@@ -984,9 +984,8 @@
    and only here, it does. */
 /* Wide enough for the level, category and quantity columns it now holds. */
 .award-page .cell-awards {
-  white-space: normal;
-  min-width: 292px;
-  max-width: 360px;
+  white-space: nowrap;
+  min-width: 150px;
 }
 .award-page .cell-awards .type-chip { margin-bottom: 3px; }
 
@@ -1653,3 +1652,15 @@
 .award-page #requisitions-table tbody td, .award-page #delivery-table tbody td { background: var(--t, transparent); }
 .award-page #requisitions-table tbody td + td, .award-page #delivery-table tbody td + td { border-left: 1px solid rgba(255,255,255,.9); }
 .award-page #requisitions-table thead th + th, .award-page #delivery-table thead th + th { border-left: 1px solid rgba(255,255,255,.18); }
+
+/* A requisition's levels in a row: their names, and the button that opens the detail. */
+.award-page .lvl-summary { margin-right: 10px; font-size: .8rem; font-weight: 700; color: var(--text); }
+
+/* In the pop-up the three columns have room, and are headed. */
+.award-page #levels-modal .lvls { min-width: 0; }
+.award-page #levels-modal .lvl-row, .award-page .lvls-head { grid-template-columns: 110px minmax(0, 1fr) 80px; }
+.award-page .lvls-head { display: grid; gap: 10px; padding: 0 0 8px; margin-bottom: 8px; border-bottom: 2px solid var(--border-strong);
+                         font-size: .66rem; font-weight: 600; letter-spacing: .11em; text-transform: uppercase; color: var(--text-muted); }
+.award-page .lvls-head span:last-child { text-align: right; }
+.award-page .lvls-total { margin: 14px 0 0; padding-top: 10px; border-top: 1px solid var(--border); font-size: .85rem; color: var(--text-soft); text-align: right; }
+.award-page .lvls-total b { color: var(--text); font-family: var(--font-mono); }

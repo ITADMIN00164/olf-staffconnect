@@ -117,7 +117,7 @@
               <th scope="col">Division</th>
               <th scope="col">District</th>
               <th scope="col">Requester</th>
-              <th scope="col">Level / Category / Qty</th>
+              <th scope="col">Levels</th>
               <th scope="col" class="num" title="Delivered / asked for">Delivered / Asked</th>
               <th scope="col">Submitted</th>
               <th scope="col">Status</th>
@@ -574,6 +574,28 @@
           <div class="form-actions">
             <button type="button" class="btn btn-ghost" data-aw-close-stock>Cancel</button>
             <button type="button" id="stock-save" class="btn btn-primary">Record</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- What a requisition asked for, level by level, opened from its row. -->
+    <div class="aw-overlay" id="levels-modal">
+      <div class="aw-overlay-backdrop" data-aw-close-levels></div>
+      <div class="aw-box aw-box-sm" role="dialog" aria-modal="true" aria-labelledby="levels-heading">
+        <div class="aw-box-head">
+          <div class="aw-box-heading">
+            <h2 id="levels-heading">Levels asked for</h2>
+            <p class="aw-box-sub" id="levels-sub"></p>
+          </div>
+          <button type="button" class="aw-box-close" data-aw-close-levels aria-label="Close">
+            <i class="aw-icon" data-aw-icon="close" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="aw-box-body">
+          <div id="levels-body"></div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-ghost" data-aw-close-levels>Close</button>
           </div>
         </div>
       </div>
