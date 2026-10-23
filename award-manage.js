@@ -1034,7 +1034,11 @@ async function decideRecord(index, decision) {   // decision: "Yes" (verify) | "
     if (cell) cell.innerHTML = renderVerifyCell(index);
     const unlockCell = document.getElementById("unlock-" + index);
     if (unlockCell) unlockCell.innerHTML = "";
-    showToast(`${decision === "Yes" ? "Verification" : "Rejection"} failed.`, "error");
+    if (/rejected/i.test(String(e && e.message))) {
+      showToast("Rejecting needs a one-time database update. Ask the admin to run award-records-rejected.sql.", "error");
+    } else {
+      showToast(`${decision === "Yes" ? "Verification" : "Rejection"} failed.`, "error");
+    }
   }
 }
 
