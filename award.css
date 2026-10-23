@@ -982,10 +982,11 @@
    Every step a requisition has been through, each carrying the colour of
    what it was, against a rule down the left. The table never wraps; here,
    and only here, it does. */
+/* Wide enough for the level, category and quantity columns it now holds. */
 .award-page .cell-awards {
   white-space: normal;
-  min-width: 178px;
-  max-width: 250px;
+  min-width: 292px;
+  max-width: 360px;
 }
 .award-page .cell-awards .type-chip { margin-bottom: 3px; }
 
@@ -1583,10 +1584,10 @@
 .award-page .detail-levels li b { margin-left: 6px; font-weight: 700; color: var(--text); }
 
 /* A requisition's levels: level, what it was for, how many, in columns. */
-.award-page .lvls { display: grid; min-width: 250px; }
+.award-page .lvls { display: grid; min-width: 236px; }
 .award-page .lvl-row {
   display: grid;
-  grid-template-columns: 70px minmax(100px, 1fr) 72px;
+  grid-template-columns: 64px minmax(96px, 1fr) 56px;
   gap: 10px;
   align-items: baseline;
   padding: 5px 0;
