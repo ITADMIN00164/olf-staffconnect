@@ -1596,26 +1596,59 @@
 .award-page .lvl-row:last-child { border-bottom: 0; padding-bottom: 0; }
 .award-page .lvl-note { padding: 2px 0 5px; font-size: .72rem; font-weight: 600; color: var(--warn); text-align: right; }
 
-/* Level, category and quantity each carry a colour. Level has a hue of its own;
-   the quantity takes its level's, so a number reads with the level it belongs
-   to. None of these is green, amber or red, which already mean arrived, waiting
-   and refused. */
-.award-page .lvl-row { --lv: #475569; --lv-soft: #F1F5F9; }
-.award-page .lvl-row.lv-block    { --lv: #2563EB; --lv-soft: #EFF6FF; }
-.award-page .lvl-row.lv-district { --lv: #7C3AED; --lv-soft: #F5F3FF; }
-.award-page .lvl-row.lv-ns       { --lv: #DB2777; --lv-soft: #FDF2F8; }
-.award-page .lvl-row.lv-su       { --lv: #0E7490; --lv-soft: #ECFEFF; }
-
-.award-page .lr-level { position: relative; padding-left: 12px; font-size: .8rem; font-weight: 700; color: var(--lv); }
-.award-page .lr-level::before { content: ""; position: absolute; left: 0; top: .38em; width: 7px; height: 7px; border-radius: 50%; background: var(--lv); }
-
+/* Inside the level column the cell stays quiet: the level in dark type, what
+   it was for as a plain pill, the quantity in a white badge. */
+.award-page .lr-level { font-size: .8rem; font-weight: 700; color: var(--text); }
 .award-page .lr-cat { justify-self: start; max-width: 100%; padding: 1px 9px; border-radius: 999px; font-size: .76rem; font-weight: 600;
-                      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: #F1F5F9; color: #475569; }
-.award-page .lr-cat.cat-academic { background: #EEF2FF; color: #4338CA; }
-.award-page .lr-cat.cat-pom      { background: #F0FDFA; color: #0F766E; }
-.award-page .lr-cat.cat-other    { background: #FFF1F2; color: #9F1239; }
-.award-page .lr-cat.is-none      { background: none; color: var(--text-muted); font-weight: 400; }
-
+                      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                      background: rgba(255,255,255,.85); border: 1px solid rgba(0,0,0,.08); color: var(--text-soft); }
+.award-page .lr-cat.is-none { background: none; border: 0; color: var(--text-muted); font-weight: 400; }
 .award-page .lr-qty { justify-self: end; min-width: 34px; padding: 1px 9px; border-radius: 8px; text-align: center; font-family: var(--font-mono);
-                      font-size: .8rem; font-weight: 700; white-space: nowrap; background: var(--lv-soft); color: var(--lv); }
-.award-page .lvl-row.is-short .lr-qty { background: var(--warn-soft); color: var(--warn); }
+                      font-size: .8rem; font-weight: 700; white-space: nowrap; background: #fff; border: 1px solid rgba(0,0,0,.08); color: var(--text); }
+.award-page .lvl-row.is-short .lr-qty { background: var(--warn-soft); border-color: var(--warn-soft-border); color: var(--warn); }
+.award-page .lvl-row { border-bottom-color: rgba(0,0,0,.07); }
+
+/* Each column of the two request tables has a colour of its own: a deep shade
+   on its heading and the faintest tint of it down the column, so the eye can
+   stay in one column and tell it from its neighbours. The hues are muted on
+   purpose, and the stage badges keep the green, amber and red that mean arrived,
+   waiting and refused. */
+.award-page #requisitions-table, .award-page #delivery-table {
+  --c1: #475569; --t1: #F8FAFC;   /* state */
+  --c2: #355C8A; --t2: #F3F7FC;   /* division */
+  --c3: #4B52A3; --t3: #F4F5FD;   /* district */
+  --c4: #2B6E69; --t4: #F1FAF8;   /* requester */
+  --c5: #6B4A9C; --t5: #F7F3FC;   /* level */
+  --c6: #3A7A4A; --t6: #F2FAF4;   /* delivered / asked */
+  --c7: #6F6455; --t7: #FAF8F4;   /* submitted */
+  --c8: #A15F2B; --t8: #FDF7F0;   /* status */
+  --c9: #3B4558; --t9: #F6F7F9;   /* log, action */
+}
+
+/* Requisition: state, division, district, requester, level, delivered / asked, submitted, status, log, review. */
+.award-page #requisitions-table thead th:nth-child(1), .award-page #requisitions-table tbody td:nth-child(1) { --c: var(--c1); --t: var(--t1); }
+.award-page #requisitions-table thead th:nth-child(2), .award-page #requisitions-table tbody td:nth-child(2) { --c: var(--c2); --t: var(--t2); }
+.award-page #requisitions-table thead th:nth-child(3), .award-page #requisitions-table tbody td:nth-child(3) { --c: var(--c3); --t: var(--t3); }
+.award-page #requisitions-table thead th:nth-child(4), .award-page #requisitions-table tbody td:nth-child(4) { --c: var(--c4); --t: var(--t4); }
+.award-page #requisitions-table thead th:nth-child(5), .award-page #requisitions-table tbody td:nth-child(5) { --c: var(--c5); --t: var(--t5); }
+.award-page #requisitions-table thead th:nth-child(6), .award-page #requisitions-table tbody td:nth-child(6) { --c: var(--c6); --t: var(--t6); }
+.award-page #requisitions-table thead th:nth-child(7), .award-page #requisitions-table tbody td:nth-child(7) { --c: var(--c7); --t: var(--t7); }
+.award-page #requisitions-table thead th:nth-child(8), .award-page #requisitions-table tbody td:nth-child(8) { --c: var(--c8); --t: var(--t8); }
+.award-page #requisitions-table thead th:nth-child(9), .award-page #requisitions-table tbody td:nth-child(9),
+.award-page #requisitions-table thead th:nth-child(10), .award-page #requisitions-table tbody td:nth-child(10) { --c: var(--c9); --t: var(--t9); }
+
+/* Delivery: state, division, district, requester, levels, delivered / asked, status, log, action. */
+.award-page #delivery-table thead th:nth-child(1), .award-page #delivery-table tbody td:nth-child(1) { --c: var(--c1); --t: var(--t1); }
+.award-page #delivery-table thead th:nth-child(2), .award-page #delivery-table tbody td:nth-child(2) { --c: var(--c2); --t: var(--t2); }
+.award-page #delivery-table thead th:nth-child(3), .award-page #delivery-table tbody td:nth-child(3) { --c: var(--c3); --t: var(--t3); }
+.award-page #delivery-table thead th:nth-child(4), .award-page #delivery-table tbody td:nth-child(4) { --c: var(--c4); --t: var(--t4); }
+.award-page #delivery-table thead th:nth-child(5), .award-page #delivery-table tbody td:nth-child(5) { --c: var(--c5); --t: var(--t5); }
+.award-page #delivery-table thead th:nth-child(6), .award-page #delivery-table tbody td:nth-child(6) { --c: var(--c6); --t: var(--t6); }
+.award-page #delivery-table thead th:nth-child(7), .award-page #delivery-table tbody td:nth-child(7) { --c: var(--c8); --t: var(--t8); }
+.award-page #delivery-table thead th:nth-child(8), .award-page #delivery-table tbody td:nth-child(8),
+.award-page #delivery-table thead th:nth-child(9), .award-page #delivery-table tbody td:nth-child(9) { --c: var(--c9); --t: var(--t9); }
+
+.award-page #requisitions-table thead th, .award-page #delivery-table thead th { background: var(--c, #334155); color: #fff; }
+.award-page #requisitions-table tbody td, .award-page #delivery-table tbody td { background: var(--t, transparent); }
+.award-page #requisitions-table tbody td + td, .award-page #delivery-table tbody td + td { border-left: 1px solid rgba(255,255,255,.9); }
+.award-page #requisitions-table thead th + th, .award-page #delivery-table thead th + th { border-left: 1px solid rgba(255,255,255,.18); }
