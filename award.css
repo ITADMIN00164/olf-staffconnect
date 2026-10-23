@@ -1572,10 +1572,20 @@
 .award-page .award-line-other  { grid-area: other; }
 .award-page .award-line-cat[hidden], .award-page .award-line-other[hidden] { display: none !important; }
 
-.award-page .detail-levels {
-  display: block;
-  margin-top: 3px;
-  font-size: .78rem;
-  font-weight: 600;
-  color: var(--accent-ink);
-}
+/* A requisition's levels: one line to a level, the name on the left and
+   what it was for, with its quantity, beside it. */
+.award-page .lvls { display: grid; gap: 5px; min-width: 230px; }
+.award-page .lvl { display: grid; grid-template-columns: 92px 1fr; align-items: start; gap: 8px; }
+.award-page .lvl-name { padding-top: 3px; font-size: .78rem; font-weight: 700; color: var(--text); line-height: 1.3; }
+.award-page .lvl-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.award-page .lvl-chips .type-chip { margin: 0; }
+.award-page .type-chip .chip-what { display: inline-block; max-width: 170px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+.award-page .lvl-sent { align-self: center; font-size: .72rem; font-weight: 600; color: var(--warn); }
+
+.award-page [data-aw-log] { white-space: nowrap; }
+
+/* In the breakdown: what a requisition asked for, under its name. */
+.award-page .detail-levels { list-style: none; margin: 7px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.award-page .detail-levels li { padding: 2px 9px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-alt); font-size: 11px; color: var(--text-soft); white-space: nowrap; }
+.award-page .detail-levels li b { margin-left: 6px; font-weight: 700; color: var(--text); }
+.award-page .type-chip.solo b { margin: 0; padding: 0; border: 0; opacity: 1; }
