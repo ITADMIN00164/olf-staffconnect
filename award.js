@@ -1539,8 +1539,6 @@ window.AWARD_CONFIG = {
     Array.prototype.forEach.call(document.querySelectorAll("[data-jute-view]"), function (btn) {
       btn.addEventListener("click", function () { showJuteView(btn.getAttribute("data-jute-view")); });
     });
-    var juteDownload = document.getElementById("jute-download");
-    if (juteDownload) juteDownload.addEventListener("click", downloadJute);
 
     ["jute-district", "jute-status", "jute-size"].forEach(function (id) {
       var sel = document.getElementById(id);
@@ -2577,7 +2575,6 @@ window.AWARD_CONFIG = {
     return awardsOf(row).filter(function (a) { return a.name === "Jute Bag"; });
   }
 
-  var juteShown = [];            // the requisitions on screen, for the download
   var juteView = "stock";        // or "requests", "districts"
 
   function juteSizeOf(row, size) {
@@ -2623,36 +2620,12 @@ window.AWARD_CONFIG = {
     var b = document.getElementById("jute-view-districts");
     if (a) a.hidden = which !== "requests";
     if (b) b.hidden = which !== "districts";
-    var dl = document.getElementById("jute-download");
-    if (dl) dl.hidden = which !== "requests";
 
     Array.prototype.forEach.call(document.querySelectorAll("[data-jute-view]"), function (btn) {
       var on = btn.getAttribute("data-jute-view") === which;
       btn.classList.toggle("is-active", on);
       btn.setAttribute("aria-selected", on ? "true" : "false");
     });
-  }
-
-  // What is on screen, as a spreadsheet: one line to a requisition.
-  function downloadJute() {
-    if (!juteShown.length) return;
-    var lines = [["District", "Requester", "Small", "Big", "Total", "Status", "Submitted", "Remark"]];
-    juteShown.forEach(function (r) {
-      var s = juteSizeOf(r, "Small"), b = juteSizeOf(r, "Big");
-      lines.push([placeOf(r).district || "", r.requester_name || "", s, b,
-                  juteLinesOf(r).reduce(function (n, a) { return n + a.quantity; }, 0),
-                  STAGES[stageOf(r)].label, formatTimestamp(r.created_at), remarkOf(r)]);
-    });
-    var csv = lines.map(function (l) { return l.map(csvField).join(","); }).join("\r\n");
-    var blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
-    var url = URL.createObjectURL(blob);
-    var link = document.createElement("a");
-    link.href = url;
-    link.download = "jute-bags-" + todayLocalISO() + ".csv";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(function () { URL.revokeObjectURL(url); }, 0);
   }
 
   function renderJute() {
@@ -2705,9 +2678,6 @@ window.AWARD_CONFIG = {
       "</div>";
     paintIcons();
     runCounters(summary);
-    juteShown = rows;
-    var dl = document.getElementById("jute-download");
-    if (dl) dl.disabled = !rows.length;
 
     // By district: who has asked for how many, and in what sizes, biggest first.
     var agg = {};
