@@ -20,45 +20,51 @@
       </span>
     </div>
 
-    <!-- There was a tab bar above this with one tab in it, named the same
-         as the heading directly underneath. It said nothing twice. -->
-    <div class="aw-body">
-
-      <div class="aw-page-header">
-        <div>
-          <h1>Stock Management</h1>
-          <p>Award stock requested from the districts</p>
-          <p class="aw-standing" id="standing-note" hidden></p>
-        </div>
-        <div class="aw-page-actions">
-          <button type="button" id="refresh-btn" class="btn btn-ghost btn-sm">Refresh</button>
-          <button type="button" id="new-req-btn" class="btn btn-primary">
-            <i class="aw-icon" data-aw-icon="plus" aria-hidden="true"></i>
-            New Requisition
-          </button>
-        </div>
+    <!-- The Test tab: Stock Management and Award Management, with the stock
+         actions on the right while Stock Management is showing. -->
+    <div class="aw-topbar">
+      <nav class="aw-toptabs" role="tablist" aria-label="Test">
+        <button type="button" role="tab" class="aw-toptab is-active" data-aw-top="stock" aria-selected="true"><i class="aw-icon" data-aw-icon="stock" aria-hidden="true"></i>Stock Management</button>
+        <button type="button" role="tab" class="aw-toptab" data-aw-top="award" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="trophy" aria-hidden="true"></i>Award Management</button>
+      </nav>
+      <div class="aw-top-actions" id="aw-stock-actions">
+        <button type="button" id="refresh-btn" class="btn btn-ghost btn-sm"><i class="aw-icon" data-aw-icon="refresh" aria-hidden="true"></i>Refresh</button>
+        <button type="button" id="new-req-btn" class="btn btn-primary btn-sm">
+          <i class="aw-icon" data-aw-icon="plus" aria-hidden="true"></i>
+          New Requisition
+        </button>
       </div>
+    </div>
+
+    <div id="aw-view-stock">
+    <div class="aw-body">
 
       <nav class="aw-subtabs" role="tablist" aria-label="Stock Management views">
         <button type="button" role="tab" id="aw-subtab-requisition" class="aw-subtab is-active"
                 data-aw-subtab="requisition" aria-controls="aw-subpanel-requisition"
                 aria-selected="true">
-          Requisition
+          <i class="aw-icon" data-aw-icon="doc" aria-hidden="true"></i>Requisition
         </button>
         <button type="button" role="tab" id="aw-subtab-delivery" class="aw-subtab"
                 data-aw-subtab="delivery" aria-controls="aw-subpanel-delivery"
                 aria-selected="false" tabindex="-1" hidden>
-          Delivery
+          <i class="aw-icon" data-aw-icon="truck" aria-hidden="true"></i>Delivery
         </button>
         <button type="button" role="tab" id="aw-subtab-stock" class="aw-subtab"
                 data-aw-subtab="stock" aria-controls="aw-subpanel-stock"
                 aria-selected="false" tabindex="-1">
-          Stock
+          <i class="aw-icon" data-aw-icon="stock" aria-hidden="true"></i>Stock
+        </button>
+        <button type="button" role="tab" id="aw-subtab-jute" class="aw-subtab"
+                data-aw-subtab="jute" aria-controls="aw-subpanel-jute"
+                aria-selected="false" tabindex="-1">
+          <i class="aw-icon" data-aw-icon="bag" aria-hidden="true"></i>Jute Bags
+          <span class="tab-count" id="jute-tab-count" hidden></span>
         </button>
         <button type="button" role="tab" id="aw-subtab-settings" class="aw-subtab"
                 data-aw-subtab="settings" aria-controls="aw-subpanel-settings"
                 aria-selected="false" tabindex="-1" hidden>
-          Settings
+          <i class="aw-icon" data-aw-icon="gear" aria-hidden="true"></i>Settings
         </button>
         <span class="pill" id="row-pill">—</span>
       </nav>
@@ -73,6 +79,9 @@
         </span>
         <span id="list-banner-text"></span>
       </div>
+      <!-- Figures above the list: how many requisitions are where, and how much
+           of what was asked for has arrived. Drawn by award.js. -->
+      <div class="req-summary" id="req-summary" hidden></div>
       <div class="filters">
         <div class="field field-sm">
           <label for="filter-state">Filter by state</label>
@@ -101,8 +110,8 @@
           </select>
         </div>
         <div class="field field-sm">
-          <label for="filter-type">Filter by type</label>
-          <select id="filter-type"><option value="">All types</option></select>
+          <label for="filter-type">Filter by gift</label>
+          <select id="filter-type"><option value="">All gifts</option></select>
         </div>
         <div class="field field-sm">
           <label for="filter-search">Search requester</label>
@@ -117,8 +126,8 @@
               <th scope="col">Division</th>
               <th scope="col">District</th>
               <th scope="col">Requester</th>
-              <th scope="col">Type</th>
-              <th scope="col" class="num">Quantity</th>
+              <th scope="col">Gifts</th>
+              <th scope="col" class="num" title="Delivered / asked for">Delivered / Asked</th>
               <th scope="col">Submitted</th>
               <th scope="col">Status</th>
               <th scope="col">Log</th>
@@ -144,11 +153,6 @@
       <div id="aw-subpanel-delivery" class="aw-subpanel" role="tabpanel"
            aria-labelledby="aw-subtab-delivery" hidden>
         <section class="card">
-          <div class="aw-panel-head">
-            <h3>Approved and waiting</h3>
-            <p>Requisitions that have been approved and are now yours to
-               acknowledge, deliver, or reject.</p>
-          </div>
           <div class="table-scroll">
             <table id="delivery-table">
               <thead>
@@ -157,7 +161,7 @@
                   <th scope="col">Division</th>
                   <th scope="col">District</th>
                   <th scope="col">Requester</th>
-                  <th scope="col">Awards</th>
+                  <th scope="col">Gifts</th>
                   <th scope="col" class="num">Quantity</th>
                   <th scope="col">Status</th>
                   <th scope="col">Log</th>
@@ -174,14 +178,8 @@
 
       <div id="aw-subpanel-stock" class="aw-subpanel" role="tabpanel"
            aria-labelledby="aw-subtab-stock" hidden>
-        <section class="card">
-          <div class="aw-panel-head">
-            <h3>Stock</h3>
-            <p>What each district is holding. Opening, what arrived, what was
-               given out, and what carries into the next month. Nothing here is
-               typed twice - the balance is added up from what happened.</p>
-          </div>
-
+        <section class="card" id="stock-host">
+          <div id="stock-sheet">
           <div class="stock-controls">
             <div class="field field-sm">
               <label for="stock-year">Year</label>
@@ -219,7 +217,91 @@
             </div>
           </div>
 
+          <!-- What was asked for, what arrived, what was given out and what is held. -->
+          <div class="stock-summary" id="stock-summary" hidden></div>
+
           <div class="table-scroll" id="stock-table-wrap"></div>
+          </div>
+        </section>
+      </div>
+
+      <div id="aw-subpanel-jute" class="aw-subpanel" role="tabpanel"
+           aria-labelledby="aw-subtab-jute" hidden>
+        <section class="card">
+          <div class="jute-bar">
+            <div class="seg" role="tablist" aria-label="Jute bags view">
+              <button type="button" role="tab" class="seg-btn is-active" data-jute-view="stock" aria-selected="true">Stock</button>
+              <button type="button" role="tab" class="seg-btn" data-jute-view="requests" aria-selected="false">By requisition</button>
+              <button type="button" role="tab" class="seg-btn" data-jute-view="districts" aria-selected="false">By district</button>
+            </div>
+          </div>
+
+          <!-- The stock sheet is moved in here, counting jute bags. -->
+          <div id="jute-view-stock"></div>
+
+          <div id="jute-view-data" hidden>
+            <div id="jute-summary"></div>
+
+          <div class="filters">
+            <div class="field field-sm">
+              <label for="jute-district">Filter by district</label>
+              <select id="jute-district"><option value="">All districts</option></select>
+            </div>
+            <div class="field field-sm">
+              <label for="jute-status">Filter by status</label>
+              <select id="jute-status"><option value="">All statuses</option></select>
+            </div>
+            <div class="field field-sm">
+              <label for="jute-size">Filter by size</label>
+              <select id="jute-size">
+                <option value="">Small and Big</option>
+                <option value="Small">Small</option>
+                <option value="Big">Big</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="jute-view-requests">
+          <div class="table-scroll">
+            <table id="jute-table">
+              <thead>
+                <tr>
+                  <th scope="col">District</th>
+                  <th scope="col">Requester</th>
+                  <th scope="col" class="num">Small</th>
+                  <th scope="col" class="num">Big</th>
+                  <th scope="col" class="num">Total</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Submitted</th>
+                  <th scope="col">Remark</th>
+                </tr>
+              </thead>
+              <tbody id="jute-body">
+                <tr class="placeholder-row"><td colspan="8">Loading…</td></tr>
+              </tbody>
+              <tfoot id="jute-foot" hidden></tfoot>
+            </table>
+          </div>
+          </div>
+
+          <div id="jute-view-districts" hidden>
+            <div class="table-scroll">
+              <table id="jute-district-table">
+                <thead>
+                  <tr>
+                    <th scope="col">District</th>
+                    <th scope="col" class="num">Requisitions</th>
+                    <th scope="col" class="num">Small</th>
+                    <th scope="col" class="num">Big</th>
+                    <th scope="col" class="num">Total</th>
+                    <th scope="col">Small and Big</th>
+                  </tr>
+                </thead>
+                <tbody id="jute-district-body"></tbody>
+              </table>
+            </div>
+          </div>
+          </div>
         </section>
       </div>
 
@@ -228,9 +310,6 @@
         <section class="card">
           <div class="aw-panel-head">
             <h3>Head Office</h3>
-            <p>Who acknowledges and dispatches approved requisitions. They see
-               the Delivery tab; nobody else does. Only Staff Connect
-               administrators can change this list.</p>
           </div>
 
           <div class="admin-add-row">
@@ -253,6 +332,111 @@
         </section>
       </div>
     </div>
+    </div><!-- /#aw-view-stock -->
+
+    <!-- Award Management: the POM page's view of awards data, copied here. Its
+         styles are award-manage.css (scoped to .awm-view) and its behaviour is
+         award-manage.js. -->
+    <div id="aw-view-award" class="awm-view" hidden>
+      <div class="pom-page">
+    <div id="awmManageView" style="display:flex; flex-direction:column; flex:1; min-height:0;">
+
+    <!-- ── LIST VIEW ── -->
+    <div id="awmListView">
+        <div class="pom-filter-card">
+            <select id="awmDistrict" class="pom-select">
+                <option value="">Select District</option>
+            </select>
+            <span class="awm-ay">AY 2026-27</span>
+        </div>
+
+        <div class="pom-card">
+            <table class="pom-table centered">
+                <thead>
+                    <tr><th>Month</th><th>Total</th><th>Awarded In Time</th><th>Awarded Late</th><th>Pending</th><th>Total Awarded</th><th>Verified</th><th></th></tr>
+                </thead>
+                <tbody id="awmMonthBody">
+                    <tr><td colspan="8" class="pom-msg">Select a District to begin</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ── DETAIL VIEW ── -->
+    <div id="awmDetailWrap" style="display:none;">
+        <div class="pom-detail-head">
+            <button id="awmBackBtn" class="pom-back-btn">← Back</button>
+            <div class="pom-detail-filters">
+                <span class="pom-detail-filter-label">District</span>
+                <select id="awmDetailDistrict" class="pom-detail-select"></select>
+                <span class="pom-filter-sep"></span>
+                <span class="pom-detail-filter-label">Month</span>
+                <select id="awmDetailMonth" class="pom-detail-select"></select>
+            </div>
+            <button id="awmRefreshBtn" class="pom-back-btn pom-refresh-btn" title="Reload latest records">⟳ Refresh Records</button>
+        </div>
+
+        <div class="pom-card scroll">
+            <table class="pom-table fixed">
+                <colgroup>
+                    <col style="width:15%"><col style="width:12%"><col style="width:7%">
+                    <col style="width:11%"><col style="width:10%"><col style="width:8%">
+                    <col style="width:8%"><col style="width:9%"><col style="width:9%"><col style="width:8%">
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th>Name</th><th>Award</th><th>Awarded</th>
+                        <th>Awarded By</th><th>Date</th><th class="col-center">Image</th><th class="col-center">Description</th>
+                        <th class="col-center">Save</th><th class="col-center">Verify</th><th class="col-center">Unlock</th>
+                    </tr>
+                </thead>
+                <tbody id="awmTableBody">
+                    <tr><td colspan="10" style="text-align:center;color:#9ca3af;padding:28px;">No month selected</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    </div><!-- end pomManageView -->
+
+    <!-- ── Image popup ── -->
+    <div id="awmImgModal" class="pom-img-overlay">
+        <div class="pom-img-box">
+            <button id="awmImgClose" class="pom-img-close">✕</button>
+            <img id="awmImgEl" src="" alt="Award image">
+            <div id="awmImgLoading" class="pom-img-loading"><div class="pom-spinner"></div></div>
+            <div id="awmImgFallback" class="pom-img-fallback">
+                <div>Couldn't preview this image here.</div>
+                <a href="#" target="_blank" rel="noopener">Open in Google Drive ↗</a>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ── Loader, toasts, generic modal ── -->
+    <div id="awmLoader" class="pom-loader-overlay"><div class="pom-spinner"></div></div>
+    <div id="awmToasts" class="pom-toasts"></div>
+    <div id="awmModal" class="pom-modal-overlay">
+        <div class="pom-modal-box">
+            <div class="pom-modal-title" id="awmModalTitle"></div>
+            <div class="pom-modal-msg" id="awmModalMsg"></div>
+            <div class="pom-modal-actions" id="awmModalActions"></div>
+        </div>
+    </div>
+    <div id="awmPrompt" class="pom-prompt-overlay">
+        <div class="pom-prompt-box">
+            <div class="pom-prompt-title" id="awmPromptTitle">Description</div>
+            <textarea id="awmPromptInput" class="pom-prompt-input" placeholder="Write a description…"></textarea>
+            <div class="pom-prompt-actions">
+                <button id="awmPromptCancel" class="pmbtn cancel">Cancel</button>
+                <button id="awmPromptOk" class="pmbtn primary">Save</button>
+            </div>
+        </div>
+    </div>
+
+      </div>
+    </div>
+
 
     <!-- New requisition.
 
@@ -307,18 +491,27 @@
         </div>
 
         <div class="field field-wide">
-          <label>Awards <span class="req" aria-hidden="true">*</span></label>
+          <label>Gifts <span class="req" aria-hidden="true">*</span></label>
 
-          <!-- One line per award asked for. Built by award.js from the award
+          <!-- One line per level asked for. Built by award.js from the award
                types it loads, so there is nothing to keep in step here. -->
           <div class="award-lines" id="award-lines"></div>
 
           <button type="button" class="btn btn-ghost btn-sm award-add" id="award-add">
             <i class="aw-icon" data-aw-icon="plus" aria-hidden="true"></i>
-            Add another award
+            Add another gift
           </button>
 
           <p class="error" id="award-type-error" role="alert"></p>
+        </div>
+
+        <div class="field field-wide">
+          <label for="req-remark">Remark
+            <span class="req" id="remark-star" aria-hidden="true">*</span>
+            <span class="hint" id="remark-hint" hidden>optional for jute bags</span>
+          </label>
+          <textarea id="req-remark" rows="2" maxlength="300" placeholder="Why are these needed?"></textarea>
+          <p class="error" id="remark-error" role="alert"></p>
         </div>
 
 
@@ -483,6 +676,28 @@
           <div class="form-actions">
             <button type="button" class="btn btn-ghost" data-aw-close-stock>Cancel</button>
             <button type="button" id="stock-save" class="btn btn-primary">Record</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- What a requisition asked for, level by level, opened from its row. -->
+    <div class="aw-overlay" id="levels-modal">
+      <div class="aw-overlay-backdrop" data-aw-close-levels></div>
+      <div class="aw-box aw-box-sm" role="dialog" aria-modal="true" aria-labelledby="levels-heading">
+        <div class="aw-box-head">
+          <div class="aw-box-heading">
+            <h2 id="levels-heading">Gifts asked for</h2>
+            <p class="aw-box-sub" id="levels-sub"></p>
+          </div>
+          <button type="button" class="aw-box-close" data-aw-close-levels aria-label="Close">
+            <i class="aw-icon" data-aw-icon="close" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="aw-box-body">
+          <div id="levels-body"></div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-ghost" data-aw-close-levels>Close</button>
           </div>
         </div>
       </div>
