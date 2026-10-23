@@ -504,6 +504,50 @@ window.PlanAdmins = {
 };
 
 /* ====================================
+   SMART GOALS EDITORS (Firestore collection "Smart Goals Admin")
+==================================== */
+window.SmartGoalsEditors = {
+    async list() {
+        const editors = [];
+        try {
+            const snap = await getDocs(collection(db, "Smart Goals Admin"));
+            snap.forEach(d => {
+                const data = d.data();
+                const em = data.Email || data.email || data["Email ID"] || d.id;
+                if (em) editors.push(String(em).trim().toLowerCase());
+            });
+        } catch (e) {
+            console.warn("[SmartGoals] Could not fetch editors from Firestore:", e);
+        }
+        return [...new Set(editors)];
+    },
+    async add(email) {
+        const clean = String(email || "").trim().toLowerCase();
+        if (!clean) throw new Error("Email is required to grant edit access");
+        await setDoc(doc(db, "Smart Goals Admin", clean), {
+            Email: clean,
+            updatedAt: new Date().toISOString()
+        });
+        return clean;
+    },
+    async remove(email) {
+        const clean = String(email || "").trim().toLowerCase();
+        if (!clean) return;
+        try { await deleteDoc(doc(db, "Smart Goals Admin", clean)); } catch (e) {}
+        try {
+            const snap = await getDocs(collection(db, "Smart Goals Admin"));
+            for (const d of snap.docs) {
+                const v = d.data();
+                const val = String(v.Email || v["Email ID"] || v.email || "").toLowerCase();
+                if (val === clean) { try { await deleteDoc(doc(db, "Smart Goals Admin", d.id)); } catch (e) {} }
+            }
+        } catch (e) {}
+    }
+};
+
+window.olfIsEmailAdmin = isEmailAdmin;
+
+/* ====================================
    EMAIL WHITELIST CHECK
 ==================================== */
 
@@ -1072,6 +1116,16 @@ window.olfStaffDirectory = async function () {
     return list;
 };
 
+/* Strictly 100% read-only fetch of full Employees records for Team Performance */
+window.olfGetEmployees = async function () {
+    const snapshot = await getDocs(collection(db, "Employees"));
+    const list = [];
+    snapshot.forEach(d => {
+        list.push({ id: String(d.id || "").trim(), ...d.data() });
+    });
+    return list;
+};
+
 /* ====================================
    WHERE THE ORGANISATION WORKS
 
@@ -1330,6 +1384,12 @@ window.navigate = async function (page) {
         // requester, so there is nothing to inject here.
         if (window.AwardManagement && typeof window.AwardManagement.mount === "function") {
             window.AwardManagement.mount();
+        }
+    }
+
+    else if (page === "team-performance") {
+        if (window.TeamPerformance && typeof window.TeamPerformance.mount === "function") {
+            window.TeamPerformance.mount();
         }
     }
 

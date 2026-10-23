@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Program Team: Goals, Plan and Review - Local Preview</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #E4EAF3;
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    }
+    .preview-banner {
+      background: #1E293B;
+      color: #F8FAFC;
+      padding: 8px 20px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .preview-banner a {
+      color: #60A5FA;
+      text-decoration: none;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="preview-banner">
+    <div><strong>Program Team: Goals, Plan and Review</strong> &middot; Local Sandbox Preview</div>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="color:#94A3B8; font-size:11px;">RBAC Simulator:</span>
+      <select id="previewRoleSelect" onchange="simulateRole(this.value)" style="background:#0F172A; color:#F8FAFC; border:1px solid #334155; border-radius:6px; padding:3px 8px; font-size:12px; cursor:pointer;">
+        <option value="user" selected>👤 Regular User (Strictly View-Only)</option>
+        <option value="admin">👑 IT Admin (Default Editor + Manage Editors)</option>
+        <option value="vishvajit">👤 Vishvajit Pawar (View-Only by default)</option>
+      </select>
+      <a href="index.html">&larr; Open Full StaffConnect App</a>
+    </div>
+  </div>
+  <div id="pageContent"></div>
+
+  <script src="team-performance-data.js?v=20261023d"></script>
+  <script src="team-performance.js?v=20261023d"></script>
+  <script>
+    function simulateRole(val) {
+      if (val === 'admin') {
+        window.__olfUser = { email: 'admin@openlinksfoundation.org', displayName: 'IT Admin', role: 'Admin' };
+      } else if (val === 'vishvajit') {
+        window.__olfUser = { email: 'vishvajit@openlinksfoundation.org', displayName: 'Vishvajit Pawar', role: 'User' };
+      } else {
+        window.__olfUser = { email: 'user@openlinksfoundation.org', displayName: 'Regular Staff', role: 'User' };
+      }
+      localStorage.setItem('olf_smart_goals_simulated_user', JSON.stringify(window.__olfUser));
+      if (window.TeamPerformance && typeof window.TeamPerformance.checkPermissions === 'function') {
+        window.TeamPerformance.checkPermissions();
+      }
+    }
+
+    // Default simulation = Regular User (View-Only)
+    simulateRole('user');
+
+    fetch('pages/team-performance.html')
+      .then(res => res.text())
+      .then(html => {
+        document.getElementById('pageContent').innerHTML = html;
+        if (window.TeamPerformance && typeof window.TeamPerformance.mount === 'function') {
+          window.TeamPerformance.mount();
+        }
+      });
+  </script>
+</body>
+</html>
