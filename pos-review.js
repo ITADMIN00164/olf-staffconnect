@@ -306,6 +306,16 @@
     var cooP = peopleOver("COO", districts)[0] || ORG.people.filter(function (p) { return p.designation === "COO"; })[0] || null;
     var lc = function (s) { return String(s || "").toLowerCase(); };
     var blocks = blockNames.map(function (b) { return { key: normBlock(b), name: b }; });
+    // Who fills H (Review record): the next person up the line. If that seat is vacant
+    // (e.g. the PM resigned and is no longer an active assignment), it moves one level up:
+    // PO -> PM -> DM -> COO, PM -> DM -> COO, DM -> COO.
+    var chain = unit === "PO" ? [["PM", pmP], ["DM", dmP], ["COO", cooP]]
+              : unit === "PM" ? [["DM", dmP], ["COO", cooP]]
+              : unit === "DM" ? [["COO", cooP]] : [];
+    var mgr = chain.filter(function (c) { return c[1]; })[0] || null;
+    var managerRole = mgr ? mgr[0] : (chain[0] ? chain[0][0] : "");
+    var managerEmailOf = lc(mgr && mgr[1].email);
+    var managerCovering = !!(mgr && chain[0] && mgr[0] !== chain[0][0]);   // true when standing in for a vacant seat
     if (unit === "PO") {
       return {
         unit: unit,
@@ -317,16 +327,17 @@
         blocks: blocks, poCount: 1,
         selfEmpId: self.emp_id,
         selfEmail: lc(self.email),                      // the PO fills A/B/G
-        managerEmail: lc(pmP && pmP.email)              // the PM fills H
+        managerEmail: managerEmailOf,                   // the PM fills H (DM if the PM seat is vacant)
+        managerRole: managerRole, managerCovering: managerCovering
       };
     }
-    var selfEmail = "", managerEmail = "";
-    if (unit === "PM") { selfEmail = lc(self.email); managerEmail = lc(dmP && dmP.email); }
-    if (unit === "DM") { selfEmail = lc(self.email); managerEmail = lc(cooP && cooP.email); }
+    var selfEmail = (unit === "PM" || unit === "DM") ? lc(self.email) : "";
+    var managerEmail = (unit === "PM" || unit === "DM") ? managerEmailOf : "";
     return {
       unit: unit,
       manager: self ? self.name : "", managerId: self ? self.emp_id : "",
       selfEmpId: self ? self.emp_id : "", selfEmail: selfEmail, managerEmail: managerEmail,
+      managerRole: managerRole, managerCovering: managerCovering,
       district: unit === "District" ? value : "",
       division: di.division, state: di.state,
       dm: unit === "PM" && dmP ? dmP.name : "",
@@ -478,8 +489,18 @@
   }
 
 
+  // Called by pos.js after an assignment is added, edited or marked resigned, so the
+  // Dashboard stops using the org structure it cached when it first opened.
+  var ORG_STALE = false;
+  function orgChanged() { ORG = null; ORG_STALE = true; }
+
   function mount() {
-    var root = $("ftrRoot"); if (!root || root.dataset.mounted === "1") return;
+    var root = $("ftrRoot"); if (!root) return;
+    if (root.dataset.mounted === "1") {
+      if (ORG_STALE) { ORG_STALE = false; VIEW = null; DIRTY = {}; loadBaseData(); }
+      return;
+    }
+    ORG_STALE = false;
     root.dataset.mounted = "1";
     if (!window.posSupabase) { prBody('<div class="pr-empty pr-error">Supabase client not loaded — check that pos-supabase.js is included.</div>'); return; }
     wireNav(); wireFilters(); wireMonthly(); sumWire();
@@ -669,7 +690,7 @@
       if (h.division) line.push(esc(h.division) + " division");
       if (h.state) line.push(esc(h.state));
       if (h.pm && h.pm.name) line.push("PM " + esc(h.pm.name) + (h.pm.designation ? " · " + esc(h.pm.designation) : ""));
-      else line.push("PM vacant");
+      else line.push("PM vacant" + (h.managerCovering && h.managerRole ? " · " + esc(h.managerRole) + " fills the review record" : ""));
       if (h.dm && h.dm.name) line.push("DM " + esc(h.dm.name));
       if (h.coo && h.coo.name) line.push("COO " + esc(h.coo.name));
       return headCard(h.po.name, '<div class="pr-po-name">' + esc(h.po.name)
@@ -836,10 +857,13 @@
     }
     return fmtNum(g[r.key]);
   }
-  function sectionWho(S, unit) {
+  function sectionWho(S, unit, h) {
     if (S.k === "TEAM") return unit === "DM" ? "PM" : "PO";
     if (!S.write) return "Auto";
-    if (S.k === "H") return unit === "DM" ? "COO" : (unit === "PM" ? "DM" : "PM");
+    if (S.k === "H") {
+      if (h && h.managerRole) return h.managerRole;   // moves up when the PM/DM seat is vacant
+      return unit === "DM" ? "COO" : (unit === "PM" ? "DM" : "PM");
+    }
     return unit === "DM" ? "DM" : (unit === "PM" ? "PM" : "PO");
   }
   function whoClassOf(who) { return who === "Auto" ? "auto" : (who === "PO" ? "po" : "pm"); }
@@ -863,7 +887,7 @@
     SEC.forEach(function (S) {
       var rows = sectionRows(S);
       var editable = S.write ? ((S.k === "H") ? canEditManager() : canEditSelf()) : false;
-      var who = sectionWho(S, uUnit);
+      var who = sectionWho(S, uUnit, VIEW.header);
       body += '<tr class="pr-grp" data-grp="' + S.k + '"><td colspan="' + totalCols + '"><span class="pr-caret">\u25B8</span><span class="pr-grp-k">' + S.k + '</span>' + esc(S.title) + ' <span class="pr-who-tag pr-who-' + whoClassOf(who) + '">' + who + '</span></td></tr>';
       if (!S.write && !rows.length) {
         body += '<tr class="pr-row pr-hidden" data-secrow="' + S.k + '"><td class="pr-item pr-mut">No data uploaded for this month yet</td>';
@@ -1529,7 +1553,7 @@
       + ' <span class="pr-who-tag pr-who-' + tagCls + '">' + tagText + "</span>" + (extra || "") + "</td></tr>";
   }
   function moWriteSection(S, w0, editable, unit) {
-    var who = sectionWho(S, unit || "PO");
+    var who = sectionWho(S, unit || "PO", MVIEW && MVIEW.header);
     var out = moGroupHead(S.k, '<span class="pr-grp-k">' + S.k + "</span>" + esc(S.title), who, whoClassOf(who));
     S.rows.forEach(function (r) {
       out += '<tr class="pr-row pr-hidden" data-secrow="m' + S.k + '"><td class="pr-item">' + esc(r.label) + '</td><td colspan="5">'
@@ -2421,5 +2445,5 @@
     }).catch(function (e) { toast(e.message || String(e)); });
   }
 
-  window.FTRDashboard = { mount: mount };
+  window.FTRDashboard = { mount: mount, orgChanged: orgChanged };
 })();
