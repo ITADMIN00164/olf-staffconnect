@@ -2664,8 +2664,7 @@ window.AWARD_CONFIG = {
     };
 
     box.innerHTML =
-      '<div class="snow-head"><h4>Current stock balance</h4>' +
-        "<span>Opening stock + Delivered − Utilised ± Adjustments = Balance</span></div>" +
+      '<div class="snow-head"><h4>Current stock balance</h4></div>' +
       '<div class="snow-grid">' +
         card("All levels", total, true) +
         types.map(function (t) {
