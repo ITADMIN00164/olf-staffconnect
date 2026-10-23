@@ -2555,11 +2555,15 @@ window.AWARD_CONFIG = {
         var qty = (short && !a.hasCategory)
           ? went.toLocaleString() + " of " + asked.toLocaleString()
           : a.quantity.toLocaleString();
-        html += '<div class="lvl-row' + (short && !a.hasCategory ? " is-short" : "") + '">' +
+        // A colour for each level and each category, so the columns can be told apart at a glance.
+        var kind = shortName(a.name).toLowerCase().replace(/[^a-z]/g, "");
+        var catKind = a.hasCategory ? (a.category === "Other" ? "other" : String(a.category).toLowerCase()) : "";
+        html += '<div class="lvl-row lv-' + kind + (short && !a.hasCategory ? " is-short" : "") + '">' +
           '<b class="lr-level" title="' + escapeHtml(a.name) + '">' +
             escapeHtml(shortName(a.name)) + "</b>" +
-          '<span class="lr-cat" title="' + escapeHtml(what) + '">' +
-            (what ? escapeHtml(what) : "—") + "</span>" +
+          (what
+            ? '<span class="lr-cat cat-' + catKind + '" title="' + escapeHtml(what) + '">' + escapeHtml(what) + "</span>"
+            : '<span class="lr-cat is-none">—</span>') +
           '<span class="lr-qty">' + escapeHtml(qty) + "</span>" +
         "</div>";
       });

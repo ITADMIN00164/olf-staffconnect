@@ -1586,7 +1586,7 @@
 .award-page .lvls { display: grid; min-width: 250px; }
 .award-page .lvl-row {
   display: grid;
-  grid-template-columns: 52px minmax(96px, 1fr) 62px;
+  grid-template-columns: 70px minmax(100px, 1fr) 72px;
   gap: 10px;
   align-items: baseline;
   padding: 5px 0;
@@ -1594,8 +1594,28 @@
 }
 .award-page .lvl-row:first-child { padding-top: 0; }
 .award-page .lvl-row:last-child { border-bottom: 0; padding-bottom: 0; }
-.award-page .lr-level { font-size: .8rem; font-weight: 700; color: var(--text); }
-.award-page .lr-cat { font-size: .8rem; color: var(--text-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.award-page .lr-qty { text-align: right; font-family: var(--font-mono); font-size: .8rem; font-weight: 700; color: var(--text); white-space: nowrap; }
-.award-page .lvl-row.is-short .lr-qty { color: var(--warn); }
 .award-page .lvl-note { padding: 2px 0 5px; font-size: .72rem; font-weight: 600; color: var(--warn); text-align: right; }
+
+/* Level, category and quantity each carry a colour. Level has a hue of its own;
+   the quantity takes its level's, so a number reads with the level it belongs
+   to. None of these is green, amber or red, which already mean arrived, waiting
+   and refused. */
+.award-page .lvl-row { --lv: #475569; --lv-soft: #F1F5F9; }
+.award-page .lvl-row.lv-block    { --lv: #2563EB; --lv-soft: #EFF6FF; }
+.award-page .lvl-row.lv-district { --lv: #7C3AED; --lv-soft: #F5F3FF; }
+.award-page .lvl-row.lv-ns       { --lv: #DB2777; --lv-soft: #FDF2F8; }
+.award-page .lvl-row.lv-su       { --lv: #0E7490; --lv-soft: #ECFEFF; }
+
+.award-page .lr-level { position: relative; padding-left: 12px; font-size: .8rem; font-weight: 700; color: var(--lv); }
+.award-page .lr-level::before { content: ""; position: absolute; left: 0; top: .38em; width: 7px; height: 7px; border-radius: 50%; background: var(--lv); }
+
+.award-page .lr-cat { justify-self: start; max-width: 100%; padding: 1px 9px; border-radius: 999px; font-size: .76rem; font-weight: 600;
+                      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: #F1F5F9; color: #475569; }
+.award-page .lr-cat.cat-academic { background: #EEF2FF; color: #4338CA; }
+.award-page .lr-cat.cat-pom      { background: #F0FDFA; color: #0F766E; }
+.award-page .lr-cat.cat-other    { background: #FFF1F2; color: #9F1239; }
+.award-page .lr-cat.is-none      { background: none; color: var(--text-muted); font-weight: 400; }
+
+.award-page .lr-qty { justify-self: end; min-width: 34px; padding: 1px 9px; border-radius: 8px; text-align: center; font-family: var(--font-mono);
+                      font-size: .8rem; font-weight: 700; white-space: nowrap; background: var(--lv-soft); color: var(--lv); }
+.award-page .lvl-row.is-short .lr-qty { background: var(--warn-soft); color: var(--warn); }
