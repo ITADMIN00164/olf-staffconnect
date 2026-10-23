@@ -920,6 +920,7 @@ async function saveAssignment() {
     }
 
     closeAssignmentModal();
+    if (window.FTRDashboard && window.FTRDashboard.orgChanged) window.FTRDashboard.orgChanged();
     await loadAll();
 }
 
@@ -962,6 +963,7 @@ async function markResigned(id) {
     if (delErr) { window.notify(friendlyDbError(delErr), "error"); return; }
 
     window.notify(`${row.name} marked resigned and archived.`, "success");
+    if (window.FTRDashboard && window.FTRDashboard.orgChanged) window.FTRDashboard.orgChanged();
     await loadAll();
 }
 
