@@ -1761,13 +1761,10 @@
 
 /* stock: arrived against given out, and what is held, level by level */
 .award-page .stock-summary { margin: 0 0 18px; }
-.award-page .kpis-stock { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
-.award-page .sbars {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 10px;
 }
-.award-page .sbar {
   display: grid;
   grid-template-columns: 44px 1fr auto;
   align-items: center;
@@ -1778,17 +1775,6 @@
   border-radius: 10px;
   animation: aw-rise .5s .15s cubic-bezier(.2,.8,.3,1) both;
 }
-.award-page .sbar-name { font-size: .8rem; font-weight: 800; color: var(--text); letter-spacing: .02em; }
-.award-page .sbar-lines { display: grid; gap: 6px; }
-.award-page .sbar-line { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; }
-.award-page .sbar-line i { display: block; height: 7px; border-radius: 999px; width: var(--w); min-width: 3px; transform-origin: left; animation: aw-grow .9s .3s cubic-bezier(.2,.8,.3,1) both; }
-.award-page .sbar-line em { font-style: normal; font-size: .72rem; color: var(--text-muted); white-space: nowrap; }
-.award-page .sb-came { background: var(--accent-2); }
-.award-page .sb-used { background: #94A3B8; }
-.award-page .sbar-held { text-align: right; }
-.award-page .sbar-held b { display: block; font-size: 1.2rem; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1; }
-.award-page .sbar-held small { font-size: .62rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); }
-.award-page .sbar-held.is-neg b { color: var(--danger); }
 
 /* ---- movement ---- */
 @keyframes aw-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
@@ -1840,3 +1826,29 @@
     transition-duration: .001ms !important;
   }
 }
+
+/* The remark box takes the same look as the other inputs. */
+.award-page #req-remark { width: 100%; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+                          font: inherit; font-size: .9rem; resize: vertical; min-height: 64px; background: var(--surface); color: var(--text); }
+.award-page #req-remark:focus { outline: 2px solid var(--accent-line); outline-offset: 0; border-color: var(--accent); }
+.award-page .qty-none { color: var(--text-muted); }
+.award-page .lvls-remark { margin: 12px 0 0; padding: 9px 12px; border-radius: 8px; background: var(--surface-alt); border: 1px solid var(--border); font-size: .85rem; color: var(--text-soft); }
+.award-page .lvls-remark b { display: block; margin-bottom: 2px; font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted); }
+
+/* Stock now: one card per level, and one for all of them, each saying how the number came about. */
+.award-page .snow-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 14px; margin: 0 0 10px; }
+.award-page .snow-head h4 { margin: 0; font-size: .95rem; font-weight: 800; color: var(--text); }
+.award-page .snow-head span { font-size: .78rem; color: var(--text-muted); }
+.award-page .snow-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.award-page .snow-card { padding: 14px 16px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);
+                         animation: aw-rise .5s cubic-bezier(.2,.8,.3,1) both; transition: transform .2s ease, box-shadow .2s ease; }
+.award-page .snow-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(15,23,42,.09); }
+.award-page .snow-card.is-total { background: var(--accent-soft); border-color: var(--accent-soft-border); }
+.award-page .snow-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.award-page .snow-name { font-size: .72rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--text-soft); }
+.award-page .snow-held { font-size: 1.7rem; font-weight: 800; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
+.award-page .snow-held.is-neg { color: var(--danger); }
+.award-page .snow-how { list-style: none; margin: 0; padding: 8px 0 0; border-top: 1px solid var(--border); display: grid; gap: 3px; }
+.award-page .snow-card.is-total .snow-how { border-top-color: var(--accent-soft-border); }
+.award-page .snow-how li { display: flex; justify-content: space-between; font-size: .78rem; color: var(--text-muted); }
+.award-page .snow-how i { font-style: normal; font-family: var(--font-mono); font-weight: 700; color: var(--text-soft); }

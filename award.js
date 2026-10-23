@@ -937,6 +937,7 @@ window.AWARD_CONFIG = {
         "<div><dt>For</dt><dd>" +
           escapeHtml([p.district, p.division, p.state].filter(Boolean).join(", ")) +
         "</dd></div>" +
+        (remarkOf(row) ? "<div><dt>Remark</dt><dd>" + escapeHtml(remarkOf(row)) + "</dd></div>" : "") +
         "<div><dt>Filed</dt><dd>" + escapeHtml(formatTimestamp(row.created_at)) + "</dd></div>" +
       "</dl>";
 
@@ -1151,6 +1152,7 @@ window.AWARD_CONFIG = {
       "<dl>" +
         "<div><dt>Requested by</dt><dd>" + escapeHtml(row.requester_name || "—") + "</dd></div>" +
         "<div><dt>Levels</dt><dd>" + awardsCellHtml(awardsOf(row), row) + "</dd></div>" +
+        (remarkOf(row) ? "<div><dt>Remark</dt><dd>" + escapeHtml(remarkOf(row)) + "</dd></div>" : "") +
         "<div><dt>For</dt><dd>" +
           escapeHtml([p.district, p.division, p.state].filter(Boolean).join(", ")) +
         "</dd></div>" +
@@ -1172,6 +1174,9 @@ window.AWARD_CONFIG = {
                '<input type="number" class="mono ho-qty" data-type="' + escapeHtml(t.id) +
                '" min="0" max="1000000" step="1" value="' + escapeHtml(asked[t.id]) + '" /></div>';
       }).join("");
+      if (!el.hoLines.innerHTML) {
+        el.hoLines.innerHTML = '<p class="hint">Only jute bags were asked for. They are not counted in stock, so there is no figure to enter.</p>';
+      }
       setFieldError(null, "ho-lines-error", "");
     }
 
@@ -1294,7 +1299,7 @@ window.AWARD_CONFIG = {
         el.hoConfirm.disabled = false;
         return;
       }
-      if (!going.length) {
+      if (!going.length && askedOf(row) > 0) {
         setFieldError(null, "ho-lines-error",
           "Nothing is going. Reject it instead, so the requester is told why.");
         el.hoConfirm.disabled = false;
@@ -1941,6 +1946,7 @@ window.AWARD_CONFIG = {
       opts += '<option value="' + escapeHtml(t.id) + '">' +
               escapeHtml(levelLabel(t.name, t.code)) + "</option>";
     });
+    opts += '<option value="jute">Jute Bag</option>';
     var cats = '<option value="">Select category</option>';
     CATEGORY_CHOICES.forEach(function (c) {
       cats += '<option value="' + escapeHtml(c) + '">' + escapeHtml(c) + "</option>";
@@ -1971,11 +1977,15 @@ window.AWARD_CONFIG = {
 
   function resetAwardLines() {
     el.awardLines.innerHTML = awardLineHtml();
+    var remark = document.getElementById("req-remark");
+    if (remark) remark.value = "";
+    setFieldError(null, "remark-error", "");
     paintIcons();
     syncAwardLines();
   }
 
   function typeById(id) {
+    if (String(id) === "jute") return JUTE;
     for (var i = 0; i < awardTypes.length; i++) {
       if (String(awardTypes[i].id) === String(id)) return awardTypes[i];
     }
@@ -1990,21 +2000,38 @@ window.AWARD_CONFIG = {
   function syncAwardLines() {
     var lines = Array.prototype.slice.call(el.awardLines.querySelectorAll(".award-line"));
     var chosen = lines.map(function (l) { return l.querySelector(".award-line-type").value; });
+    var labels = chosen.map(function (v) {
+      var t = typeById(v);
+      return t ? levelLabel(t.name, t.code) : "";
+    });
+    var needs = labels.map(function (label) { return levelHasCategory(label); });
 
-    var needs = lines.map(function (l, i) {
-      var type = typeById(chosen[i]);
-      return !!type && levelHasCategory(levelLabel(type.name, type.code));
+    // A level offers its own categories. When a line changes to a level with a
+    // different set, the list is rebuilt and the old choice dropped.
+    lines.forEach(function (line, i) {
+      var cat = line.querySelector(".award-line-cat");
+      cat.hidden = !needs[i];
+      if (!needs[i]) { cat.value = ""; cat.setAttribute("data-set", ""); return; }
+      var set = categoriesFor(labels[i]);
+      var key = set.join("|");
+      if (cat.getAttribute("data-set") !== key) {
+        var html = '<option value="">Select category</option>';
+        set.forEach(function (c) {
+          html += '<option value="' + escapeHtml(c) + '">' + escapeHtml(c) + "</option>";
+        });
+        cat.innerHTML = html;
+        cat.setAttribute("data-set", key);
+      }
     });
 
     // First settle what each line holds. A line that holds a category an
     // earlier line at the same level already has loses it: the earlier line
     // keeps it. "Other" can be asked for more than once - each is its own
-    // words - so only Academic and POM are taken once.
+    // words - so every other category is taken once.
     var used = {};              // level id -> { category: true }
     lines.forEach(function (line, i) {
+      if (!needs[i]) return;
       var cat = line.querySelector(".award-line-cat");
-      cat.hidden = !needs[i];
-      if (!needs[i]) { cat.value = ""; return; }
       var u = used[chosen[i]] || (used[chosen[i]] = {});
       if (cat.value && cat.value !== "Other" && u[cat.value]) cat.value = "";
       if (cat.value && cat.value !== "Other") u[cat.value] = true;
@@ -2039,6 +2066,14 @@ window.AWARD_CONFIG = {
 
       line.querySelector(".award-line-remove").hidden = lines.length < 2;
     });
+
+    // The remark is asked for on every requisition except one that is only
+    // jute bags, where it is optional.
+    var juteOnly = chosen.some(Boolean) && chosen.every(function (v) { return !v || v === "jute"; });
+    var star = document.getElementById("remark-star");
+    var hint = document.getElementById("remark-hint");
+    if (star) star.hidden = juteOnly;
+    if (hint) hint.hidden = !juteOnly;
 
     el.awardAdd.hidden = lines.length >= MAX_LEVEL_LINES;
   }
@@ -2175,7 +2210,7 @@ window.AWARD_CONFIG = {
       if (!l.id) {
         if (!lineFault) lineFault = "Choose a level on every line, or remove the empty one.";
       } else if (l.needsCategory && !l.category) {
-        if (!lineFault) lineFault = "Choose a category for every Block and District line.";
+        if (!lineFault) lineFault = "Choose a category for every Block, District and Jute Bag line.";
       } else if (l.needsCategory && l.category === "Other" && !l.other) {
         if (!lineFault) lineFault = "Say what the other category is.";
       } else if (!l.qty) {
@@ -2189,7 +2224,7 @@ window.AWARD_CONFIG = {
       } else {
         seen[l.id + "|" + l.category + "|" + l.other.toLowerCase()] = true;
         var item = {
-          award_type_id: Number(l.id),
+          award_type_id: l.id === "jute" ? null : Number(l.id),
           code: l.type ? l.type.code : null,
           name: l.type ? levelLabel(l.type.name, l.type.code) : null,
           quantity: n
@@ -2206,6 +2241,20 @@ window.AWARD_CONFIG = {
     });
 
     if (!items.length && !lineFault) lineFault = "Add at least one level.";
+
+    /* The remark says why these are needed, and is asked for on every requisition
+       but one that is only jute bags. It is kept as the note on the first step of
+       the log, which is where the people reading it already look. */
+    var remarkEl = document.getElementById("req-remark");
+    var remark = remarkEl ? remarkEl.value.trim() : "";
+    var juteOnly = lines.length > 0 && lines.every(function (l) { return l.id === "jute"; });
+    if (!remark && !juteOnly) {
+      setFieldError(remarkEl, "remark-error", "Add a remark: say what these are needed for.");
+      ok = false;
+    } else {
+      setFieldError(remarkEl, "remark-error", "");
+      if (remark && values.log) values.log[0].note = remark;
+    }
 
     if (lineFault) {
       setFieldError(null, "award-type-error", lineFault);
@@ -2479,6 +2528,8 @@ window.AWARD_CONFIG = {
       }
       node.textContent = "0";
       window.requestAnimationFrame(step);
+      // A page that is not on screen does not run animation frames; the figure still has to be right.
+      window.setTimeout(function () { node.textContent = to.toLocaleString(); }, span + 200);
     });
   }
 
@@ -2510,7 +2561,7 @@ window.AWARD_CONFIG = {
     rows.forEach(function (row) {
       var st = stageOf(row);
       PIPE.forEach(function (p) { if (p.stages.indexOf(st) !== -1) count[p.key] += 1; });
-      asked += Number(row.quantity) || 0;
+      asked += askedOf(row);
       got += deliveredOf(row);
     });
     var total = rows.length;
@@ -2549,65 +2600,80 @@ window.AWARD_CONFIG = {
     runCounters(box);
   }
 
-  /* The same idea for stock: what was asked for, what arrived, what was given
-     out, what is held now, and per level what came against what went. */
-  function renderStockSummary(rows, types) {
+  /* What each level holds now, and how it got there, in plain words: what the
+     districts started the year with, plus what has arrived, minus what was
+     given out. That is the whole story of the number, so it is said once per
+     level and added up in the first card. */
+  function renderStockSummary(rows, types, fy) {
     var box = document.getElementById("stock-summary");
     if (!box) return;
     if (!rows || !rows.length) { box.hidden = true; box.innerHTML = ""; return; }
 
-    var asked = 0, came = 0, used = 0;
-    var cameBy = {}, usedBy = {}, heldBy = {};
+    var start = {}, came = {}, used = {}, held = {};
     var latest = {};
     var nowKey = monthKeyOf(new Date());
 
     rows.forEach(function (r) {
-      asked += sumOf(r.requisition);
-      came += sumOf(r.delivery);
-      used += sumOf(r.utilisation);
       types.forEach(function (t) {
-        cameBy[t.id] = (cameBy[t.id] || 0) + (r.delivery[t.id] || 0);
-        usedBy[t.id] = (usedBy[t.id] || 0) + (r.utilisation[t.id] || 0);
+        if (!r.monthKey) start[t.id] = (start[t.id] || 0) + (r.balance[t.id] || 0);
+        came[t.id] = (came[t.id] || 0) + (r.delivery[t.id] || 0);
+        used[t.id] = (used[t.id] || 0) + (r.utilisation[t.id] || 0);
       });
-      // The balance a district holds today: its last row up to this month.
+      // What a district holds today is its last row up to this month.
       var cur = latest[r.district];
       var ok = !r.monthKey || r.monthKey <= nowKey;
       if (ok && (!cur || !cur.monthKey || (r.monthKey && r.monthKey >= cur.monthKey))) latest[r.district] = r;
     });
-    var held = 0;
     Object.keys(latest).forEach(function (d) {
-      types.forEach(function (t) {
-        var n = latest[d].balance[t.id] || 0;
-        heldBy[t.id] = (heldBy[t.id] || 0) + n;
-        held += n;
-      });
+      types.forEach(function (t) { held[t.id] = (held[t.id] || 0) + (latest[d].balance[t.id] || 0); });
     });
 
-    var scale = 1;
-    types.forEach(function (t) { scale = Math.max(scale, cameBy[t.id] || 0, usedBy[t.id] || 0, heldBy[t.id] || 0); });
+    // What a district was given to begin the year with is part of where it started.
+    var shown = {};
+    rows.forEach(function (r) { shown[r.district] = true; });
+    stockMovements.forEach(function (m) {
+      if (m.kind !== "opening" || !shown[m.district_name]) return;
+      var k = monthKeyOf(m.occurred_on);
+      if (k >= fy + "-04" && k < (fy + 1) + "-04") {
+        start[m.award_type_id] = (start[m.award_type_id] || 0) + (Number(m.quantity) || 0);
+      }
+    });
 
-    var bars = types.map(function (t) {
-      var c = cameBy[t.id] || 0, u = usedBy[t.id] || 0, h = heldBy[t.id] || 0;
-      return '<div class="sbar">' +
-        '<span class="sbar-name">' + escapeHtml(shortType(t)) + "</span>" +
-        '<span class="sbar-lines">' +
-          '<span class="sbar-line"><i class="sb-came" style="--w:' + (c / scale * 100) + '%"></i><em>' + c.toLocaleString() + " arrived</em></span>" +
-          '<span class="sbar-line"><i class="sb-used" style="--w:' + (u / scale * 100) + '%"></i><em>' + u.toLocaleString() + " given out</em></span>" +
-        "</span>" +
-        '<span class="sbar-held' + (h < 0 ? " is-neg" : "") + '"><b>' + h.toLocaleString() + "</b><small>held</small></span>" +
-      "</div>";
-    }).join("");
+    var sum = function (map) {
+      return types.reduce(function (n, t) { return n + (map[t.id] || 0); }, 0);
+    };
+    var total = { held: sum(held), start: sum(start), came: sum(came), used: sum(used) };
+
+    var line = function (label, value) {
+      return "<li><span>" + escapeHtml(label) + "</span><i>" + escapeHtml(value) + "</i></li>";
+    };
+    var signed = function (n) { return n === 0 ? "0" : (n < 0 ? "−" : "+") + Math.abs(n).toLocaleString(); };
+
+    var card = function (name, d, isTotal) {
+      var fix = d.held - (d.start + d.came - d.used);
+      return '<div class="snow-card' + (isTotal ? " is-total" : "") + '">' +
+        '<div class="snow-top"><span class="snow-name">' + escapeHtml(name) + "</span>" +
+          '<b class="snow-held' + (d.held < 0 ? " is-neg" : "") + '" data-count="' + d.held + '">' +
+          d.held.toLocaleString() + "</b></div>" +
+        '<ul class="snow-how">' +
+          line("Started with", d.start.toLocaleString()) +
+          line("Arrived", signed(d.came)) +
+          line("Given out", signed(-d.used)) +
+          (fix ? line("Corrected", signed(fix)) : "") +
+        "</ul></div>";
+    };
 
     box.innerHTML =
-      '<div class="kpis kpis-stock">' +
-        kpiHtml("doc", "total", asked, "Asked for", "") +
-        kpiHtml("truck", "move", came, "Arrived", "") +
-        kpiHtml("chart", "wait", used, "Given out", "") +
-        kpiHtml("layers", held < 0 ? "bad" : "good", held, "Held now", "across what is shown") +
-      "</div>" +
-      '<div class="sbars" aria-label="Arrived, given out and held, by level">' + bars + "</div>";
+      '<div class="snow-head"><h4>In stock now</h4>' +
+        "<span>started with + arrived − given out = in stock</span></div>" +
+      '<div class="snow-grid">' +
+        card("All levels", total, true) +
+        types.map(function (t) {
+          return card(shortType(t), { held: held[t.id] || 0, start: start[t.id] || 0,
+                                      came: came[t.id] || 0, used: used[t.id] || 0 }, false);
+        }).join("") +
+      "</div>";
     box.hidden = false;
-    paintIcons();
     runCounters(box);
   }
 
@@ -2652,7 +2718,7 @@ window.AWARD_CONFIG = {
     var html = "";
 
     rows.forEach(function (row) {
-      total += Number(row.quantity) || 0;
+      total += askedOf(row);
       gotTotal += deliveredOf(row);
       var p = placeOf(row);
       var stateName = p.state || "Unknown state";
@@ -2697,23 +2763,50 @@ window.AWARD_CONFIG = {
      one, so that is what it reads as. */
   var CATEGORY_CHOICES = ["Academic", "POM", "Other"];
 
+  /* Jute bags are asked for on the same form but are not an award: they have
+     no row in award_types, so they never become a column in the stock sheet,
+     and what is held, arrives or is given out never counts them. */
+  var JUTE = { id: "jute", code: "JUTE_BAG", name: "Jute Bag" };
+  var JUTE_CATEGORIES = ["Small", "Big"];
+
   function levelLabel(name, code) {
     var n = String(name || "");
     var c = String(code || "");
+    if (/jute/i.test(c) || /jute/i.test(n)) return "Jute Bag";
     if (/block/i.test(c) || (!c && /block/i.test(n))) return "Block";
     if (/district/i.test(c) || (!c && /district/i.test(n))) return "District";
     return n || c || "Award";
   }
 
   function levelHasCategory(label) {
-    return label === "Block" || label === "District";
+    return label === "Block" || label === "District" || label === "Jute Bag";
   }
 
-  // What a line reads as: "Block · Academic", "District · Hindi Week", or just the level.
+  // What a level can be for: Block and District by what the awards are for, a jute bag by its size.
+  function categoriesFor(label) {
+    return label === "Jute Bag" ? JUTE_CATEGORIES : CATEGORY_CHOICES;
+  }
+
+  // What a line reads as: "Block · Academic", "Jute Bag · Small", or just the level.
   function awardChipLabel(a) {
     if (!a.hasCategory) return a.name;
     return a.name + " · " +
       (a.category === "Other" ? (a.categoryOther || "Other") : a.category);
+  }
+
+  /* What was asked for that the stock sheet counts: everything but jute bags.
+     This is the "asked" in delivered / asked. */
+  function askedOf(row) {
+    return awardsOf(row).reduce(function (n, a) {
+      return a.name === "Jute Bag" ? n : n + a.quantity;
+    }, 0);
+  }
+
+  // Why it was asked for, written by whoever raised it: the note on the first step of the log.
+  function remarkOf(row) {
+    var log = row && row.log;
+    if (log && log.length && log[0] && log[0].what === "raised") return String(log[0].note || "");
+    return "";
   }
 
   // What was asked for at a level, split by category, for where the split matters.
@@ -2738,7 +2831,7 @@ window.AWARD_CONFIG = {
       var has = levelHasCategory(label);
       return { id: Number(id) || 0, name: label, quantity: quantity,
                hasCategory: has,
-               category: has ? (category || "POM") : "",
+               category: has ? (category || (label === "Jute Bag" ? "" : "POM")) : "",
                categoryOther: has && category === "Other" ? (other || "") : "" };
     };
 
@@ -2784,7 +2877,7 @@ window.AWARD_CONFIG = {
       var list = groups[id];
       var asked = list.reduce(function (n, a) { return n + a.quantity; }, 0);
       var went = sent ? (sent[id] || 0) : asked;
-      var short = !!sent && went < asked;
+      var short = !!sent && went < asked && list[0].name !== "Jute Bag";
 
       list.forEach(function (a) {
         var what = a.hasCategory
@@ -2845,7 +2938,8 @@ window.AWARD_CONFIG = {
   }
 
   function quantityCellHtml(row) {
-    var asked = Number(row.quantity) || 0;
+    var asked = askedOf(row);
+    if (!asked) return '<span class="qty-none" title="Jute bags only: not counted">\u2014</span>';
     var got = deliveredOf(row);
     return '<span class="qty-got' + (got ? "" : " is-none") + '">' +
              escapeHtml(got.toLocaleString()) + "</span>" +
@@ -2907,8 +3001,12 @@ window.AWARD_CONFIG = {
     el.levelsBody.innerHTML =
       '<div class="lvls-head"><span>Level</span><span>Category</span><span>Asked</span></div>' +
       awardsCellHtml(awardsOf(row), row) +
-      '<p class="lvls-total">Delivered <b>' + escapeHtml(deliveredOf(row).toLocaleString()) +
-      '</b> of <b>' + escapeHtml((Number(row.quantity) || 0).toLocaleString()) + "</b> asked for</p>";
+      (askedOf(row)
+        ? '<p class="lvls-total">Delivered <b>' + escapeHtml(deliveredOf(row).toLocaleString()) +
+          '</b> of <b>' + escapeHtml(askedOf(row).toLocaleString()) + "</b> asked for" +
+          (awardsOf(row).some(function (a) { return a.name === "Jute Bag"; }) ? " (jute bags not counted)" : "") + "</p>"
+        : '<p class="lvls-total">Jute bags are not counted in stock.</p>') +
+      (remarkOf(row) ? '<p class="lvls-remark"><b>Remark</b>' + escapeHtml(remarkOf(row)) + "</p>" : "");
     el.levelsModal.classList.add("is-open");
     document.addEventListener("keydown", onLevelsKeydown);
     scrollLockedAt = window.scrollY;
@@ -3466,7 +3564,7 @@ window.AWARD_CONFIG = {
       return;
     }
 
-    renderStockSummary(rows, types);
+    renderStockSummary(rows, types, fy);
 
     var head = groupHeadHtml(types, { before:
         '<th rowspan="2" class="col-month">Month</th>' +
