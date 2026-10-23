@@ -90,6 +90,9 @@ window.AWARD_CONFIG = {
     stockWhere: document.getElementById("stock-where"),
     stockModal: document.getElementById("stock-modal"),
     detailModal: document.getElementById("detail-modal"),
+    levelsModal: document.getElementById("levels-modal"),
+    levelsSub: document.getElementById("levels-sub"),
+    levelsBody: document.getElementById("levels-body"),
     logModal: document.getElementById("log-modal"),
     logSub: document.getElementById("log-sub"),
     logBody: document.getElementById("log-body"),
@@ -575,7 +578,49 @@ window.AWARD_CONFIG = {
               '<path d="M12 4v10m0 0 4-4m-4 4-4-4M5 18h14"/></svg>',
     upload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
             'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-            '<path d="M12 20V10m0 0 4 4m-4-4-4 4M5 5h14"/></svg>'
+            '<path d="M12 20V10m0 0 4 4m-4-4-4 4M5 5h14"/></svg>',
+    stock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+           'stroke-linecap="round" stroke-linejoin="round">' +
+           '<path d="M12 3 3 7.5v9L12 21l9-4.5v-9L12 3Z"/><path d="m3 7.5 9 4.5 9-4.5M12 12v9"/></svg>',
+    truck: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+           'stroke-linecap="round" stroke-linejoin="round">' +
+           '<path d="M2 6h11v10H2zM13 9h4l3 3v4h-7"/><circle cx="7" cy="18" r="1.8"/>' +
+           '<circle cx="17" cy="18" r="1.8"/></svg>',
+    clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+           'stroke-linecap="round" stroke-linejoin="round">' +
+           '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    done:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+           'stroke-linecap="round" stroke-linejoin="round">' +
+           '<circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg>',
+    stopped: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+             'stroke-linecap="round" stroke-linejoin="round">' +
+             '<circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/></svg>',
+    trophy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+            'stroke-linecap="round" stroke-linejoin="round">' +
+            '<path d="M8 4h8v5a4 4 0 0 1-8 0V4Z"/>' +
+            '<path d="M8 6H4v2a3 3 0 0 0 4 2.8M16 6h4v2a3 3 0 0 1-4 2.8M12 13v4M8.5 20h7M10 17h4"/></svg>',
+    doc:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+           'stroke-linecap="round" stroke-linejoin="round">' +
+           '<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 16h5"/></svg>',
+    refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+             'stroke-linecap="round" stroke-linejoin="round">' +
+             '<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>',
+    eye:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+           'stroke-linecap="round" stroke-linejoin="round">' +
+           '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>',
+    gear:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+           'stroke-linecap="round" stroke-linejoin="round">' +
+           '<circle cx="12" cy="12" r="3"/>' +
+           '<path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>',
+    layers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+            'stroke-linecap="round" stroke-linejoin="round">' +
+            '<path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/></svg>',
+    bag:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+           'stroke-linecap="round" stroke-linejoin="round">' +
+           '<path d="M5 8h14l-1 12H6L5 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>',
+    chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+           'stroke-linecap="round" stroke-linejoin="round">' +
+           '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>'
   };
 
   function paintIcons() {
@@ -648,9 +693,45 @@ window.AWARD_CONFIG = {
 
   // ------------------------------------------------------------- bootstrap
 
+  /* The Test tab holds two things: Stock Management, which is the rest of
+     this file, and Award Management, a copy of the POM page's view kept in
+     award-manage.js. That one starts the first time it is opened, since it
+     fetches the district list and nothing else needs it. */
+  var awardViewStarted = false;
+
+  function showTopView(which) {
+    var award = which === "award";
+    var stock = document.getElementById("aw-view-stock");
+    var awardView = document.getElementById("aw-view-award");
+    if (!stock || !awardView) return;
+
+    stock.hidden = award;
+    var actions = document.getElementById("aw-stock-actions");
+    if (actions) actions.hidden = award;
+    awardView.hidden = !award;
+    Array.prototype.forEach.call(
+      document.querySelectorAll(".award-page .aw-toptab"),
+      function (tab) {
+        var on = tab.getAttribute("data-aw-top") === which;
+        tab.classList.toggle("is-active", on);
+        tab.setAttribute("aria-selected", on ? "true" : "false");
+        tab.tabIndex = on ? 0 : -1;
+      }
+    );
+
+    if (award && !awardViewStarted && typeof window.initAwardManageUI === "function") {
+      awardViewStarted = true;
+      window.initAwardManageUI();
+    }
+  }
+
   function mount() {
     cacheElements();
     if (!el.form) return;        // the tab is not on screen
+
+    awardViewStarted = false;      // a fresh page has a fresh Award Management view
+    juteView = "stock";
+    stockScope = "awards";
 
     allRequisitions = [];
     returnFocusTo = null;          // the node it pointed at is gone
@@ -721,6 +802,10 @@ window.AWARD_CONFIG = {
        sat in the corner saying "3 items" about something that was not on
        screen. */
     if (el.rowPill) el.rowPill.hidden = name !== "requisition";
+
+    // One sheet, two tabs: it goes where it is wanted, counting what that tab is about.
+    if (name === "jute") showJuteView(juteView);
+    else if (name === "stock") attachSheet("awards");
   }
 
   function wireTabList(buttons, attr) {
@@ -855,12 +940,13 @@ window.AWARD_CONFIG = {
         "<div><dt>Requested by</dt><dd>" + escapeHtml(row.requester_name || "—") +
           (row.requester_role ? ' <span class="chip-role">' +
              escapeHtml(row.requester_role) + "</span>" : "") + "</dd></div>" +
-        "<div><dt>Awards</dt><dd>" + awardsCellHtml(awardsOf(row), row) + "</dd></div>" +
+        "<div><dt>Gifts</dt><dd>" + awardsCellHtml(awardsOf(row), row) + "</dd></div>" +
         "<div><dt>Total</dt><dd>" + escapeHtml(Number(row.quantity).toLocaleString()) +
         "</dd></div>" +
         "<div><dt>For</dt><dd>" +
           escapeHtml([p.district, p.division, p.state].filter(Boolean).join(", ")) +
         "</dd></div>" +
+        (remarkOf(row) ? "<div><dt>Remark</dt><dd>" + escapeHtml(remarkOf(row)) + "</dd></div>" : "") +
         "<div><dt>Filed</dt><dd>" + escapeHtml(formatTimestamp(row.created_at)) + "</dd></div>" +
       "</dl>";
 
@@ -970,7 +1056,7 @@ window.AWARD_CONFIG = {
      decided, so neither is shown to people they mean nothing to. Hidden
      rather than disabled: a tab you may never open is clutter. */
   function applyAccess() {
-    var show = { requisition: true, stock: true,
+    var show = { requisition: true, stock: true, jute: true,
                  delivery: isHoAdmin(), settings: canManageAdmins() };
 
     Array.prototype.forEach.call(el.subtabs, function (tab) {
@@ -1074,7 +1160,8 @@ window.AWARD_CONFIG = {
     el.hoSummary.innerHTML =
       "<dl>" +
         "<div><dt>Requested by</dt><dd>" + escapeHtml(row.requester_name || "—") + "</dd></div>" +
-        "<div><dt>Awards</dt><dd>" + awardsCellHtml(awardsOf(row), row) + "</dd></div>" +
+        "<div><dt>Gifts</dt><dd>" + awardsCellHtml(awardsOf(row), row) + "</dd></div>" +
+        (remarkOf(row) ? "<div><dt>Remark</dt><dd>" + escapeHtml(remarkOf(row)) + "</dd></div>" : "") +
         "<div><dt>For</dt><dd>" +
           escapeHtml([p.district, p.division, p.state].filter(Boolean).join(", ")) +
         "</dd></div>" +
@@ -1087,14 +1174,18 @@ window.AWARD_CONFIG = {
     el.hoLinesField.hidden = !sending;
     if (sending) {
       var asked = quantitiesOf(row, "items");
-      el.hoLines.innerHTML = awardTypes.filter(function (t) {
+      el.hoLines.innerHTML = allTypes().filter(function (t) {
         return asked[t.id];
       }).map(function (t) {
-        return '<div class="stock-line"><label>' + escapeHtml(t.name) +
-               ' <span class="hint">asked for ' + escapeHtml(asked[t.id]) + '</span></label>' +
+        return '<div class="stock-line"><label>' + escapeHtml(typeLabel(t)) +
+               ' <span class="hint">asked for ' + escapeHtml(asked[t.id]) +
+               escapeHtml(isJuteType(t) ? "" : askedSplit(row, t.id)) + '</span></label>' +
                '<input type="number" class="mono ho-qty" data-type="' + escapeHtml(t.id) +
                '" min="0" max="1000000" step="1" value="' + escapeHtml(asked[t.id]) + '" /></div>';
       }).join("");
+      if (!el.hoLines.innerHTML) {
+        el.hoLines.innerHTML = '<p class="hint">Nothing here can be counted yet, so there is no figure to enter.</p>';
+      }
       setFieldError(null, "ho-lines-error", "");
     }
 
@@ -1206,7 +1297,7 @@ window.AWARD_CONFIG = {
         }
         if (n < asked) short = true;
         if (n > 0) {
-          var type = awardTypes.filter(function (t) { return Number(t.id) === id; })[0] || {};
+          var type = allTypes().filter(function (t) { return Number(t.id) === id; })[0] || {};
           going.push({ award_type_id: id, code: type.code || null,
                        name: type.name || null, quantity: n });
         }
@@ -1217,7 +1308,7 @@ window.AWARD_CONFIG = {
         el.hoConfirm.disabled = false;
         return;
       }
-      if (!going.length) {
+      if (!going.length && askedOf(row) > 0) {
         setFieldError(null, "ho-lines-error",
           "Nothing is going. Reject it instead, so the requester is told why.");
         el.hoConfirm.disabled = false;
@@ -1445,6 +1536,24 @@ window.AWARD_CONFIG = {
 
     wireTabList(el.subtabs, "data-aw-subtab");
 
+    Array.prototype.forEach.call(document.querySelectorAll("[data-jute-view]"), function (btn) {
+      btn.addEventListener("click", function () { showJuteView(btn.getAttribute("data-jute-view")); });
+    });
+
+    ["jute-district", "jute-status", "jute-size"].forEach(function (id) {
+      var sel = document.getElementById(id);
+      if (sel) sel.addEventListener("change", renderJute);
+    });
+
+    Array.prototype.forEach.call(
+      document.querySelectorAll(".award-page .aw-toptab"),
+      function (tab) {
+        tab.addEventListener("click", function () {
+          showTopView(tab.getAttribute("data-aw-top"));
+        });
+      }
+    );
+
     Array.prototype.forEach.call(
       el.hoModal.querySelectorAll("[data-aw-close-ho]"),
       function (node) { node.addEventListener("click", closeHo); }
@@ -1503,6 +1612,10 @@ window.AWARD_CONFIG = {
     Array.prototype.forEach.call(
       el.detailModal.querySelectorAll("[data-aw-close-detail]"),
       function (n) { n.addEventListener("click", closeBreakdown); }
+    );
+    Array.prototype.forEach.call(
+      el.levelsModal.querySelectorAll("[data-aw-close-levels]"),
+      function (n) { n.addEventListener("click", closeLevels); }
     );
     Array.prototype.forEach.call(
       el.logModal.querySelectorAll("[data-aw-close-log]"),
@@ -1573,7 +1686,8 @@ window.AWARD_CONFIG = {
     // The lines are rebuilt as they are added and removed, so the listeners
     // sit on the container rather than on each one.
     el.awardLines.addEventListener("change", function (event) {
-      if (event.target.classList.contains("award-line-type")) {
+      if (event.target.classList.contains("award-line-type") ||
+          event.target.classList.contains("award-line-cat")) {
         setFieldError(null, "award-type-error", "");
         syncAwardLines();
       }
@@ -1598,6 +1712,9 @@ window.AWARD_CONFIG = {
 
         var log = event.target.closest("[data-aw-log]");
         if (log) { openLog(log.getAttribute("data-aw-log")); return; }
+
+        var lv = event.target.closest("[data-aw-levels]");
+        if (lv) { openLevels(lv.getAttribute("data-aw-levels")); return; }
 
         var review = event.target.closest("[data-aw-review]");
         if (review) { openReview(review.getAttribute("data-aw-review")); return; }
@@ -1785,7 +1902,7 @@ window.AWARD_CONFIG = {
     }
 
     var monthKey = monthKeyOf(new Date());
-    var held = balanceOn(district, fyStartOf(new Date()), monthKey);
+    var held = balanceOn(district, fyStartOf(new Date()), monthKey, mainIds());
 
     el.reqStock.className = "req-stock";
     el.reqStock.innerHTML =
@@ -1838,23 +1955,71 @@ window.AWARD_CONFIG = {
       });
   }
 
-  /* The award types, kept so a line can be built whenever one is added. */
+  /* The award types, kept so a line can be built whenever one is added.
+     awardTypes is the four awards the stock sheet counts. Jute bags are two
+     more types in the same table - Small and Big - but they are kept apart:
+     they have a sheet of their own, and never count towards the awards. */
   var awardTypes = [];
+  var juteTypes = [];            // present once sql/award-jute-types.sql has been run
+  var stockScope = "awards";     // which sheet the stock view is showing: "awards" or "jute"
+
+  function isJuteType(t) { return /^JUTE_/i.test(String((t && t.code) || "")); }
+  function allTypes() { return awardTypes.concat(juteTypes); }
+  function stockTypes() { return stockScope === "jute" ? juteTypes : awardTypes; }
+  function mainIds() { return awardTypes.map(function (t) { return t.id; }); }
+  function scopeIds() { return stockTypes().map(function (t) { return t.id; }); }
+  function scopeHas(id) {
+    return scopeIds().some(function (i) { return Number(i) === Number(id); });
+  }
+  function juteSizeOfCode(code) {
+    var c = String(code || "").toUpperCase();
+    return c === "JUTE_SMALL" ? "Small" : c === "JUTE_BIG" ? "Big" : "";
+  }
+  function juteTypeFor(size) {
+    var code = size === "Big" ? "JUTE_BIG" : size === "Small" ? "JUTE_SMALL" : "";
+    for (var i = 0; i < juteTypes.length; i++) {
+      if (String(juteTypes[i].code).toUpperCase() === code) return juteTypes[i];
+    }
+    return null;
+  }
+  function juteTypeId(size) { var t = juteTypeFor(size); return t ? t.id : null; }
+  // What a type is called where the level alone is not enough: a jute bag by its size.
+  function typeLabel(t) {
+    var label = levelLabel(t.name, t.code);
+    return isJuteType(t) ? label + " · " + juteSizeOfCode(t.code) : label;
+  }
+  // The part of a map of quantities that belongs to the sheet being shown.
+  function inScope(map) {
+    var out = {};
+    Object.keys(map).forEach(function (k) { if (scopeHas(k)) out[k] = map[k]; });
+    return out;
+  }
 
   function awardLineHtml() {
-    var opts = '<option value="">Select award type</option>';
+    var opts = '<option value="">Select gift</option>';
     awardTypes.forEach(function (t) {
-      opts += '<option value="' + escapeHtml(t.id) + '">' + escapeHtml(t.name) + "</option>";
+      opts += '<option value="' + escapeHtml(t.id) + '">' +
+              escapeHtml(levelLabel(t.name, t.code)) + "</option>";
+    });
+    opts += '<option value="jute">Jute Bag</option>';
+    var cats = '<option value="">Select category</option>';
+    CATEGORY_CHOICES.forEach(function (c) {
+      cats += '<option value="' + escapeHtml(c) + '">' + escapeHtml(c) + "</option>";
     });
     return '<div class="award-line">' +
-             '<select class="award-line-type" aria-label="Award type">' + opts + "</select>" +
+             '<select class="award-line-type" aria-label="Gift">' + opts + "</select>" +
+             '<select class="award-line-cat" aria-label="Category" hidden>' + cats + "</select>" +
              '<input type="number" class="award-line-qty mono" min="1" max="1000000" ' +
                     'step="1" placeholder="Qty" aria-label="Quantity" />' +
-             '<button type="button" class="award-line-remove" aria-label="Remove this award">' +
+             '<button type="button" class="award-line-remove" aria-label="Remove this gift">' +
                '<i class="aw-icon" data-aw-icon="close" aria-hidden="true"></i>' +
              "</button>" +
+             '<input type="text" class="award-line-other" maxlength="60" hidden ' +
+                    'placeholder="What is it for?" aria-label="Other category" />' +
            "</div>";
   }
+
+  var MAX_LEVEL_LINES = 12;
 
   function addAwardLine() {
     el.awardLines.insertAdjacentHTML("beforeend", awardLineHtml());
@@ -1867,28 +2032,106 @@ window.AWARD_CONFIG = {
 
   function resetAwardLines() {
     el.awardLines.innerHTML = awardLineHtml();
+    var remark = document.getElementById("req-remark");
+    if (remark) remark.value = "";
+    setFieldError(null, "remark-error", "");
     paintIcons();
     syncAwardLines();
   }
 
-  /* An award already on the requisition is taken out of the other lines'
-     lists: the same one twice is a mistake every time, and catching it here
-     beats refusing it on submit. */
+  function typeById(id) {
+    if (String(id) === "jute") return JUTE;
+    var every = allTypes();
+    for (var i = 0; i < every.length; i++) {
+      if (String(every[i].id) === String(id)) return every[i];
+    }
+    return null;
+  }
+
+  /* Keeps each line in step with what it says. Block and District ask for a
+     category, and "Other" asks for words. Nanhe Sitare and Shikshan Utsav
+     have neither, and can only be on the requisition once: the same one twice
+     is a mistake every time, and catching it here beats refusing it on submit.
+     Block and District may repeat, once for each category. */
   function syncAwardLines() {
     var lines = Array.prototype.slice.call(el.awardLines.querySelectorAll(".award-line"));
     var chosen = lines.map(function (l) { return l.querySelector(".award-line-type").value; });
+    var labels = chosen.map(function (v) {
+      var t = typeById(v);
+      return t ? levelLabel(t.name, t.code) : "";
+    });
+    var needs = labels.map(function (label) { return levelHasCategory(label); });
 
+    // A level offers its own categories. When a line changes to a level with a
+    // different set, the list is rebuilt and the old choice dropped.
+    lines.forEach(function (line, i) {
+      var cat = line.querySelector(".award-line-cat");
+      cat.hidden = !needs[i];
+      if (!needs[i]) { cat.value = ""; cat.setAttribute("data-set", ""); return; }
+      var set = categoriesFor(labels[i]);
+      var key = set.join("|");
+      if (cat.getAttribute("data-set") !== key) {
+        var html = '<option value="">Select category</option>';
+        set.forEach(function (c) {
+          html += '<option value="' + escapeHtml(c) + '">' + escapeHtml(c) + "</option>";
+        });
+        cat.innerHTML = html;
+        cat.setAttribute("data-set", key);
+      }
+    });
+
+    // First settle what each line holds. A line that holds a category an
+    // earlier line at the same level already has loses it: the earlier line
+    // keeps it. "Other" can be asked for more than once - each is its own
+    // words - so every other category is taken once.
+    var used = {};              // level id -> { category: true }
+    lines.forEach(function (line, i) {
+      if (!needs[i]) return;
+      var cat = line.querySelector(".award-line-cat");
+      var u = used[chosen[i]] || (used[chosen[i]] = {});
+      if (cat.value && cat.value !== "Other" && u[cat.value]) cat.value = "";
+      if (cat.value && cat.value !== "Other") u[cat.value] = true;
+    });
+
+    // Then what each line may still choose: nothing another line holds.
     lines.forEach(function (line, i) {
       var select = line.querySelector(".award-line-type");
       Array.prototype.forEach.call(select.options, function (opt) {
-        opt.disabled = opt.value !== "" && opt.value !== chosen[i] &&
-                       chosen.indexOf(opt.value) !== -1;
+        var t = opt.value === "" ? null : typeById(opt.value);
+        var single = t && !levelHasCategory(levelLabel(t.name, t.code));
+        opt.disabled = !!single && opt.value !== chosen[i] && chosen.indexOf(opt.value) !== -1;
       });
+
+      var cat = line.querySelector(".award-line-cat");
+      var other = line.querySelector(".award-line-other");
+
+      if (needs[i]) {
+        Array.prototype.forEach.call(cat.options, function (opt) {
+          var heldElsewhere = lines.some(function (l2, j) {
+            return j !== i && chosen[j] === chosen[i] &&
+                   l2.querySelector(".award-line-cat").value === opt.value;
+          });
+          opt.disabled = opt.value !== "" && opt.value !== "Other" && heldElsewhere;
+        });
+      }
+
+      other.hidden = !(needs[i] && cat.value === "Other");
+      if (other.hidden) other.value = "";
+      line.classList.toggle("has-category", needs[i]);
+      line.classList.toggle("has-other", !other.hidden);
+
       line.querySelector(".award-line-remove").hidden = lines.length < 2;
     });
 
-    // Nothing left to add once every award is on the requisition.
-    el.awardAdd.hidden = lines.length >= awardTypes.length;
+    // The remark is asked for on every requisition except one that is only
+    // jute bags, where it is optional.
+    var juteOnly = chosen.some(Boolean) && chosen.every(function (v) { return !v || v === "jute"; });
+    var star = document.getElementById("remark-star");
+    var hint = document.getElementById("remark-hint");
+    if (star) star.hidden = juteOnly;
+    if (hint) hint.hidden = !juteOnly;
+
+    el.awardAdd.hidden = lines.length >= MAX_LEVEL_LINES;
   }
 
   function readAwardLines() {
@@ -1897,11 +2140,13 @@ window.AWARD_CONFIG = {
       function (line) {
         var id = line.querySelector(".award-line-type").value;
         var qty = line.querySelector(".award-line-qty").value.trim();
-        var type = null;
-        for (var i = 0; i < awardTypes.length; i++) {
-          if (String(awardTypes[i].id) === String(id)) { type = awardTypes[i]; break; }
-        }
-        return { line: line, id: id, qty: qty, type: type };
+        var type = typeById(id);
+        var needs = !!type && levelHasCategory(levelLabel(type.name, type.code));
+        return {
+          line: line, id: id, qty: qty, type: type, needsCategory: needs,
+          category: needs ? line.querySelector(".award-line-cat").value : "",
+          other: needs ? line.querySelector(".award-line-other").value.trim() : ""
+        };
       }
     );
   }
@@ -1937,15 +2182,19 @@ window.AWARD_CONFIG = {
       .then(function (res) {
         if (res.error) {
           el.awardLines.innerHTML =
-            '<p class="error">Could not load award types.</p>';
+            '<p class="error">Could not load the gifts.</p>';
           reportError("load award types", res.error);
           return;
         }
-        awardTypes = res.data || [];
+        var every = res.data || [];
+        awardTypes = every.filter(function (t) { return !isJuteType(t); });
+        juteTypes = every.filter(isJuteType);
         resetAwardLines();
+        // Requisitions filed before the jute types existed read their size from the line.
+        if (allRequisitions.length) renderRows();
       })
       .catch(function (err) {
-        el.awardLines.innerHTML = '<p class="error">Could not load award types.</p>';
+        el.awardLines.innerHTML = '<p class="error">Could not load the gifts.</p>';
         reportError("load award types", err);
       });
   }
@@ -2012,33 +2261,62 @@ window.AWARD_CONFIG = {
     var items = [];
     var total = 0;
     var lineFault = "";
+    var seen = {};
 
     lines.forEach(function (l) {
       l.line.classList.remove("has-error");
       var n = Number(l.qty);
 
       if (!l.id) {
-        if (!lineFault) lineFault = "Choose an award on every line, or remove the empty one.";
+        if (!lineFault) lineFault = "Choose a gift on every line, or remove the empty one.";
+      } else if (l.needsCategory && !l.category) {
+        if (!lineFault) lineFault = "Choose a category for every Block, District and Jute Bag line.";
+      } else if (l.needsCategory && l.category === "Other" && !l.other) {
+        if (!lineFault) lineFault = "Say what the other category is.";
       } else if (!l.qty) {
-        if (!lineFault) lineFault = "Say how many of each award.";
+        if (!lineFault) lineFault = "Say how many for each gift.";
       } else if (!Number.isInteger(n) || n < 1) {
         if (!lineFault) lineFault = "Quantities are whole numbers of 1 or more.";
       } else if (n > 1000000) {
         if (!lineFault) lineFault = "That quantity looks too large.";
+      } else if (seen[l.id + "|" + l.category + "|" + l.other.toLowerCase()]) {
+        if (!lineFault) lineFault = "The same gift and category is on the requisition twice.";
       } else {
-        items.push({
-          award_type_id: Number(l.id),
-          code: l.type ? l.type.code : null,
-          name: l.type ? l.type.name : null,
+        seen[l.id + "|" + l.category + "|" + l.other.toLowerCase()] = true;
+        // A jute bag is one of two types, by size, once those exist; until then it has none.
+        var jt = l.id === "jute" ? juteTypeFor(l.category) : null;
+        var item = {
+          award_type_id: l.id === "jute" ? (jt ? jt.id : null) : Number(l.id),
+          code: jt ? jt.code : (l.type ? l.type.code : null),
+          name: l.type ? levelLabel(l.type.name, l.type.code) : null,
           quantity: n
-        });
+        };
+        if (l.needsCategory) {
+          item.category = l.category;
+          if (l.category === "Other") item.category_other = l.other;
+        }
+        items.push(item);
         total += n;
         return;
       }
       l.line.classList.add("has-error");
     });
 
-    if (!items.length && !lineFault) lineFault = "Add at least one award.";
+    if (!items.length && !lineFault) lineFault = "Add at least one gift.";
+
+    /* The remark says why these are needed, and is asked for on every requisition
+       but one that is only jute bags. It is kept as the note on the first step of
+       the log, which is where the people reading it already look. */
+    var remarkEl = document.getElementById("req-remark");
+    var remark = remarkEl ? remarkEl.value.trim() : "";
+    var juteOnly = lines.length > 0 && lines.every(function (l) { return l.id === "jute"; });
+    if (!remark && !juteOnly) {
+      setFieldError(remarkEl, "remark-error", "Add a remark: say what these are needed for.");
+      ok = false;
+    } else {
+      setFieldError(remarkEl, "remark-error", "");
+      if (remark && values.log) values.log[0].note = remark;
+    }
 
     if (lineFault) {
       setFieldError(null, "award-type-error", lineFault);
@@ -2104,9 +2382,10 @@ window.AWARD_CONFIG = {
         };
 
         // Read before clearing: the message names the award type.
+        var first = values.items[0];
         var typeName = values.items.length === 1
-          ? values.items[0].name
-          : values.items.length + " awards";
+          ? first.name + (first.category ? " · " + (first.category_other || first.category) : "")
+          : "across " + values.items.length + " gifts";
 
         resetAwardLines();
 
@@ -2224,6 +2503,7 @@ window.AWARD_CONFIG = {
         // Their own tables, and renderTable returns early when the list is
         // empty - which is exactly when they need their empty states.
         renderDelivery();
+        renderJute();
         refreshStockControls();
         renderStock();
       })
@@ -2266,7 +2546,7 @@ window.AWARD_CONFIG = {
 
     fillSelect(el.filterState, Object.keys(states).sort(), "All states",
       function (name) { return name; },
-      function (name) { return states[name] ? name + " (" + states[name] + ")" : name; });
+      function (name) { return name; });
 
     fillSelect(el.filterDivision, Object.keys(divisions).sort(), "All divisions",
       function (name) { return name; }, function (name) { return name; });
@@ -2274,7 +2554,7 @@ window.AWARD_CONFIG = {
     fillSelect(el.filterDistrict, Object.keys(districts).sort(), "All districts",
       function (name) { return name; }, function (name) { return name; });
 
-    fillSelect(el.filterType, Object.keys(types).sort(), "All types",
+    fillSelect(el.filterType, Object.keys(types).sort(), "All gifts",
       function (name) { return name; }, function (name) { return name; });
   }
 
@@ -2282,6 +2562,357 @@ window.AWARD_CONFIG = {
   function renderRows() {
     renderTable();
     renderDelivery();
+    renderJute();
+  }
+
+  /* ------------------------------------------------------------- jute bags
+
+     Asked for on the same requisitions as everything else, but not an award:
+     they are not in the stock sheet and are never counted in it. So they have
+     a tab of their own, where they are counted by size instead. */
+
+  function juteLinesOf(row) {
+    return awardsOf(row).filter(function (a) { return a.name === "Jute Bag"; });
+  }
+
+  var juteView = "stock";        // or "requests", "districts"
+
+  function juteSizeOf(row, size) {
+    return juteLinesOf(row).reduce(function (n, a) { return a.category === size ? n + a.quantity : n; }, 0);
+  }
+
+  /* ------------------------------------------------------- the jute sheet
+
+     Jute bags are counted on the same sheet as the awards - requisition,
+     delivery, utilisation, balance, by month and district - only in two
+     columns, Small and Big. It is the same sheet, so there is one of it: when
+     the Jute Bags tab is opened the sheet is moved there and told to count
+     jute bags; when the Stock tab is opened it is moved back. Everything that
+     can be done on the stock sheet can be done on this one. */
+  function attachSheet(scope) {
+    var sheet = document.getElementById("stock-sheet");
+    var host = document.getElementById(scope === "jute" ? "jute-view-stock" : "stock-host");
+    if (!sheet || !host) return;
+
+    var changed = stockScope !== scope;
+    stockScope = scope;
+    if (sheet.parentNode !== host) host.appendChild(sheet);
+    sheet.classList.toggle("is-jute", scope === "jute");
+
+    if (changed) {
+      stockShown = false;           // the other sheet's figures are not this one's
+      discardStockEdits();
+      refreshStockControls();
+      renderStock();
+    }
+  }
+
+  function showJuteView(which) {
+    juteView = which;
+    var stock = which === "stock";
+
+    if (stock) attachSheet("jute");
+
+    var map = { stock: "jute-view-stock", data: "jute-view-data" };
+    document.getElementById(map.stock).hidden = !stock;
+    document.getElementById(map.data).hidden = stock;
+    var a = document.getElementById("jute-view-requests");
+    var b = document.getElementById("jute-view-districts");
+    if (a) a.hidden = which !== "requests";
+    if (b) b.hidden = which !== "districts";
+
+    Array.prototype.forEach.call(document.querySelectorAll("[data-jute-view]"), function (btn) {
+      var on = btn.getAttribute("data-jute-view") === which;
+      btn.classList.toggle("is-active", on);
+      btn.setAttribute("aria-selected", on ? "true" : "false");
+    });
+  }
+
+  function renderJute() {
+    var body = document.getElementById("jute-body");
+    if (!body) return;
+    var summary = document.getElementById("jute-summary");
+    var foot = document.getElementById("jute-foot");
+    var count = document.getElementById("jute-tab-count");
+    var selDistrict = document.getElementById("jute-district");
+    var selStatus = document.getElementById("jute-status");
+    var selSize = document.getElementById("jute-size");
+
+    var all = allRequisitions.filter(function (r) { return juteLinesOf(r).length; });
+    if (count) { count.hidden = !all.length; count.textContent = all.length; }
+
+    var districts = {}, stages = {};
+    all.forEach(function (r) {
+      var p = placeOf(r);
+      if (p.district) districts[p.district] = true;
+      stages[stageOf(r)] = true;
+    });
+    fillSelect(selDistrict, Object.keys(districts).sort(), "All districts",
+      function (n) { return n; }, function (n) { return n; });
+    fillSelect(selStatus, Object.keys(STAGES).filter(function (k) { return stages[k]; }), "All statuses",
+      function (k) { return k; }, function (k) { return STAGES[k].label; });
+
+    var sizeOf = function (row, size) {
+      return juteLinesOf(row).reduce(function (n, a) { return a.category === size ? n + a.quantity : n; }, 0);
+    };
+    var totalOf = function (row) {
+      return juteLinesOf(row).reduce(function (n, a) { return n + a.quantity; }, 0);
+    };
+
+    var rows = all.filter(function (r) {
+      var p = placeOf(r);
+      if (selDistrict.value && p.district !== selDistrict.value) return false;
+      if (selStatus.value && stageOf(r) !== selStatus.value) return false;
+      if (selSize.value && !sizeOf(r, selSize.value)) return false;
+      return true;
+    });
+
+    var small = 0, big = 0, bags = 0;
+    rows.forEach(function (r) { small += sizeOf(r, "Small"); big += sizeOf(r, "Big"); bags += totalOf(r); });
+
+    summary.innerHTML = '<div class="kpis">' +
+      kpiHtml("bag", "total", bags, bags === 1 ? "Jute bag" : "Jute bags", "") +
+      kpiHtml("doc", "move", rows.length, rows.length === 1 ? "Requisition" : "Requisitions", "") +
+      kpiHtml("layers", "wait", small, "Small", "") +
+      kpiHtml("layers", "good", big, "Big", "") +
+      "</div>";
+    paintIcons();
+    runCounters(summary);
+
+    // By district: who has asked for how many, and in what sizes, biggest first.
+    var agg = {};
+    rows.forEach(function (r) {
+      var d = placeOf(r).district || "\u2014";
+      var a = agg[d] || (agg[d] = { n: 0, s: 0, b: 0 });
+      a.n += 1; a.s += sizeOf(r, "Small"); a.b += sizeOf(r, "Big");
+    });
+    var names = Object.keys(agg).sort(function (x, y) {
+      return (agg[y].s + agg[y].b) - (agg[x].s + agg[x].b) || x.localeCompare(y);
+    });
+    var top = names.length ? Math.max(1, agg[names[0]].s + agg[names[0]].b) : 1;
+    var dBody = document.getElementById("jute-district-body");
+    if (dBody) {
+      dBody.innerHTML = names.length ? names.map(function (d) {
+        var a = agg[d];
+        return "<tr><td><b>" + escapeHtml(d) + "</b></td>" +
+          '<td class="num">' + a.n + "</td>" +
+          '<td class="num">' + (a.s ? a.s.toLocaleString() : "\u2014") + "</td>" +
+          '<td class="num">' + (a.b ? a.b.toLocaleString() : "\u2014") + "</td>" +
+          '<td class="num"><b>' + (a.s + a.b).toLocaleString() + "</b></td>" +
+          '<td class="jute-split"><span class="js-track">' +
+            '<i class="js-s" style="--w:' + (a.s / top * 100) + '%"></i>' +
+            '<i class="js-b" style="--w:' + (a.b / top * 100) + '%"></i></span></td></tr>';
+      }).join("") : '<tr class="placeholder-row"><td colspan="6">Nothing to show.</td></tr>';
+    }
+
+    if (!all.length) {
+      body.innerHTML = '<tr class="placeholder-row"><td colspan="8">No jute bags asked for yet. ' +
+        "Choose Jute Bag under Gifts when raising a requisition.</td></tr>";
+      foot.hidden = true;
+      return;
+    }
+    if (!rows.length) {
+      body.innerHTML = '<tr class="placeholder-row"><td colspan="8">No matches.</td></tr>';
+      foot.hidden = true;
+      return;
+    }
+
+    body.innerHTML = rows.map(function (r) {
+      var p = placeOf(r);
+      var s = sizeOf(r, "Small"), b = sizeOf(r, "Big");
+      var remark = remarkOf(r);
+      return "<tr>" +
+        "<td>" + escapeHtml(p.district || "—") + "</td>" +
+        "<td>" + escapeHtml(r.requester_name || "—") + "</td>" +
+        '<td class="num">' + (s ? escapeHtml(s.toLocaleString()) : "—") + "</td>" +
+        '<td class="num">' + (b ? escapeHtml(b.toLocaleString()) : "—") + "</td>" +
+        '<td class="num"><b>' + escapeHtml(totalOf(r).toLocaleString()) + "</b></td>" +
+        "<td>" + statusCellHtml(r) + "</td>" +
+        '<td class="cell-date muted">' + escapeHtml(formatTimestamp(r.created_at)) + "</td>" +
+        '<td class="cell-remark" title="' + escapeHtml(remark) + '">' + (remark ? escapeHtml(remark) : "—") + "</td>" +
+      "</tr>";
+    }).join("");
+
+    foot.innerHTML = "<tr><td colspan=\"2\">" + rows.length + (rows.length === 1 ? " requisition" : " requisitions") + "</td>" +
+      '<td class="num mono">' + small.toLocaleString() + "</td>" +
+      '<td class="num mono">' + big.toLocaleString() + "</td>" +
+      '<td class="num mono">' + bags.toLocaleString() + "</td><td colspan=\"3\"></td></tr>";
+    foot.hidden = false;
+  }
+
+  /* ------------------------------------------------------------- summaries
+
+     A strip of figures above each list, so what is going on can be read before
+     the rows are: how many requisitions are where, and how much of what was
+     asked for has actually arrived. They are drawn from the same rows the
+     table shows, so a filter narrows them too. */
+
+  function reducedMotion() {
+    return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }
+
+  // Counts up to the figure instead of appearing at it.
+  function runCounters(root) {
+    Array.prototype.forEach.call(root.querySelectorAll("[data-count]"), function (node) {
+      var to = Number(node.getAttribute("data-count")) || 0;
+      if (reducedMotion() || to === 0) { node.textContent = to.toLocaleString(); return; }
+      var start = null;
+      var span = 700;
+      function step(now) {
+        if (start === null) start = now;
+        var t = Math.min(1, (now - start) / span);
+        var eased = 1 - Math.pow(1 - t, 3);
+        node.textContent = Math.round(to * eased).toLocaleString();
+        if (t < 1) window.requestAnimationFrame(step);
+      }
+      node.textContent = "0";
+      window.requestAnimationFrame(step);
+      // A page that is not on screen does not run animation frames; the figure still has to be right.
+      window.setTimeout(function () { node.textContent = to.toLocaleString(); }, span + 200);
+    });
+  }
+
+  function kpiHtml(icon, tone, count, label, hint) {
+    return '<div class="kpi kpi-' + tone + '">' +
+             '<span class="kpi-ico"><i class="aw-icon" data-aw-icon="' + icon + '" aria-hidden="true"></i></span>' +
+             '<div class="kpi-text"><b data-count="' + count + '">' + count.toLocaleString() + "</b>" +
+             "<small>" + escapeHtml(label) + "</small>" +
+             (hint ? "<em>" + escapeHtml(hint) + "</em>" : "") + "</div>" +
+           "</div>";
+  }
+
+  var PIPE = [
+    { key: "pending",  label: "Pending",    cls: "pipe-pending",  stages: ["submitted"] },
+    { key: "moving",   label: "In progress", cls: "pipe-moving",   stages: ["approved", "acknowledged", "dispatched"] },
+    { key: "held",     label: "On hold",    cls: "pipe-held",     stages: ["on_hold"] },
+    { key: "done",     label: "Received",   cls: "pipe-done",     stages: ["received"] },
+    { key: "stopped",  label: "Declined",   cls: "pipe-stopped",  stages: ["declined", "rejected"] }
+  ];
+
+  function renderReqSummary(rows) {
+    var box = document.getElementById("req-summary");
+    if (!box) return;
+    if (!allRequisitions.length) { box.hidden = true; box.innerHTML = ""; return; }
+
+    var count = {};
+    PIPE.forEach(function (p) { count[p.key] = 0; });
+    var asked = 0, got = 0;
+    rows.forEach(function (row) {
+      var st = stageOf(row);
+      PIPE.forEach(function (p) { if (p.stages.indexOf(st) !== -1) count[p.key] += 1; });
+      asked += askedOf(row);
+      got += deliveredOf(row);
+    });
+    var total = rows.length;
+    var pct = asked ? Math.round((got / asked) * 100) : 0;
+    var C = 2 * Math.PI * 26;
+
+    var segments = PIPE.filter(function (p) { return count[p.key]; }).map(function (p) {
+      return '<span class="pipe-seg ' + p.cls + '" style="--w:' + (count[p.key] / total * 100) +
+             '%" title="' + escapeHtml(p.label) + ": " + count[p.key] + '"></span>';
+    }).join("");
+    var legend = PIPE.filter(function (p) { return count[p.key]; }).map(function (p) {
+      return '<span class="pipe-key"><i class="' + p.cls + '"></i>' + escapeHtml(p.label) +
+             " <b>" + count[p.key] + "</b></span>";
+    }).join("");
+
+    box.innerHTML =
+      '<div class="kpis">' +
+        kpiHtml("doc", "total", total, total === 1 ? "Requisition" : "Requisitions", "") +
+        kpiHtml("clock", "wait", count.pending + count.held, "Waiting", "pending or on hold") +
+        kpiHtml("truck", "move", count.moving, "In progress", "approved to dispatched") +
+        kpiHtml("done", "good", count.done, "Received", "") +
+        '<div class="kpi kpi-ring">' +
+          '<svg class="ring" viewBox="0 0 64 64" aria-hidden="true">' +
+            '<circle class="ring-bg" cx="32" cy="32" r="26"/>' +
+            '<circle class="ring-fg" cx="32" cy="32" r="26" stroke-dasharray="' + C.toFixed(1) +
+              '" style="--c:' + C.toFixed(1) + ";--to:" + (C * (1 - Math.min(1, pct / 100))).toFixed(1) + '"/>' +
+          "</svg>" +
+          '<div class="kpi-text"><b><span data-count="' + pct + '">' + pct + '</span>%</b>' +
+            "<small>Delivered</small><em>" + got.toLocaleString() + " of " + asked.toLocaleString() + "</em></div>" +
+        "</div>" +
+      "</div>" +
+      (total ? '<div class="pipe"><div class="pipe-bar">' + segments + '</div><div class="pipe-legend">' +
+               legend + "</div></div>" : "");
+    box.hidden = false;
+    paintIcons();
+    runCounters(box);
+  }
+
+  /* What each level holds now, and how it got there, in plain words: what the
+     districts started the year with, plus what has arrived, minus what was
+     given out. That is the whole story of the number, so it is said once per
+     level and added up in the first card. */
+  function renderStockSummary(rows, types, fy) {
+    var box = document.getElementById("stock-summary");
+    if (!box) return;
+    if (!rows || !rows.length) { box.hidden = true; box.innerHTML = ""; return; }
+
+    var start = {}, came = {}, used = {}, held = {};
+    var latest = {};
+    var nowKey = monthKeyOf(new Date());
+
+    rows.forEach(function (r) {
+      types.forEach(function (t) {
+        if (!r.monthKey) start[t.id] = (start[t.id] || 0) + (r.balance[t.id] || 0);
+        came[t.id] = (came[t.id] || 0) + (r.delivery[t.id] || 0);
+        used[t.id] = (used[t.id] || 0) + (r.utilisation[t.id] || 0);
+      });
+      // What a district holds today is its last row up to this month.
+      var cur = latest[r.district];
+      var ok = !r.monthKey || r.monthKey <= nowKey;
+      if (ok && (!cur || !cur.monthKey || (r.monthKey && r.monthKey >= cur.monthKey))) latest[r.district] = r;
+    });
+    Object.keys(latest).forEach(function (d) {
+      types.forEach(function (t) { held[t.id] = (held[t.id] || 0) + (latest[d].balance[t.id] || 0); });
+    });
+
+    // What a district was given to begin the year with is part of where it started.
+    var shown = {};
+    rows.forEach(function (r) { shown[r.district] = true; });
+    stockMovements.forEach(function (m) {
+      if (m.kind !== "opening" || !shown[m.district_name]) return;
+      var k = monthKeyOf(m.occurred_on);
+      if (k >= fy + "-04" && k < (fy + 1) + "-04") {
+        start[m.award_type_id] = (start[m.award_type_id] || 0) + (Number(m.quantity) || 0);
+      }
+    });
+
+    var sum = function (map) {
+      return types.reduce(function (n, t) { return n + (map[t.id] || 0); }, 0);
+    };
+    var total = { held: sum(held), start: sum(start), came: sum(came), used: sum(used) };
+
+    var line = function (label, value) {
+      return "<li><span>" + escapeHtml(label) + "</span><i>" + escapeHtml(value) + "</i></li>";
+    };
+    var signed = function (n) { return n === 0 ? "0" : (n < 0 ? "−" : "+") + Math.abs(n).toLocaleString(); };
+
+    var card = function (name, d, isTotal) {
+      var fix = d.held - (d.start + d.came - d.used);
+      return '<div class="snow-card' + (isTotal ? " is-total" : "") + '">' +
+        '<div class="snow-top"><span class="snow-name">' + escapeHtml(name) + "</span>" +
+          '<b class="snow-held' + (d.held < 0 ? " is-neg" : "") + '" data-count="' + d.held + '">' +
+          d.held.toLocaleString() + "</b></div>" +
+        '<ul class="snow-how">' +
+          line("Opening stock", d.start.toLocaleString()) +
+          line("Delivered", signed(d.came)) +
+          line("Utilised", signed(-d.used)) +
+          (fix ? line("Adjustments", signed(fix)) : "") +
+        "</ul></div>";
+    };
+
+    box.innerHTML =
+      '<div class="snow-head"><h4>Current stock balance</h4></div>' +
+      '<div class="snow-grid">' +
+        card(stockScope === "jute" ? "All sizes" : "All gifts", total, true) +
+        types.map(function (t) {
+          return card(shortType(t), { held: held[t.id] || 0, start: start[t.id] || 0,
+                                      came: came[t.id] || 0, used: used[t.id] || 0 }, false);
+        }).join("") +
+      "</div>";
+    box.hidden = false;
+    runCounters(box);
   }
 
   function renderTable() {
@@ -2309,6 +2940,8 @@ window.AWARD_CONFIG = {
       return true;
     });
 
+    renderReqSummary(rows);
+
     if (!allRequisitions.length) {
       placeholderRow("No requisitions yet.");
       return;
@@ -2323,7 +2956,7 @@ window.AWARD_CONFIG = {
     var html = "";
 
     rows.forEach(function (row) {
-      total += Number(row.quantity) || 0;
+      total += askedOf(row);
       gotTotal += deliveredOf(row);
       var p = placeOf(row);
       var stateName = p.state || "Unknown state";
@@ -2337,7 +2970,7 @@ window.AWARD_CONFIG = {
           "<td>" + escapeHtml(p.division || "—") + "</td>" +
           "<td>" + escapeHtml(p.district || "—") + "</td>" +
           "<td>" + escapeHtml(row.requester_name) + "</td>" +
-          '<td class="cell-awards">' + awardsCellHtml(awards, row) + "</td>" +
+          '<td class="cell-awards">' + levelsCellHtml(row) + "</td>" +
           '<td class="num">' + quantityCellHtml(row) + "</td>" +
           '<td class="cell-date muted">' + escapeHtml(formatTimestamp(row.created_at)) + "</td>" +
           "<td>" + statusCellHtml(row) + "</td>" +
@@ -2355,30 +2988,115 @@ window.AWARD_CONFIG = {
       : rows.length + " of " + allRequisitions.length;
     el.footTotal.textContent = gotTotal.toLocaleString() + " / " + total.toLocaleString();
     el.tfoot.hidden = false;
+    paintIcons();
+  }
+
+  /* ------------------------------------------------------------- levels
+
+     A requisition asks for stock at a level: Block, District, Nanhe Sitare
+     (NS) or Shikshan Utsav (SU). Block and District each split again by what
+     the awards are for - Academic, POM, or something else that is typed in.
+     The database still holds the four award types it always had; "POM Block"
+     is the Block level, and a row filed before categories existed was a POM
+     one, so that is what it reads as. */
+  var CATEGORY_CHOICES = ["Academic", "POM", "Other"];
+
+  /* Jute bags are asked for on the same form but are not an award: they have
+     no row in award_types, so they never become a column in the stock sheet,
+     and what is held, arrives or is given out never counts them. */
+  var JUTE = { id: "jute", code: "JUTE_BAG", name: "Jute Bag" };
+  var JUTE_CATEGORIES = ["Small", "Big"];
+
+  function levelLabel(name, code) {
+    var n = String(name || "");
+    var c = String(code || "");
+    if (/jute/i.test(c) || /jute/i.test(n)) return "Jute Bag";
+    if (/block/i.test(c) || (!c && /block/i.test(n))) return "Block";
+    if (/district/i.test(c) || (!c && /district/i.test(n))) return "District";
+    return n || c || "Award";
+  }
+
+  function levelHasCategory(label) {
+    return label === "Block" || label === "District" || label === "Jute Bag";
+  }
+
+  // What a level can be for: Block and District by what the awards are for, a jute bag by its size.
+  function categoriesFor(label) {
+    return label === "Jute Bag" ? JUTE_CATEGORIES : CATEGORY_CHOICES;
+  }
+
+  // What a line reads as: "Block · Academic", "Jute Bag · Small", or just the level.
+  function awardChipLabel(a) {
+    if (!a.hasCategory) return a.name;
+    return a.name + " · " +
+      (a.category === "Other" ? (a.categoryOther || "Other") : a.category);
+  }
+
+  /* Everything asked for that can be counted: the awards and the jute bags. A jute
+     line with no type behind it yet - filed before the jute types existed in
+     the database - cannot be sent or counted, so it waits. This is the "asked"
+     in delivered / asked. */
+  function askedOf(row) {
+    return awardsOf(row).reduce(function (n, a) {
+      return a.id ? n + a.quantity : n;
+    }, 0);
+  }
+
+  // Why it was asked for, written by whoever raised it: the note on the first step of the log.
+  function remarkOf(row) {
+    var log = row && row.log;
+    if (log && log.length && log[0] && log[0].what === "raised") return String(log[0].note || "");
+    return "";
+  }
+
+  // What was asked for at a level, split by category, for where the split matters.
+  function askedSplit(row, id) {
+    var parts = awardsOf(row).filter(function (a) { return a.id === Number(id) && a.hasCategory; })
+      .map(function (a) { return awardChipLabel(a).replace(/^[^\u00b7]*\u00b7 /, "") + " " + a.quantity; });
+    return parts.length ? " (" + parts.join(", ") + ")" : "";
   }
 
   /* What a requisition asks for. New rows carry a list; the ones filed
      before that asked for one award and are read from the join. */
   function awardsOf(row) {
+    var typeOf = function (id) {
+      var every = allTypes();
+      for (var i = 0; i < every.length; i++) {
+        if (String(every[i].id) === String(id)) return every[i];
+      }
+      return null;
+    };
+    var make = function (id, name, code, quantity, category, other) {
+      var t = typeOf(id);
+      var label = levelLabel(name || (t && t.name), code || (t && t.code));
+      var has = levelHasCategory(label);
+      // A jute bag's size is in its type; one filed before the types existed has it on the line.
+      var size = label === "Jute Bag" ? (category || juteSizeOfCode(code || (t && t.code))) : "";
+      var typeId = Number(id) || (label === "Jute Bag" ? (juteTypeId(size) || 0) : 0);
+      return { id: typeId, name: label, quantity: quantity,
+               hasCategory: has,
+               category: has ? (label === "Jute Bag" ? size : (category || "POM")) : "",
+               categoryOther: has && category === "Other" ? (other || "") : "" };
+    };
+
     if (row && row.items && row.items.length) {
       return row.items.map(function (it) {
-        return { id: Number(it.award_type_id) || 0,
-                 name: it.name || it.code || "Award",
-                 quantity: Number(it.quantity) || 0 };
+        return make(it.award_type_id, it.name || it.code || "Award", it.code,
+                    Number(it.quantity) || 0, it.category, it.category_other);
       });
     }
     if (row && row.award_types) {
-      return [{ id: Number(row.award_type_id) || 0,
-                name: row.award_types.name,
-                quantity: Number(row.quantity) || 0 }];
+      return [make(row.award_type_id, row.award_types.name, row.award_types.code,
+                   Number(row.quantity) || 0, "POM", "")];
     }
     return [];
   }
 
-  /* What a requisition asked for, and - once it has been sent - what
-     actually went, where the two differ. "15 of 16" says it on the award
-     itself; a badge reading "part-filled" beside it named the situation
-     without giving the figures. */
+  /* What a requisition asked for, one line to each thing asked for, in three
+     aligned columns: the level, what it was for, how many. NS and SU have no
+     category, so that column is left empty for them. Once it has been sent, a
+     level that went short says so under its lines - "sent 8 of 9" - because
+     what goes out is counted per level, not per category. */
   function awardsCellHtml(awards, row) {
     if (!awards.length) return "—";
 
@@ -2386,19 +3104,51 @@ window.AWARD_CONFIG = {
       ? quantitiesOf(row, "dispatched")
       : null;
 
-    return awards.map(function (a) {
-      var went = sent ? (sent[a.id] || 0) : a.quantity;
-      var short = sent && went < a.quantity;
-      return '<span class="type-chip' + (short ? " is-short" : "") + '"' +
-             (short ? ' title="' + escapeHtml(a.quantity - went) +
-                      ' fewer than asked for"' : "") + ">" +
-             escapeHtml(a.name) + "<b>" +
-             (short
-               ? escapeHtml(went.toLocaleString()) + " of " +
-                 escapeHtml(a.quantity.toLocaleString())
-               : escapeHtml(a.quantity.toLocaleString())) +
-             "</b></span>";
-    }).join(" ");
+    var order = [];
+    var groups = {};
+    awards.forEach(function (a) {
+      if (!groups[a.id]) { groups[a.id] = []; order.push(a.id); }
+      groups[a.id].push(a);
+    });
+
+    var shortName = function (name) {
+      var m = /\(([A-Z]{2,})\)\s*$/.exec(name);
+      return m ? m[1] : name;
+    };
+
+    var html = '<div class="lvls">';
+    order.forEach(function (id) {
+      var list = groups[id];
+      var asked = list.reduce(function (n, a) { return n + a.quantity; }, 0);
+      var went = sent ? (sent[id] || 0) : asked;
+      var short = !!sent && went < asked && !(list[0].name === "Jute Bag" && !list[0].id);
+
+      list.forEach(function (a) {
+        var what = a.hasCategory
+          ? (a.category === "Other" ? (a.categoryOther || "Other") : a.category)
+          : "";
+        var qty = (short && !a.hasCategory)
+          ? went.toLocaleString() + " of " + asked.toLocaleString()
+          : a.quantity.toLocaleString();
+        // A colour for each level and each category, so the columns can be told apart at a glance.
+        var kind = shortName(a.name).toLowerCase().replace(/[^a-z]/g, "");
+        var catKind = a.hasCategory ? (a.category === "Other" ? "other" : String(a.category).toLowerCase()) : "";
+        html += '<div class="lvl-row lv-' + kind + (short && !a.hasCategory ? " is-short" : "") + '">' +
+          '<b class="lr-level" title="' + escapeHtml(a.name) + '">' +
+            escapeHtml(shortName(a.name)) + "</b>" +
+          (what
+            ? '<span class="lr-cat cat-' + catKind + '" title="' + escapeHtml(what) + '">' + escapeHtml(what) + "</span>"
+            : '<span class="lr-cat is-none">—</span>') +
+          '<span class="lr-qty">' + escapeHtml(qty) + "</span>" +
+        "</div>";
+      });
+
+      if (short && list[0].hasCategory) {
+        html += '<div class="lvl-note">' + escapeHtml(shortName(list[0].name)) + " sent " +
+          escapeHtml(went.toLocaleString()) + " of " + escapeHtml(asked.toLocaleString()) + "</div>";
+      }
+    });
+    return html + "</div>";
   }
 
   // Where a requisition stands and who it is sitting with. The steps that
@@ -2419,7 +3169,7 @@ window.AWARD_CONFIG = {
     var steps = trailOf(row);
     if (!steps.length) return '<span class="log-none">—</span>';
     return '<button type="button" class="btn btn-ghost btn-xs" data-aw-log="' +
-             escapeHtml(row.id) + '">View log <span class="log-count">' +
+             escapeHtml(row.id) + '"><i class="aw-icon" data-aw-icon="doc" aria-hidden="true"></i>View log <span class="log-count">' +
              steps.length + "</span></button>";
   }
 
@@ -2428,11 +3178,12 @@ window.AWARD_CONFIG = {
   function deliveredOf(row) {
     if (stageOf(row) !== "received") return 0;
     var sent = quantitiesOf(row, "dispatched");
-    return Object.keys(sent).reduce(function (n, id) { return n + sent[id]; }, 0);
+    return allTypes().reduce(function (n, t) { return n + (sent[t.id] || 0); }, 0);
   }
 
   function quantityCellHtml(row) {
-    var asked = Number(row.quantity) || 0;
+    var asked = askedOf(row);
+    if (!asked) return '<span class="qty-none" title="Nothing to count yet">\u2014</span>';
     var got = deliveredOf(row);
     return '<span class="qty-got' + (got ? "" : " is-none") + '">' +
              escapeHtml(got.toLocaleString()) + "</span>" +
@@ -2465,6 +3216,57 @@ window.AWARD_CONFIG = {
               "\u201d</span>";
     }
     return html;
+  }
+
+  /* In the tables a requisition takes one line: the levels it asked for, named,
+     and a button for the detail. The level, category and quantity lines open in a
+     pop-up, the same way the log does. */
+  function levelsCellHtml(row) {
+    var awards = awardsOf(row);
+    if (!awards.length) return "\u2014";
+    var names = [];
+    awards.forEach(function (a) {
+      var m = /\(([A-Z]{2,})\)\s*$/.exec(a.name);
+      var n = m ? m[1] : a.name;
+      if (names.indexOf(n) === -1) names.push(n);
+    });
+    return '<span class="lvl-summary" title="' + escapeHtml(names.join(", ")) + '">' +
+             escapeHtml(names.join(" \u00b7 ")) + "</span>" +
+           '<button type="button" class="btn btn-ghost btn-xs" data-aw-levels="' +
+             escapeHtml(row.id) + '"><i class="aw-icon" data-aw-icon="eye" aria-hidden="true"></i>View <span class="log-count">' + awards.length + "</span></button>";
+  }
+
+  function openLevels(id) {
+    var row = allRequisitions.filter(function (r) { return String(r.id) === String(id); })[0];
+    if (!row) return;
+    var p = placeOf(row);
+    el.levelsSub.textContent = [row.requester_name, p.district].filter(Boolean).join(" \u00b7 ") +
+      " \u00b7 " + stageLabel(row, false);
+    el.levelsBody.innerHTML =
+      '<div class="lvls-head"><span>Gift</span><span>Category</span><span>Asked</span></div>' +
+      awardsCellHtml(awardsOf(row), row) +
+      (askedOf(row)
+        ? '<p class="lvls-total">Delivered <b>' + escapeHtml(deliveredOf(row).toLocaleString()) +
+          '</b> of <b>' + escapeHtml(askedOf(row).toLocaleString()) + "</b> asked for" +
+          "</p>"
+        : '<p class="lvls-total">Nothing to count yet.</p>') +
+      (remarkOf(row) ? '<p class="lvls-remark"><b>Remark</b>' + escapeHtml(remarkOf(row)) + "</p>" : "");
+    el.levelsModal.classList.add("is-open");
+    document.addEventListener("keydown", onLevelsKeydown);
+    scrollLockedAt = window.scrollY;
+    document.body.style.overflow = "hidden";
+    el.levelsModal.querySelector("[data-aw-close-levels]").focus();
+  }
+
+  function closeLevels() {
+    el.levelsModal.classList.remove("is-open");
+    document.removeEventListener("keydown", onLevelsKeydown);
+    document.body.style.overflow = "";
+    if (scrollLockedAt !== null) { window.scrollTo(0, scrollLockedAt); scrollLockedAt = null; }
+  }
+
+  function onLevelsKeydown(e) {
+    if (e.key === "Escape") { e.stopPropagation(); closeLevels(); }
   }
 
   function openLog(id) {
@@ -2569,7 +3371,7 @@ window.AWARD_CONFIG = {
         "<td>" + escapeHtml(p.division || "—") + "</td>" +
         "<td>" + escapeHtml(p.district || "—") + "</td>" +
         "<td>" + escapeHtml(row.requester_name || "—") + "</td>" +
-        '<td class="cell-awards">' + awardsCellHtml(awards, row) + "</td>" +
+        '<td class="cell-awards">' + levelsCellHtml(row) + "</td>" +
         '<td class="num">' + quantityCellHtml(row) + "</td>" +
         "<td>" + statusCellHtml(row, true) + "</td>" +
         '<td class="cell-log-col">' + logCellHtml(row) + "</td>" +
@@ -2645,6 +3447,10 @@ window.AWARD_CONFIG = {
     if (list && list.length) {
       list.forEach(function (it) {
         var id = Number(it.award_type_id);
+        // A jute line filed before the types existed has no id; its size says which it is.
+        if (!id && /jute/i.test(String(it.code || it.name || ""))) {
+          id = juteTypeId(it.category || juteSizeOfCode(it.code)) || 0;
+        }
         if (id) out[id] = (out[id] || 0) + (Number(it.quantity) || 0);
       });
     } else if (row.award_type_id) {
@@ -2672,7 +3478,7 @@ window.AWARD_CONFIG = {
     adjustment:  { column: "other",       sign: 1 }
   };
 
-  function stockEvents(requisitions, movements) {
+  function stockEvents(requisitions, movements, ids) {
     var events = [];
 
     (requisitions || []).forEach(function (row) {
@@ -2713,14 +3519,21 @@ window.AWARD_CONFIG = {
       });
     });
 
+    // One sheet counts its own types and no others.
+    var allow = {};
+    (ids || scopeIds()).forEach(function (i) { allow[i] = true; });
+    events.forEach(function (e) {
+      Object.keys(e.quantities).forEach(function (k) { if (!allow[k]) delete e.quantities[k]; });
+    });
+
     return events;
   }
 
   /* One block of rows per district: what it was holding when the year
      started, then every month of that year whether or not anything moved -
      a month with no activity still has to show the stock sitting there. */
-  function stockRows(fyStart, requisitions, movements, places) {
-    var events = stockEvents(requisitions, movements);
+  function stockRows(fyStart, requisitions, movements, places, ids) {
+    var events = stockEvents(requisitions, movements, ids);
     var months = fyMonthKeys(fyStart);
     var rows = [];
 
@@ -2933,6 +3746,13 @@ window.AWARD_CONFIG = {
   function renderStock() {
     var wrap = document.getElementById("stock-table-wrap");
     if (!wrap) return;
+    var summaryBox = document.getElementById("stock-summary");
+    if (summaryBox) summaryBox.hidden = true;
+
+    if (stockScope === "jute" && !juteTypes.length) {
+      wrap.innerHTML = '<p class="aw-empty-line">Run <code>sql/award-jute-types.sql</code> in the Supabase SQL Editor to set this up.</p>';
+      return;
+    }
 
     if (!stockShown) {
       wrap.innerHTML =
@@ -2969,7 +3789,7 @@ window.AWARD_CONFIG = {
       return;
     }
 
-    var types = awardTypes;
+    var types = stockTypes();
     // Drawn with the unsaved edits in it, so every balance below one of them
     // follows along as it is typed.
     var rows = stockRows(fy, allRequisitions,
@@ -3003,6 +3823,8 @@ window.AWARD_CONFIG = {
         "</div>";
       return;
     }
+
+    renderStockSummary(rows, types, fy);
 
     var head = groupHeadHtml(types, { before:
         '<th rowspan="2" class="col-month">Month</th>' +
@@ -3118,6 +3940,8 @@ window.AWARD_CONFIG = {
     var code = String(t.code || "").toUpperCase();
     if (code === "POM_BLOCK") return "Block";
     if (code === "POM_DISTRICT") return "District";
+    if (code === "JUTE_SMALL") return "Small";
+    if (code === "JUTE_BIG") return "Big";
     return code || t.name;
   }
 
@@ -3707,7 +4531,7 @@ window.AWARD_CONFIG = {
     });
     if (!trouble) return "";
 
-    var type = awardTypes.filter(function (a) {
+    var type = allTypes().filter(function (a) {
       return Number(a.id) === trouble.bad.award_type_id;
     })[0] || {};
     return "Saving these would leave " + trouble.district + " holding " +
@@ -3818,7 +4642,7 @@ window.AWARD_CONFIG = {
     });
 
     if (trouble) {
-      var short = awardTypes.filter(function (a) {
+      var short = allTypes().filter(function (a) {
         return Number(a.id) === trouble.bad.award_type_id;
       })[0] || {};
       showStockEditError(
@@ -3917,8 +4741,10 @@ window.AWARD_CONFIG = {
       if (!raisedHere && !cameHere) return;
 
       var cells = none();
-      if (raisedHere) cells.requisition = quantitiesOf(row, "items");
-      if (cameHere) cells.delivery = quantitiesOf(row, "dispatched");
+      if (raisedHere) cells.requisition = inScope(quantitiesOf(row, "items"));
+      if (cameHere) cells.delivery = inScope(quantitiesOf(row, "dispatched"));
+      // Nothing of this requisition belongs to this sheet.
+      if (!sumOf(cells.requisition) && !sumOf(cells.delivery)) return;
 
       entries.push({
         sort: 0,
@@ -3928,6 +4754,11 @@ window.AWARD_CONFIG = {
         who: row.requester_name || "",
         note: raisedHere ? stageLabel(row, false)
                          : "raised " + formatTimestamp(row.created_at),
+        levels: raisedHere
+          ? awardsOf(row).filter(function (a) { return scopeHas(a.id); }).map(function (a) {
+              return { label: awardChipLabel(a), qty: a.quantity };
+            })
+          : [],
         cells: cells
       });
     });
@@ -3935,6 +4766,7 @@ window.AWARD_CONFIG = {
     // Utilisation and figures typed in stand on their own: no requisition
     // lies behind them.
     stockMovements.filter(mine).forEach(function (m) {
+      if (!scopeHas(m.award_type_id)) return;
       if (!inMonth(monthKeyOf(m.occurred_on))) return;
       var kind = MOVEMENT_KINDS[m.kind] || MOVEMENT_KINDS.adjustment;
       var cells = none();
@@ -3984,7 +4816,7 @@ window.AWARD_CONFIG = {
   function openBreakdown(district, monthKey) {
     var fy = Number(el.stockYear.value) || fyStartOf(new Date());
     var entries = monthBreakdown(district, monthKey, fy);
-    var types = awardTypes;
+    var types = stockTypes();
     var left = balanceOn(district, fy, monthKey);
 
     returnFocusTo = document.activeElement;
@@ -4024,6 +4856,12 @@ window.AWARD_CONFIG = {
           (e.who ? "<span>" + escapeHtml(e.who) + "</span>" : "") +
           "<time>" + escapeHtml(e.when) + "</time>" +
           (e.note ? "<em>" + escapeHtml(e.note) + "</em>" : "") +
+          (e.levels && e.levels.length
+            ? '<ul class="detail-levels">' + e.levels.map(function (l) {
+                return "<li>" + escapeHtml(l.label) + "<b>" +
+                       escapeHtml(Number(l.qty).toLocaleString()) + "</b></li>";
+              }).join("") + "</ul>"
+            : "") +
         "</td>" +
         group(e.cells.requisition, "req") +
         group(e.cells.delivery, "del") +
@@ -4118,10 +4956,10 @@ window.AWARD_CONFIG = {
     // What there is to give out, which is the ceiling for what is typed.
     var held = balanceOn(stockCtx.district, fy, monthKey);
 
-    el.stockLines.innerHTML = awardTypes.map(function (t) {
+    el.stockLines.innerHTML = stockTypes().map(function (t) {
       var have = held[t.id] || 0;
       return '<div class="stock-line' + (have ? "" : " is-empty") + '">' +
-             "<label>" + escapeHtml(t.name) +
+             "<label>" + escapeHtml(typeLabel(t)) +
                '<span class="hint">' +
                  (have ? escapeHtml(have.toLocaleString()) + " in stock"
                        : "none in stock") +
@@ -4175,9 +5013,9 @@ window.AWARD_CONFIG = {
 
   /* What the district holds at the end of a month - or, for the empty month
      key, what it carried into the year. */
-  function balanceOn(district, fy, monthKey) {
+  function balanceOn(district, fy, monthKey, ids) {
     var rows = stockRows(fy, allRequisitions, stockMovements,
-                         [{ state: "", division: "", district: district, pm: "" }]);
+                         [{ state: "", division: "", district: district, pm: "" }], ids);
     for (var i = 0; i < rows.length; i++) {
       if (rows[i].monthKey === monthKey) return rows[i].balance;
     }
@@ -4226,8 +5064,8 @@ window.AWARD_CONFIG = {
     var fault = "";
 
     var nameOf = function (id) {
-      var t = awardTypes.filter(function (a) { return Number(a.id) === Number(id); })[0];
-      return (t && t.name) || "that award";
+      var t = allTypes().filter(function (a) { return Number(a.id) === Number(id); })[0];
+      return (t && typeLabel(t)) || "that award";
     };
 
     Array.prototype.forEach.call(el.stockLines.querySelectorAll(".stock-qty"),
@@ -4264,7 +5102,7 @@ window.AWARD_CONFIG = {
     // No correction may leave a later month holding less than nothing.
     var trouble = wouldGoNegative(stockCtx.district, stockCtx.fy, stockCtx.month, rows);
     if (trouble) {
-      var short = awardTypes.filter(function (a) {
+      var short = allTypes().filter(function (a) {
         return Number(a.id) === trouble.award_type_id;
       })[0] || {};
       setFieldError(null, "stock-qty-error",
