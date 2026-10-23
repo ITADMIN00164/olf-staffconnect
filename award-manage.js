@@ -752,7 +752,7 @@ function renderTable() {
       <td class="img-cell" id="desccell-${i}">${renderDescCell(i, viewOnly)}</td>
       <td class="col-center" id="rowsave-${i}">${renderRowSaveCell(i)}</td>
       <td class="verify-cell col-center" id="verify-${i}">${renderVerifyCell(i)}</td>
-      <td class="col-center" id="unlock-${i}">${locked && isVerifier ? `<button class="unlock-btn" onclick="awmUnlockRecord(${i})">Unlock</button>` : ""}</td>
+      <td class="col-center" id="unlock-${i}">${(locked || r.verified === "Rejected") && isVerifier ? `<button class="unlock-btn" onclick="awmUnlockRecord(${i})">Unlock</button>` : ""}</td>
     </tr>`;
   }).join("");
 
