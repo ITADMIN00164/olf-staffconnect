@@ -1184,7 +1184,7 @@ window.AWARD_CONFIG = {
                '" min="0" max="1000000" step="1" value="' + escapeHtml(asked[t.id]) + '" /></div>';
       }).join("");
       if (!el.hoLines.innerHTML) {
-        el.hoLines.innerHTML = '<p class="hint">Only jute bags were asked for. They are not counted in stock, so there is no figure to enter.</p>';
+        el.hoLines.innerHTML = '<p class="hint">Nothing here can be counted yet, so there is no figure to enter.</p>';
       }
       setFieldError(null, "ho-lines-error", "");
     }
@@ -3032,11 +3032,13 @@ window.AWARD_CONFIG = {
       (a.category === "Other" ? (a.categoryOther || "Other") : a.category);
   }
 
-  /* What was asked for that the stock sheet counts: everything but jute bags.
-     This is the "asked" in delivered / asked. */
+  /* Everything asked for that can be counted: the awards and the jute bags. A jute
+     line with no type behind it yet - filed before the jute types existed in
+     the database - cannot be sent or counted, so it waits. This is the "asked"
+     in delivered / asked. */
   function askedOf(row) {
     return awardsOf(row).reduce(function (n, a) {
-      return a.name === "Jute Bag" ? n : n + a.quantity;
+      return a.id ? n + a.quantity : n;
     }, 0);
   }
 
@@ -3176,13 +3178,12 @@ window.AWARD_CONFIG = {
   function deliveredOf(row) {
     if (stageOf(row) !== "received") return 0;
     var sent = quantitiesOf(row, "dispatched");
-    // The awards only: jute bags are not counted in delivered / asked.
-    return awardTypes.reduce(function (n, t) { return n + (sent[t.id] || 0); }, 0);
+    return allTypes().reduce(function (n, t) { return n + (sent[t.id] || 0); }, 0);
   }
 
   function quantityCellHtml(row) {
     var asked = askedOf(row);
-    if (!asked) return '<span class="qty-none" title="Jute bags only: not counted">\u2014</span>';
+    if (!asked) return '<span class="qty-none" title="Nothing to count yet">\u2014</span>';
     var got = deliveredOf(row);
     return '<span class="qty-got' + (got ? "" : " is-none") + '">' +
              escapeHtml(got.toLocaleString()) + "</span>" +
@@ -3247,8 +3248,8 @@ window.AWARD_CONFIG = {
       (askedOf(row)
         ? '<p class="lvls-total">Delivered <b>' + escapeHtml(deliveredOf(row).toLocaleString()) +
           '</b> of <b>' + escapeHtml(askedOf(row).toLocaleString()) + "</b> asked for" +
-          (awardsOf(row).some(function (a) { return a.name === "Jute Bag"; }) ? " (jute bags not counted)" : "") + "</p>"
-        : '<p class="lvls-total">Jute bags are not counted in stock.</p>') +
+          "</p>"
+        : '<p class="lvls-total">Nothing to count yet.</p>') +
       (remarkOf(row) ? '<p class="lvls-remark"><b>Remark</b>' + escapeHtml(remarkOf(row)) + "</p>" : "");
     el.levelsModal.classList.add("is-open");
     document.addEventListener("keydown", onLevelsKeydown);
