@@ -1215,6 +1215,92 @@
 
         .table-wrap { width: 100%; overflow-x: auto; }
 
+        .toolbar-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+        .btn-filters {
+            display: inline-flex; align-items: center; gap: 7px;
+            padding: 9px 14px;
+            border: 1px solid #e5e7eb; border-radius: 8px;
+            background: #fff; color: #374151;
+            font: inherit; font-size: 13.5px; font-weight: 600;
+            cursor: pointer; white-space: nowrap;
+            transition: border-color .15s, background .15s;
+        }
+        .btn-filters:hover { border-color: #c7d2fe; background: #f8faff; }
+        .btn-filters[aria-expanded="true"] { border-color: #4f8ef7; background: #f5f8ff; color: #3a6fd1; }
+        .btn-filters-ico { font-size: 14px; line-height: 1; }
+        .btn-filters-count[hidden] { display: none; }
+        .btn-filters-count {
+            min-width: 20px; height: 20px; padding: 0 6px;
+            border-radius: 999px; background: #4f8ef7; color: #fff;
+            font-size: 11.5px; font-weight: 700;
+            display: inline-flex; align-items: center; justify-content: center;
+        }
+
+        .emp-filters {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            gap: 10px;
+            margin: 0 0 14px;
+            padding: 10px 12px 12px;
+            background: #f8fafc;
+            border: 1px solid #eef0f4;
+            border-radius: 10px;
+        }
+        @media (max-width: 1280px) { .emp-filters { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+        @media (max-width: 760px)  { .emp-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        .emp-filters[hidden], .emp-chips[hidden] { display: none; }
+        .emp-filter { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+        .emp-filter label {
+            font-size: 10.5px; font-weight: 700; color: #8a93a3;
+            text-transform: uppercase; letter-spacing: 0.6px;
+            padding-left: 2px;
+        }
+        .emp-filter select {
+            width: 100%;
+            padding: 7px 8px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 12.5px;
+            font-family: inherit;
+            background: #fff;
+            color: #374151;
+            outline: none;
+            text-overflow: ellipsis;
+        }
+        .emp-filter select:focus { border-color: #4f8ef7; box-shadow: 0 0 0 3px rgba(79,142,247,0.1); }
+        .emp-filter.is-set select { border-color: #4f8ef7; background: #f5f8ff; font-weight: 600; color: #3a6fd1; }
+
+        .emp-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 14px; }
+        .emp-chip {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 4px 6px 4px 11px;
+            border-radius: 999px; background: #eef4ff; color: #3a6fd1;
+            font-size: 12.5px; font-weight: 600;
+        }
+        .emp-chip i { font-style: normal; font-weight: 500; color: #6b86b8; }
+        .emp-chip button {
+            border: none; background: #d9e6ff; color: #3a6fd1;
+            width: 18px; height: 18px; border-radius: 50%;
+            cursor: pointer; font-size: 11px; line-height: 1; padding: 0;
+        }
+        .emp-chip button:hover { background: #4f8ef7; color: #fff; }
+        .emp-filter-clear {
+            border: none; background: none; color: #6b7280; cursor: pointer;
+            font: inherit; font-size: 12.5px; font-weight: 600; padding: 4px 6px;
+        }
+        .emp-filter-clear:hover { color: #dc2626; text-decoration: underline; }
+
+        th.is-sortable { cursor: pointer; user-select: none; transition: background .15s, color .15s; }
+        th.is-sortable:hover { color: #374151; background: #f1f3f7; }
+        th.is-sortable .sort-mark {
+            display: inline-block; width: 12px; margin-left: 6px;
+            font-size: 10px; color: #9ca3af; opacity: 0; transition: opacity .15s;
+        }
+        th.is-sortable:hover .sort-mark { opacity: 1; }
+        th.is-sorted { color: #3a6fd1; background: #f5f8ff; }
+        th.is-sorted .sort-mark { color: #4f8ef7; opacity: 1; }
+
         table { border-collapse: collapse; white-space: nowrap; }
         thead tr { border-bottom: 2px solid #f3f4f6; }
 
@@ -2341,7 +2427,7 @@
 <!-- The ?v= is bumped whenever award.css or award.js changes: without it
      a browser keeps the copy it already has, and the tab carries on
      behaving as it did before the change. -->
-<link rel="stylesheet" href="award.css?v=2026-10-19t">
+<link rel="stylesheet" href="award.css?v=2026-10-22e">
 </head>
 <body>
 
@@ -2520,14 +2606,14 @@
             <button class="nav-item" data-page="pos" id="posNavBtn" onclick="navigate('pos')" title="Field Review System" hidden>
                 <span class="icon">📍</span><span class="label">Field Review System</span>
             </button>
-            <button class="nav-item" data-page="award-management" onclick="navigate('award-management')" title="Award Management">
-                <span class="icon">🏆</span><span class="label">Award Management</span>
-            </button>
             <button class="nav-item" data-page="gr" onclick="navigate('gr')" title="GRs & Circulars">
                 <span class="icon">📜</span><span class="label">GRs & Circulars</span>
             </button>
             <button class="nav-item" data-page="forms" onclick="navigate('forms')" title="OLF Forms">
                 <span class="icon">📝</span><span class="label">OLF Forms</span>
+            </button>
+            <button class="nav-item" data-page="award-management" onclick="navigate('award-management')" title="Test">
+                <span class="icon">🏆</span><span class="label">Test</span>
             </button>
             </div><!-- /.sidebar-nav -->
 
@@ -2640,7 +2726,7 @@
 <script src="pos-supabase.js"></script>
 <script src="pos.js"></script>
 <script src="pos-review.js"></script>
-<script src="award.js?v=2026-10-19t"></script>
+<script src="award.js?v=2026-10-22e"></script>
 <script src="team-performance-data.js?v=20261023d"></script>
 <script src="team-performance.js?v=20261023d"></script>
 </body>

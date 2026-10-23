@@ -90,6 +90,9 @@ window.AWARD_CONFIG = {
     stockWhere: document.getElementById("stock-where"),
     stockModal: document.getElementById("stock-modal"),
     detailModal: document.getElementById("detail-modal"),
+    logModal: document.getElementById("log-modal"),
+    logSub: document.getElementById("log-sub"),
+    logBody: document.getElementById("log-body"),
     detailHeading: document.getElementById("detail-heading"),
     detailSub: document.getElementById("detail-sub"),
     detailBody: document.getElementById("detail-body"),
@@ -1501,6 +1504,10 @@ window.AWARD_CONFIG = {
       el.detailModal.querySelectorAll("[data-aw-close-detail]"),
       function (n) { n.addEventListener("click", closeBreakdown); }
     );
+    Array.prototype.forEach.call(
+      el.logModal.querySelectorAll("[data-aw-close-log]"),
+      function (n) { n.addEventListener("click", closeLog); }
+    );
     // A complaint about a figure should not outlive the figure. Without
     // this the message sits there contradicting what is now on screen.
     el.stockLines.addEventListener("input", function () {
@@ -1588,6 +1595,9 @@ window.AWARD_CONFIG = {
       if (!body) return;
       body.addEventListener("click", function (event) {
         if (!event.target.closest) return;
+
+        var log = event.target.closest("[data-aw-log]");
+        if (log) { openLog(log.getAttribute("data-aw-log")); return; }
 
         var review = event.target.closest("[data-aw-review]");
         if (review) { openReview(review.getAttribute("data-aw-review")); return; }
@@ -2309,10 +2319,12 @@ window.AWARD_CONFIG = {
     }
 
     var total = 0;
+    var gotTotal = 0;
     var html = "";
 
     rows.forEach(function (row) {
       total += Number(row.quantity) || 0;
+      gotTotal += deliveredOf(row);
       var p = placeOf(row);
       var stateName = p.state || "Unknown state";
       // Rows filed before the directory fed this page have no division, and
@@ -2326,7 +2338,7 @@ window.AWARD_CONFIG = {
           "<td>" + escapeHtml(p.district || "—") + "</td>" +
           "<td>" + escapeHtml(row.requester_name) + "</td>" +
           '<td class="cell-awards">' + awardsCellHtml(awards, row) + "</td>" +
-          '<td class="num">' + escapeHtml(row.quantity) + "</td>" +
+          '<td class="num">' + quantityCellHtml(row) + "</td>" +
           '<td class="cell-date muted">' + escapeHtml(formatTimestamp(row.created_at)) + "</td>" +
           "<td>" + statusCellHtml(row) + "</td>" +
           '<td class="cell-log-col">' + logCellHtml(row) + "</td>" +
@@ -2341,7 +2353,7 @@ window.AWARD_CONFIG = {
     el.footCount.textContent = rows.length === allRequisitions.length
       ? rows.length + (rows.length === 1 ? " requisition" : " requisitions")
       : rows.length + " of " + allRequisitions.length;
-    el.footTotal.textContent = total.toLocaleString();
+    el.footTotal.textContent = gotTotal.toLocaleString() + " / " + total.toLocaleString();
     el.tfoot.hidden = false;
   }
 
@@ -2405,6 +2417,31 @@ window.AWARD_CONFIG = {
      Coloured by what the step was. */
   function logCellHtml(row) {
     var steps = trailOf(row);
+    if (!steps.length) return '<span class="log-none">—</span>';
+    return '<button type="button" class="btn btn-ghost btn-xs" data-aw-log="' +
+             escapeHtml(row.id) + '">View log <span class="log-count">' +
+             steps.length + "</span></button>";
+  }
+
+  /* What has actually reached the district: only a received requisition
+     has delivered anything, and it is what was dispatched that counts. */
+  function deliveredOf(row) {
+    if (stageOf(row) !== "received") return 0;
+    var sent = quantitiesOf(row, "dispatched");
+    return Object.keys(sent).reduce(function (n, id) { return n + sent[id]; }, 0);
+  }
+
+  function quantityCellHtml(row) {
+    var asked = Number(row.quantity) || 0;
+    var got = deliveredOf(row);
+    return '<span class="qty-got' + (got ? "" : " is-none") + '">' +
+             escapeHtml(got.toLocaleString()) + "</span>" +
+           '<span class="qty-sep"> / </span>' +
+           '<span class="qty-asked">' + escapeHtml(asked.toLocaleString()) + "</span>";
+  }
+
+  function logListHtml(row) {
+    var steps = trailOf(row);
     if (!steps.length) return '<span class="log-none">\u2014</span>';
 
     var html = '<ol class="cell-log">' + steps.map(function (st) {
@@ -2428,6 +2465,31 @@ window.AWARD_CONFIG = {
               "\u201d</span>";
     }
     return html;
+  }
+
+  function openLog(id) {
+    var row = allRequisitions.filter(function (r) { return String(r.id) === String(id); })[0];
+    if (!row) return;
+    var p = placeOf(row);
+    el.logSub.textContent = [row.requester_name, p.district].filter(Boolean).join(" · ") +
+      " · " + stageLabel(row, false);
+    el.logBody.innerHTML = logListHtml(row);
+    el.logModal.classList.add("is-open");
+    document.addEventListener("keydown", onLogKeydown);
+    scrollLockedAt = window.scrollY;
+    document.body.style.overflow = "hidden";
+    el.logModal.querySelector("[data-aw-close-log]").focus();
+  }
+
+  function closeLog() {
+    el.logModal.classList.remove("is-open");
+    document.removeEventListener("keydown", onLogKeydown);
+    document.body.style.overflow = "";
+    if (scrollLockedAt !== null) { window.scrollTo(0, scrollLockedAt); scrollLockedAt = null; }
+  }
+
+  function onLogKeydown(e) {
+    if (e.key === "Escape") { e.stopPropagation(); closeLog(); }
   }
 
   var HO_LABELS = {
@@ -2508,7 +2570,7 @@ window.AWARD_CONFIG = {
         "<td>" + escapeHtml(p.district || "—") + "</td>" +
         "<td>" + escapeHtml(row.requester_name || "—") + "</td>" +
         '<td class="cell-awards">' + awardsCellHtml(awards, row) + "</td>" +
-        '<td class="num">' + escapeHtml(Number(row.quantity).toLocaleString()) + "</td>" +
+        '<td class="num">' + quantityCellHtml(row) + "</td>" +
         "<td>" + statusCellHtml(row, true) + "</td>" +
         '<td class="cell-log-col">' + logCellHtml(row) + "</td>" +
         '<td class="cell-action">' + actionCellHtml(row) + "</td>" +
@@ -2712,7 +2774,18 @@ window.AWARD_CONFIG = {
     return rows;
   }
 
-  // Every district the directory knows, with the manager of its division.
+  /* Who manages the place, one name to a line. A stand-in is marked so it is
+     not read as the post-holder: the name, then an "interim" badge. */
+  function pmHtml(text) {
+    if (!text) return "—";
+    return String(text).split(", ").map(function (one) {
+      var m = one.match(/^(.*?)\s*\((interim [^)]+)\)$/i);
+      return '<span class="pm-one">' + escapeHtml(m ? m[1] : one) +
+        (m ? ' <em class="pm-interim">' + escapeHtml(m[2]) + "</em>" : "") + "</span>";
+    }).join("");
+  }
+
+  // Every district the directory knows, with who manages it.
   function stockPlaces() {
     var out = [];
     var seen = {};
@@ -2721,7 +2794,7 @@ window.AWARD_CONFIG = {
       st.divisions.forEach(function (dv) {
         dv.districts.forEach(function (d) {
           seen[d.toLowerCase()] = true;
-          out.push({ state: st.name, division: dv.name, district: d, pm: dv.pm || "" });
+          out.push({ state: st.name, division: dv.name, district: d, pm: (dv.pmByDistrict && dv.pmByDistrict[d]) || dv.pm || "" });
         });
       });
     });
@@ -2958,7 +3031,7 @@ window.AWARD_CONFIG = {
         '<td class="col-district is-district">' + escapeHtml(r.district) + "</td>" +
         "<td>" + escapeHtml(r.state) + "</td>" +
         '<td class="col-pm" title="' + escapeHtml(r.pm || "") + '">' +
-          escapeHtml(r.pm || "\u2014") + "</td>" +
+          pmHtml(r.pm) + "</td>" +
         cellsHtml(r.requisition, types, "req", r, mayEdit && !carry) +
         cellsHtml(r.delivery, types, "del", r, mayEdit && !carry) +
         cellsHtml(r.utilisation, types, "use", r, mayEdit && !carry) +

@@ -488,6 +488,28 @@
       </div>
     </div>
 
+    <!-- The journey of one requisition, opened from its row. -->
+    <div class="aw-overlay" id="log-modal">
+      <div class="aw-overlay-backdrop" data-aw-close-log></div>
+      <div class="aw-box aw-box-sm" role="dialog" aria-modal="true" aria-labelledby="log-heading">
+        <div class="aw-box-head">
+          <div class="aw-box-heading">
+            <h2 id="log-heading">Requisition log</h2>
+            <p class="aw-box-sub" id="log-sub"></p>
+          </div>
+          <button type="button" class="aw-box-close" data-aw-close-log aria-label="Close">
+            <i class="aw-icon" data-aw-icon="close" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="aw-box-body">
+          <div id="log-body"></div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-ghost" data-aw-close-log>Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- What a month's figures are made of: every requisition, arrival,
          utilisation and typed figure behind them. -->
     <div class="aw-overlay" id="detail-modal">

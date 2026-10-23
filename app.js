@@ -77,6 +77,7 @@ let newsRefreshInterval = null;
  * @param {Object} details  - action-specific payload (see callers below)
  */
 async function logAudit(action, details = {}) {
+    if (String(action).startsWith("employee-")) { orgGeography = null; staffDirectory = null; }
     try {
         await addDoc(collection(db, "audittrail"), {
             action,
@@ -1165,79 +1166,173 @@ const DISTRICT_RENAMES = {
    reason - taking off the MH leaves Raigarh, which is a different district
    in a different state. */
 function tidyDistrict(name) {
-    const trimmed = String(name || "").trim().replace(/\s*[-–]?\s*MC$/i, "").trim();
+    const trimmed = String(name || "").trim().replace(/(?:\s*[-–]\s*|\s+)MC$/i, "").trim();
     return DISTRICT_RENAMES[trimmed.toLowerCase()] || trimmed;
 }
 
 let orgGeography = null;
+let orgGeographyAt = 0;
+
+/* Re-read after a minute, and straight away after any change made here. A
+   person marked Inactive in one tab must leave the stock sheet in the next
+   visit, not at the next page load. */
+const GEOGRAPHY_FRESH_MS = 60 * 1000;
 
 window.olfGeography = async function () {
-    if (orgGeography) return orgGeography;
+    if (orgGeography && Date.now() - orgGeographyAt < GEOGRAPHY_FRESH_MS) return orgGeography;
 
     const snapshot = await getDocs(collection(db, "Employees"));
 
-    // state -> division -> Set(district)
-    const tree = new Map();
+    /* The directory is typed by hand, so the same place turns up as "Pune",
+       "pune" and "Pune " . They are one place; the first spelling seen is the
+       one shown. */
+    const norm = s => String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
+    const shown = new Map();
+    const say = s => { const k = norm(s); if (!shown.has(k)) shown.set(k, s.replace(/\s+/g, " ").trim()); return k; };
+    const keys = list => [...new Set(list.map(say))];
 
-    /* Who manages each division, for the stock sheet's PM column. A
-       Programme Manager covers one division, so the division is the link -
-       the sheet lists a PM beside every district, and that is the PM of the
-       division the district sits in. */
-    const pmOfDivision = new Map();
-
+    const people = [];
     snapshot.forEach(d => {
         const r = d.data();
         if (!isActiveEmployee(r)) return;
-
-        const states    = splitMulti(r["State"]);
-        const divisions = splitMulti(r["Division"]);
-        const districts = splitMulti(r["District"]).map(tidyDistrict);
-
-        const isPM = /^program implementation\s*[-–]?\s*pm$/
-            .test(String(r["Dept"] || "").trim().toLowerCase().replace(/\s+/g, " "));
-        if (isPM) {
-            // A division can have more than one - Amravati has two and
-            // Chhatrapati Sambhajinagar three. Naming only the first would
-            // leave the others off a column that is supposed to say who
-            // manages the place.
-            for (const dv of divisions) {
-                const name = String(r.Name || "").trim();
-                if (!name) continue;
-                const list = pmOfDivision.get(dv) || [];
-                if (!list.includes(name)) list.push(name);
-                pmOfDivision.set(dv, list);
-            }
-        }
-
-        for (const st of states) {
-            if (!tree.has(st)) tree.set(st, new Map());
-            const byDiv = tree.get(st);
-            for (const dv of divisions) {
-                if (!byDiv.has(dv)) byDiv.set(dv, new Set());
-                districts.forEach(dt => byDiv.get(dv).add(dt));
-            }
-        }
+        people.push({
+            name:      String(r.Name || "").trim(),
+            email:     String(r.Email || "").trim().toLowerCase(),
+            boss:      String(r["Reporting manager"] || r["Reporting Manager"] || "").trim().toLowerCase(),
+            isPM:      /^program implementation\s*[-–]?\s*pm$/
+                           .test(String(r["Dept"] || "").trim().toLowerCase().replace(/\s+/g, " ")),
+            isDM:      /^program implementation\s*[-–]?\s*div$/
+                           .test(String(r["Dept"] || "").trim().toLowerCase().replace(/\s+/g, " ")),
+            isCOO:     /^program implementation\s*[-–]?\s*coo$/
+                           .test(String(r["Dept"] || "").trim().toLowerCase().replace(/\s+/g, " ")),
+            states:    keys(splitMulti(r["State"])),
+            divisions: keys(splitMulti(r["Division"])),
+            districts: keys(splitMulti(r["District"]).map(tidyDistrict))
+        });
     });
+
+    /* Where each district is. Someone covering several places lists their
+       states, divisions and districts side by side and nothing says which
+       goes with which - crossing the three lists put Begusarai under
+       Maharashtra because a manager there also covers Bihar. So a district is
+       placed by what can be known for certain, strongest first:
+         1. a person with one state, one division and one district;
+         2. a person with one state and one division and several districts,
+            for any district step 1 has not already placed - a list typed by
+            hand is where a stray district slips in;
+         3. lists of equal length, read in step: the first state, division
+            and district belong together;
+         4. only for a district nobody above names, the crossing of what is
+            listed, which is the best there is.
+       A district placed at an earlier step is not placed by a later one. */
+    const placed = new Map();      // district -> Map("state|division" -> {state, division})
+    const place = (map, dt, st, dv) => {
+        const at = map.get(dt) || new Map();
+        at.set(st + "|" + dv, { state: st, division: dv });
+        map.set(dt, at);
+    };
+    for (const p of people) {
+        if (p.states.length === 1 && p.divisions.length === 1 && p.districts.length === 1) {
+            place(placed, p.districts[0], p.states[0], p.divisions[0]);
+        }
+    }
+    /* Step 2 goes shortest list first. A Divisional Manager lists a good part
+       of the state, a PM only their own districts, and where the two disagree
+       it is the PM's shorter list that is right - Sukma is in Bastar, though
+       the Raipur division manager lists it too. */
+    const taken = new Map();       // district -> length of the list that placed it
+    const wide = people
+        .filter(p => p.states.length === 1 && p.divisions.length === 1 && p.districts.length > 1)
+        .sort((a, b) => a.districts.length - b.districts.length);
+    for (const p of wide) {
+        for (const dt of p.districts) {
+            if (placed.has(dt) && !taken.has(dt)) continue;       // step 1 already has it
+            if (taken.has(dt) && taken.get(dt) < p.districts.length) continue;
+            taken.set(dt, p.districts.length);
+            place(placed, dt, p.states[0], p.divisions[0]);
+        }
+    }
+    for (const p of people) {
+        if (p.states.length > 1 && p.states.length === p.divisions.length &&
+            p.states.length === p.districts.length) {
+            p.districts.forEach((dt, i) => {
+                if (!placed.has(dt)) place(placed, dt, p.states[i], p.divisions[i]);
+            });
+        }
+    }
+    const guessed = new Map();
+    for (const p of people) {
+        for (const dt of p.districts) {
+            if (placed.has(dt)) continue;
+            for (const st of p.states) for (const dv of p.divisions) place(guessed, dt, st, dv);
+        }
+    }
+    const spotsOf = dt => [...(placed.get(dt) || guessed.get(dt) || new Map()).values()];
+
+    // state -> division -> Set(district)
+    const tree = new Map();
+    for (const dt of new Set([...placed.keys(), ...guessed.keys()])) {
+        for (const w of spotsOf(dt)) {
+            if (!tree.has(w.state)) tree.set(w.state, new Map());
+            const byDiv = tree.get(w.state);
+            if (!byDiv.has(w.division)) byDiv.set(w.division, new Set());
+            byDiv.get(w.division).add(dt);
+        }
+    }
+
+    /* Who manages a district, first match wins:
+         1. a PM who lists the district, in the state it sits in - a PM is given
+            districts, and one may cross a division line to take one;
+         2. no PM, so the DM - the one the district's staff report to, then any
+            DM covering its state and division - as "(interim DM)";
+         3. no DM either, so the COO, as "(interim COO)".
+       A division's other PMs are not stood in: a PM manages the districts they
+       are given, not whatever else sits in the same division. */
+    const covers = (p, st, dv) => p.states.includes(st) && p.divisions.includes(dv);
+    const nameList = ps => [...new Set(ps.map(p => p.name))];
+    const byEmail = new Map(people.filter(p => p.email).map(p => [p.email, p]));
+    const managerOf = (dt, st, dv) => {
+        const pms = nameList(people.filter(p =>
+            p.isPM && p.name && p.districts.includes(dt) && p.states.includes(st)));
+        if (pms.length) return pms.join(", ");
+
+        const bosses = nameList(people
+            .filter(p => p.districts.length === 1 && p.districts[0] === dt && p.boss)
+            .map(p => byEmail.get(p.boss))
+            .filter(b => b && b.isDM && b.name));
+        const dms = bosses.length ? bosses
+            : nameList(people.filter(p => p.isDM && p.name && covers(p, st, dv)));
+        if (dms.length) return dms.map(n => n + " (interim DM)").join(", ");
+
+        return nameList(people.filter(p => p.isCOO && p.name))
+            .map(n => n + " (interim COO)").join(", ");
+    };
 
     const out = [];
     for (const [state, byDiv] of tree) {
         const divisions = [];
         for (const [division, districts] of byDiv) {
-            if (!districts.size) continue;
+            const sorted = [...districts].map(k => shown.get(k))
+                .sort((a, b) => a.localeCompare(b));
+            const byDistrict = {};
+            for (const k of districts) {
+                const who = managerOf(k, state, division);
+                if (who) byDistrict[shown.get(k)] = who;
+            }
             divisions.push({
-                name: division,
-                pm: (pmOfDivision.get(division) || []).join(", "),
-                pms: pmOfDivision.get(division) || [],
-                districts: [...districts].sort((a, b) => a.localeCompare(b))
+                name: shown.get(division),
+                pm: "",
+                pmByDistrict: byDistrict,
+                districts: sorted
             });
         }
-        if (!divisions.length) continue;        // nothing selectable under it
         divisions.sort((a, b) => a.name.localeCompare(b.name));
-        out.push({ name: state, divisions });
+        out.push({ name: shown.get(state), divisions });
     }
     out.sort((a, b) => a.name.localeCompare(b.name));
 
     orgGeography = out;
+    orgGeographyAt = Date.now();
     return out;
 };
 
@@ -1601,7 +1696,15 @@ async function initEmployeesPage() {
     }
 
     if (addBtn)    addBtn.addEventListener("click", openAddModal);
+    // Each visit starts on current staff; the Status filter can be cleared to
+    // see everyone, or switched to Inactive.
+    empFilter = { Status: "Active" };
     if (searchBox) searchBox.addEventListener("input", renderEmployees);
+    document.getElementById("tableHead")?.addEventListener("click", onEmpHeadClick);
+    const filterBox = document.getElementById("empFilters");
+    if (filterBox) filterBox.addEventListener("change", onEmpFilterChange);
+    document.getElementById("empChips")?.addEventListener("click", onEmpFilterClick);
+    document.getElementById("empFiltersBtn")?.addEventListener("click", onEmpFiltersToggle);
     if (closeBtn)  closeBtn.addEventListener("click", closeModal);
     if (closeBtn2) closeBtn2.addEventListener("click", closeModal);
     if (excelBtn)  excelBtn.addEventListener("click", downloadExcel);
@@ -1639,6 +1742,7 @@ async function loadEmployees() {
         await deriveSchema();
         const snapshot = await getDocs(collection(db, "Employees"));
         snapshot.forEach(d => employees.push({ id: d.id, ...d.data() }));
+        buildEmpFilters();
         renderEmployees();
     } catch (err) {
         console.error(err);
@@ -1705,6 +1809,188 @@ function showMultiFor(empId, key) {
     });
 }
 
+/* ====================================
+   FILTERS AND SORTING
+
+   A drop-down for each column worth narrowing by, built from what the
+   records hold so there is nothing to keep in step. They combine with each
+   other and with the search box. Division and District hold several values
+   in one cell, so a person matches when any one of them is the chosen one.
+
+   Headers sort on a click: ascending, then descending, then back to the
+   order the records came in. Blank cells always go last, whichever way.
+==================================== */
+
+const EMP_FILTERS = [
+    { key: "Dept",        label: "Department"  },
+    { key: "Designation", label: "Designation" },
+    { key: "Status",      label: "Status"      },
+    { key: "State",       label: "State"       },
+    { key: "Division",    label: "Division",    multi: true },
+    { key: "District",    label: "District",    multi: true },
+    { key: "Location",    label: "Location"    }
+];
+const EMP_BLANK = "__blank__";
+
+let empFilter = {};                    // key -> chosen value
+let empSort   = { key: "", dir: 1 };   // key "" = the order records came in
+
+function empValues(emp, key) {
+    if (key === "Status") return [isActiveEmployee(emp) ? "Active" : "Inactive"];
+    if (EMP_FILTERS.some(f => f.key === key && f.multi) || key === "Block") return splitMulti(emp[key]);
+    const v = String(emp[key] || "").trim();
+    return v ? [v] : [];
+}
+
+function empMatchesFilters(emp, except) {
+    return EMP_FILTERS.every(f => {
+        const want = empFilter[f.key];
+        if (!want || f.key === except) return true;
+        const have = empValues(emp, f.key);
+        return want === EMP_BLANK ? have.length === 0 : have.includes(want);
+    });
+}
+
+/* Each drop-down offers what is left once every OTHER filter has been
+   applied, so the lists narrow as you choose: pick a state and the divisions
+   and districts are only that state's. A drop-down leaves its own choice out
+   of its own pool, so it can still be changed. Each option carries how many
+   people it would show. */
+function empPool(key) {
+    const seen = new Map();
+    let blank = 0;
+    employees.forEach(emp => {
+        if (!empMatchesFilters(emp, key)) return;
+        const vals = empValues(emp, key);
+        if (!vals.length) blank++;
+        vals.forEach(v => seen.set(v, (seen.get(v) || 0) + 1));
+    });
+    return { seen, blank };
+}
+
+function buildEmpFilters() {
+    const box = document.getElementById("empFilters");
+    if (!box) return;
+
+    // A choice that another filter has since made impossible is dropped, and
+    // that can in turn empty another, so go round until nothing changes.
+    for (let again = true, n = 0; again && n < EMP_FILTERS.length + 1; n++) {
+        again = false;
+        EMP_FILTERS.forEach(f => {
+            const want = empFilter[f.key];
+            if (!want) return;
+            const { seen, blank } = empPool(f.key);
+            if (want === EMP_BLANK ? !blank : !seen.has(want)) { delete empFilter[f.key]; again = true; }
+        });
+    }
+
+    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+    box.innerHTML = EMP_FILTERS.map(f => {
+        const { seen, blank } = empPool(f.key);
+        const chosen = empFilter[f.key] || "";
+        const options = [...seen.keys()].sort(collator.compare);
+
+        return `<div class="emp-filter${chosen ? " is-set" : ""}">
+            <label for="empf-${f.key}">${f.label}</label>
+            <select id="empf-${f.key}" data-filter="${f.key}">
+                <option value="">All</option>
+                ${blank ? `<option value="${EMP_BLANK}"${chosen === EMP_BLANK ? " selected" : ""}>(blank) · ${blank}</option>` : ""}
+                ${options.map(v => `<option value="${escHtml(v)}"${v === chosen ? " selected" : ""}>${escHtml(v)} · ${seen.get(v)}</option>`).join("")}
+            </select>
+        </div>`;
+    }).join("");
+
+    syncEmpFilterBar();
+}
+
+let empFiltersOpen = false;
+
+/* The panel, its button and the chips of what is applied, kept in step. The
+   chips stay up while the panel is shut, so nothing is filtered out of sight. */
+function syncEmpFilterBar() {
+    const box   = document.getElementById("empFilters");
+    const btn   = document.getElementById("empFiltersBtn");
+    const count = document.getElementById("empFiltersCount");
+    const chips = document.getElementById("empChips");
+    const keys  = Object.keys(empFilter);
+
+    if (box) box.hidden = !empFiltersOpen;
+    if (btn) btn.setAttribute("aria-expanded", String(!!box && !box.hidden));
+    if (count) { count.hidden = !keys.length; count.textContent = keys.length; }
+
+    if (chips) {
+        chips.hidden = !keys.length;
+        chips.innerHTML = keys.map(k => {
+            const f = EMP_FILTERS.find(x => x.key === k);
+            const v = empFilter[k] === EMP_BLANK ? "(blank)" : empFilter[k];
+            return `<span class="emp-chip"><i>${f.label}:</i> ${escHtml(v)}
+                <button type="button" data-drop-filter="${k}" title="Remove" aria-label="Remove ${f.label} filter">✕</button></span>`;
+        }).join("") + (keys.length > 1
+            ? `<button type="button" class="emp-filter-clear" data-clear-filters>Clear all</button>` : "");
+    }
+}
+
+function empSortValue(emp, key) {
+    if (key === "__id") return emp.id;
+    if (key === "Status") return isActiveEmployee(emp) ? "Active" : "Inactive";
+    if (MULTI_VALUE_FIELDS[key]) return splitMulti(emp[key]).join("; ");
+    return String(emp[key] || "").trim();
+}
+
+function sortEmployees(list) {
+    if (!empSort.key) return list;
+    const { key, dir } = empSort;
+    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+    return list.slice().sort((a, b) => {
+        const x = empSortValue(a, key), y = empSortValue(b, key);
+        if (!x && !y) return 0;
+        if (!x) return 1;
+        if (!y) return -1;
+        return dir * collator.compare(x, y);
+    });
+}
+
+function onEmpHeadClick(e) {
+    const th = e.target.closest("th[data-sort]");
+    if (!th) return;
+    const key = th.dataset.sort;
+    if (empSort.key !== key)      empSort = { key, dir: 1 };
+    else if (empSort.dir === 1)   empSort = { key, dir: -1 };
+    else                          empSort = { key: "", dir: 1 };
+    renderEmployees();
+}
+
+function onEmpFilterChange(e) {
+    const sel = e.target.closest("select[data-filter]");
+    if (!sel) return;
+    if (sel.value) empFilter[sel.dataset.filter] = sel.value;
+    else delete empFilter[sel.dataset.filter];
+    buildEmpFilters();
+    renderEmployees();
+}
+
+function onEmpFilterClick(e) {
+    const drop = e.target.closest("[data-drop-filter]");
+    if (drop) delete empFilter[drop.dataset.dropFilter];
+    else if (e.target.closest("[data-clear-filters]")) empFilter = {};
+    else return;
+    buildEmpFilters();
+    renderEmployees();
+}
+
+function onEmpFiltersToggle() {
+    empFiltersOpen = !empFiltersOpen;
+    syncEmpFilterBar();
+}
+
+function sortableTh(key, label, cls) {
+    const on = empSort.key === key;
+    const mark = on ? (empSort.dir === 1 ? "▲" : "▼") : "⇅";
+    return `<th class="${cls} is-sortable${on ? " is-sorted" : ""}" data-sort="${key}"
+        aria-sort="${on ? (empSort.dir === 1 ? "ascending" : "descending") : "none"}"
+        title="Sort by ${label}">${label}<span class="sort-mark">${mark}</span></th>`;
+}
+
 function renderEmployees() {
     const searchBox = document.getElementById("searchBox");
     const tableHead = document.getElementById("tableHead");
@@ -1714,9 +2000,15 @@ function renderEmployees() {
     if (!tableHead || !tableEl) return;
 
     const search   = searchBox?.value.trim().toLowerCase() || "";
-    const filtered = employees.filter(emp => JSON.stringify(emp).toLowerCase().includes(search));
+    const filtered = sortEmployees(employees.filter(emp =>
+        empMatchesFilters(emp) && JSON.stringify(emp).toLowerCase().includes(search)));
 
-    if (metaEl) metaEl.textContent = `${filtered.length} record${filtered.length !== 1 ? "s" : ""}`;
+    if (metaEl) {
+        const narrowed = search || Object.keys(empFilter).length;
+        metaEl.textContent = narrowed
+            ? `${filtered.length} of ${employees.length} records`
+            : `${filtered.length} record${filtered.length !== 1 ? "s" : ""}`;
+    }
 
     const tableCols = getTableColumns();
     const colCount  = tableCols.length + 1 + (currentRole === "Admin" ? 1 : 0);
@@ -1724,11 +2016,10 @@ function renderEmployees() {
     tableHead.innerHTML = `
         <tr>
             ${currentRole === "Admin" ? `<th class="col-actions">Actions</th>` : ""}
-            <th class="col-id">ID</th>
+            ${sortableTh("__id", "ID", "col-id")}
             ${tableCols.map(key => {
                 const field = schemaFields.find(f => f.key === key);
-                const label = field ? field.label : key;
-                return `<th class="${colClass(key)}">${label}</th>`;
+                return sortableTh(key, field ? field.label : key, colClass(key));
             }).join("")}
         </tr>
     `;
@@ -1738,7 +2029,7 @@ function renderEmployees() {
             <tr><td colspan="${colCount}">
                 <div class="empty-state">
                     <div class="empty-icon">🔍</div>
-                    No employees match your search.
+                    No employees match your search or filters.
                 </div>
             </td></tr>
         `;
