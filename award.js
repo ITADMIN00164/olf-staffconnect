@@ -2395,7 +2395,7 @@ window.AWARD_CONFIG = {
 
     fillSelect(el.filterState, Object.keys(states).sort(), "All states",
       function (name) { return name; },
-      function (name) { return states[name] ? name + " (" + states[name] + ")" : name; });
+      function (name) { return name; });
 
     fillSelect(el.filterDivision, Object.keys(divisions).sort(), "All divisions",
       function (name) { return name; }, function (name) { return name; });
