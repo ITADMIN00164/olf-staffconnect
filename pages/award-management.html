@@ -178,8 +178,8 @@
 
       <div id="aw-subpanel-stock" class="aw-subpanel" role="tabpanel"
            aria-labelledby="aw-subtab-stock" hidden>
-        <section class="card">
-
+        <section class="card" id="stock-host">
+          <div id="stock-sheet">
           <div class="stock-controls">
             <div class="field field-sm">
               <label for="stock-year">Year</label>
@@ -221,13 +221,29 @@
           <div class="stock-summary" id="stock-summary" hidden></div>
 
           <div class="table-scroll" id="stock-table-wrap"></div>
+          </div>
         </section>
       </div>
 
       <div id="aw-subpanel-jute" class="aw-subpanel" role="tabpanel"
            aria-labelledby="aw-subtab-jute" hidden>
         <section class="card">
-          <div id="jute-summary"></div>
+          <div class="jute-bar">
+            <div class="seg" role="tablist" aria-label="Jute bags view">
+              <button type="button" role="tab" class="seg-btn is-active" data-jute-view="stock" aria-selected="true">Stock</button>
+              <button type="button" role="tab" class="seg-btn" data-jute-view="requests" aria-selected="false">By requisition</button>
+              <button type="button" role="tab" class="seg-btn" data-jute-view="districts" aria-selected="false">By district</button>
+            </div>
+            <button type="button" id="jute-download" class="btn btn-ghost btn-sm" hidden>
+              <i class="aw-icon" data-aw-icon="download" aria-hidden="true"></i>Download
+            </button>
+          </div>
+
+          <!-- The stock sheet is moved in here, counting jute bags. -->
+          <div id="jute-view-stock"></div>
+
+          <div id="jute-view-data" hidden>
+            <div id="jute-summary"></div>
 
           <div class="filters">
             <div class="field field-sm">
@@ -246,16 +262,6 @@
                 <option value="Big">Big</option>
               </select>
             </div>
-          </div>
-
-          <div class="jute-bar">
-            <div class="seg" role="tablist" aria-label="Jute bags view">
-              <button type="button" role="tab" class="seg-btn is-active" data-jute-view="requests" aria-selected="true">By requisition</button>
-              <button type="button" role="tab" class="seg-btn" data-jute-view="districts" aria-selected="false">By district</button>
-            </div>
-            <button type="button" id="jute-download" class="btn btn-ghost btn-sm">
-              <i class="aw-icon" data-aw-icon="download" aria-hidden="true"></i>Download
-            </button>
           </div>
 
           <div id="jute-view-requests">
@@ -297,6 +303,7 @@
                 <tbody id="jute-district-body"></tbody>
               </table>
             </div>
+          </div>
           </div>
         </section>
       </div>

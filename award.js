@@ -730,7 +730,8 @@ window.AWARD_CONFIG = {
     if (!el.form) return;        // the tab is not on screen
 
     awardViewStarted = false;      // a fresh page has a fresh Award Management view
-    juteView = "requests";
+    juteView = "stock";
+    stockScope = "awards";
 
     allRequisitions = [];
     returnFocusTo = null;          // the node it pointed at is gone
@@ -801,6 +802,10 @@ window.AWARD_CONFIG = {
        sat in the corner saying "3 items" about something that was not on
        screen. */
     if (el.rowPill) el.rowPill.hidden = name !== "requisition";
+
+    // One sheet, two tabs: it goes where it is wanted, counting what that tab is about.
+    if (name === "jute") showJuteView(juteView);
+    else if (name === "stock") attachSheet("awards");
   }
 
   function wireTabList(buttons, attr) {
@@ -1169,12 +1174,12 @@ window.AWARD_CONFIG = {
     el.hoLinesField.hidden = !sending;
     if (sending) {
       var asked = quantitiesOf(row, "items");
-      el.hoLines.innerHTML = awardTypes.filter(function (t) {
+      el.hoLines.innerHTML = allTypes().filter(function (t) {
         return asked[t.id];
       }).map(function (t) {
-        return '<div class="stock-line"><label>' + escapeHtml(levelLabel(t.name, t.code)) +
+        return '<div class="stock-line"><label>' + escapeHtml(typeLabel(t)) +
                ' <span class="hint">asked for ' + escapeHtml(asked[t.id]) +
-               escapeHtml(askedSplit(row, t.id)) + '</span></label>' +
+               escapeHtml(isJuteType(t) ? "" : askedSplit(row, t.id)) + '</span></label>' +
                '<input type="number" class="mono ho-qty" data-type="' + escapeHtml(t.id) +
                '" min="0" max="1000000" step="1" value="' + escapeHtml(asked[t.id]) + '" /></div>';
       }).join("");
@@ -1292,7 +1297,7 @@ window.AWARD_CONFIG = {
         }
         if (n < asked) short = true;
         if (n > 0) {
-          var type = awardTypes.filter(function (t) { return Number(t.id) === id; })[0] || {};
+          var type = allTypes().filter(function (t) { return Number(t.id) === id; })[0] || {};
           going.push({ award_type_id: id, code: type.code || null,
                        name: type.name || null, quantity: n });
         }
@@ -1899,7 +1904,7 @@ window.AWARD_CONFIG = {
     }
 
     var monthKey = monthKeyOf(new Date());
-    var held = balanceOn(district, fyStartOf(new Date()), monthKey);
+    var held = balanceOn(district, fyStartOf(new Date()), monthKey, mainIds());
 
     el.reqStock.className = "req-stock";
     el.reqStock.innerHTML =
@@ -1952,8 +1957,45 @@ window.AWARD_CONFIG = {
       });
   }
 
-  /* The award types, kept so a line can be built whenever one is added. */
+  /* The award types, kept so a line can be built whenever one is added.
+     awardTypes is the four awards the stock sheet counts. Jute bags are two
+     more types in the same table - Small and Big - but they are kept apart:
+     they have a sheet of their own, and never count towards the awards. */
   var awardTypes = [];
+  var juteTypes = [];            // present once sql/award-jute-types.sql has been run
+  var stockScope = "awards";     // which sheet the stock view is showing: "awards" or "jute"
+
+  function isJuteType(t) { return /^JUTE_/i.test(String((t && t.code) || "")); }
+  function allTypes() { return awardTypes.concat(juteTypes); }
+  function stockTypes() { return stockScope === "jute" ? juteTypes : awardTypes; }
+  function mainIds() { return awardTypes.map(function (t) { return t.id; }); }
+  function scopeIds() { return stockTypes().map(function (t) { return t.id; }); }
+  function scopeHas(id) {
+    return scopeIds().some(function (i) { return Number(i) === Number(id); });
+  }
+  function juteSizeOfCode(code) {
+    var c = String(code || "").toUpperCase();
+    return c === "JUTE_SMALL" ? "Small" : c === "JUTE_BIG" ? "Big" : "";
+  }
+  function juteTypeFor(size) {
+    var code = size === "Big" ? "JUTE_BIG" : size === "Small" ? "JUTE_SMALL" : "";
+    for (var i = 0; i < juteTypes.length; i++) {
+      if (String(juteTypes[i].code).toUpperCase() === code) return juteTypes[i];
+    }
+    return null;
+  }
+  function juteTypeId(size) { var t = juteTypeFor(size); return t ? t.id : null; }
+  // What a type is called where the level alone is not enough: a jute bag by its size.
+  function typeLabel(t) {
+    var label = levelLabel(t.name, t.code);
+    return isJuteType(t) ? label + " · " + juteSizeOfCode(t.code) : label;
+  }
+  // The part of a map of quantities that belongs to the sheet being shown.
+  function inScope(map) {
+    var out = {};
+    Object.keys(map).forEach(function (k) { if (scopeHas(k)) out[k] = map[k]; });
+    return out;
+  }
 
   function awardLineHtml() {
     var opts = '<option value="">Select level</option>';
@@ -2001,8 +2043,9 @@ window.AWARD_CONFIG = {
 
   function typeById(id) {
     if (String(id) === "jute") return JUTE;
-    for (var i = 0; i < awardTypes.length; i++) {
-      if (String(awardTypes[i].id) === String(id)) return awardTypes[i];
+    var every = allTypes();
+    for (var i = 0; i < every.length; i++) {
+      if (String(every[i].id) === String(id)) return every[i];
     }
     return null;
   }
@@ -2145,8 +2188,12 @@ window.AWARD_CONFIG = {
           reportError("load award types", res.error);
           return;
         }
-        awardTypes = res.data || [];
+        var every = res.data || [];
+        awardTypes = every.filter(function (t) { return !isJuteType(t); });
+        juteTypes = every.filter(isJuteType);
         resetAwardLines();
+        // Requisitions filed before the jute types existed read their size from the line.
+        if (allRequisitions.length) renderRows();
       })
       .catch(function (err) {
         el.awardLines.innerHTML = '<p class="error">Could not load the levels.</p>';
@@ -2238,9 +2285,11 @@ window.AWARD_CONFIG = {
         if (!lineFault) lineFault = "The same level and category is on the requisition twice.";
       } else {
         seen[l.id + "|" + l.category + "|" + l.other.toLowerCase()] = true;
+        // A jute bag is one of two types, by size, once those exist; until then it has none.
+        var jt = l.id === "jute" ? juteTypeFor(l.category) : null;
         var item = {
-          award_type_id: l.id === "jute" ? null : Number(l.id),
-          code: l.type ? l.type.code : null,
+          award_type_id: l.id === "jute" ? (jt ? jt.id : null) : Number(l.id),
+          code: jt ? jt.code : (l.type ? l.type.code : null),
           name: l.type ? levelLabel(l.type.name, l.type.code) : null,
           quantity: n
         };
@@ -2529,18 +2578,54 @@ window.AWARD_CONFIG = {
   }
 
   var juteShown = [];            // the requisitions on screen, for the download
-  var juteView = "requests";     // or "districts"
+  var juteView = "stock";        // or "requests", "districts"
 
   function juteSizeOf(row, size) {
     return juteLinesOf(row).reduce(function (n, a) { return a.category === size ? n + a.quantity : n; }, 0);
   }
 
+  /* ------------------------------------------------------- the jute sheet
+
+     Jute bags are counted on the same sheet as the awards - requisition,
+     delivery, utilisation, balance, by month and district - only in two
+     columns, Small and Big. It is the same sheet, so there is one of it: when
+     the Jute Bags tab is opened the sheet is moved there and told to count
+     jute bags; when the Stock tab is opened it is moved back. Everything that
+     can be done on the stock sheet can be done on this one. */
+  function attachSheet(scope) {
+    var sheet = document.getElementById("stock-sheet");
+    var host = document.getElementById(scope === "jute" ? "jute-view-stock" : "stock-host");
+    if (!sheet || !host) return;
+
+    var changed = stockScope !== scope;
+    stockScope = scope;
+    if (sheet.parentNode !== host) host.appendChild(sheet);
+    sheet.classList.toggle("is-jute", scope === "jute");
+
+    if (changed) {
+      stockShown = false;           // the other sheet's figures are not this one's
+      discardStockEdits();
+      refreshStockControls();
+      renderStock();
+    }
+  }
+
   function showJuteView(which) {
     juteView = which;
+    var stock = which === "stock";
+
+    if (stock) attachSheet("jute");
+
+    var map = { stock: "jute-view-stock", data: "jute-view-data" };
+    document.getElementById(map.stock).hidden = !stock;
+    document.getElementById(map.data).hidden = stock;
     var a = document.getElementById("jute-view-requests");
     var b = document.getElementById("jute-view-districts");
     if (a) a.hidden = which !== "requests";
     if (b) b.hidden = which !== "districts";
+    var dl = document.getElementById("jute-download");
+    if (dl) dl.hidden = which !== "requests";
+
     Array.prototype.forEach.call(document.querySelectorAll("[data-jute-view]"), function (btn) {
       var on = btn.getAttribute("data-jute-view") === which;
       btn.classList.toggle("is-active", on);
@@ -2850,7 +2935,7 @@ window.AWARD_CONFIG = {
     box.innerHTML =
       '<div class="snow-head"><h4>Current stock balance</h4></div>' +
       '<div class="snow-grid">' +
-        card("All levels", total, true) +
+        card(stockScope === "jute" ? "All sizes" : "All levels", total, true) +
         types.map(function (t) {
           return card(shortType(t), { held: held[t.id] || 0, start: start[t.id] || 0,
                                       came: came[t.id] || 0, used: used[t.id] || 0 }, false);
@@ -3003,8 +3088,9 @@ window.AWARD_CONFIG = {
      before that asked for one award and are read from the join. */
   function awardsOf(row) {
     var typeOf = function (id) {
-      for (var i = 0; i < awardTypes.length; i++) {
-        if (String(awardTypes[i].id) === String(id)) return awardTypes[i];
+      var every = allTypes();
+      for (var i = 0; i < every.length; i++) {
+        if (String(every[i].id) === String(id)) return every[i];
       }
       return null;
     };
@@ -3012,9 +3098,12 @@ window.AWARD_CONFIG = {
       var t = typeOf(id);
       var label = levelLabel(name || (t && t.name), code || (t && t.code));
       var has = levelHasCategory(label);
-      return { id: Number(id) || 0, name: label, quantity: quantity,
+      // A jute bag's size is in its type; one filed before the types existed has it on the line.
+      var size = label === "Jute Bag" ? (category || juteSizeOfCode(code || (t && t.code))) : "";
+      var typeId = Number(id) || (label === "Jute Bag" ? (juteTypeId(size) || 0) : 0);
+      return { id: typeId, name: label, quantity: quantity,
                hasCategory: has,
-               category: has ? (category || (label === "Jute Bag" ? "" : "POM")) : "",
+               category: has ? (label === "Jute Bag" ? size : (category || "POM")) : "",
                categoryOther: has && category === "Other" ? (other || "") : "" };
     };
 
@@ -3060,7 +3149,7 @@ window.AWARD_CONFIG = {
       var list = groups[id];
       var asked = list.reduce(function (n, a) { return n + a.quantity; }, 0);
       var went = sent ? (sent[id] || 0) : asked;
-      var short = !!sent && went < asked && list[0].name !== "Jute Bag";
+      var short = !!sent && went < asked && !(list[0].name === "Jute Bag" && !list[0].id);
 
       list.forEach(function (a) {
         var what = a.hasCategory
@@ -3117,7 +3206,8 @@ window.AWARD_CONFIG = {
   function deliveredOf(row) {
     if (stageOf(row) !== "received") return 0;
     var sent = quantitiesOf(row, "dispatched");
-    return Object.keys(sent).reduce(function (n, id) { return n + sent[id]; }, 0);
+    // The awards only: jute bags are not counted in delivered / asked.
+    return awardTypes.reduce(function (n, t) { return n + (sent[t.id] || 0); }, 0);
   }
 
   function quantityCellHtml(row) {
@@ -3386,6 +3476,10 @@ window.AWARD_CONFIG = {
     if (list && list.length) {
       list.forEach(function (it) {
         var id = Number(it.award_type_id);
+        // A jute line filed before the types existed has no id; its size says which it is.
+        if (!id && /jute/i.test(String(it.code || it.name || ""))) {
+          id = juteTypeId(it.category || juteSizeOfCode(it.code)) || 0;
+        }
         if (id) out[id] = (out[id] || 0) + (Number(it.quantity) || 0);
       });
     } else if (row.award_type_id) {
@@ -3413,7 +3507,7 @@ window.AWARD_CONFIG = {
     adjustment:  { column: "other",       sign: 1 }
   };
 
-  function stockEvents(requisitions, movements) {
+  function stockEvents(requisitions, movements, ids) {
     var events = [];
 
     (requisitions || []).forEach(function (row) {
@@ -3454,14 +3548,21 @@ window.AWARD_CONFIG = {
       });
     });
 
+    // One sheet counts its own types and no others.
+    var allow = {};
+    (ids || scopeIds()).forEach(function (i) { allow[i] = true; });
+    events.forEach(function (e) {
+      Object.keys(e.quantities).forEach(function (k) { if (!allow[k]) delete e.quantities[k]; });
+    });
+
     return events;
   }
 
   /* One block of rows per district: what it was holding when the year
      started, then every month of that year whether or not anything moved -
      a month with no activity still has to show the stock sitting there. */
-  function stockRows(fyStart, requisitions, movements, places) {
-    var events = stockEvents(requisitions, movements);
+  function stockRows(fyStart, requisitions, movements, places, ids) {
+    var events = stockEvents(requisitions, movements, ids);
     var months = fyMonthKeys(fyStart);
     var rows = [];
 
@@ -3677,6 +3778,11 @@ window.AWARD_CONFIG = {
     var summaryBox = document.getElementById("stock-summary");
     if (summaryBox) summaryBox.hidden = true;
 
+    if (stockScope === "jute" && !juteTypes.length) {
+      wrap.innerHTML = '<p class="aw-empty-line">Run <code>sql/award-jute-types.sql</code> in the Supabase SQL Editor to set this up.</p>';
+      return;
+    }
+
     if (!stockShown) {
       wrap.innerHTML =
         '<div class="stock-prompt">' +
@@ -3712,7 +3818,7 @@ window.AWARD_CONFIG = {
       return;
     }
 
-    var types = awardTypes;
+    var types = stockTypes();
     // Drawn with the unsaved edits in it, so every balance below one of them
     // follows along as it is typed.
     var rows = stockRows(fy, allRequisitions,
@@ -3863,6 +3969,8 @@ window.AWARD_CONFIG = {
     var code = String(t.code || "").toUpperCase();
     if (code === "POM_BLOCK") return "Block";
     if (code === "POM_DISTRICT") return "District";
+    if (code === "JUTE_SMALL") return "Small";
+    if (code === "JUTE_BIG") return "Big";
     return code || t.name;
   }
 
@@ -4452,7 +4560,7 @@ window.AWARD_CONFIG = {
     });
     if (!trouble) return "";
 
-    var type = awardTypes.filter(function (a) {
+    var type = allTypes().filter(function (a) {
       return Number(a.id) === trouble.bad.award_type_id;
     })[0] || {};
     return "Saving these would leave " + trouble.district + " holding " +
@@ -4563,7 +4671,7 @@ window.AWARD_CONFIG = {
     });
 
     if (trouble) {
-      var short = awardTypes.filter(function (a) {
+      var short = allTypes().filter(function (a) {
         return Number(a.id) === trouble.bad.award_type_id;
       })[0] || {};
       showStockEditError(
@@ -4662,8 +4770,10 @@ window.AWARD_CONFIG = {
       if (!raisedHere && !cameHere) return;
 
       var cells = none();
-      if (raisedHere) cells.requisition = quantitiesOf(row, "items");
-      if (cameHere) cells.delivery = quantitiesOf(row, "dispatched");
+      if (raisedHere) cells.requisition = inScope(quantitiesOf(row, "items"));
+      if (cameHere) cells.delivery = inScope(quantitiesOf(row, "dispatched"));
+      // Nothing of this requisition belongs to this sheet.
+      if (!sumOf(cells.requisition) && !sumOf(cells.delivery)) return;
 
       entries.push({
         sort: 0,
@@ -4674,7 +4784,7 @@ window.AWARD_CONFIG = {
         note: raisedHere ? stageLabel(row, false)
                          : "raised " + formatTimestamp(row.created_at),
         levels: raisedHere
-          ? awardsOf(row).map(function (a) {
+          ? awardsOf(row).filter(function (a) { return scopeHas(a.id); }).map(function (a) {
               return { label: awardChipLabel(a), qty: a.quantity };
             })
           : [],
@@ -4685,6 +4795,7 @@ window.AWARD_CONFIG = {
     // Utilisation and figures typed in stand on their own: no requisition
     // lies behind them.
     stockMovements.filter(mine).forEach(function (m) {
+      if (!scopeHas(m.award_type_id)) return;
       if (!inMonth(monthKeyOf(m.occurred_on))) return;
       var kind = MOVEMENT_KINDS[m.kind] || MOVEMENT_KINDS.adjustment;
       var cells = none();
@@ -4734,7 +4845,7 @@ window.AWARD_CONFIG = {
   function openBreakdown(district, monthKey) {
     var fy = Number(el.stockYear.value) || fyStartOf(new Date());
     var entries = monthBreakdown(district, monthKey, fy);
-    var types = awardTypes;
+    var types = stockTypes();
     var left = balanceOn(district, fy, monthKey);
 
     returnFocusTo = document.activeElement;
@@ -4874,10 +4985,10 @@ window.AWARD_CONFIG = {
     // What there is to give out, which is the ceiling for what is typed.
     var held = balanceOn(stockCtx.district, fy, monthKey);
 
-    el.stockLines.innerHTML = awardTypes.map(function (t) {
+    el.stockLines.innerHTML = stockTypes().map(function (t) {
       var have = held[t.id] || 0;
       return '<div class="stock-line' + (have ? "" : " is-empty") + '">' +
-             "<label>" + escapeHtml(levelLabel(t.name, t.code)) +
+             "<label>" + escapeHtml(typeLabel(t)) +
                '<span class="hint">' +
                  (have ? escapeHtml(have.toLocaleString()) + " in stock"
                        : "none in stock") +
@@ -4931,9 +5042,9 @@ window.AWARD_CONFIG = {
 
   /* What the district holds at the end of a month - or, for the empty month
      key, what it carried into the year. */
-  function balanceOn(district, fy, monthKey) {
+  function balanceOn(district, fy, monthKey, ids) {
     var rows = stockRows(fy, allRequisitions, stockMovements,
-                         [{ state: "", division: "", district: district, pm: "" }]);
+                         [{ state: "", division: "", district: district, pm: "" }], ids);
     for (var i = 0; i < rows.length; i++) {
       if (rows[i].monthKey === monthKey) return rows[i].balance;
     }
@@ -4982,8 +5093,8 @@ window.AWARD_CONFIG = {
     var fault = "";
 
     var nameOf = function (id) {
-      var t = awardTypes.filter(function (a) { return Number(a.id) === Number(id); })[0];
-      return (t && t.name) || "that award";
+      var t = allTypes().filter(function (a) { return Number(a.id) === Number(id); })[0];
+      return (t && typeLabel(t)) || "that award";
     };
 
     Array.prototype.forEach.call(el.stockLines.querySelectorAll(".stock-qty"),
@@ -5020,7 +5131,7 @@ window.AWARD_CONFIG = {
     // No correction may leave a later month holding less than nothing.
     var trouble = wouldGoNegative(stockCtx.district, stockCtx.fy, stockCtx.month, rows);
     if (trouble) {
-      var short = awardTypes.filter(function (a) {
+      var short = allTypes().filter(function (a) {
         return Number(a.id) === trouble.award_type_id;
       })[0] || {};
       setFieldError(null, "stock-qty-error",

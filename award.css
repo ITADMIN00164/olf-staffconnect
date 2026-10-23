@@ -1870,3 +1870,7 @@
 .award-page .js-track i { display: block; flex: 0 0 var(--w); transform-origin: left; animation: aw-grow .8s .1s cubic-bezier(.2,.8,.3,1) both; }
 .award-page .js-s { background: var(--accent-2); }
 .award-page .js-b { background: #64748B; border-left: 2px solid var(--surface); }
+
+/* The jute sheet is the stock sheet counting jute bags, so the awards' file
+   template and import, which are about the four awards, are not offered on it. */
+.award-page #stock-sheet.is-jute #stock-template, .award-page #stock-sheet.is-jute #stock-import { display: none !important; }
