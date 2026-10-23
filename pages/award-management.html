@@ -55,6 +55,12 @@
                 aria-selected="false" tabindex="-1">
           <i class="aw-icon" data-aw-icon="stock" aria-hidden="true"></i>Stock
         </button>
+        <button type="button" role="tab" id="aw-subtab-jute" class="aw-subtab"
+                data-aw-subtab="jute" aria-controls="aw-subpanel-jute"
+                aria-selected="false" tabindex="-1">
+          <i class="aw-icon" data-aw-icon="bag" aria-hidden="true"></i>Jute Bags
+          <span class="tab-count" id="jute-tab-count" hidden></span>
+        </button>
         <button type="button" role="tab" id="aw-subtab-settings" class="aw-subtab"
                 data-aw-subtab="settings" aria-controls="aw-subpanel-settings"
                 aria-selected="false" tabindex="-1" hidden>
@@ -215,6 +221,53 @@
           <div class="stock-summary" id="stock-summary" hidden></div>
 
           <div class="table-scroll" id="stock-table-wrap"></div>
+        </section>
+      </div>
+
+      <div id="aw-subpanel-jute" class="aw-subpanel" role="tabpanel"
+           aria-labelledby="aw-subtab-jute" hidden>
+        <section class="card">
+          <div id="jute-summary"></div>
+
+          <div class="filters">
+            <div class="field field-sm">
+              <label for="jute-district">Filter by district</label>
+              <select id="jute-district"><option value="">All districts</option></select>
+            </div>
+            <div class="field field-sm">
+              <label for="jute-status">Filter by status</label>
+              <select id="jute-status"><option value="">All statuses</option></select>
+            </div>
+            <div class="field field-sm">
+              <label for="jute-size">Filter by size</label>
+              <select id="jute-size">
+                <option value="">Small and Big</option>
+                <option value="Small">Small</option>
+                <option value="Big">Big</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="table-scroll">
+            <table id="jute-table">
+              <thead>
+                <tr>
+                  <th scope="col">District</th>
+                  <th scope="col">Requester</th>
+                  <th scope="col" class="num">Small</th>
+                  <th scope="col" class="num">Big</th>
+                  <th scope="col" class="num">Total</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Submitted</th>
+                  <th scope="col">Remark</th>
+                </tr>
+              </thead>
+              <tbody id="jute-body">
+                <tr class="placeholder-row"><td colspan="8">Loading…</td></tr>
+              </tbody>
+              <tfoot id="jute-foot" hidden></tfoot>
+            </table>
+          </div>
         </section>
       </div>
 

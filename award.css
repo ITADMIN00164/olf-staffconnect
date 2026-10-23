@@ -1852,3 +1852,9 @@
 .award-page .snow-card.is-total .snow-how { border-top-color: var(--accent-soft-border); }
 .award-page .snow-how li { display: flex; justify-content: space-between; font-size: .78rem; color: var(--text-muted); }
 .award-page .snow-how i { font-style: normal; font-family: var(--font-mono); font-weight: 700; color: var(--text-soft); }
+
+/* Jute bags tab. */
+.award-page .tab-count { margin-left: 7px; padding: 0 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink); font-size: .72rem; font-weight: 700; }
+.award-page .aw-subtab.is-active .tab-count { background: rgba(255,255,255,.22); color: #fff; }
+.award-page #jute-table .cell-remark { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-soft); }
+.award-page #jute-body tr { animation: aw-row .32s ease both; }

@@ -615,6 +615,9 @@ window.AWARD_CONFIG = {
     layers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
             'stroke-linecap="round" stroke-linejoin="round">' +
             '<path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/></svg>',
+    bag:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+           'stroke-linecap="round" stroke-linejoin="round">' +
+           '<path d="M5 8h14l-1 12H6L5 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>',
     chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
            'stroke-linecap="round" stroke-linejoin="round">' +
            '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>'
@@ -1047,7 +1050,7 @@ window.AWARD_CONFIG = {
      decided, so neither is shown to people they mean nothing to. Hidden
      rather than disabled: a tab you may never open is clutter. */
   function applyAccess() {
-    var show = { requisition: true, stock: true,
+    var show = { requisition: true, stock: true, jute: true,
                  delivery: isHoAdmin(), settings: canManageAdmins() };
 
     Array.prototype.forEach.call(el.subtabs, function (tab) {
@@ -1526,6 +1529,11 @@ window.AWARD_CONFIG = {
     el.form.dataset.awWired = "1";
 
     wireTabList(el.subtabs, "data-aw-subtab");
+
+    ["jute-district", "jute-status", "jute-size"].forEach(function (id) {
+      var sel = document.getElementById(id);
+      if (sel) sel.addEventListener("change", renderJute);
+    });
 
     Array.prototype.forEach.call(
       document.querySelectorAll(".award-page .aw-toptab"),
@@ -2499,6 +2507,103 @@ window.AWARD_CONFIG = {
   function renderRows() {
     renderTable();
     renderDelivery();
+    renderJute();
+  }
+
+  /* ------------------------------------------------------------- jute bags
+
+     Asked for on the same requisitions as everything else, but not an award:
+     they are not in the stock sheet and are never counted in it. So they have
+     a tab of their own, where they are counted by size instead. */
+
+  function juteLinesOf(row) {
+    return awardsOf(row).filter(function (a) { return a.name === "Jute Bag"; });
+  }
+
+  function renderJute() {
+    var body = document.getElementById("jute-body");
+    if (!body) return;
+    var summary = document.getElementById("jute-summary");
+    var foot = document.getElementById("jute-foot");
+    var count = document.getElementById("jute-tab-count");
+    var selDistrict = document.getElementById("jute-district");
+    var selStatus = document.getElementById("jute-status");
+    var selSize = document.getElementById("jute-size");
+
+    var all = allRequisitions.filter(function (r) { return juteLinesOf(r).length; });
+    if (count) { count.hidden = !all.length; count.textContent = all.length; }
+
+    var districts = {}, stages = {};
+    all.forEach(function (r) {
+      var p = placeOf(r);
+      if (p.district) districts[p.district] = true;
+      stages[stageOf(r)] = true;
+    });
+    fillSelect(selDistrict, Object.keys(districts).sort(), "All districts",
+      function (n) { return n; }, function (n) { return n; });
+    fillSelect(selStatus, Object.keys(STAGES).filter(function (k) { return stages[k]; }), "All statuses",
+      function (k) { return k; }, function (k) { return STAGES[k].label; });
+
+    var sizeOf = function (row, size) {
+      return juteLinesOf(row).reduce(function (n, a) { return a.category === size ? n + a.quantity : n; }, 0);
+    };
+    var totalOf = function (row) {
+      return juteLinesOf(row).reduce(function (n, a) { return n + a.quantity; }, 0);
+    };
+
+    var rows = all.filter(function (r) {
+      var p = placeOf(r);
+      if (selDistrict.value && p.district !== selDistrict.value) return false;
+      if (selStatus.value && stageOf(r) !== selStatus.value) return false;
+      if (selSize.value && !sizeOf(r, selSize.value)) return false;
+      return true;
+    });
+
+    var small = 0, big = 0, bags = 0;
+    rows.forEach(function (r) { small += sizeOf(r, "Small"); big += sizeOf(r, "Big"); bags += totalOf(r); });
+
+    summary.innerHTML = '<div class="kpis">' +
+      kpiHtml("bag", "total", bags, bags === 1 ? "Jute bag" : "Jute bags", "") +
+      kpiHtml("doc", "move", rows.length, rows.length === 1 ? "Requisition" : "Requisitions", "") +
+      kpiHtml("layers", "wait", small, "Small", "") +
+      kpiHtml("layers", "good", big, "Big", "") +
+      "</div>";
+    paintIcons();
+    runCounters(summary);
+
+    if (!all.length) {
+      body.innerHTML = '<tr class="placeholder-row"><td colspan="8">No jute bags asked for yet. ' +
+        "Choose Jute Bag under Levels when raising a requisition.</td></tr>";
+      foot.hidden = true;
+      return;
+    }
+    if (!rows.length) {
+      body.innerHTML = '<tr class="placeholder-row"><td colspan="8">No matches.</td></tr>';
+      foot.hidden = true;
+      return;
+    }
+
+    body.innerHTML = rows.map(function (r) {
+      var p = placeOf(r);
+      var s = sizeOf(r, "Small"), b = sizeOf(r, "Big");
+      var remark = remarkOf(r);
+      return "<tr>" +
+        "<td>" + escapeHtml(p.district || "—") + "</td>" +
+        "<td>" + escapeHtml(r.requester_name || "—") + "</td>" +
+        '<td class="num">' + (s ? escapeHtml(s.toLocaleString()) : "—") + "</td>" +
+        '<td class="num">' + (b ? escapeHtml(b.toLocaleString()) : "—") + "</td>" +
+        '<td class="num"><b>' + escapeHtml(totalOf(r).toLocaleString()) + "</b></td>" +
+        "<td>" + statusCellHtml(r) + "</td>" +
+        '<td class="cell-date muted">' + escapeHtml(formatTimestamp(r.created_at)) + "</td>" +
+        '<td class="cell-remark" title="' + escapeHtml(remark) + '">' + (remark ? escapeHtml(remark) : "—") + "</td>" +
+      "</tr>";
+    }).join("");
+
+    foot.innerHTML = "<tr><td colspan=\"2\">" + rows.length + (rows.length === 1 ? " requisition" : " requisitions") + "</td>" +
+      '<td class="num mono">' + small.toLocaleString() + "</td>" +
+      '<td class="num mono">' + big.toLocaleString() + "</td>" +
+      '<td class="num mono">' + bags.toLocaleString() + "</td><td colspan=\"3\"></td></tr>";
+    foot.hidden = false;
   }
 
   /* ------------------------------------------------------------- summaries
