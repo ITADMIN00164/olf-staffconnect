@@ -2656,16 +2656,16 @@ window.AWARD_CONFIG = {
           '<b class="snow-held' + (d.held < 0 ? " is-neg" : "") + '" data-count="' + d.held + '">' +
           d.held.toLocaleString() + "</b></div>" +
         '<ul class="snow-how">' +
-          line("Started with", d.start.toLocaleString()) +
-          line("Arrived", signed(d.came)) +
-          line("Given out", signed(-d.used)) +
-          (fix ? line("Corrected", signed(fix)) : "") +
+          line("Opening stock", d.start.toLocaleString()) +
+          line("Delivered", signed(d.came)) +
+          line("Utilised", signed(-d.used)) +
+          (fix ? line("Adjustments", signed(fix)) : "") +
         "</ul></div>";
     };
 
     box.innerHTML =
-      '<div class="snow-head"><h4>In stock now</h4>' +
-        "<span>started with + arrived − given out = in stock</span></div>" +
+      '<div class="snow-head"><h4>Current stock balance</h4>' +
+        "<span>Opening stock + Delivered − Utilised ± Adjustments = Balance</span></div>" +
       '<div class="snow-grid">' +
         card("All levels", total, true) +
         types.map(function (t) {
