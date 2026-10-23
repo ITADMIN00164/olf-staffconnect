@@ -1,2078 +1,2161 @@
-<!-- pages/team-performance.html -->
-<div id="tpRoot" class="tp-module">
-  <style>
-    /* Scoped Styles for Team Performance Module */
-    #tpRoot {
-      --tp-canvas: #E4EAF3;
-      --tp-surface: #FFFFFF;
-      --tp-surface-subtle: #F8FAFC;
-      --tp-ink: #0F172A;
-      --tp-ink-muted: #64748B;
-      --tp-border: #CBD5E1;
-      --tp-border-subtle: #E2E8F0;
-      --tp-brand: #4F8EF7;
-      --tp-brand-dark: #1E40AF;
-      --tp-teal: #0D9488;
-      --tp-teal-lt: #CCFBF1;
-      --tp-gold: #D97706;
-      --tp-gold-lt: #FEF3C7;
-      --tp-rose: #E11D48;
-      --tp-font: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-      font-family: var(--tp-font);
-      color: var(--tp-ink);
-      padding: 16px 20px 48px;
-      min-height: 100%;
-      background: var(--tp-canvas);
-    }
-
-    #tpRoot * {
-      box-sizing: border-box;
-    }
-
-    /* Top Header Bar */
-    .tp-header-top-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      width: 100%;
-      gap: 16px;
-    }
-    .tp-header-right {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .tp-header {
-      background: var(--tp-surface);
-      border-radius: 14px;
-      padding: 16px 20px;
-      border: 1px solid var(--tp-border-subtle);
-      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      margin-bottom: 14px;
-    }
-
-    .tp-title-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .tp-title {
-      font-size: 20px;
-      font-weight: 700;
-      margin: 0;
-      color: var(--tp-ink);
-      letter-spacing: -0.02em;
-    }
-
-    .tp-badge {
-      background: rgba(79, 142, 247, 0.12);
-      color: var(--tp-brand);
-      font-size: 11px;
-      font-weight: 600;
-      padding: 3px 10px;
-      border-radius: 20px;
-    }
-
-    .tp-subtitle {
-      font-size: 13px;
-      color: var(--tp-ink-muted);
-      margin: 3px 0 0;
-    }
-
-    .tp-header-controls {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 12px;
-    }
-
-    /* Segmented State Switcher */
-    .tp-segmented-control {
-      display: inline-flex;
-      background: #F1F5F9;
-      border-radius: 10px;
-      padding: 3px;
-      border: 1px solid var(--tp-border-subtle);
-    }
-
-    .tp-seg-btn {
-      border: none;
-      background: transparent;
-      padding: 6px 14px;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--tp-ink-muted);
-      border-radius: 8px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      transition: all 0.18s ease;
-    }
-
-    .tp-seg-btn.active {
-      background: var(--tp-surface);
-      color: var(--tp-brand-dark);
-      box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
-    }
-
-    /* Quick Search Input */
-    .tp-search-box {
-      position: relative;
-      display: flex;
-      align-items: center;
-    }
-
-    .tp-search-icon {
-      position: absolute;
-      left: 10px;
-      color: var(--tp-ink-muted);
-      pointer-events: none;
-    }
-
-    .tp-search-box input {
-      padding: 7px 32px 7px 32px;
-      font-size: 13px;
-      font-family: inherit;
-      border: 1px solid var(--tp-border);
-      border-radius: 9px;
-      background: var(--tp-surface);
-      width: 220px;
-      transition: border-color 0.16s, width 0.2s;
-    }
-
-    .tp-search-box input:focus {
-      outline: none;
-      border-color: var(--tp-brand);
-      width: 260px;
-      box-shadow: 0 0 0 3px rgba(79, 142, 247, 0.16);
-    }
-
-    .tp-search-clear {
-      position: absolute;
-      right: 8px;
-      background: none;
-      border: none;
-      font-size: 16px;
-      color: var(--tp-ink-muted);
-      cursor: pointer;
-      line-height: 1;
-    }
-
-    /* Buttons */
-    .tp-btn-group {
-      display: flex;
-      gap: 6px;
-    }
-
-    .tp-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 12px;
-      font-weight: 600;
-      font-family: inherit;
-      padding: 6px 12px;
-      border-radius: 8px;
-      border: 1px solid var(--tp-border);
-      cursor: pointer;
-      transition: all 0.16s;
-    }
-
-    .tp-btn-secondary {
-      background: var(--tp-surface);
-      color: var(--tp-ink);
-    }
-    .tp-btn-secondary:hover {
-      background: var(--tp-surface-subtle);
-      border-color: #94A3B8;
-    }
-
-    .tp-btn-primary {
-      background: var(--tp-brand);
-      color: #fff;
-      border-color: var(--tp-brand);
-    }
-    .tp-btn-primary:hover {
-      background: #3B82F6;
-    }
-
-    .tp-btn-success {
-      background: #10B981;
-      color: #fff;
-      border-color: #10B981;
-    }
-    .tp-btn-success:hover {
-      background: #059669;
-    }
-
-    .tp-btn-cancel {
-      background: #F1F5F9;
-      color: var(--tp-ink-muted);
-      border-color: var(--tp-border);
-    }
-    .tp-btn-cancel:hover {
-      background: #E2E8F0;
-      color: var(--tp-ink);
-    }
-
-    .tp-btn-subtle {
-      background: transparent;
-      color: var(--tp-rose);
-      border-color: transparent;
-    }
-    .tp-btn-subtle:hover {
-      background: rgba(225, 29, 72, 0.08);
-    }
-
-    .tp-btn-sm {
-      padding: 5px 10px;
-      font-size: 12px;
-    }
-
-    /* Division Filter Bar */
-    .tp-division-pills-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 16px;
-      overflow-x: auto;
-      padding-bottom: 4px;
-    }
-
-    .tp-filter-label {
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--tp-ink-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      white-space: nowrap;
-    }
-
-    .tp-pills-wrapper {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-
-    .tp-pill-btn {
-      background: var(--tp-surface);
-      border: 1px solid var(--tp-border);
-      color: var(--tp-ink);
-      font-size: 12px;
-      font-weight: 600;
-      padding: 5px 12px;
-      border-radius: 20px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      transition: all 0.15s ease;
-      white-space: nowrap;
-    }
-
-    .tp-pill-btn:hover {
-      border-color: var(--tp-brand);
-      color: var(--tp-brand);
-    }
-
-    .tp-pill-btn.active {
-      background: var(--tp-brand);
-      color: #fff;
-      border-color: var(--tp-brand);
-      box-shadow: 0 2px 6px rgba(79, 142, 247, 0.28);
-    }
-
-    .tp-pill-badge {
-      background: rgba(0, 0, 0, 0.08);
-      font-size: 10px;
-      padding: 1px 6px;
-      border-radius: 10px;
-    }
-
-    .tp-pill-btn.active .tp-pill-badge {
-      background: rgba(255, 255, 255, 0.25);
-      color: #fff;
-    }
-
-    /* Search summary */
-    .tp-search-summary {
-      background: #FEF3C7;
-      border: 1px solid #FDE68A;
-      color: #92400E;
-      font-size: 12px;
-      font-weight: 600;
-      padding: 8px 14px;
-      border-radius: 8px;
-      margin-bottom: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .tp-link-btn {
-      background: none;
-      border: none;
-      color: #B45309;
-      font-weight: 700;
-      text-decoration: underline;
-      cursor: pointer;
-    }
-
-    /* Viewport & Flow Canvas */
-    .tp-viewport {
-      background: radial-gradient(circle at 50% 0%, #FFFFFF 0%, #F1F5F9 100%);
-      border-radius: 16px;
-      border: 1px solid var(--tp-border);
-      overflow: auto;
-      padding: 36px 28px 64px;
-      min-height: 620px;
-      box-shadow: inset 0 2px 6px rgba(15, 23, 42, 0.04);
-      scroll-behavior: smooth;
-    }
-
-    .tp-canvas {
-      position: relative;
-      min-width: max-content;
-      margin: 0 auto;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      width: 100%;
-    }
-
-    .tp-connectors-svg {
-      position: absolute;
-      top: 0;
-      left: 0;
-      pointer-events: none;
-      overflow: visible;
-      z-index: 1;
-    }
-
-    .tp-connector-trunk {
-      stroke: #94A3B8;
-      stroke-width: 2.5px;
-      stroke-dasharray: 4, 3;
-      transition: all 0.2s ease;
-    }
-
-    .tp-connector-hub {
-      fill: #0D9488;
-      stroke: #FFFFFF;
-      stroke-width: 2px;
-      filter: drop-shadow(0 2px 5px rgba(13, 148, 136, 0.4));
-    }
-
-    .tp-connector-branch {
-      stroke: #94A3B8;
-      stroke-width: 2px;
-      stroke-dasharray: 4, 3;
-      stroke-linejoin: round;
-      stroke-linecap: round;
-      transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    .tp-connector-branch.highlighted {
-      stroke: #0D9488 !important;
-      stroke-width: 3.5px !important;
-      stroke-dasharray: none !important;
-      filter: drop-shadow(0 0 8px rgba(13, 148, 136, 0.6)) !important;
-    }
-
-    .tp-connector-anchor {
-      fill: #0D9488;
-      stroke: #FFFFFF;
-      stroke-width: 2px;
-      transition: all 0.2s ease;
-    }
-
-    .tp-connector-anchor.highlighted {
-      r: 5px;
-      fill: #0F766E;
-      stroke-width: 2.5px;
-    }
-
-    .tp-connector-root-pip {
-      fill: #F59E0B;
-      stroke: #FFFFFF;
-      stroke-width: 2px;
-    }
-
-    .tp-tree-container {
-      position: relative;
-      z-index: 2;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      width: 100%;
-    }
-
-    /* Node Card Base */
-    .tp-card {
-      background: #FFFFFF;
-      border-radius: 14px;
-      border: 1px solid #E2E8F0;
-      box-shadow: 0 4px 14px -2px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.03);
-      padding: 16px 18px;
-      transition: all 0.24s cubic-bezier(0.34, 1.56, 0.64, 1);
-      position: relative;
-    }
-
-    .tp-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 16px 32px -6px rgba(15, 23, 42, 0.12), 0 4px 12px rgba(15, 23, 42, 0.04);
-      border-color: #94A3B8;
-    }
-
-    .tp-card-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-
-    .tp-tag {
-      font-size: 10px;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      padding: 3px 9px;
-      border-radius: 6px;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .tp-tag-gold {
-      background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
-      color: #92400E;
-      border: 1px solid #FCD34D;
-      border-radius: 20px;
-    }
-
-    .tp-tag-teal {
-      background: #CCFBF1;
-      color: #0F766E;
-      border: 1px solid #99F6E4;
-    }
-
-    .tp-tag-blue {
-      background: #EFF6FF;
-      color: #1D4ED8;
-      border: 1px solid #BFDBFE;
-    }
-
-    /* Direct Details Button on Card */
-    .tp-card-details-btn {
-      background: #EFF6FF;
-      border: 1px solid #BFDBFE;
-      color: #1D4ED8;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 4px 10px;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .tp-card-details-btn:hover {
-      background: #2563EB;
-      color: #FFFFFF;
-      border-color: #2563EB;
-      transform: translateX(2px);
-      box-shadow: 0 4px 10px rgba(37, 99, 235, 0.28);
-    }
-
-    .tp-card-name {
-      font-size: 16px;
-      font-weight: 800;
-      color: var(--tp-ink);
-      line-height: 1.3;
-      letter-spacing: -0.01em;
-    }
-
-    .tp-card-sub {
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--tp-ink-muted);
-      margin-top: 3px;
-    }
-
-    /* Root Node (State Lead) */
-    .tp-row-root {
-      margin-bottom: 56px;
-      display: flex;
-      justify-content: center;
-      position: relative;
-    }
-
-    .tp-card-root {
-      width: 420px;
-      background: linear-gradient(180deg, #FFFFFF 0%, #FAFCFF 100%);
-      border: 1px solid #CBD5E1;
-      border-top: 5px solid #F59E0B;
-      border-radius: 16px;
-      padding: 18px 22px;
-      box-shadow: 0 6px 20px -4px rgba(245, 158, 11, 0.12), 0 2px 8px -2px rgba(15, 23, 42, 0.04);
-      transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-    }
-
-    .tp-card-root:hover {
-      transform: translateY(-5px);
-      border-color: #F59E0B;
-      box-shadow: 0 20px 40px -8px rgba(245, 158, 11, 0.24), 0 6px 16px rgba(15, 23, 42, 0.06);
-    }
-
-    .tp-card-root .tp-card-name {
-      font-size: 17px;
-      font-weight: 800;
-      color: #0F172A;
-    }
-
-    .tp-card-stats {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
-      margin-top: 14px;
-      padding: 10px 8px;
-      background: #F8FAFC;
-      border-radius: 12px;
-      border: 1px solid #E2E8F0;
-    }
-
-    .tp-stat-item {
-      text-align: center;
-    }
-
-    .tp-stat-item strong {
-      display: block;
-      font-size: 16px;
-      font-weight: 800;
-      color: #1E40AF;
-    }
-
-    .tp-stat-item span {
-      font-size: 10px;
-      font-weight: 700;
-      color: #64748B;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-
-    /* Divisions Row (Collapsible Level 1) */
-    .tp-divisions-row {
-      display: flex;
-      justify-content: center;
-      gap: 20px;
-      width: 100%;
-      flex-wrap: wrap;
-      margin-bottom: 36px;
-    }
-
-    .tp-card-div {
-      width: 256px;
-      background: linear-gradient(180deg, #FFFFFF 0%, #FAFCFF 100%);
-      border: 1px solid #E2E8F0;
-      border-top: 4px solid #0D9488;
-      border-radius: 14px;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      box-shadow: 0 4px 14px -2px rgba(15, 23, 42, 0.05);
-      transition: all 0.24s cubic-bezier(0.34, 1.56, 0.64, 1);
-      position: relative;
-    }
-
-    .tp-card-div:hover {
-      transform: translateY(-5px);
-      border-color: #0D9488;
-      box-shadow: 0 18px 36px -6px rgba(13, 148, 136, 0.22), 0 4px 12px rgba(0, 0, 0, 0.04);
-    }
-
-    .tp-card-div.tp-expanded-card {
-      border: 2px solid #0D9488;
-      border-top: 4px solid #0D9488;
-      box-shadow: 0 10px 28px -4px rgba(13, 148, 136, 0.25);
-      background: linear-gradient(180deg, #F0FDFA 0%, #FFFFFF 100%);
-    }
-
-    .tp-card-div .tp-card-name {
-      font-size: 15px;
-      font-weight: 800;
-      color: #0F172A;
-      margin-top: 4px;
-    }
-
-    .tp-card-div .tp-card-sub {
-      font-size: 12px;
-      font-weight: 600;
-      color: #475569;
-      margin-top: 3px;
-    }
-
-    .tp-card-meta {
-      margin-top: 12px;
-      margin-bottom: 12px;
-      font-size: 11px;
-      color: #475569;
-      font-weight: 600;
-      background: #F1F5F9;
-      padding: 5px 10px;
-      border-radius: 8px;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .tp-card-footer-actions {
-      margin-top: auto;
-      padding-top: 12px;
-      border-top: 1px solid var(--tp-border-subtle);
-    }
-
-    .tp-toggle-team-btn {
-      background: #FFFFFF;
-      border: 1px solid #CBD5E1;
-      color: #334155;
-      font-weight: 700;
-      font-size: 12px;
-      border-radius: 8px;
-      padding: 7px 12px;
-      cursor: pointer;
-      width: 100%;
-      transition: all 0.18s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-    }
-
-    .tp-toggle-team-btn:hover {
-      background: #0D9488;
-      color: #FFFFFF;
-      border-color: #0D9488;
-      box-shadow: 0 4px 12px rgba(13, 148, 136, 0.28);
-    }
-
-    .tp-toggle-team-btn.active {
-      background: #0F766E;
-      color: #FFFFFF;
-      border-color: #0F766E;
-    }
-
-    /* Expanded Division Details Panel */
-    .tp-expanded-divisions-container {
-      display: flex;
-      flex-direction: column;
-      gap: 36px;
-      width: 100%;
-      margin-top: 10px;
-    }
-
-    .tp-division-expanded-panel {
-      background: #FFFFFF;
-      border: 1px solid var(--tp-border);
-      border-radius: 16px;
-      padding: 24px 20px 32px;
-      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
-      width: 100%;
-      overflow-x: auto;
-    }
-
-    .tp-panel-banner {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      border-bottom: 2px solid #F1F5F9;
-      padding-bottom: 16px;
-      margin-bottom: 24px;
-    }
-
-    .tp-panel-badge {
-      display: inline-block;
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      background: var(--tp-teal-lt);
-      color: var(--tp-teal);
-      padding: 2px 8px;
-      border-radius: 4px;
-      margin-bottom: 4px;
-    }
-
-    .tp-panel-title {
-      margin: 0;
-      font-size: 18px;
-      font-weight: 800;
-      color: var(--tp-ink);
-    }
-
-    .tp-panel-lead {
-      font-size: 13px;
-      color: var(--tp-ink-muted);
-      margin-top: 3px;
-      display: block;
-    }
-
-    .tp-panel-banner-right {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-
-    /* Program Manager Row & Columns - Center Aligned */
-    .tp-pm-row {
-      display: flex;
-      gap: 24px;
-      align-items: flex-start;
-      justify-content: center;
-      min-width: 100%;
-      width: max-content;
-      margin: 0 auto;
-      box-sizing: border-box;
-    }
-
-    .tp-pm-col {
-      width: 220px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 16px;
-      flex-shrink: 0;
-    }
-
-    .tp-card-pm {
-      width: 100%;
-      border-top: 3px solid var(--tp-brand);
-    }
-
-    .tp-badge-sm-tag {
-      margin-top: 8px;
-      display: inline-block;
-      background: #F1F5F9;
-      color: #475569;
-      font-size: 10px;
-      font-weight: 700;
-      padding: 2px 6px;
-      border-radius: 4px;
-    }
-
-    /* Districts & PO Cards */
-    .tp-districts-list {
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .tp-district-card {
-      background: var(--tp-surface);
-      border-radius: 9px;
-      border: 1px solid var(--tp-border);
-      overflow: hidden;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-      transition: border-color 0.15s, box-shadow 0.15s;
-    }
-
-    .tp-district-card:hover {
-      border-color: #94A3B8;
-      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.06);
-    }
-
-    .tp-district-header {
-      padding: 8px 12px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: #F8FAFC;
-      border-bottom: 1px solid var(--tp-border-subtle);
-    }
-
-    .tp-dist-pip {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--tp-brand);
-    }
-
-    .tp-dist-title {
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--tp-ink);
-      flex: 1;
-    }
-
-    .tp-row-details-btn {
-      background: none;
-      border: none;
-      color: var(--tp-brand);
-      font-size: 11px;
-      font-weight: 700;
-      cursor: pointer;
-      padding: 2px 4px;
-      border-radius: 4px;
-      transition: background 0.12s;
-    }
-
-    .tp-row-details-btn:hover {
-      background: rgba(79, 142, 247, 0.12);
-      text-decoration: underline;
-    }
-
-    .tp-pos-list {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .tp-po-row {
-      padding: 7px 12px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12px;
-      color: var(--tp-ink);
-      border-bottom: 1px solid #F1F5F9;
-      transition: background 0.15s;
-    }
-
-    .tp-po-row:last-child {
-      border-bottom: none;
-    }
-
-    .tp-po-row:hover {
-      background: #EFF6FF;
-      color: var(--tp-brand-dark);
-    }
-
-    .tp-po-dot {
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
-      background: #94A3B8;
-    }
-
-    .tp-po-name {
-      flex: 1;
-      font-weight: 500;
-    }
-
-    /* Highlight matching search */
-    .tp-matched {
-      border: 2px solid var(--tp-gold) !important;
-      box-shadow: 0 0 12px rgba(217, 119, 6, 0.35) !important;
-    }
-    .tp-matched-row {
-      background: #FEF3C7 !important;
-      font-weight: 700 !important;
-      color: #92400E !important;
-    }
-
-    /* Modal Overlay & Dialog */
-    .tp-modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(15, 23, 42, 0.6);
-      backdrop-filter: blur(6px);
-      z-index: 9999;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s ease;
-    }
-
-    .tp-modal-overlay.open {
-      opacity: 1;
-      pointer-events: auto;
-    }
-
-    .tp-modal-dialog {
-      box-sizing: border-box;
-      background: var(--tp-surface);
-      border-radius: 16px;
-      width: 95%;
-      max-width: 1060px;
-      max-height: 88vh;
-      display: flex;
-      flex-direction: column;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
-      border: 1px solid var(--tp-border-subtle);
-      transform: translateY(12px) scale(0.98);
-      transition: transform 0.2s ease, width 0.2s ease, max-width 0.2s ease, height 0.2s ease;
-      overflow: hidden;
-    }
-
-    .tp-modal-dialog.maximized {
-      width: 96vw !important;
-      max-width: 96vw !important;
-      height: 94vh !important;
-      max-height: 94vh !important;
-      border-radius: 12px;
-    }
-
-    .tp-modal-overlay.open .tp-modal-dialog {
-      transform: translateY(0) scale(1);
-    }
-
-    .tp-modal-header {
-      box-sizing: border-box;
-      width: 100%;
-      max-width: 100%;
-      padding: 18px 24px 14px;
-      border-bottom: 1px solid var(--tp-border-subtle);
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 16px;
-      background: #FFFFFF;
-    }
-
-    .tp-modal-badge {
-      display: inline-block;
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--tp-brand);
-      margin-bottom: 4px;
-    }
-
-    .tp-modal-title {
-      word-break: break-word;
-      font-size: 20px;
-      font-weight: 800;
-      margin: 0;
-      color: var(--tp-ink);
-      line-height: 1.25;
-    }
-
-    .tp-modal-person {
-      word-break: break-word;
-      font-size: 14px;
-      color: var(--tp-ink-muted);
-      margin-top: 4px;
-      font-weight: 500;
-    }
-
-    .tp-modal-header-actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .tp-modal-btn-icon {
-      background: #FFFFFF;
-      border: 1px solid var(--tp-border);
-      font-size: 15px;
-      line-height: 1;
-      color: var(--tp-ink-muted);
-      cursor: pointer;
-      border-radius: 8px;
-      padding: 6px 10px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.16s ease;
-      font-weight: 700;
-    }
-    .tp-modal-btn-icon:hover {
-      background: #F1F5F9;
-      color: var(--tp-ink);
-      border-color: #94A3B8;
-    }
-
-    .tp-modal-close {
-      background: none;
-      border: none;
-      font-size: 24px;
-      line-height: 1;
-      color: var(--tp-ink-muted);
-      cursor: pointer;
-      border-radius: 8px;
-      padding: 4px 8px;
-    }
-    .tp-modal-close:hover {
-      background: #F1F5F9;
-      color: var(--tp-ink);
-    }
-
-    /* Modal Tabs - Pinned with zero scrolling/drift */
-    .tp-modal-tabs {
-      box-sizing: border-box;
-      width: 100%;
-      max-width: 100%;
-      overflow: hidden;
-      display: flex;
-      align-items: center;
-      border-bottom: 1px solid var(--tp-border-subtle);
-      padding: 0 24px;
-      background: #F8FAFC;
-      flex-shrink: 0;
-    }
-
-    .tp-tab-btn {
-      background: none;
-      border: none;
-      border-bottom: 2px solid transparent;
-      padding: 12px 18px;
-      font-size: 13px;
-      font-weight: 600;
-      font-family: inherit;
-      color: #64748B !important;
-      cursor: pointer;
-      transition: all 0.16s;
-      white-space: nowrap !important;
-      flex-shrink: 0;
-    }
-
-    .tp-tab-btn:hover {
-      color: #0F172A !important;
-    }
-
-    .tp-tab-btn.active {
-      color: #1E40AF !important;
-      border-bottom-color: #3B82F6 !important;
-      background: #FFFFFF !important;
-      font-weight: 700;
-    }
-
-    /* Modal Body */
-    .tp-modal-body {
-      padding: 20px 24px;
-      overflow-y: auto;
-      overflow-x: hidden;
-      flex: 1;
-      box-sizing: border-box;
-      width: 100%;
-      max-width: 100%;
-    }
-
-    .tp-tab-pane {
-      display: none;
-      width: 100%;
-      max-width: 100%;
-      box-sizing: border-box;
-      overflow-x: hidden;
-    }
-    .tp-tab-pane.active {
-      display: block;
-    }
-
-    /* Per-Tab Toolbar */
-    .tp-tab-toolbar {
-      box-sizing: border-box;
-      width: 100%;
-      flex-wrap: wrap;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 16px;
-      padding-bottom: 10px;
-      border-bottom: 1px dashed var(--tp-border-subtle);
-    }
-
-    .tp-tab-status-pill {
-      font-size: 12px;
-      color: var(--tp-ink-muted);
-      background: #F1F5F9;
-      padding: 5px 12px;
-      border-radius: 20px;
-    }
-
-    .tp-tab-status-pill strong {
-      color: var(--tp-teal);
-    }
-
-    .tp-edit-controls {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    /* Table Styles */
-    .tp-table {
-      width: 100%;
-      max-width: 100%;
-      table-layout: fixed;
-      border-collapse: collapse;
-      font-size: 13px;
-      border: 1px solid var(--tp-border);
-      border-radius: 10px;
-      overflow: hidden;
-      box-sizing: border-box;
-      white-space: normal !important;
-    }
-
-    .tp-table thead tr {
-      background: #1E293B;
-      color: #fff;
-    }
-
-    .tp-table th {
-      padding: 10px 14px;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      text-align: left;
-      box-sizing: border-box;
-      overflow-wrap: break-word;
-      word-break: break-word;
-      white-space: normal !important;
-    }
-
-    .tp-table tbody tr {
-      border-bottom: 1px solid var(--tp-border-subtle);
-    }
-
-    .tp-table tbody tr:nth-child(even) {
-      background: #F8FAFC;
-    }
-
-    .tp-table td {
-      padding: 10px 14px;
-      vertical-align: top;
-      line-height: 1.5;
-      box-sizing: border-box;
-      overflow-wrap: break-word;
-      word-break: break-word;
-      white-space: normal !important;
-    }
-
-    .tp-table th *,
-    .tp-table td * {
-      white-space: normal !important;
-    }
-
-    .tp-table-clean thead {
-      display: none;
-    }
-
-    .tp-measures-cell {
-      line-height: 1.5;
-      color: #334155;
-      overflow-wrap: break-word;
-      word-break: break-word;
-    }
-
-    .tp-empty-table-cell {
-      text-align: center;
-      padding: 32px 14px;
-      color: var(--tp-ink-muted);
-    }
-
-    /* Edit Lists & Cards */
-    .tp-goals-edit-list, .tp-edit-list {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-
-    .tp-goal-edit-card, .tp-priority-edit-card, .tp-annexure-edit-card {
-      background: #F8FAFC;
-      border: 1px solid var(--tp-border);
-      border-radius: 10px;
-      padding: 14px 16px;
-    }
-
-    .tp-goal-edit-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 10px;
-    }
-
-    .tp-goal-idx-badge, .tp-priority-idx-badge, .tp-annex-idx-badge {
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--tp-brand-dark);
-      background: rgba(79, 142, 247, 0.12);
-      padding: 3px 8px;
-      border-radius: 6px;
-    }
-
-    .tp-goal-weight-input-wrap {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-    .tp-input {
-      font-family: inherit;
-      font-size: 13px;
-      border: 1px solid var(--tp-border);
-      border-radius: 6px;
-      padding: 6px 10px;
-      background: #fff;
-    }
-    .tp-input:focus, .tp-textarea:focus {
-      outline: none;
-      border-color: var(--tp-brand);
-      box-shadow: 0 0 0 2px rgba(79, 142, 247, 0.16);
-    }
-
-    .tp-input-weight {
-      width: 70px;
-      text-align: right;
-    }
-
-    .tp-btn-icon-del {
-      background: none;
-      border: none;
-      color: var(--tp-rose);
-      font-size: 20px;
-      cursor: pointer;
-      line-height: 1;
-      padding: 2px 6px;
-      border-radius: 4px;
-    }
-    .tp-btn-icon-del:hover {
-      background: rgba(225, 29, 72, 0.1);
-    }
-
-    .tp-form-group {
-      margin-bottom: 8px;
-    }
-
-    .tp-form-group label {
-      display: block;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--tp-ink-muted);
-      text-transform: uppercase;
-      margin-bottom: 4px;
-    }
-
-    .tp-textarea {
-      width: 100%;
-      font-family: inherit;
-      font-size: 12px;
-      border: 1px solid var(--tp-border);
-      border-radius: 6px;
-      padding: 8px 10px;
-      resize: vertical;
-      line-height: 1.45;
-    }
-
-    .tp-edit-row {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      width: 100%;
-      box-sizing: border-box;
-    }
-    .tp-edit-row .tp-textarea {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .tp-row-idx {
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--tp-ink-muted);
-      padding-top: 8px;
-      width: 24px;
-    }
-
-    .tp-weight-live-bar {
-      margin-top: 14px;
-      padding: 10px 14px;
-      background: #F1F5F9;
-      border-radius: 8px;
-      font-size: 13px;
-    }
-
-    .tp-weight-warn {
-      margin-left: 8px;
-      font-weight: 600;
-      color: #C0392B;
-    }
-
-    /* Role Card & Resp Blocks */
-    .tp-role-overview-card {
-      background: #F8FAFC;
-      border: 1px solid var(--tp-border);
-      border-radius: 10px;
-      padding: 14px 16px;
-      margin-bottom: 16px;
-    }
-
-    .tp-role-card-label {
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--tp-brand);
-      margin-bottom: 6px;
-    }
-
-    /* Annexures View */
-    .tp-annexures-list {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .tp-annexure-card {
-      background: var(--tp-surface);
-      border: 1px solid var(--tp-border);
-      border-radius: 10px;
-      overflow: hidden;
-    }
-
-    .tp-annexure-header {
-      padding: 12px 16px;
-      background: #F8FAFC;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      cursor: pointer;
-      font-weight: 700;
-      font-size: 13px;
-      color: var(--tp-ink);
-    }
-
-    .tp-annexure-chevron {
-      font-size: 11px;
-      color: var(--tp-ink-muted);
-      transition: transform 0.2s;
-    }
-
-    .tp-annexure-card.open .tp-annexure-chevron {
-      transform: rotate(180deg);
-    }
-
-    .tp-annexure-body {
-      padding: 16px;
-      border-top: 1px solid var(--tp-border-subtle);
-      display: none;
-      overflow-x: auto;
-      font-size: 13px;
-      line-height: 1.5;
-    }
-
-    .tp-annexure-card.open .tp-annexure-body {
-      display: block;
-    }
-
-    /* Original Template Table Classes inside Annexures */
-    .annex-table {
-      width: 100%;
-      min-width: 680px;
-      border-collapse: collapse;
-      font-size: 12px;
-      margin: 10px 0;
-      white-space: normal !important;
-    }
-    .annex-table th, .annex-table td {
-      border: 1px solid #CBD5E1;
-      padding: 6px 10px;
-      text-align: left;
-      white-space: normal !important;
-      overflow-wrap: break-word;
-      word-break: break-word;
-    }
-    .annex-table th {
-      background: #F1F5F9;
-      font-weight: 700;
-    }
-    .annex-table td.center, .annex-table th.center {
-      text-align: center;
-    }
-    .annex-note {
-      font-size: 12px;
-      color: #64748B;
-      margin: 6px 0;
-    }
-    .cat-head td {
-      background: #E2E8F0;
-      font-weight: 700;
-    }
-
-    /* Visual Table & Spreadsheet Editor in Annexures */
-    .tp-annex-visual-editor-box {
-      background: #FFFFFF;
-      border: 1px solid var(--tp-border);
-      border-radius: 8px;
-      padding: 14px;
-      min-height: 120px;
-    }
-
-    .tp-table-editor-wrapper {
-      margin: 10px 0 16px;
-      background: #F8FAFC;
-      border: 1px solid #CBD5E1;
-      border-radius: 8px;
-      padding: 10px;
-      overflow-x: auto;
-    }
-
-    .tp-table-toolbar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-top: 10px;
-      padding-top: 8px;
-      border-top: 1px dashed #CBD5E1;
-      flex-wrap: wrap;
-    }
-
-    .tp-tbl-tool-label {
-      font-size: 11px;
-      font-weight: 700;
-      color: #64748B;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-
-    .tp-table-btn {
-      background: #FFFFFF;
-      border: 1px solid #CBD5E1;
-      border-radius: 6px;
-      padding: 4px 10px;
-      font-size: 11px;
-      font-weight: 700;
-      color: #334155;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      transition: all 0.14s;
-    }
-    .tp-table-btn:hover {
-      background: #EFF6FF;
-      border-color: #3B82F6;
-      color: #1D4ED8;
-    }
-    .tp-table-btn-danger:hover {
-      background: #FEF2F2;
-      border-color: #EF4444;
-      color: #B91C1C;
-    }
-
-    .tp-editable-annex-table {
-      margin: 0 !important;
-      background: #FFFFFF;
-    }
-
-    .tp-editable-cell {
-      outline: none;
-      border: 1px dashed #94A3B8 !important;
-      background: #FFFFFF;
-      min-width: 50px;
-      cursor: text;
-      transition: background 0.12s, border-color 0.12s;
-    }
-    .tp-editable-cell:focus {
-      background: #EFF6FF !important;
-      border: 1px solid #3B82F6 !important;
-      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
-    }
-
-    .tp-editable-text {
-      outline: none;
-      border: 1px dashed transparent;
-      padding: 4px 6px;
-      border-radius: 4px;
-      cursor: text;
-      transition: all 0.14s;
-    }
-    .tp-editable-text:hover {
-      border-color: #CBD5E1;
-      background: #F8FAFC;
-    }
-    .tp-editable-text:focus {
-      border: 1px solid #3B82F6;
-      background: #EFF6FF;
-    }
-
-    .tp-empty-msg {
-      padding: 32px;
-      text-align: center;
-      color: var(--tp-ink-muted);
-      font-style: italic;
-    }
-
-    /* Primary Top View Tabs */
-    .tp-top-tabs-bar {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 16px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid var(--tp-border-subtle);
-    }
-
-    .tp-view-tabs {
-      display: inline-flex;
-      background: #E2E8F0;
-      padding: 4px;
-      border-radius: 12px;
-      gap: 4px;
-    }
-
-    .tp-view-tab {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 9px 18px;
-      border: none;
-      background: transparent;
-      color: #475569;
-      font-size: 14px;
-      font-weight: 700;
-      font-family: inherit;
-      border-radius: 9px;
-      cursor: pointer;
-      transition: all 0.18s ease;
-    }
-
-    .tp-view-tab:hover {
-      color: #0F172A;
-      background: rgba(255, 255, 255, 0.6);
-    }
-
-    .tp-view-tab.active {
-      background: #FFFFFF;
-      color: var(--tp-brand-dark);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    }
-
-    .tp-view-tab-icon {
-      font-size: 16px;
-      line-height: 1;
-    }
-
-    .tp-view-tab-pill {
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      background: #F1F5F9;
-      color: #64748B;
-      padding: 2px 7px;
-      border-radius: 10px;
-    }
-
-    .tp-view-tab.active .tp-view-tab-pill {
-      background: #FEF3C7;
-      color: #92400E;
-    }
-
-    /* Historical View Card */
-    .tp-historical-content {
-      padding: 24px 0;
-    }
-
-    .tp-historical-placeholder-card {
-      background: #FFFFFF;
-      border: 1px dashed #CBD5E1;
-      border-radius: 16px;
-      padding: 48px 32px;
-      text-align: center;
-      max-width: 720px;
-      margin: 0 auto;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
-    }
-
-    .tp-hist-icon-box {
-      font-size: 42px;
-      margin-bottom: 16px;
-      line-height: 1;
-    }
-
-    .tp-hist-heading {
-      font-size: 20px;
-      font-weight: 800;
-      color: #0F172A;
-      margin-bottom: 10px;
-    }
-
-    .tp-hist-desc {
-      font-size: 14px;
-      color: #64748B;
-      line-height: 1.6;
-      margin-bottom: 24px;
-    }
-
-    .tp-hist-features {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 10px;
-    }
-
-    .tp-hist-feature-pill {
-      background: #F8FAFC;
-      border: 1px solid #E2E8F0;
-      color: #334155;
-      font-size: 12px;
-      font-weight: 600;
-      padding: 6px 14px;
-      border-radius: 20px;
-    }
-
-    /* Admin Manage Editors Styles */
-    .tp-btn-admin {
-      background: #7C3AED;
-      color: #FFFFFF;
-      border-color: #7C3AED;
-      font-weight: 700;
-      gap: 6px;
-    }
-    .tp-btn-admin:hover {
-      background: #6D28D9;
-      border-color: #6D28D9;
-      box-shadow: 0 4px 12px rgba(124, 58, 237, 0.28);
-    }
-    .tp-modal-dialog-sm {
-      max-width: 540px !important;
-      width: 95% !important;
-    }
-    .tp-editors-add-box {
-      background: #F8FAFC;
-      border: 1px solid var(--tp-border-subtle);
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 20px;
-    }
-    .tp-editors-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      max-height: 280px;
-      overflow-y: auto;
-      padding-right: 4px;
-    }
-    .tp-editor-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 14px;
-      background: #FFFFFF;
-      border: 1px solid var(--tp-border-subtle);
-      border-radius: 10px;
-      transition: all 0.15s ease;
-    }
-    .tp-editor-item:hover {
-      border-color: var(--tp-border);
-      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
-    }
-    .tp-editor-item-left {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      min-width: 0;
-    }
-    .tp-editor-avatar {
-      width: 34px;
-      height: 34px;
-      border-radius: 50%;
-      background: #EDE9FE;
-      color: #6D28D9;
-      font-size: 13px;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-    .tp-editor-info {
-      min-width: 0;
-    }
-    .tp-editor-name {
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--tp-ink);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .tp-editor-email {
-      font-size: 12px;
-      color: var(--tp-ink-muted);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .tp-btn-revoke {
-      background: #FFF1F2;
-      color: #E11D48;
-      border: 1px solid #FECDD3;
-      border-radius: 6px;
-      padding: 5px 10px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      transition: all 0.15s ease;
-      flex-shrink: 0;
-    }
-    .tp-btn-revoke:hover {
-      background: #FFE4E6;
-      border-color: #FDA4AF;
-      color: #BE123C;
-    }
-    .tp-empty-editors {
-      padding: 24px 16px;
-      text-align: center;
-      font-size: 13px;
-      color: var(--tp-ink-muted);
-      background: #F8FAFC;
-      border: 1px dashed var(--tp-border);
-      border-radius: 10px;
-    }
-  </style>
-
-  <!-- Top View Navigation Tabs -->
-  <div class="tp-top-tabs-bar">
-    <div class="tp-view-tabs" role="tablist">
-      <button type="button" class="tp-view-tab active" id="tpViewTabSmartGoals" onclick="window.TeamPerformance.switchView('smart-goals')">
-        <span class="tp-view-tab-icon">🎯</span>
-        <span class="tp-view-tab-text">SMART GOALS</span>
-      </button>
-      <button type="button" class="tp-view-tab" id="tpViewTabHistorical" onclick="window.TeamPerformance.switchView('historical')">
-        <span class="tp-view-tab-icon">📜</span>
-        <span class="tp-view-tab-text">Historical Data</span>
-        <span class="tp-view-tab-pill">Upcoming</span>
-      </button>
-    </div>
-  </div>
-
-  <!-- 1. SMART GOALS View Container -->
-  <div id="tpSmartGoalsView" class="tp-view-section">
-    <!-- Top Navigation & Toolbar -->
-    <div class="tp-header">
-      <div class="tp-header-top-row">
-        <div class="tp-header-left">
-          <div class="tp-title-row">
-            <h2 class="tp-title">SMART GOALS</h2>
-            <span class="tp-badge" id="tpTotalCountBadge">Loading...</span>
-          </div>
-          <p class="tp-subtitle">State-to-district operational hierarchy, commitments, and editable scorecards</p>
-        </div>
-        <div class="tp-header-right">
-          <button type="button" class="tp-btn tp-btn-admin" id="tpManageEditorsBtn" onclick="window.TeamPerformance.openEditorsModal()" style="display:none;" title="Manage SMART GOALS Editors (Admin only)">
-            ⚙ Manage Editors
-          </button>
-        </div>
-      </div>
-
-    <div class="tp-header-controls">
-      <!-- Segmented State Switcher -->
-      <div class="tp-segmented-control" role="tablist">
-        <button type="button" class="tp-seg-btn active" id="tpSegMH" onclick="window.TeamPerformance.setState('MH')">
-          <span class="tp-seg-icon">🚩</span> Maharashtra
-        </button>
-        <button type="button" class="tp-seg-btn" id="tpSegCH" onclick="window.TeamPerformance.setState('CH')">
-          <span class="tp-seg-icon">🏛️</span> Chhattisgarh
-        </button>
-        <button type="button" class="tp-seg-btn" id="tpSegMP" onclick="window.TeamPerformance.setState('MP')">
-          <span class="tp-seg-icon">🌳</span> Madhya Pradesh
-        </button>
-        <button type="button" class="tp-seg-btn" id="tpSegBR" onclick="window.TeamPerformance.setState('BR')">
-          <span class="tp-seg-icon">🌾</span> Bihar
-        </button>
-      </div>
-
-      <!-- Quick Search Input -->
-      <div class="tp-search-box">
-        <svg class="tp-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-        </svg>
-        <input type="text" id="tpSearchInput" placeholder="Search person, district, role..." oninput="window.TeamPerformance.onSearch(this.value)" autocomplete="off">
-        <button type="button" id="tpSearchClear" class="tp-search-clear" onclick="window.TeamPerformance.clearSearch()" style="display:none;">&times;</button>
-      </div>
-
-      <!-- Action Buttons -->
-      <div class="tp-btn-group">
-        <button type="button" class="tp-btn tp-btn-secondary" onclick="window.TeamPerformance.expandAll()" title="Expand all divisions">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="7 13 12 18 17 13"></polyline><polyline points="7 6 12 11 17 6"></polyline></svg> Expand All
-        </button>
-        <button type="button" class="tp-btn tp-btn-secondary" onclick="window.TeamPerformance.collapseAll()" title="Collapse to divisions overview">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 11 12 6 7 11"></polyline><polyline points="17 18 12 13 7 18"></polyline></svg> Collapse All
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Division Toggle Pills Bar -->
-  <div class="tp-division-pills-bar" id="tpDivisionBar">
-    <span class="tp-filter-label">Quick Toggle:</span>
-    <div class="tp-pills-wrapper" id="tpDivisionPills">
-      <!-- Injected dynamically -->
-    </div>
-  </div>
-
-  <!-- Search Summary -->
-  <div class="tp-search-summary" id="tpSearchSummary" style="display:none;">
-    <span id="tpSearchSummaryText">Showing matches</span>
-    <button type="button" class="tp-link-btn" onclick="window.TeamPerformance.clearSearch()">Clear search</button>
-  </div>
-
-  <!-- Flowchart Viewport -->
-  <div class="tp-viewport" id="tpViewport">
-    <div class="tp-canvas" id="tpCanvas">
-      <svg class="tp-connectors-svg" id="tpSvg"></svg>
-      <div id="tpTreeContainer" class="tp-tree-container">
-        <!-- Rendered dynamically -->
-      </div>
-    </div>
-  </div>
-  </div> <!-- End #tpSmartGoalsView -->
-
-  <!-- 2. Historical Data View Container -->
-  <div id="tpHistoricalView" class="tp-view-section" style="display:none;">
-    <div class="tp-header">
-      <div class="tp-header-left">
-        <div class="tp-title-row">
-          <h2 class="tp-title">Historical Data</h2>
-          <span class="tp-badge">Archival Module</span>
-        </div>
-        <p class="tp-subtitle">Quarterly evaluations, historical performance records, and longitudinal trend archives</p>
-      </div>
-    </div>
-
-    <div class="tp-historical-content">
-      <div class="tp-historical-placeholder-card">
-        <div class="tp-hist-icon-box">📜</div>
-        <h3 class="tp-hist-heading">Historical Performance Archive</h3>
-        <p class="tp-hist-desc">
-          This tab will house historical performance snapshots, past quarter evaluations, and previous academic year reviews.
-          Data integration and archival records setup will be configured here.
-        </p>
-        <div class="tp-hist-features">
-          <div class="tp-hist-feature-pill">📅 Prior Quarterly Reviews (Q1 &middot; Q2 &middot; Q3)</div>
-          <div class="tp-hist-feature-pill">📊 State &amp; Division Trends</div>
-          <div class="tp-hist-feature-pill">🎯 Scorecard Progression History</div>
-        </div>
-      </div>
-    </div>
-  </div> <!-- End #tpHistoricalView -->
-
-  <!-- Role Detail & Full Editor Modal -->
-  <div id="tpModal" class="tp-modal-overlay" onclick="if(event.target===this)window.TeamPerformance.closeModal()">
-    <div class="tp-modal-dialog" role="dialog" aria-modal="true">
-      <!-- Modal Header -->
-      <div class="tp-modal-header">
-        <div class="tp-modal-title-wrap">
-          <div class="tp-modal-badge" id="tpModalLevel">Level</div>
-          <h3 class="tp-modal-title" id="tpModalTitle">Role Title</h3>
-          <div class="tp-modal-person" id="tpModalPerson">Person Name</div>
-        </div>
-        <div class="tp-modal-header-actions">
-          <button type="button" class="tp-btn tp-btn-sm tp-btn-subtle" id="tpResetDefaultBtn" onclick="window.TeamPerformance.resetDefaultAll()" title="Reset all data back to original organization template" style="display:none;">
-            ↺ Reset to Default
-          </button>
-          <button type="button" class="tp-modal-btn-icon" id="tpModalMaxBtn" onclick="window.TeamPerformance.toggleModalMaximize()" title="Maximize / Fullscreen" aria-label="Maximize / Fullscreen">
-            ⛶
-          </button>
-          <button type="button" class="tp-modal-close" onclick="window.TeamPerformance.closeModal()" title="Close">&times;</button>
-        </div>
-      </div>
-
-      <!-- Modal Tabs -->
-      <div class="tp-modal-tabs">
-        <button type="button" class="tp-tab-btn active" id="tpTabBtnGoals" onclick="window.TeamPerformance.switchTab('goals')">Goals &amp; Measures</button>
-        <button type="button" class="tp-tab-btn" id="tpTabBtnRole" onclick="window.TeamPerformance.switchTab('role')">Role &amp; Responsibilities</button>
-        <button type="button" class="tp-tab-btn" id="tpTabBtnPriority" onclick="window.TeamPerformance.switchTab('priority')">3 Months Priority</button>
-        <button type="button" class="tp-tab-btn" id="tpTabBtnAnnexures" onclick="window.TeamPerformance.switchTab('annexures')">Annexures</button>
-      </div>
-
-      <!-- Modal Content Body -->
-      <div class="tp-modal-body">
-        <!-- 1. Goals & Measures Tab -->
-        <div id="tpTabPaneGoals" class="tp-tab-pane active">
-          <div class="tp-tab-toolbar">
-            <div class="tp-tab-status-pill">
-              <span id="tpGoalsCountText">0 Goals</span> &middot; <strong id="tpGoalsWeightText">100%</strong> Weight
-            </div>
-            <div class="tp-goals-actions">
-              <button type="button" class="tp-btn tp-btn-sm tp-btn-primary" id="tpEditGoalsBtn" onclick="window.TeamPerformance.toggleEditGoals(true)">
-                ✎ Edit Goals
-              </button>
-              <div id="tpEditGoalsControls" class="tp-edit-controls" style="display:none;">
-                <button type="button" class="tp-btn tp-btn-sm tp-btn-secondary" onclick="window.TeamPerformance.addNewGoalRow()">+ Add Goal</button>
-                <button type="button" class="tp-btn tp-btn-sm tp-btn-success" onclick="window.TeamPerformance.saveGoals()">Save Changes</button>
-                <button type="button" class="tp-btn tp-btn-sm tp-btn-cancel" onclick="window.TeamPerformance.toggleEditGoals(false)">Cancel</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- View Mode -->
-          <div id="tpGoalsViewContainer" style="width: 100%; max-width: 100%; box-sizing: border-box; overflow-x: hidden;">
-            <table class="tp-table">
-              <thead>
-                <tr>
-                  <th style="width: 44px; text-align: center;">#</th>
-                  <th style="width: 30%;">Goal</th>
-                  <th style="width: auto;">Measures &amp; Key Deliverables</th>
-                  <th style="width: 110px; text-align: right; white-space: nowrap !important;">Weightage</th>
-                </tr>
-              </thead>
-              <tbody id="tpGoalsTableBody"></tbody>
-            </table>
-          </div>
-
-          <!-- Edit Mode -->
-          <div id="tpGoalsEditContainer" style="display:none;">
-            <div id="tpGoalsEditList" class="tp-goals-edit-list"></div>
-            <div class="tp-weight-live-bar" id="tpWeightLiveBar">
-              Total Weight: <strong id="tpLiveWeightTotal">100%</strong>
-              <span id="tpLiveWeightWarning" class="tp-weight-warn" style="display:none;">(Must equal 100%)</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 2. Role & Responsibilities Tab -->
-        <div id="tpTabPaneRole" class="tp-tab-pane">
-          <div class="tp-tab-toolbar">
-            <div class="tp-tab-status-pill">Designation Roles &amp; Responsibilities</div>
-            <div>
-              <button type="button" class="tp-btn tp-btn-sm tp-btn-primary" id="tpEditRoleBtn" onclick="window.TeamPerformance.toggleEditRole(true)">
-                ✎ Edit Role
-              </button>
-              <div id="tpEditRoleControls" class="tp-edit-controls" style="display:none;">
-                <button type="button" class="tp-btn tp-btn-sm tp-btn-secondary" onclick="window.TeamPerformance.addNewRespRow()">+ Add Item</button>
-                <button type="button" class="tp-btn tp-btn-sm tp-btn-success" onclick="window.TeamPerformance.saveRole()">Save Changes</button>
-                <button type="button" class="tp-btn tp-btn-sm tp-btn-cancel" onclick="window.TeamPerformance.toggleEditRole(false)">Cancel</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- View Mode -->
-          <div id="tpRoleViewContainer"></div>
-
-          <!-- Edit Mode -->
-          <div id="tpRoleEditContainer" style="display:none;">
-            <div class="tp-form-group">
-              <label>Role Summary</label>
-              <input type="text" id="tpInputRoleOverview" class="tp-input" style="width:100%;" placeholder="Summary statement of primary role...">
-            </div>
-            <div class="tp-form-group">
-              <label>Responsibilities List</label>
-              <div id="tpRespEditList" class="tp-edit-list"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 3. 3 Months Priority Tab -->
-        <div id="tpTabPanePriority" class="tp-tab-pane">
-          <div class="tp-tab-toolbar">
-            <div class="tp-tab-status-pill">Quarterly Strategic Action Items</div>
-            <div>
-              <button type="button" class="tp-btn tp-btn-sm tp-btn-primary" id="tpEditPriorityBtn" onclick="window.TeamPerformance.toggleEditPriority(true)">
-                ✎ Edit Priority
-              </button>
-              <div id="tpEditPriorityControls" class="tp-edit-controls" style="display:none;">
-                <button type="button" class="tp-btn tp-btn-sm tp-btn-secondary" onclick="window.TeamPerformance.addNewPriorityRow()">+ Add Priority Item</button>
-                <button type="button" class="tp-btn tp-btn-sm tp-btn-success" onclick="window.TeamPerformance.savePriority()">Save Changes</button>
-                <button type="button" class="tp-btn tp-btn-sm tp-btn-cancel" onclick="window.TeamPerformance.toggleEditPriority(false)">Cancel</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- View Mode -->
-          <div id="tpPriorityViewContainer"></div>
-
-          <!-- Edit Mode -->
-          <div id="tpPriorityEditContainer" style="display:none;">
-            <div id="tpPriorityEditList" class="tp-edit-list"></div>
-          </div>
-        </div>
-
-        <!-- 4. Annexures Tab -->
-        <div id="tpTabPaneAnnexures" class="tp-tab-pane">
-          <div class="tp-tab-toolbar">
-            <div class="tp-tab-status-pill">Operational Guidelines &amp; Reference Tables</div>
-            <div>
-              <button type="button" class="tp-btn tp-btn-sm tp-btn-primary" id="tpEditAnnexuresBtn" onclick="window.TeamPerformance.toggleEditAnnexures(true)">
-                ✎ Edit Annexures
-              </button>
-              <div id="tpEditAnnexuresControls" class="tp-edit-controls" style="display:none;">
-                <button type="button" class="tp-btn tp-btn-sm tp-btn-secondary" onclick="window.TeamPerformance.addNewAnnexureRow()">+ Add Annexure</button>
-                <button type="button" class="tp-btn tp-btn-sm tp-btn-success" onclick="window.TeamPerformance.saveAnnexures()">Save Changes</button>
-                <button type="button" class="tp-btn tp-btn-sm tp-btn-cancel" onclick="window.TeamPerformance.toggleEditAnnexures(false)">Cancel</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- View Mode -->
-          <div id="tpAnnexuresViewContainer"></div>
-
-          <!-- Edit Mode -->
-          <div id="tpAnnexuresEditContainer" style="display:none;">
-            <div id="tpAnnexuresEditList" class="tp-edit-list"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Manage Editors Modal (Admin Only) -->
-  <div id="tpEditorsModal" class="tp-modal-overlay" onclick="if(event.target===this)window.TeamPerformance.closeEditorsModal()" style="display:none;">
-    <div class="tp-modal-dialog tp-modal-dialog-sm" role="dialog" aria-modal="true">
-      <div class="tp-modal-header">
-        <div class="tp-modal-title-wrap">
-          <div class="tp-modal-badge" style="background: rgba(124, 58, 237, 0.12); color: #7C3AED;">Access Control</div>
-          <h3 class="tp-modal-title">Manage SMART GOALS Editors</h3>
-          <div class="tp-modal-person">Grant or revoke editor permissions for scorecards &amp; measures</div>
-        </div>
-        <button type="button" class="tp-modal-close" onclick="window.TeamPerformance.closeEditorsModal()" title="Close">&times;</button>
-      </div>
-      <div class="tp-modal-body" style="padding: 20px;">
-        <!-- Add Editor Form -->
-        <div class="tp-editors-add-box">
-          <label style="display:block; font-size: 13px; font-weight: 700; margin-bottom: 6px; color: #0F172A;">Grant Edit Permission</label>
-          <div style="display: flex; gap: 8px;">
-            <input type="email" id="tpNewEditorEmail" class="tp-input" placeholder="Enter staff email (e.g. name@openlinksfoundation.org)" style="flex: 1;" list="tpStaffEmailList" autocomplete="off" />
-            <datalist id="tpStaffEmailList"></datalist>
-            <button type="button" class="tp-btn tp-btn-primary" onclick="window.TeamPerformance.grantEditorAccess()">
-              + Grant Access
-            </button>
-          </div>
-          <p style="font-size: 12px; color: #64748B; margin: 8px 0 0; line-height: 1.4;">
-            🔒 <strong>STRICTLY Admin Only by Default:</strong> IT Admins have edit access automatically. Adding an employee here grants them permission to edit SMART Goals scorecards, priorities, and annexures.
-          </p>
-        </div>
-
-        <!-- Active Editors Section -->
-        <div>
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-            <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: #0F172A;">Authorized Editors (<span id="tpEditorsCount">0</span>)</h4>
-            <span style="font-size: 11px; font-weight: 600; color: #7C3AED; background: #EDE9FE; padding: 2px 8px; border-radius: 12px;">Admin-Managed</span>
-          </div>
-          <div id="tpEditorsList" class="tp-editors-list">
-            <!-- Injected dynamically -->
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+<!-- pages/team-performance.html -->
+<div id="tpRoot" class="tp-module">
+  <style>
+    /* Scoped Styles for Team Performance Module */
+    #tpRoot {
+      --tp-canvas: #E4EAF3;
+      --tp-surface: #FFFFFF;
+      --tp-surface-subtle: #F8FAFC;
+      --tp-ink: #0F172A;
+      --tp-ink-muted: #64748B;
+      --tp-border: #CBD5E1;
+      --tp-border-subtle: #E2E8F0;
+      --tp-brand: #4F8EF7;
+      --tp-brand-dark: #1E40AF;
+      --tp-teal: #0D9488;
+      --tp-teal-lt: #CCFBF1;
+      --tp-gold: #D97706;
+      --tp-gold-lt: #FEF3C7;
+      --tp-rose: #E11D48;
+      --tp-font: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      font-family: var(--tp-font);
+      color: var(--tp-ink);
+      padding: 16px 20px 48px;
+      min-height: 100%;
+      background: var(--tp-canvas);
+    }
+
+    #tpRoot * {
+      box-sizing: border-box;
+    }
+
+    /* Top Header Bar */
+    .tp-header-top-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      gap: 16px;
+    }
+    .tp-header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .tp-header {
+      background: var(--tp-surface);
+      border-radius: 14px;
+      padding: 16px 20px;
+      border: 1px solid var(--tp-border-subtle);
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    .tp-title-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .tp-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin: 0;
+      color: var(--tp-ink);
+      letter-spacing: -0.02em;
+    }
+
+    .tp-badge {
+      background: rgba(79, 142, 247, 0.12);
+      color: var(--tp-brand);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+
+    .tp-subtitle {
+      font-size: 13px;
+      color: var(--tp-ink-muted);
+      margin: 3px 0 0;
+    }
+
+    .tp-header-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* Segmented State Switcher */
+    .tp-segmented-control {
+      display: inline-flex;
+      background: #F1F5F9;
+      border-radius: 10px;
+      padding: 3px;
+      border: 1px solid var(--tp-border-subtle);
+    }
+
+    .tp-seg-btn {
+      border: none;
+      background: transparent;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--tp-ink-muted);
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.18s ease;
+    }
+
+    .tp-seg-btn.active {
+      background: var(--tp-surface);
+      color: var(--tp-brand-dark);
+      box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+    }
+
+    /* Quick Search Input */
+    .tp-search-box {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .tp-search-icon {
+      position: absolute;
+      left: 10px;
+      color: var(--tp-ink-muted);
+      pointer-events: none;
+    }
+
+    .tp-search-box input {
+      padding: 7px 32px 7px 32px;
+      font-size: 13px;
+      font-family: inherit;
+      border: 1px solid var(--tp-border);
+      border-radius: 9px;
+      background: var(--tp-surface);
+      width: 220px;
+      transition: border-color 0.16s, width 0.2s;
+    }
+
+    .tp-search-box input:focus {
+      outline: none;
+      border-color: var(--tp-brand);
+      width: 260px;
+      box-shadow: 0 0 0 3px rgba(79, 142, 247, 0.16);
+    }
+
+    .tp-search-clear {
+      position: absolute;
+      right: 8px;
+      background: none;
+      border: none;
+      font-size: 16px;
+      color: var(--tp-ink-muted);
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    /* Buttons */
+    .tp-btn-group {
+      display: flex;
+      gap: 6px;
+    }
+
+    .tp-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--tp-border);
+      cursor: pointer;
+      transition: all 0.16s;
+    }
+
+    .tp-btn-secondary {
+      background: var(--tp-surface);
+      color: var(--tp-ink);
+    }
+    .tp-btn-secondary:hover {
+      background: var(--tp-surface-subtle);
+      border-color: #94A3B8;
+    }
+
+    .tp-btn-primary {
+      background: var(--tp-brand);
+      color: #fff;
+      border-color: var(--tp-brand);
+    }
+    .tp-btn-primary:hover {
+      background: #3B82F6;
+    }
+
+    .tp-btn-success {
+      background: #10B981;
+      color: #fff;
+      border-color: #10B981;
+    }
+    .tp-btn-success:hover {
+      background: #059669;
+    }
+
+    .tp-btn-cancel {
+      background: #F1F5F9;
+      color: var(--tp-ink-muted);
+      border-color: var(--tp-border);
+    }
+    .tp-btn-cancel:hover {
+      background: #E2E8F0;
+      color: var(--tp-ink);
+    }
+
+    .tp-btn-subtle {
+      background: transparent;
+      color: var(--tp-rose);
+      border-color: transparent;
+    }
+    .tp-btn-subtle:hover {
+      background: rgba(225, 29, 72, 0.08);
+    }
+
+    .tp-btn-sm {
+      padding: 5px 10px;
+      font-size: 12px;
+    }
+
+    /* Division Filter Bar */
+    .tp-division-pills-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .tp-filter-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--tp-ink-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+
+    .tp-pills-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .tp-pill-btn {
+      background: var(--tp-surface);
+      border: 1px solid var(--tp-border);
+      color: var(--tp-ink);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 20px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .tp-pill-btn:hover {
+      border-color: var(--tp-brand);
+      color: var(--tp-brand);
+    }
+
+    .tp-pill-btn.active {
+      background: var(--tp-brand);
+      color: #fff;
+      border-color: var(--tp-brand);
+      box-shadow: 0 2px 6px rgba(79, 142, 247, 0.28);
+    }
+
+    .tp-pill-badge {
+      background: rgba(0, 0, 0, 0.08);
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 10px;
+    }
+
+    .tp-pill-btn.active .tp-pill-badge {
+      background: rgba(255, 255, 255, 0.25);
+      color: #fff;
+    }
+
+    /* Search summary */
+    .tp-search-summary {
+      background: #FEF3C7;
+      border: 1px solid #FDE68A;
+      color: #92400E;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 8px 14px;
+      border-radius: 8px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .tp-link-btn {
+      background: none;
+      border: none;
+      color: #B45309;
+      font-weight: 700;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    /* Viewport & Flow Canvas */
+    .tp-viewport {
+      background: radial-gradient(circle at 50% 0%, #FFFFFF 0%, #F1F5F9 100%);
+      border-radius: 16px;
+      border: 1px solid var(--tp-border);
+      overflow: auto;
+      padding: 36px 28px 64px;
+      min-height: 620px;
+      box-shadow: inset 0 2px 6px rgba(15, 23, 42, 0.04);
+      scroll-behavior: smooth;
+    }
+
+    .tp-canvas {
+      position: relative;
+      min-width: max-content;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+    }
+
+    .tp-connectors-svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      overflow: visible;
+      z-index: 1;
+    }
+
+    .tp-connector-trunk {
+      stroke: #94A3B8;
+      stroke-width: 2.5px;
+      stroke-dasharray: 4, 3;
+      transition: all 0.2s ease;
+    }
+
+    .tp-connector-hub {
+      fill: #0D9488;
+      stroke: #FFFFFF;
+      stroke-width: 2px;
+      filter: drop-shadow(0 2px 5px rgba(13, 148, 136, 0.4));
+    }
+
+    .tp-connector-branch {
+      stroke: #94A3B8;
+      stroke-width: 2px;
+      stroke-dasharray: 4, 3;
+      stroke-linejoin: round;
+      stroke-linecap: round;
+      transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .tp-connector-branch.highlighted {
+      stroke: #0D9488 !important;
+      stroke-width: 3.5px !important;
+      stroke-dasharray: none !important;
+      filter: drop-shadow(0 0 8px rgba(13, 148, 136, 0.6)) !important;
+    }
+
+    .tp-connector-anchor {
+      fill: #0D9488;
+      stroke: #FFFFFF;
+      stroke-width: 2px;
+      transition: all 0.2s ease;
+    }
+
+    .tp-connector-anchor.highlighted {
+      r: 5px;
+      fill: #0F766E;
+      stroke-width: 2.5px;
+    }
+
+    .tp-connector-root-pip {
+      fill: #F59E0B;
+      stroke: #FFFFFF;
+      stroke-width: 2px;
+    }
+
+    .tp-tree-container {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+    }
+
+    /* Node Card Base */
+    .tp-card {
+      background: #FFFFFF;
+      border-radius: 14px;
+      border: 1px solid #E2E8F0;
+      box-shadow: 0 4px 14px -2px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.03);
+      padding: 16px 18px;
+      transition: all 0.24s cubic-bezier(0.34, 1.56, 0.64, 1);
+      position: relative;
+    }
+
+    .tp-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 16px 32px -6px rgba(15, 23, 42, 0.12), 0 4px 12px rgba(15, 23, 42, 0.04);
+      border-color: #94A3B8;
+    }
+
+    .tp-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .tp-tag {
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 3px 9px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .tp-tag-gold {
+      background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+      color: #92400E;
+      border: 1px solid #FCD34D;
+      border-radius: 20px;
+    }
+
+    .tp-tag-teal {
+      background: #CCFBF1;
+      color: #0F766E;
+      border: 1px solid #99F6E4;
+    }
+
+    .tp-tag-blue {
+      background: #EFF6FF;
+      color: #1D4ED8;
+      border: 1px solid #BFDBFE;
+    }
+
+    /* Direct Details Button on Card */
+    .tp-card-details-btn {
+      background: #EFF6FF;
+      border: 1px solid #BFDBFE;
+      color: #1D4ED8;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .tp-card-details-btn:hover {
+      background: #2563EB;
+      color: #FFFFFF;
+      border-color: #2563EB;
+      transform: translateX(2px);
+      box-shadow: 0 4px 10px rgba(37, 99, 235, 0.28);
+    }
+
+    .tp-card-name {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--tp-ink);
+      line-height: 1.3;
+      letter-spacing: -0.01em;
+    }
+
+    .tp-card-sub {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--tp-ink-muted);
+      margin-top: 3px;
+    }
+
+    /* Root Node (State Lead) */
+    .tp-row-root {
+      margin-bottom: 56px;
+      display: flex;
+      justify-content: center;
+      position: relative;
+    }
+
+    .tp-card-root {
+      width: 420px;
+      background: linear-gradient(180deg, #FFFFFF 0%, #FAFCFF 100%);
+      border: 1px solid #CBD5E1;
+      border-top: 5px solid #F59E0B;
+      border-radius: 16px;
+      padding: 18px 22px;
+      box-shadow: 0 6px 20px -4px rgba(245, 158, 11, 0.12), 0 2px 8px -2px rgba(15, 23, 42, 0.04);
+      transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .tp-card-root:hover {
+      transform: translateY(-5px);
+      border-color: #F59E0B;
+      box-shadow: 0 20px 40px -8px rgba(245, 158, 11, 0.24), 0 6px 16px rgba(15, 23, 42, 0.06);
+    }
+
+    .tp-card-root .tp-card-name {
+      font-size: 17px;
+      font-weight: 800;
+      color: #0F172A;
+    }
+
+    .tp-card-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 14px;
+      padding: 10px 8px;
+      background: #F8FAFC;
+      border-radius: 12px;
+      border: 1px solid #E2E8F0;
+    }
+
+    .tp-stat-item {
+      text-align: center;
+    }
+
+    .tp-stat-item strong {
+      display: block;
+      font-size: 16px;
+      font-weight: 800;
+      color: #1E40AF;
+    }
+
+    .tp-stat-item span {
+      font-size: 10px;
+      font-weight: 700;
+      color: #64748B;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    /* Divisions Row (Collapsible Level 1) */
+    .tp-divisions-row {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      width: 100%;
+      flex-wrap: wrap;
+      margin-bottom: 36px;
+    }
+
+    .tp-card-div {
+      width: 256px;
+      background: linear-gradient(180deg, #FFFFFF 0%, #FAFCFF 100%);
+      border: 1px solid #E2E8F0;
+      border-top: 4px solid #0D9488;
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 4px 14px -2px rgba(15, 23, 42, 0.05);
+      transition: all 0.24s cubic-bezier(0.34, 1.56, 0.64, 1);
+      position: relative;
+    }
+
+    .tp-card-div:hover {
+      transform: translateY(-5px);
+      border-color: #0D9488;
+      box-shadow: 0 18px 36px -6px rgba(13, 148, 136, 0.22), 0 4px 12px rgba(0, 0, 0, 0.04);
+    }
+
+    .tp-card-div.tp-expanded-card {
+      border: 2px solid #0D9488;
+      border-top: 4px solid #0D9488;
+      box-shadow: 0 10px 28px -4px rgba(13, 148, 136, 0.25);
+      background: linear-gradient(180deg, #F0FDFA 0%, #FFFFFF 100%);
+    }
+
+    .tp-card-div .tp-card-name {
+      font-size: 15px;
+      font-weight: 800;
+      color: #0F172A;
+      margin-top: 4px;
+    }
+
+    .tp-card-div .tp-card-sub {
+      font-size: 12px;
+      font-weight: 600;
+      color: #475569;
+      margin-top: 3px;
+    }
+
+    .tp-card-meta {
+      margin-top: 12px;
+      margin-bottom: 12px;
+      font-size: 11px;
+      color: #475569;
+      font-weight: 600;
+      background: #F1F5F9;
+      padding: 5px 10px;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .tp-card-footer-actions {
+      margin-top: auto;
+      padding-top: 12px;
+      border-top: 1px solid var(--tp-border-subtle);
+    }
+
+    .tp-toggle-team-btn {
+      background: #FFFFFF;
+      border: 1px solid #CBD5E1;
+      color: #334155;
+      font-weight: 700;
+      font-size: 12px;
+      border-radius: 8px;
+      padding: 7px 12px;
+      cursor: pointer;
+      width: 100%;
+      transition: all 0.18s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .tp-toggle-team-btn:hover {
+      background: #0D9488;
+      color: #FFFFFF;
+      border-color: #0D9488;
+      box-shadow: 0 4px 12px rgba(13, 148, 136, 0.28);
+    }
+
+    .tp-toggle-team-btn.active {
+      background: #0F766E;
+      color: #FFFFFF;
+      border-color: #0F766E;
+    }
+
+    /* Expanded Division Details Panel */
+    .tp-expanded-divisions-container {
+      display: flex;
+      flex-direction: column;
+      gap: 36px;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    .tp-division-expanded-panel {
+      background: #FFFFFF;
+      border: 1px solid var(--tp-border);
+      border-radius: 16px;
+      padding: 24px 20px 32px;
+      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    .tp-panel-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      border-bottom: 2px solid #F1F5F9;
+      padding-bottom: 16px;
+      margin-bottom: 24px;
+    }
+
+    .tp-panel-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: var(--tp-teal-lt);
+      color: var(--tp-teal);
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 4px;
+    }
+
+    .tp-panel-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--tp-ink);
+    }
+
+    .tp-panel-lead {
+      font-size: 13px;
+      color: var(--tp-ink-muted);
+      margin-top: 3px;
+      display: block;
+    }
+
+    .tp-panel-banner-right {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    /* Tree Tier: Division Manager (Tier 1) */
+    .tp-tree-tier-dm {
+      display: flex;
+      justify-content: center;
+      margin: 8px 0 0 0;
+      position: relative;
+    }
+
+    .tp-card-dm {
+      width: 350px;
+      background: linear-gradient(180deg, #FFFFFF 0%, #FAF5FF 100%);
+      border: 1px solid #E9D5FF;
+      border-top: 5px solid #8B5CF6;
+      border-radius: 14px;
+      padding: 16px 20px;
+      box-shadow: 0 4px 16px -2px rgba(139, 92, 246, 0.12), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+      transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+      position: relative;
+      text-align: left;
+    }
+
+    .tp-card-dm:hover {
+      transform: translateY(-4px);
+      border-color: #8B5CF6;
+      box-shadow: 0 16px 32px -6px rgba(139, 92, 246, 0.22);
+    }
+
+    .tp-card-dm.tp-card-interim {
+      border-top: 5px dashed #94A3B8;
+      border-color: #CBD5E1;
+      background: #F8FAFC;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+    }
+
+    .tp-card-dm .tp-card-name {
+      font-size: 16px;
+      font-weight: 800;
+      color: #0F172A;
+      margin-top: 6px;
+    }
+
+    .tp-card-dm .tp-card-sub {
+      font-size: 12px;
+      font-weight: 600;
+      color: #475569;
+      margin-top: 3px;
+    }
+
+    .tp-tag-purple {
+      background: #F3E8FF;
+      color: #6B21A8;
+      border: 1px solid #D8B4FE;
+    }
+
+    .tp-tag-gray {
+      background: #F1F5F9;
+      color: #475569;
+      border: 1px dashed #CBD5E1;
+    }
+
+    .tp-tree-connector-v {
+      width: 2px;
+      height: 30px;
+      background: #CBD5E1;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    .tp-tree-connector-v::after {
+      content: '';
+      position: absolute;
+      bottom: -4px;
+      left: -3px;
+      width: 8px;
+      height: 8px;
+      background: #8B5CF6;
+      border-radius: 50%;
+    }
+
+    .tp-tree-tier-pms {
+      margin-top: 6px;
+    }
+
+    /* Program Manager Row & Columns - Center Aligned */
+    .tp-pm-row {
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
+      justify-content: center;
+      min-width: 100%;
+      width: max-content;
+      margin: 0 auto;
+      box-sizing: border-box;
+    }
+
+    .tp-pm-col {
+      width: 220px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+
+    .tp-card-pm {
+      width: 100%;
+      border-top: 3px solid var(--tp-brand);
+    }
+
+    .tp-badge-sm-tag {
+      margin-top: 8px;
+      display: inline-block;
+      background: #F1F5F9;
+      color: #475569;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    /* Districts & PO Cards */
+    .tp-districts-list {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .tp-district-card {
+      background: var(--tp-surface);
+      border-radius: 9px;
+      border: 1px solid var(--tp-border);
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .tp-district-card:hover {
+      border-color: #94A3B8;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.06);
+    }
+
+    .tp-district-header {
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #F8FAFC;
+      border-bottom: 1px solid var(--tp-border-subtle);
+    }
+
+    .tp-dist-pip {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--tp-brand);
+    }
+
+    .tp-dist-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--tp-ink);
+      flex: 1;
+    }
+
+    .tp-row-details-btn {
+      background: none;
+      border: none;
+      color: var(--tp-brand);
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: background 0.12s;
+    }
+
+    .tp-row-details-btn:hover {
+      background: rgba(79, 142, 247, 0.12);
+      text-decoration: underline;
+    }
+
+    .tp-pos-list {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tp-po-row {
+      padding: 7px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--tp-ink);
+      border-bottom: 1px solid #F1F5F9;
+      transition: background 0.15s;
+    }
+
+    .tp-po-row:last-child {
+      border-bottom: none;
+    }
+
+    .tp-po-row:hover {
+      background: #EFF6FF;
+      color: var(--tp-brand-dark);
+    }
+
+    .tp-po-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #94A3B8;
+    }
+
+    .tp-po-name {
+      flex: 1;
+      font-weight: 500;
+    }
+
+    /* Highlight matching search */
+    .tp-matched {
+      border: 2px solid var(--tp-gold) !important;
+      box-shadow: 0 0 12px rgba(217, 119, 6, 0.35) !important;
+    }
+    .tp-matched-row {
+      background: #FEF3C7 !important;
+      font-weight: 700 !important;
+      color: #92400E !important;
+    }
+
+    /* Modal Overlay & Dialog */
+    .tp-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(6px);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .tp-modal-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .tp-modal-dialog {
+      box-sizing: border-box;
+      background: var(--tp-surface);
+      border-radius: 16px;
+      width: 95%;
+      max-width: 1060px;
+      max-height: 88vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--tp-border-subtle);
+      transform: translateY(12px) scale(0.98);
+      transition: transform 0.2s ease, width 0.2s ease, max-width 0.2s ease, height 0.2s ease;
+      overflow: hidden;
+    }
+
+    .tp-modal-dialog.maximized {
+      width: 96vw !important;
+      max-width: 96vw !important;
+      height: 94vh !important;
+      max-height: 94vh !important;
+      border-radius: 12px;
+    }
+
+    .tp-modal-overlay.open .tp-modal-dialog {
+      transform: translateY(0) scale(1);
+    }
+
+    .tp-modal-header {
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 100%;
+      padding: 18px 24px 14px;
+      border-bottom: 1px solid var(--tp-border-subtle);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      background: #FFFFFF;
+    }
+
+    .tp-modal-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--tp-brand);
+      margin-bottom: 4px;
+    }
+
+    .tp-modal-title {
+      word-break: break-word;
+      font-size: 20px;
+      font-weight: 800;
+      margin: 0;
+      color: var(--tp-ink);
+      line-height: 1.25;
+    }
+
+    .tp-modal-person {
+      word-break: break-word;
+      font-size: 14px;
+      color: var(--tp-ink-muted);
+      margin-top: 4px;
+      font-weight: 500;
+    }
+
+    .tp-modal-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .tp-modal-btn-icon {
+      background: #FFFFFF;
+      border: 1px solid var(--tp-border);
+      font-size: 15px;
+      line-height: 1;
+      color: var(--tp-ink-muted);
+      cursor: pointer;
+      border-radius: 8px;
+      padding: 6px 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.16s ease;
+      font-weight: 700;
+    }
+    .tp-modal-btn-icon:hover {
+      background: #F1F5F9;
+      color: var(--tp-ink);
+      border-color: #94A3B8;
+    }
+
+    .tp-modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      line-height: 1;
+      color: var(--tp-ink-muted);
+      cursor: pointer;
+      border-radius: 8px;
+      padding: 4px 8px;
+    }
+    .tp-modal-close:hover {
+      background: #F1F5F9;
+      color: var(--tp-ink);
+    }
+
+    /* Modal Tabs - Pinned with zero scrolling/drift */
+    .tp-modal-tabs {
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 100%;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      border-bottom: 1px solid var(--tp-border-subtle);
+      padding: 0 24px;
+      background: #F8FAFC;
+      flex-shrink: 0;
+    }
+
+    .tp-tab-btn {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      padding: 12px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      color: #64748B !important;
+      cursor: pointer;
+      transition: all 0.16s;
+      white-space: nowrap !important;
+      flex-shrink: 0;
+    }
+
+    .tp-tab-btn:hover {
+      color: #0F172A !important;
+    }
+
+    .tp-tab-btn.active {
+      color: #1E40AF !important;
+      border-bottom-color: #3B82F6 !important;
+      background: #FFFFFF !important;
+      font-weight: 700;
+    }
+
+    /* Modal Body */
+    .tp-modal-body {
+      padding: 20px 24px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      flex: 1;
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 100%;
+    }
+
+    .tp-tab-pane {
+      display: none;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+      overflow-x: hidden;
+    }
+    .tp-tab-pane.active {
+      display: block;
+    }
+
+    /* Per-Tab Toolbar */
+    .tp-tab-toolbar {
+      box-sizing: border-box;
+      width: 100%;
+      flex-wrap: wrap;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px dashed var(--tp-border-subtle);
+    }
+
+    .tp-tab-status-pill {
+      font-size: 12px;
+      color: var(--tp-ink-muted);
+      background: #F1F5F9;
+      padding: 5px 12px;
+      border-radius: 20px;
+    }
+
+    .tp-tab-status-pill strong {
+      color: var(--tp-teal);
+    }
+
+    .tp-edit-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Table Styles */
+    .tp-table {
+      width: 100%;
+      max-width: 100%;
+      table-layout: fixed;
+      border-collapse: collapse;
+      font-size: 13px;
+      border: 1px solid var(--tp-border);
+      border-radius: 10px;
+      overflow: hidden;
+      box-sizing: border-box;
+      white-space: normal !important;
+    }
+
+    .tp-table thead tr {
+      background: #1E293B;
+      color: #fff;
+    }
+
+    .tp-table th {
+      padding: 10px 14px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      text-align: left;
+      box-sizing: border-box;
+      overflow-wrap: break-word;
+      word-break: break-word;
+      white-space: normal !important;
+    }
+
+    .tp-table tbody tr {
+      border-bottom: 1px solid var(--tp-border-subtle);
+    }
+
+    .tp-table tbody tr:nth-child(even) {
+      background: #F8FAFC;
+    }
+
+    .tp-table td {
+      padding: 10px 14px;
+      vertical-align: top;
+      line-height: 1.5;
+      box-sizing: border-box;
+      overflow-wrap: break-word;
+      word-break: break-word;
+      white-space: normal !important;
+    }
+
+    .tp-table th *,
+    .tp-table td * {
+      white-space: normal !important;
+    }
+
+    .tp-table-clean thead {
+      display: none;
+    }
+
+    .tp-measures-cell {
+      line-height: 1.5;
+      color: #334155;
+      overflow-wrap: break-word;
+      word-break: break-word;
+    }
+
+    .tp-empty-table-cell {
+      text-align: center;
+      padding: 32px 14px;
+      color: var(--tp-ink-muted);
+    }
+
+    /* Edit Lists & Cards */
+    .tp-goals-edit-list, .tp-edit-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .tp-goal-edit-card, .tp-priority-edit-card, .tp-annexure-edit-card {
+      background: #F8FAFC;
+      border: 1px solid var(--tp-border);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+
+    .tp-goal-edit-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .tp-goal-idx-badge, .tp-priority-idx-badge, .tp-annex-idx-badge {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--tp-brand-dark);
+      background: rgba(79, 142, 247, 0.12);
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+
+    .tp-goal-weight-input-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .tp-input {
+      font-family: inherit;
+      font-size: 13px;
+      border: 1px solid var(--tp-border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      background: #fff;
+    }
+    .tp-input:focus, .tp-textarea:focus {
+      outline: none;
+      border-color: var(--tp-brand);
+      box-shadow: 0 0 0 2px rgba(79, 142, 247, 0.16);
+    }
+
+    .tp-input-weight {
+      width: 70px;
+      text-align: right;
+    }
+
+    .tp-btn-icon-del {
+      background: none;
+      border: none;
+      color: var(--tp-rose);
+      font-size: 20px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .tp-btn-icon-del:hover {
+      background: rgba(225, 29, 72, 0.1);
+    }
+
+    .tp-form-group {
+      margin-bottom: 8px;
+    }
+
+    .tp-form-group label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--tp-ink-muted);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .tp-textarea {
+      width: 100%;
+      font-family: inherit;
+      font-size: 12px;
+      border: 1px solid var(--tp-border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      resize: vertical;
+      line-height: 1.45;
+    }
+
+    .tp-edit-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .tp-edit-row .tp-textarea {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .tp-row-idx {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--tp-ink-muted);
+      padding-top: 8px;
+      width: 24px;
+    }
+
+    .tp-weight-live-bar {
+      margin-top: 14px;
+      padding: 10px 14px;
+      background: #F1F5F9;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+
+    .tp-weight-warn {
+      margin-left: 8px;
+      font-weight: 600;
+      color: #C0392B;
+    }
+
+    /* Role Card & Resp Blocks */
+    .tp-role-overview-card {
+      background: #F8FAFC;
+      border: 1px solid var(--tp-border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+    }
+
+    .tp-role-card-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--tp-brand);
+      margin-bottom: 6px;
+    }
+
+    /* Annexures View */
+    .tp-annexures-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .tp-annexure-card {
+      background: var(--tp-surface);
+      border: 1px solid var(--tp-border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .tp-annexure-header {
+      padding: 12px 16px;
+      background: #F8FAFC;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 13px;
+      color: var(--tp-ink);
+    }
+
+    .tp-annexure-chevron {
+      font-size: 11px;
+      color: var(--tp-ink-muted);
+      transition: transform 0.2s;
+    }
+
+    .tp-annexure-card.open .tp-annexure-chevron {
+      transform: rotate(180deg);
+    }
+
+    .tp-annexure-body {
+      padding: 16px;
+      border-top: 1px solid var(--tp-border-subtle);
+      display: none;
+      overflow-x: auto;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .tp-annexure-card.open .tp-annexure-body {
+      display: block;
+    }
+
+    /* Original Template Table Classes inside Annexures */
+    .annex-table {
+      width: 100%;
+      min-width: 680px;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin: 10px 0;
+      white-space: normal !important;
+    }
+    .annex-table th, .annex-table td {
+      border: 1px solid #CBD5E1;
+      padding: 6px 10px;
+      text-align: left;
+      white-space: normal !important;
+      overflow-wrap: break-word;
+      word-break: break-word;
+    }
+    .annex-table th {
+      background: #F1F5F9;
+      font-weight: 700;
+    }
+    .annex-table td.center, .annex-table th.center {
+      text-align: center;
+    }
+    .annex-note {
+      font-size: 12px;
+      color: #64748B;
+      margin: 6px 0;
+    }
+    .cat-head td {
+      background: #E2E8F0;
+      font-weight: 700;
+    }
+
+    /* Visual Table & Spreadsheet Editor in Annexures */
+    .tp-annex-visual-editor-box {
+      background: #FFFFFF;
+      border: 1px solid var(--tp-border);
+      border-radius: 8px;
+      padding: 14px;
+      min-height: 120px;
+    }
+
+    .tp-table-editor-wrapper {
+      margin: 10px 0 16px;
+      background: #F8FAFC;
+      border: 1px solid #CBD5E1;
+      border-radius: 8px;
+      padding: 10px;
+      overflow-x: auto;
+    }
+
+    .tp-table-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px dashed #CBD5E1;
+      flex-wrap: wrap;
+    }
+
+    .tp-tbl-tool-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #64748B;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .tp-table-btn {
+      background: #FFFFFF;
+      border: 1px solid #CBD5E1;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #334155;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.14s;
+    }
+    .tp-table-btn:hover {
+      background: #EFF6FF;
+      border-color: #3B82F6;
+      color: #1D4ED8;
+    }
+    .tp-table-btn-danger:hover {
+      background: #FEF2F2;
+      border-color: #EF4444;
+      color: #B91C1C;
+    }
+
+    .tp-editable-annex-table {
+      margin: 0 !important;
+      background: #FFFFFF;
+    }
+
+    .tp-editable-cell {
+      outline: none;
+      border: 1px dashed #94A3B8 !important;
+      background: #FFFFFF;
+      min-width: 50px;
+      cursor: text;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .tp-editable-cell:focus {
+      background: #EFF6FF !important;
+      border: 1px solid #3B82F6 !important;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+    }
+
+    .tp-editable-text {
+      outline: none;
+      border: 1px dashed transparent;
+      padding: 4px 6px;
+      border-radius: 4px;
+      cursor: text;
+      transition: all 0.14s;
+    }
+    .tp-editable-text:hover {
+      border-color: #CBD5E1;
+      background: #F8FAFC;
+    }
+    .tp-editable-text:focus {
+      border: 1px solid #3B82F6;
+      background: #EFF6FF;
+    }
+
+    .tp-empty-msg {
+      padding: 32px;
+      text-align: center;
+      color: var(--tp-ink-muted);
+      font-style: italic;
+    }
+
+    /* Primary Top View Tabs */
+    .tp-top-tabs-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--tp-border-subtle);
+    }
+
+    .tp-view-tabs {
+      display: inline-flex;
+      background: #E2E8F0;
+      padding: 4px;
+      border-radius: 12px;
+      gap: 4px;
+    }
+
+    .tp-view-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 18px;
+      border: none;
+      background: transparent;
+      color: #475569;
+      font-size: 14px;
+      font-weight: 700;
+      font-family: inherit;
+      border-radius: 9px;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+
+    .tp-view-tab:hover {
+      color: #0F172A;
+      background: rgba(255, 255, 255, 0.6);
+    }
+
+    .tp-view-tab.active {
+      background: #FFFFFF;
+      color: var(--tp-brand-dark);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .tp-view-tab-icon {
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .tp-view-tab-pill {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      background: #F1F5F9;
+      color: #64748B;
+      padding: 2px 7px;
+      border-radius: 10px;
+    }
+
+    .tp-view-tab.active .tp-view-tab-pill {
+      background: #FEF3C7;
+      color: #92400E;
+    }
+
+    /* Historical View Card */
+    .tp-historical-content {
+      padding: 24px 0;
+    }
+
+    .tp-historical-placeholder-card {
+      background: #FFFFFF;
+      border: 1px dashed #CBD5E1;
+      border-radius: 16px;
+      padding: 48px 32px;
+      text-align: center;
+      max-width: 720px;
+      margin: 0 auto;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    }
+
+    .tp-hist-icon-box {
+      font-size: 42px;
+      margin-bottom: 16px;
+      line-height: 1;
+    }
+
+    .tp-hist-heading {
+      font-size: 20px;
+      font-weight: 800;
+      color: #0F172A;
+      margin-bottom: 10px;
+    }
+
+    .tp-hist-desc {
+      font-size: 14px;
+      color: #64748B;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+
+    .tp-hist-features {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .tp-hist-feature-pill {
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      color: #334155;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 20px;
+    }
+
+    /* Admin Manage Editors Styles */
+    .tp-btn-admin {
+      background: #7C3AED;
+      color: #FFFFFF;
+      border-color: #7C3AED;
+      font-weight: 700;
+      gap: 6px;
+    }
+    .tp-btn-admin:hover {
+      background: #6D28D9;
+      border-color: #6D28D9;
+      box-shadow: 0 4px 12px rgba(124, 58, 237, 0.28);
+    }
+    .tp-modal-dialog-sm {
+      max-width: 540px !important;
+      width: 95% !important;
+    }
+    .tp-editors-add-box {
+      background: #F8FAFC;
+      border: 1px solid var(--tp-border-subtle);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+    .tp-editors-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 280px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+    .tp-editor-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: #FFFFFF;
+      border: 1px solid var(--tp-border-subtle);
+      border-radius: 10px;
+      transition: all 0.15s ease;
+    }
+    .tp-editor-item:hover {
+      border-color: var(--tp-border);
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+    }
+    .tp-editor-item-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+    .tp-editor-avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: #EDE9FE;
+      color: #6D28D9;
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .tp-editor-info {
+      min-width: 0;
+    }
+    .tp-editor-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--tp-ink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tp-editor-email {
+      font-size: 12px;
+      color: var(--tp-ink-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tp-btn-revoke {
+      background: #FFF1F2;
+      color: #E11D48;
+      border: 1px solid #FECDD3;
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+    .tp-btn-revoke:hover {
+      background: #FFE4E6;
+      border-color: #FDA4AF;
+      color: #BE123C;
+    }
+    .tp-empty-editors {
+      padding: 24px 16px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--tp-ink-muted);
+      background: #F8FAFC;
+      border: 1px dashed var(--tp-border);
+      border-radius: 10px;
+    }
+  </style>
+
+  <!-- Top View Navigation Tabs -->
+  <div class="tp-top-tabs-bar">
+    <div class="tp-view-tabs" role="tablist">
+      <button type="button" class="tp-view-tab active" id="tpViewTabSmartGoals" onclick="window.TeamPerformance.switchView('smart-goals')">
+        <span class="tp-view-tab-icon">🎯</span>
+        <span class="tp-view-tab-text">SMART GOALS</span>
+      </button>
+      <button type="button" class="tp-view-tab" id="tpViewTabHistorical" onclick="window.TeamPerformance.switchView('historical')">
+        <span class="tp-view-tab-icon">📜</span>
+        <span class="tp-view-tab-text">Historical Data</span>
+        <span class="tp-view-tab-pill">Upcoming</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 1. SMART GOALS View Container -->
+  <div id="tpSmartGoalsView" class="tp-view-section">
+    <!-- Top Navigation & Toolbar -->
+    <div class="tp-header">
+      <div class="tp-header-top-row">
+        <div class="tp-header-left">
+          <div class="tp-title-row">
+            <h2 class="tp-title">SMART GOALS</h2>
+            <span class="tp-badge" id="tpTotalCountBadge">Loading...</span>
+          </div>
+          <p class="tp-subtitle">State-to-district operational hierarchy, commitments, and editable scorecards</p>
+        </div>
+        <div class="tp-header-right">
+          <button type="button" class="tp-btn tp-btn-admin" id="tpManageEditorsBtn" onclick="window.TeamPerformance.openEditorsModal()" style="display:none;" title="Manage SMART GOALS Editors (Admin only)">
+            ⚙ Manage Editors
+          </button>
+        </div>
+      </div>
+
+    <div class="tp-header-controls">
+      <!-- Segmented State Switcher -->
+      <div class="tp-segmented-control" role="tablist">
+        <button type="button" class="tp-seg-btn active" id="tpSegMH" onclick="window.TeamPerformance.setState('MH')">
+          <span class="tp-seg-icon">🚩</span> Maharashtra
+        </button>
+        <button type="button" class="tp-seg-btn" id="tpSegCH" onclick="window.TeamPerformance.setState('CH')">
+          <span class="tp-seg-icon">🏛️</span> Chhattisgarh
+        </button>
+        <button type="button" class="tp-seg-btn" id="tpSegMP" onclick="window.TeamPerformance.setState('MP')">
+          <span class="tp-seg-icon">🌳</span> Madhya Pradesh
+        </button>
+        <button type="button" class="tp-seg-btn" id="tpSegBR" onclick="window.TeamPerformance.setState('BR')">
+          <span class="tp-seg-icon">🌾</span> Bihar
+        </button>
+      </div>
+
+      <!-- Quick Search Input -->
+      <div class="tp-search-box">
+        <svg class="tp-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="tpSearchInput" placeholder="Search person, district, role..." oninput="window.TeamPerformance.onSearch(this.value)" autocomplete="off">
+        <button type="button" id="tpSearchClear" class="tp-search-clear" onclick="window.TeamPerformance.clearSearch()" style="display:none;">&times;</button>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="tp-btn-group">
+        <button type="button" class="tp-btn tp-btn-secondary" onclick="window.TeamPerformance.expandAll()" title="Expand all divisions">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="7 13 12 18 17 13"></polyline><polyline points="7 6 12 11 17 6"></polyline></svg> Expand All
+        </button>
+        <button type="button" class="tp-btn tp-btn-secondary" onclick="window.TeamPerformance.collapseAll()" title="Collapse to divisions overview">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 11 12 6 7 11"></polyline><polyline points="17 18 12 13 7 18"></polyline></svg> Collapse All
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Division Toggle Pills Bar -->
+  <div class="tp-division-pills-bar" id="tpDivisionBar">
+    <span class="tp-filter-label">Quick Toggle:</span>
+    <div class="tp-pills-wrapper" id="tpDivisionPills">
+      <!-- Injected dynamically -->
+    </div>
+  </div>
+
+  <!-- Search Summary -->
+  <div class="tp-search-summary" id="tpSearchSummary" style="display:none;">
+    <span id="tpSearchSummaryText">Showing matches</span>
+    <button type="button" class="tp-link-btn" onclick="window.TeamPerformance.clearSearch()">Clear search</button>
+  </div>
+
+  <!-- Flowchart Viewport -->
+  <div class="tp-viewport" id="tpViewport">
+    <div class="tp-canvas" id="tpCanvas">
+      <svg class="tp-connectors-svg" id="tpSvg"></svg>
+      <div id="tpTreeContainer" class="tp-tree-container">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+  </div> <!-- End #tpSmartGoalsView -->
+
+  <!-- 2. Historical Data View Container -->
+  <div id="tpHistoricalView" class="tp-view-section" style="display:none;">
+    <div class="tp-header">
+      <div class="tp-header-left">
+        <div class="tp-title-row">
+          <h2 class="tp-title">Historical Data</h2>
+          <span class="tp-badge">Archival Module</span>
+        </div>
+        <p class="tp-subtitle">Quarterly evaluations, historical performance records, and longitudinal trend archives</p>
+      </div>
+    </div>
+
+    <div class="tp-historical-content">
+      <div class="tp-historical-placeholder-card">
+        <div class="tp-hist-icon-box">📜</div>
+        <h3 class="tp-hist-heading">Historical Performance Archive</h3>
+        <p class="tp-hist-desc">
+          This tab will house historical performance snapshots, past quarter evaluations, and previous academic year reviews.
+          Data integration and archival records setup will be configured here.
+        </p>
+        <div class="tp-hist-features">
+          <div class="tp-hist-feature-pill">📅 Prior Quarterly Reviews (Q1 &middot; Q2 &middot; Q3)</div>
+          <div class="tp-hist-feature-pill">📊 State &amp; Division Trends</div>
+          <div class="tp-hist-feature-pill">🎯 Scorecard Progression History</div>
+        </div>
+      </div>
+    </div>
+  </div> <!-- End #tpHistoricalView -->
+
+  <!-- Role Detail & Full Editor Modal -->
+  <div id="tpModal" class="tp-modal-overlay" onclick="if(event.target===this)window.TeamPerformance.closeModal()">
+    <div class="tp-modal-dialog" role="dialog" aria-modal="true">
+      <!-- Modal Header -->
+      <div class="tp-modal-header">
+        <div class="tp-modal-title-wrap">
+          <div class="tp-modal-badge" id="tpModalLevel">Level</div>
+          <h3 class="tp-modal-title" id="tpModalTitle">Role Title</h3>
+          <div class="tp-modal-person" id="tpModalPerson">Person Name</div>
+        </div>
+        <div class="tp-modal-header-actions">
+          <button type="button" class="tp-btn tp-btn-sm tp-btn-subtle" id="tpResetDefaultBtn" onclick="window.TeamPerformance.resetDefaultAll()" title="Reset all data back to original organization template" style="display:none;">
+            ↺ Reset to Default
+          </button>
+          <button type="button" class="tp-modal-btn-icon" id="tpModalMaxBtn" onclick="window.TeamPerformance.toggleModalMaximize()" title="Maximize / Fullscreen" aria-label="Maximize / Fullscreen">
+            ⛶
+          </button>
+          <button type="button" class="tp-modal-close" onclick="window.TeamPerformance.closeModal()" title="Close">&times;</button>
+        </div>
+      </div>
+
+      <!-- Modal Tabs -->
+      <div class="tp-modal-tabs">
+        <button type="button" class="tp-tab-btn active" id="tpTabBtnGoals" onclick="window.TeamPerformance.switchTab('goals')">Goals &amp; Measures</button>
+        <button type="button" class="tp-tab-btn" id="tpTabBtnRole" onclick="window.TeamPerformance.switchTab('role')">Role &amp; Responsibilities</button>
+        <button type="button" class="tp-tab-btn" id="tpTabBtnPriority" onclick="window.TeamPerformance.switchTab('priority')">3 Months Priority</button>
+        <button type="button" class="tp-tab-btn" id="tpTabBtnAnnexures" onclick="window.TeamPerformance.switchTab('annexures')">Annexures</button>
+      </div>
+
+      <!-- Modal Content Body -->
+      <div class="tp-modal-body">
+        <!-- 1. Goals & Measures Tab -->
+        <div id="tpTabPaneGoals" class="tp-tab-pane active">
+          <div class="tp-tab-toolbar">
+            <div class="tp-tab-status-pill">
+              <span id="tpGoalsCountText">0 Goals</span> &middot; <strong id="tpGoalsWeightText">100%</strong> Weight
+            </div>
+            <div class="tp-goals-actions">
+              <button type="button" class="tp-btn tp-btn-sm tp-btn-primary" id="tpEditGoalsBtn" onclick="window.TeamPerformance.toggleEditGoals(true)">
+                ✎ Edit Goals
+              </button>
+              <div id="tpEditGoalsControls" class="tp-edit-controls" style="display:none;">
+                <button type="button" class="tp-btn tp-btn-sm tp-btn-secondary" onclick="window.TeamPerformance.addNewGoalRow()">+ Add Goal</button>
+                <button type="button" class="tp-btn tp-btn-sm tp-btn-success" onclick="window.TeamPerformance.saveGoals()">Save Changes</button>
+                <button type="button" class="tp-btn tp-btn-sm tp-btn-cancel" onclick="window.TeamPerformance.toggleEditGoals(false)">Cancel</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- View Mode -->
+          <div id="tpGoalsViewContainer" style="width: 100%; max-width: 100%; box-sizing: border-box; overflow-x: hidden;">
+            <table class="tp-table">
+              <thead>
+                <tr>
+                  <th style="width: 44px; text-align: center;">#</th>
+                  <th style="width: 30%;">Goal</th>
+                  <th style="width: auto;">Measures &amp; Key Deliverables</th>
+                  <th style="width: 110px; text-align: right; white-space: nowrap !important;">Weightage</th>
+                </tr>
+              </thead>
+              <tbody id="tpGoalsTableBody"></tbody>
+            </table>
+          </div>
+
+          <!-- Edit Mode -->
+          <div id="tpGoalsEditContainer" style="display:none;">
+            <div id="tpGoalsEditList" class="tp-goals-edit-list"></div>
+            <div class="tp-weight-live-bar" id="tpWeightLiveBar">
+              Total Weight: <strong id="tpLiveWeightTotal">100%</strong>
+              <span id="tpLiveWeightWarning" class="tp-weight-warn" style="display:none;">(Must equal 100%)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Role & Responsibilities Tab -->
+        <div id="tpTabPaneRole" class="tp-tab-pane">
+          <div class="tp-tab-toolbar">
+            <div class="tp-tab-status-pill">Designation Roles &amp; Responsibilities</div>
+            <div>
+              <button type="button" class="tp-btn tp-btn-sm tp-btn-primary" id="tpEditRoleBtn" onclick="window.TeamPerformance.toggleEditRole(true)">
+                ✎ Edit Role
+              </button>
+              <div id="tpEditRoleControls" class="tp-edit-controls" style="display:none;">
+                <button type="button" class="tp-btn tp-btn-sm tp-btn-secondary" onclick="window.TeamPerformance.addNewRespRow()">+ Add Item</button>
+                <button type="button" class="tp-btn tp-btn-sm tp-btn-success" onclick="window.TeamPerformance.saveRole()">Save Changes</button>
+                <button type="button" class="tp-btn tp-btn-sm tp-btn-cancel" onclick="window.TeamPerformance.toggleEditRole(false)">Cancel</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- View Mode -->
+          <div id="tpRoleViewContainer"></div>
+
+          <!-- Edit Mode -->
+          <div id="tpRoleEditContainer" style="display:none;">
+            <div class="tp-form-group">
+              <label>Role Summary</label>
+              <input type="text" id="tpInputRoleOverview" class="tp-input" style="width:100%;" placeholder="Summary statement of primary role...">
+            </div>
+            <div class="tp-form-group">
+              <label>Responsibilities List</label>
+              <div id="tpRespEditList" class="tp-edit-list"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. 3 Months Priority Tab -->
+        <div id="tpTabPanePriority" class="tp-tab-pane">
+          <div class="tp-tab-toolbar">
+            <div class="tp-tab-status-pill">Quarterly Strategic Action Items</div>
+            <div>
+              <button type="button" class="tp-btn tp-btn-sm tp-btn-primary" id="tpEditPriorityBtn" onclick="window.TeamPerformance.toggleEditPriority(true)">
+                ✎ Edit Priority
+              </button>
+              <div id="tpEditPriorityControls" class="tp-edit-controls" style="display:none;">
+                <button type="button" class="tp-btn tp-btn-sm tp-btn-secondary" onclick="window.TeamPerformance.addNewPriorityRow()">+ Add Priority Item</button>
+                <button type="button" class="tp-btn tp-btn-sm tp-btn-success" onclick="window.TeamPerformance.savePriority()">Save Changes</button>
+                <button type="button" class="tp-btn tp-btn-sm tp-btn-cancel" onclick="window.TeamPerformance.toggleEditPriority(false)">Cancel</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- View Mode -->
+          <div id="tpPriorityViewContainer"></div>
+
+          <!-- Edit Mode -->
+          <div id="tpPriorityEditContainer" style="display:none;">
+            <div id="tpPriorityEditList" class="tp-edit-list"></div>
+          </div>
+        </div>
+
+        <!-- 4. Annexures Tab -->
+        <div id="tpTabPaneAnnexures" class="tp-tab-pane">
+          <div class="tp-tab-toolbar">
+            <div class="tp-tab-status-pill">Operational Guidelines &amp; Reference Tables</div>
+            <div>
+              <button type="button" class="tp-btn tp-btn-sm tp-btn-primary" id="tpEditAnnexuresBtn" onclick="window.TeamPerformance.toggleEditAnnexures(true)">
+                ✎ Edit Annexures
+              </button>
+              <div id="tpEditAnnexuresControls" class="tp-edit-controls" style="display:none;">
+                <button type="button" class="tp-btn tp-btn-sm tp-btn-secondary" onclick="window.TeamPerformance.addNewAnnexureRow()">+ Add Annexure</button>
+                <button type="button" class="tp-btn tp-btn-sm tp-btn-success" onclick="window.TeamPerformance.saveAnnexures()">Save Changes</button>
+                <button type="button" class="tp-btn tp-btn-sm tp-btn-cancel" onclick="window.TeamPerformance.toggleEditAnnexures(false)">Cancel</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- View Mode -->
+          <div id="tpAnnexuresViewContainer"></div>
+
+          <!-- Edit Mode -->
+          <div id="tpAnnexuresEditContainer" style="display:none;">
+            <div id="tpAnnexuresEditList" class="tp-edit-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manage Editors Modal (Admin Only) -->
+  <div id="tpEditorsModal" class="tp-modal-overlay" onclick="if(event.target===this)window.TeamPerformance.closeEditorsModal()" style="display:none;">
+    <div class="tp-modal-dialog tp-modal-dialog-sm" role="dialog" aria-modal="true">
+      <div class="tp-modal-header">
+        <div class="tp-modal-title-wrap">
+          <div class="tp-modal-badge" style="background: rgba(124, 58, 237, 0.12); color: #7C3AED;">Access Control</div>
+          <h3 class="tp-modal-title">Manage SMART GOALS Editors</h3>
+          <div class="tp-modal-person">Grant or revoke editor permissions for scorecards &amp; measures</div>
+        </div>
+        <button type="button" class="tp-modal-close" onclick="window.TeamPerformance.closeEditorsModal()" title="Close">&times;</button>
+      </div>
+      <div class="tp-modal-body" style="padding: 20px;">
+        <!-- Add Editor Form -->
+        <div class="tp-editors-add-box">
+          <label style="display:block; font-size: 13px; font-weight: 700; margin-bottom: 6px; color: #0F172A;">Grant Edit Permission</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="email" id="tpNewEditorEmail" class="tp-input" placeholder="Enter staff email (e.g. name@openlinksfoundation.org)" style="flex: 1;" list="tpStaffEmailList" autocomplete="off" />
+            <datalist id="tpStaffEmailList"></datalist>
+            <button type="button" class="tp-btn tp-btn-primary" onclick="window.TeamPerformance.grantEditorAccess()">
+              + Grant Access
+            </button>
+          </div>
+          <p style="font-size: 12px; color: #64748B; margin: 8px 0 0; line-height: 1.4;">
+            🔒 <strong>STRICTLY Admin Only by Default:</strong> IT Admins have edit access automatically. Adding an employee here grants them permission to edit SMART Goals scorecards, priorities, and annexures.
+          </p>
+        </div>
+
+        <!-- Active Editors Section -->
+        <div>
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+            <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: #0F172A;">Authorized Editors (<span id="tpEditorsCount">0</span>)</h4>
+            <span style="font-size: 11px; font-weight: 600; color: #7C3AED; background: #EDE9FE; padding: 2px 8px; border-radius: 12px;">Admin-Managed</span>
+          </div>
+          <div id="tpEditorsList" class="tp-editors-list">
+            <!-- Injected dynamically -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
