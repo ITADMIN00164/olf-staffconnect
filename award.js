@@ -940,7 +940,7 @@ window.AWARD_CONFIG = {
         "<div><dt>Requested by</dt><dd>" + escapeHtml(row.requester_name || "—") +
           (row.requester_role ? ' <span class="chip-role">' +
              escapeHtml(row.requester_role) + "</span>" : "") + "</dd></div>" +
-        "<div><dt>Levels</dt><dd>" + awardsCellHtml(awardsOf(row), row) + "</dd></div>" +
+        "<div><dt>Gifts</dt><dd>" + awardsCellHtml(awardsOf(row), row) + "</dd></div>" +
         "<div><dt>Total</dt><dd>" + escapeHtml(Number(row.quantity).toLocaleString()) +
         "</dd></div>" +
         "<div><dt>For</dt><dd>" +
@@ -1160,7 +1160,7 @@ window.AWARD_CONFIG = {
     el.hoSummary.innerHTML =
       "<dl>" +
         "<div><dt>Requested by</dt><dd>" + escapeHtml(row.requester_name || "—") + "</dd></div>" +
-        "<div><dt>Levels</dt><dd>" + awardsCellHtml(awardsOf(row), row) + "</dd></div>" +
+        "<div><dt>Gifts</dt><dd>" + awardsCellHtml(awardsOf(row), row) + "</dd></div>" +
         (remarkOf(row) ? "<div><dt>Remark</dt><dd>" + escapeHtml(remarkOf(row)) + "</dd></div>" : "") +
         "<div><dt>For</dt><dd>" +
           escapeHtml([p.district, p.division, p.state].filter(Boolean).join(", ")) +
@@ -1996,7 +1996,7 @@ window.AWARD_CONFIG = {
   }
 
   function awardLineHtml() {
-    var opts = '<option value="">Select level</option>';
+    var opts = '<option value="">Select gift</option>';
     awardTypes.forEach(function (t) {
       opts += '<option value="' + escapeHtml(t.id) + '">' +
               escapeHtml(levelLabel(t.name, t.code)) + "</option>";
@@ -2007,11 +2007,11 @@ window.AWARD_CONFIG = {
       cats += '<option value="' + escapeHtml(c) + '">' + escapeHtml(c) + "</option>";
     });
     return '<div class="award-line">' +
-             '<select class="award-line-type" aria-label="Level">' + opts + "</select>" +
+             '<select class="award-line-type" aria-label="Gift">' + opts + "</select>" +
              '<select class="award-line-cat" aria-label="Category" hidden>' + cats + "</select>" +
              '<input type="number" class="award-line-qty mono" min="1" max="1000000" ' +
                     'step="1" placeholder="Qty" aria-label="Quantity" />' +
-             '<button type="button" class="award-line-remove" aria-label="Remove this level">' +
+             '<button type="button" class="award-line-remove" aria-label="Remove this gift">' +
                '<i class="aw-icon" data-aw-icon="close" aria-hidden="true"></i>' +
              "</button>" +
              '<input type="text" class="award-line-other" maxlength="60" hidden ' +
@@ -2182,7 +2182,7 @@ window.AWARD_CONFIG = {
       .then(function (res) {
         if (res.error) {
           el.awardLines.innerHTML =
-            '<p class="error">Could not load the levels.</p>';
+            '<p class="error">Could not load the gifts.</p>';
           reportError("load award types", res.error);
           return;
         }
@@ -2194,7 +2194,7 @@ window.AWARD_CONFIG = {
         if (allRequisitions.length) renderRows();
       })
       .catch(function (err) {
-        el.awardLines.innerHTML = '<p class="error">Could not load the levels.</p>';
+        el.awardLines.innerHTML = '<p class="error">Could not load the gifts.</p>';
         reportError("load award types", err);
       });
   }
@@ -2268,19 +2268,19 @@ window.AWARD_CONFIG = {
       var n = Number(l.qty);
 
       if (!l.id) {
-        if (!lineFault) lineFault = "Choose a level on every line, or remove the empty one.";
+        if (!lineFault) lineFault = "Choose a gift on every line, or remove the empty one.";
       } else if (l.needsCategory && !l.category) {
         if (!lineFault) lineFault = "Choose a category for every Block, District and Jute Bag line.";
       } else if (l.needsCategory && l.category === "Other" && !l.other) {
         if (!lineFault) lineFault = "Say what the other category is.";
       } else if (!l.qty) {
-        if (!lineFault) lineFault = "Say how many for each level.";
+        if (!lineFault) lineFault = "Say how many for each gift.";
       } else if (!Number.isInteger(n) || n < 1) {
         if (!lineFault) lineFault = "Quantities are whole numbers of 1 or more.";
       } else if (n > 1000000) {
         if (!lineFault) lineFault = "That quantity looks too large.";
       } else if (seen[l.id + "|" + l.category + "|" + l.other.toLowerCase()]) {
-        if (!lineFault) lineFault = "The same level and category is on the requisition twice.";
+        if (!lineFault) lineFault = "The same gift and category is on the requisition twice.";
       } else {
         seen[l.id + "|" + l.category + "|" + l.other.toLowerCase()] = true;
         // A jute bag is one of two types, by size, once those exist; until then it has none.
@@ -2302,7 +2302,7 @@ window.AWARD_CONFIG = {
       l.line.classList.add("has-error");
     });
 
-    if (!items.length && !lineFault) lineFault = "Add at least one level.";
+    if (!items.length && !lineFault) lineFault = "Add at least one gift.";
 
     /* The remark says why these are needed, and is asked for on every requisition
        but one that is only jute bags. It is kept as the note on the first step of
@@ -2385,7 +2385,7 @@ window.AWARD_CONFIG = {
         var first = values.items[0];
         var typeName = values.items.length === 1
           ? first.name + (first.category ? " · " + (first.category_other || first.category) : "")
-          : "across " + values.items.length + " levels";
+          : "across " + values.items.length + " gifts";
 
         resetAwardLines();
 
@@ -2554,7 +2554,7 @@ window.AWARD_CONFIG = {
     fillSelect(el.filterDistrict, Object.keys(districts).sort(), "All districts",
       function (name) { return name; }, function (name) { return name; });
 
-    fillSelect(el.filterType, Object.keys(types).sort(), "All levels",
+    fillSelect(el.filterType, Object.keys(types).sort(), "All gifts",
       function (name) { return name; }, function (name) { return name; });
   }
 
@@ -2707,7 +2707,7 @@ window.AWARD_CONFIG = {
 
     if (!all.length) {
       body.innerHTML = '<tr class="placeholder-row"><td colspan="8">No jute bags asked for yet. ' +
-        "Choose Jute Bag under Levels when raising a requisition.</td></tr>";
+        "Choose Jute Bag under Gifts when raising a requisition.</td></tr>";
       foot.hidden = true;
       return;
     }
@@ -2905,7 +2905,7 @@ window.AWARD_CONFIG = {
     box.innerHTML =
       '<div class="snow-head"><h4>Current stock balance</h4></div>' +
       '<div class="snow-grid">' +
-        card(stockScope === "jute" ? "All sizes" : "All levels", total, true) +
+        card(stockScope === "jute" ? "All sizes" : "All gifts", total, true) +
         types.map(function (t) {
           return card(shortType(t), { held: held[t.id] || 0, start: start[t.id] || 0,
                                       came: came[t.id] || 0, used: used[t.id] || 0 }, false);
@@ -3242,7 +3242,7 @@ window.AWARD_CONFIG = {
     el.levelsSub.textContent = [row.requester_name, p.district].filter(Boolean).join(" \u00b7 ") +
       " \u00b7 " + stageLabel(row, false);
     el.levelsBody.innerHTML =
-      '<div class="lvls-head"><span>Level</span><span>Category</span><span>Asked</span></div>' +
+      '<div class="lvls-head"><span>Gift</span><span>Category</span><span>Asked</span></div>' +
       awardsCellHtml(awardsOf(row), row) +
       (askedOf(row)
         ? '<p class="lvls-total">Delivered <b>' + escapeHtml(deliveredOf(row).toLocaleString()) +

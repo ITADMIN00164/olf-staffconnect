@@ -110,8 +110,8 @@
           </select>
         </div>
         <div class="field field-sm">
-          <label for="filter-type">Filter by level</label>
-          <select id="filter-type"><option value="">All levels</option></select>
+          <label for="filter-type">Filter by gift</label>
+          <select id="filter-type"><option value="">All gifts</option></select>
         </div>
         <div class="field field-sm">
           <label for="filter-search">Search requester</label>
@@ -126,7 +126,7 @@
               <th scope="col">Division</th>
               <th scope="col">District</th>
               <th scope="col">Requester</th>
-              <th scope="col">Levels</th>
+              <th scope="col">Gifts</th>
               <th scope="col" class="num" title="Delivered / asked for">Delivered / Asked</th>
               <th scope="col">Submitted</th>
               <th scope="col">Status</th>
@@ -161,7 +161,7 @@
                   <th scope="col">Division</th>
                   <th scope="col">District</th>
                   <th scope="col">Requester</th>
-                  <th scope="col">Levels</th>
+                  <th scope="col">Gifts</th>
                   <th scope="col" class="num">Quantity</th>
                   <th scope="col">Status</th>
                   <th scope="col">Log</th>
@@ -491,7 +491,7 @@
         </div>
 
         <div class="field field-wide">
-          <label>Levels <span class="req" aria-hidden="true">*</span></label>
+          <label>Gifts <span class="req" aria-hidden="true">*</span></label>
 
           <!-- One line per level asked for. Built by award.js from the award
                types it loads, so there is nothing to keep in step here. -->
@@ -499,7 +499,7 @@
 
           <button type="button" class="btn btn-ghost btn-sm award-add" id="award-add">
             <i class="aw-icon" data-aw-icon="plus" aria-hidden="true"></i>
-            Add another level
+            Add another gift
           </button>
 
           <p class="error" id="award-type-error" role="alert"></p>
@@ -687,7 +687,7 @@
       <div class="aw-box aw-box-sm" role="dialog" aria-modal="true" aria-labelledby="levels-heading">
         <div class="aw-box-head">
           <div class="aw-box-heading">
-            <h2 id="levels-heading">Levels asked for</h2>
+            <h2 id="levels-heading">Gifts asked for</h2>
             <p class="aw-box-sub" id="levels-sub"></p>
           </div>
           <button type="button" class="aw-box-close" data-aw-close-levels aria-label="Close">
