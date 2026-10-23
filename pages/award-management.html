@@ -248,6 +248,17 @@
             </div>
           </div>
 
+          <div class="jute-bar">
+            <div class="seg" role="tablist" aria-label="Jute bags view">
+              <button type="button" role="tab" class="seg-btn is-active" data-jute-view="requests" aria-selected="true">By requisition</button>
+              <button type="button" role="tab" class="seg-btn" data-jute-view="districts" aria-selected="false">By district</button>
+            </div>
+            <button type="button" id="jute-download" class="btn btn-ghost btn-sm">
+              <i class="aw-icon" data-aw-icon="download" aria-hidden="true"></i>Download
+            </button>
+          </div>
+
+          <div id="jute-view-requests">
           <div class="table-scroll">
             <table id="jute-table">
               <thead>
@@ -267,6 +278,25 @@
               </tbody>
               <tfoot id="jute-foot" hidden></tfoot>
             </table>
+          </div>
+          </div>
+
+          <div id="jute-view-districts" hidden>
+            <div class="table-scroll">
+              <table id="jute-district-table">
+                <thead>
+                  <tr>
+                    <th scope="col">District</th>
+                    <th scope="col" class="num">Requisitions</th>
+                    <th scope="col" class="num">Small</th>
+                    <th scope="col" class="num">Big</th>
+                    <th scope="col" class="num">Total</th>
+                    <th scope="col">Small and Big</th>
+                  </tr>
+                </thead>
+                <tbody id="jute-district-body"></tbody>
+              </table>
+            </div>
           </div>
         </section>
       </div>

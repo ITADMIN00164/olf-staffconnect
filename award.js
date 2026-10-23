@@ -730,6 +730,7 @@ window.AWARD_CONFIG = {
     if (!el.form) return;        // the tab is not on screen
 
     awardViewStarted = false;      // a fresh page has a fresh Award Management view
+    juteView = "requests";
 
     allRequisitions = [];
     returnFocusTo = null;          // the node it pointed at is gone
@@ -1529,6 +1530,12 @@ window.AWARD_CONFIG = {
     el.form.dataset.awWired = "1";
 
     wireTabList(el.subtabs, "data-aw-subtab");
+
+    Array.prototype.forEach.call(document.querySelectorAll("[data-jute-view]"), function (btn) {
+      btn.addEventListener("click", function () { showJuteView(btn.getAttribute("data-jute-view")); });
+    });
+    var juteDownload = document.getElementById("jute-download");
+    if (juteDownload) juteDownload.addEventListener("click", downloadJute);
 
     ["jute-district", "jute-status", "jute-size"].forEach(function (id) {
       var sel = document.getElementById(id);
@@ -2449,6 +2456,7 @@ window.AWARD_CONFIG = {
         // Their own tables, and renderTable returns early when the list is
         // empty - which is exactly when they need their empty states.
         renderDelivery();
+        renderJute();
         refreshStockControls();
         renderStock();
       })
@@ -2520,6 +2528,48 @@ window.AWARD_CONFIG = {
     return awardsOf(row).filter(function (a) { return a.name === "Jute Bag"; });
   }
 
+  var juteShown = [];            // the requisitions on screen, for the download
+  var juteView = "requests";     // or "districts"
+
+  function juteSizeOf(row, size) {
+    return juteLinesOf(row).reduce(function (n, a) { return a.category === size ? n + a.quantity : n; }, 0);
+  }
+
+  function showJuteView(which) {
+    juteView = which;
+    var a = document.getElementById("jute-view-requests");
+    var b = document.getElementById("jute-view-districts");
+    if (a) a.hidden = which !== "requests";
+    if (b) b.hidden = which !== "districts";
+    Array.prototype.forEach.call(document.querySelectorAll("[data-jute-view]"), function (btn) {
+      var on = btn.getAttribute("data-jute-view") === which;
+      btn.classList.toggle("is-active", on);
+      btn.setAttribute("aria-selected", on ? "true" : "false");
+    });
+  }
+
+  // What is on screen, as a spreadsheet: one line to a requisition.
+  function downloadJute() {
+    if (!juteShown.length) return;
+    var lines = [["District", "Requester", "Small", "Big", "Total", "Status", "Submitted", "Remark"]];
+    juteShown.forEach(function (r) {
+      var s = juteSizeOf(r, "Small"), b = juteSizeOf(r, "Big");
+      lines.push([placeOf(r).district || "", r.requester_name || "", s, b,
+                  juteLinesOf(r).reduce(function (n, a) { return n + a.quantity; }, 0),
+                  STAGES[stageOf(r)].label, formatTimestamp(r.created_at), remarkOf(r)]);
+    });
+    var csv = lines.map(function (l) { return l.map(csvField).join(","); }).join("\r\n");
+    var blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement("a");
+    link.href = url;
+    link.download = "jute-bags-" + todayLocalISO() + ".csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+  }
+
   function renderJute() {
     var body = document.getElementById("jute-body");
     if (!body) return;
@@ -2570,6 +2620,35 @@ window.AWARD_CONFIG = {
       "</div>";
     paintIcons();
     runCounters(summary);
+    juteShown = rows;
+    var dl = document.getElementById("jute-download");
+    if (dl) dl.disabled = !rows.length;
+
+    // By district: who has asked for how many, and in what sizes, biggest first.
+    var agg = {};
+    rows.forEach(function (r) {
+      var d = placeOf(r).district || "\u2014";
+      var a = agg[d] || (agg[d] = { n: 0, s: 0, b: 0 });
+      a.n += 1; a.s += sizeOf(r, "Small"); a.b += sizeOf(r, "Big");
+    });
+    var names = Object.keys(agg).sort(function (x, y) {
+      return (agg[y].s + agg[y].b) - (agg[x].s + agg[x].b) || x.localeCompare(y);
+    });
+    var top = names.length ? Math.max(1, agg[names[0]].s + agg[names[0]].b) : 1;
+    var dBody = document.getElementById("jute-district-body");
+    if (dBody) {
+      dBody.innerHTML = names.length ? names.map(function (d) {
+        var a = agg[d];
+        return "<tr><td><b>" + escapeHtml(d) + "</b></td>" +
+          '<td class="num">' + a.n + "</td>" +
+          '<td class="num">' + (a.s ? a.s.toLocaleString() : "\u2014") + "</td>" +
+          '<td class="num">' + (a.b ? a.b.toLocaleString() : "\u2014") + "</td>" +
+          '<td class="num"><b>' + (a.s + a.b).toLocaleString() + "</b></td>" +
+          '<td class="jute-split"><span class="js-track">' +
+            '<i class="js-s" style="--w:' + (a.s / top * 100) + '%"></i>' +
+            '<i class="js-b" style="--w:' + (a.b / top * 100) + '%"></i></span></td></tr>';
+      }).join("") : '<tr class="placeholder-row"><td colspan="6">Nothing to show.</td></tr>';
+    }
 
     if (!all.length) {
       body.innerHTML = '<tr class="placeholder-row"><td colspan="8">No jute bags asked for yet. ' +

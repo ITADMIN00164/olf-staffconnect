@@ -1858,3 +1858,15 @@
 .award-page .aw-subtab.is-active .tab-count { background: rgba(255,255,255,.22); color: #fff; }
 .award-page #jute-table .cell-remark { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-soft); }
 .award-page #jute-body tr { animation: aw-row .32s ease both; }
+
+/* Jute bags: the view switch, and the district bars. */
+.award-page .jute-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
+.award-page .seg { display: inline-flex; padding: 3px; gap: 2px; background: var(--surface-alt); border: 1px solid var(--border); border-radius: 10px; }
+.award-page .seg-btn { padding: 6px 14px; border: 0; border-radius: 8px; background: transparent; font-family: var(--font-sans); font-size: .82rem; font-weight: 700; color: var(--text-soft); cursor: pointer; transition: background .15s, color .15s; }
+.award-page .seg-btn:hover { color: var(--text); }
+.award-page .seg-btn.is-active { background: var(--surface); color: var(--accent-ink); box-shadow: var(--shadow); }
+.award-page .jute-split { min-width: 220px; }
+.award-page .js-track { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: #EEF1F6; }
+.award-page .js-track i { display: block; flex: 0 0 var(--w); transform-origin: left; animation: aw-grow .8s .1s cubic-bezier(.2,.8,.3,1) both; }
+.award-page .js-s { background: var(--accent-2); }
+.award-page .js-b { background: #64748B; border-left: 2px solid var(--surface); }
