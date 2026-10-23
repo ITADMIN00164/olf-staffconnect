@@ -2517,10 +2517,11 @@ window.AWARD_CONFIG = {
     return [];
   }
 
-  /* What a requisition asked for, one line to a level: the level's name, then
-     what it was for, each with its quantity. Once it has been sent, a level
-     that went short says so - "sent 8 of 9" - because what goes out is counted
-     per level, not per category. */
+  /* What a requisition asked for, one line to each thing asked for, in three
+     aligned columns: the level, what it was for, how many. NS and SU have no
+     category, so that column is left empty for them. Once it has been sent, a
+     level that went short says so under its lines - "sent 8 of 9" - because
+     what goes out is counted per level, not per category. */
   function awardsCellHtml(awards, row) {
     if (!awards.length) return "—";
 
@@ -2535,36 +2536,40 @@ window.AWARD_CONFIG = {
       groups[a.id].push(a);
     });
 
-    return '<div class="lvls">' + order.map(function (id) {
+    var shortName = function (name) {
+      var m = /\(([A-Z]{2,})\)\s*$/.exec(name);
+      return m ? m[1] : name;
+    };
+
+    var html = '<div class="lvls">';
+    order.forEach(function (id) {
       var list = groups[id];
-      var first = list[0];
       var asked = list.reduce(function (n, a) { return n + a.quantity; }, 0);
       var went = sent ? (sent[id] || 0) : asked;
       var short = !!sent && went < asked;
-      var chips;
 
-      if (first.hasCategory) {
-        chips = list.map(function (a) {
-          var what = a.category === "Other" ? (a.categoryOther || "Other") : a.category;
-          return '<span class="type-chip" title="' + escapeHtml(what) + '">' +
-                 '<span class="chip-what">' + escapeHtml(what) + "</span><b>" +
-                 escapeHtml(a.quantity.toLocaleString()) + "</b></span>";
-        }).join("");
-        if (short) {
-          chips += '<span class="lvl-sent is-short">sent ' + escapeHtml(went.toLocaleString()) +
-                   " of " + escapeHtml(asked.toLocaleString()) + "</span>";
-        }
-      } else {
-        chips = '<span class="type-chip solo' + (short ? " is-short" : "") + '"' +
-                (short ? ' title="' + escapeHtml(asked - went) + ' fewer than asked for"' : "") +
-                "><b>" + (short
-                  ? escapeHtml(went.toLocaleString()) + " of " + escapeHtml(asked.toLocaleString())
-                  : escapeHtml(asked.toLocaleString())) + "</b></span>";
+      list.forEach(function (a) {
+        var what = a.hasCategory
+          ? (a.category === "Other" ? (a.categoryOther || "Other") : a.category)
+          : "";
+        var qty = (short && !a.hasCategory)
+          ? went.toLocaleString() + " of " + asked.toLocaleString()
+          : a.quantity.toLocaleString();
+        html += '<div class="lvl-row' + (short && !a.hasCategory ? " is-short" : "") + '">' +
+          '<b class="lr-level" title="' + escapeHtml(a.name) + '">' +
+            escapeHtml(shortName(a.name)) + "</b>" +
+          '<span class="lr-cat" title="' + escapeHtml(what) + '">' +
+            (what ? escapeHtml(what) : "—") + "</span>" +
+          '<span class="lr-qty">' + escapeHtml(qty) + "</span>" +
+        "</div>";
+      });
+
+      if (short && list[0].hasCategory) {
+        html += '<div class="lvl-note">' + escapeHtml(shortName(list[0].name)) + " sent " +
+          escapeHtml(went.toLocaleString()) + " of " + escapeHtml(asked.toLocaleString()) + "</div>";
       }
-
-      return '<div class="lvl"><span class="lvl-name">' + escapeHtml(first.name) +
-             '</span><span class="lvl-chips">' + chips + "</span></div>";
-    }).join("") + "</div>";
+    });
+    return html + "</div>";
   }
 
   // Where a requisition stands and who it is sitting with. The steps that

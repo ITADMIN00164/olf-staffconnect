@@ -1574,13 +1574,6 @@
 
 /* A requisition's levels: one line to a level, the name on the left and
    what it was for, with its quantity, beside it. */
-.award-page .lvls { display: grid; gap: 5px; min-width: 230px; }
-.award-page .lvl { display: grid; grid-template-columns: 92px 1fr; align-items: start; gap: 8px; }
-.award-page .lvl-name { padding-top: 3px; font-size: .78rem; font-weight: 700; color: var(--text); line-height: 1.3; }
-.award-page .lvl-chips { display: flex; flex-wrap: wrap; gap: 4px; }
-.award-page .lvl-chips .type-chip { margin: 0; }
-.award-page .type-chip .chip-what { display: inline-block; max-width: 170px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
-.award-page .lvl-sent { align-self: center; font-size: .72rem; font-weight: 600; color: var(--warn); }
 
 .award-page [data-aw-log] { white-space: nowrap; }
 
@@ -1588,4 +1581,21 @@
 .award-page .detail-levels { list-style: none; margin: 7px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
 .award-page .detail-levels li { padding: 2px 9px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-alt); font-size: 11px; color: var(--text-soft); white-space: nowrap; }
 .award-page .detail-levels li b { margin-left: 6px; font-weight: 700; color: var(--text); }
-.award-page .type-chip.solo b { margin: 0; padding: 0; border: 0; opacity: 1; }
+
+/* A requisition's levels: level, what it was for, how many, in columns. */
+.award-page .lvls { display: grid; min-width: 250px; }
+.award-page .lvl-row {
+  display: grid;
+  grid-template-columns: 52px minmax(96px, 1fr) 62px;
+  gap: 10px;
+  align-items: baseline;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+}
+.award-page .lvl-row:first-child { padding-top: 0; }
+.award-page .lvl-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.award-page .lr-level { font-size: .8rem; font-weight: 700; color: var(--text); }
+.award-page .lr-cat { font-size: .8rem; color: var(--text-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.award-page .lr-qty { text-align: right; font-family: var(--font-mono); font-size: .8rem; font-weight: 700; color: var(--text); white-space: nowrap; }
+.award-page .lvl-row.is-short .lr-qty { color: var(--warn); }
+.award-page .lvl-note { padding: 2px 0 5px; font-size: .72rem; font-weight: 600; color: var(--warn); text-align: right; }
