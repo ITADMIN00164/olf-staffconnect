@@ -24,11 +24,11 @@
          actions on the right while Stock Management is showing. -->
     <div class="aw-topbar">
       <nav class="aw-toptabs" role="tablist" aria-label="Test">
-        <button type="button" role="tab" class="aw-toptab is-active" data-aw-top="stock" aria-selected="true">Stock Management</button>
-        <button type="button" role="tab" class="aw-toptab" data-aw-top="award" aria-selected="false" tabindex="-1">Award Management</button>
+        <button type="button" role="tab" class="aw-toptab is-active" data-aw-top="stock" aria-selected="true"><i class="aw-icon" data-aw-icon="stock" aria-hidden="true"></i>Stock Management</button>
+        <button type="button" role="tab" class="aw-toptab" data-aw-top="award" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="trophy" aria-hidden="true"></i>Award Management</button>
       </nav>
       <div class="aw-top-actions" id="aw-stock-actions">
-        <button type="button" id="refresh-btn" class="btn btn-ghost btn-sm">Refresh</button>
+        <button type="button" id="refresh-btn" class="btn btn-ghost btn-sm"><i class="aw-icon" data-aw-icon="refresh" aria-hidden="true"></i>Refresh</button>
         <button type="button" id="new-req-btn" class="btn btn-primary btn-sm">
           <i class="aw-icon" data-aw-icon="plus" aria-hidden="true"></i>
           New Requisition
@@ -43,22 +43,22 @@
         <button type="button" role="tab" id="aw-subtab-requisition" class="aw-subtab is-active"
                 data-aw-subtab="requisition" aria-controls="aw-subpanel-requisition"
                 aria-selected="true">
-          Requisition
+          <i class="aw-icon" data-aw-icon="doc" aria-hidden="true"></i>Requisition
         </button>
         <button type="button" role="tab" id="aw-subtab-delivery" class="aw-subtab"
                 data-aw-subtab="delivery" aria-controls="aw-subpanel-delivery"
                 aria-selected="false" tabindex="-1" hidden>
-          Delivery
+          <i class="aw-icon" data-aw-icon="truck" aria-hidden="true"></i>Delivery
         </button>
         <button type="button" role="tab" id="aw-subtab-stock" class="aw-subtab"
                 data-aw-subtab="stock" aria-controls="aw-subpanel-stock"
                 aria-selected="false" tabindex="-1">
-          Stock
+          <i class="aw-icon" data-aw-icon="stock" aria-hidden="true"></i>Stock
         </button>
         <button type="button" role="tab" id="aw-subtab-settings" class="aw-subtab"
                 data-aw-subtab="settings" aria-controls="aw-subpanel-settings"
                 aria-selected="false" tabindex="-1" hidden>
-          Settings
+          <i class="aw-icon" data-aw-icon="gear" aria-hidden="true"></i>Settings
         </button>
         <span class="pill" id="row-pill">—</span>
       </nav>
@@ -73,6 +73,9 @@
         </span>
         <span id="list-banner-text"></span>
       </div>
+      <!-- Figures above the list: how many requisitions are where, and how much
+           of what was asked for has arrived. Drawn by award.js. -->
+      <div class="req-summary" id="req-summary" hidden></div>
       <div class="filters">
         <div class="field field-sm">
           <label for="filter-state">Filter by state</label>
@@ -207,6 +210,9 @@
               </button>
             </div>
           </div>
+
+          <!-- What was asked for, what arrived, what was given out and what is held. -->
+          <div class="stock-summary" id="stock-summary" hidden></div>
 
           <div class="table-scroll" id="stock-table-wrap"></div>
         </section>

@@ -578,7 +578,46 @@ window.AWARD_CONFIG = {
               '<path d="M12 4v10m0 0 4-4m-4 4-4-4M5 18h14"/></svg>',
     upload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
             'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-            '<path d="M12 20V10m0 0 4 4m-4-4-4 4M5 5h14"/></svg>'
+            '<path d="M12 20V10m0 0 4 4m-4-4-4 4M5 5h14"/></svg>',
+    stock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+           'stroke-linecap="round" stroke-linejoin="round">' +
+           '<path d="M12 3 3 7.5v9L12 21l9-4.5v-9L12 3Z"/><path d="m3 7.5 9 4.5 9-4.5M12 12v9"/></svg>',
+    truck: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+           'stroke-linecap="round" stroke-linejoin="round">' +
+           '<path d="M2 6h11v10H2zM13 9h4l3 3v4h-7"/><circle cx="7" cy="18" r="1.8"/>' +
+           '<circle cx="17" cy="18" r="1.8"/></svg>',
+    clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+           'stroke-linecap="round" stroke-linejoin="round">' +
+           '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    done:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+           'stroke-linecap="round" stroke-linejoin="round">' +
+           '<circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg>',
+    stopped: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+             'stroke-linecap="round" stroke-linejoin="round">' +
+             '<circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/></svg>',
+    trophy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+            'stroke-linecap="round" stroke-linejoin="round">' +
+            '<path d="M8 4h8v5a4 4 0 0 1-8 0V4Z"/>' +
+            '<path d="M8 6H4v2a3 3 0 0 0 4 2.8M16 6h4v2a3 3 0 0 1-4 2.8M12 13v4M8.5 20h7M10 17h4"/></svg>',
+    doc:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+           'stroke-linecap="round" stroke-linejoin="round">' +
+           '<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 16h5"/></svg>',
+    refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+             'stroke-linecap="round" stroke-linejoin="round">' +
+             '<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>',
+    eye:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+           'stroke-linecap="round" stroke-linejoin="round">' +
+           '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>',
+    gear:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+           'stroke-linecap="round" stroke-linejoin="round">' +
+           '<circle cx="12" cy="12" r="3"/>' +
+           '<path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>',
+    layers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+            'stroke-linecap="round" stroke-linejoin="round">' +
+            '<path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/></svg>',
+    chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+           'stroke-linecap="round" stroke-linejoin="round">' +
+           '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>'
   };
 
   function paintIcons() {
@@ -2413,6 +2452,165 @@ window.AWARD_CONFIG = {
     renderDelivery();
   }
 
+  /* ------------------------------------------------------------- summaries
+
+     A strip of figures above each list, so what is going on can be read before
+     the rows are: how many requisitions are where, and how much of what was
+     asked for has actually arrived. They are drawn from the same rows the
+     table shows, so a filter narrows them too. */
+
+  function reducedMotion() {
+    return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }
+
+  // Counts up to the figure instead of appearing at it.
+  function runCounters(root) {
+    Array.prototype.forEach.call(root.querySelectorAll("[data-count]"), function (node) {
+      var to = Number(node.getAttribute("data-count")) || 0;
+      if (reducedMotion() || to === 0) { node.textContent = to.toLocaleString(); return; }
+      var start = null;
+      var span = 700;
+      function step(now) {
+        if (start === null) start = now;
+        var t = Math.min(1, (now - start) / span);
+        var eased = 1 - Math.pow(1 - t, 3);
+        node.textContent = Math.round(to * eased).toLocaleString();
+        if (t < 1) window.requestAnimationFrame(step);
+      }
+      node.textContent = "0";
+      window.requestAnimationFrame(step);
+    });
+  }
+
+  function kpiHtml(icon, tone, count, label, hint) {
+    return '<div class="kpi kpi-' + tone + '">' +
+             '<span class="kpi-ico"><i class="aw-icon" data-aw-icon="' + icon + '" aria-hidden="true"></i></span>' +
+             '<div class="kpi-text"><b data-count="' + count + '">' + count.toLocaleString() + "</b>" +
+             "<small>" + escapeHtml(label) + "</small>" +
+             (hint ? "<em>" + escapeHtml(hint) + "</em>" : "") + "</div>" +
+           "</div>";
+  }
+
+  var PIPE = [
+    { key: "pending",  label: "Pending",    cls: "pipe-pending",  stages: ["submitted"] },
+    { key: "moving",   label: "In progress", cls: "pipe-moving",   stages: ["approved", "acknowledged", "dispatched"] },
+    { key: "held",     label: "On hold",    cls: "pipe-held",     stages: ["on_hold"] },
+    { key: "done",     label: "Received",   cls: "pipe-done",     stages: ["received"] },
+    { key: "stopped",  label: "Declined",   cls: "pipe-stopped",  stages: ["declined", "rejected"] }
+  ];
+
+  function renderReqSummary(rows) {
+    var box = document.getElementById("req-summary");
+    if (!box) return;
+    if (!allRequisitions.length) { box.hidden = true; box.innerHTML = ""; return; }
+
+    var count = {};
+    PIPE.forEach(function (p) { count[p.key] = 0; });
+    var asked = 0, got = 0;
+    rows.forEach(function (row) {
+      var st = stageOf(row);
+      PIPE.forEach(function (p) { if (p.stages.indexOf(st) !== -1) count[p.key] += 1; });
+      asked += Number(row.quantity) || 0;
+      got += deliveredOf(row);
+    });
+    var total = rows.length;
+    var pct = asked ? Math.round((got / asked) * 100) : 0;
+    var C = 2 * Math.PI * 26;
+
+    var segments = PIPE.filter(function (p) { return count[p.key]; }).map(function (p) {
+      return '<span class="pipe-seg ' + p.cls + '" style="--w:' + (count[p.key] / total * 100) +
+             '%" title="' + escapeHtml(p.label) + ": " + count[p.key] + '"></span>';
+    }).join("");
+    var legend = PIPE.filter(function (p) { return count[p.key]; }).map(function (p) {
+      return '<span class="pipe-key"><i class="' + p.cls + '"></i>' + escapeHtml(p.label) +
+             " <b>" + count[p.key] + "</b></span>";
+    }).join("");
+
+    box.innerHTML =
+      '<div class="kpis">' +
+        kpiHtml("doc", "total", total, total === 1 ? "Requisition" : "Requisitions", "") +
+        kpiHtml("clock", "wait", count.pending + count.held, "Waiting", "pending or on hold") +
+        kpiHtml("truck", "move", count.moving, "In progress", "approved to dispatched") +
+        kpiHtml("done", "good", count.done, "Received", "") +
+        '<div class="kpi kpi-ring">' +
+          '<svg class="ring" viewBox="0 0 64 64" aria-hidden="true">' +
+            '<circle class="ring-bg" cx="32" cy="32" r="26"/>' +
+            '<circle class="ring-fg" cx="32" cy="32" r="26" stroke-dasharray="' + C.toFixed(1) +
+              '" style="--c:' + C.toFixed(1) + ";--to:" + (C * (1 - Math.min(1, pct / 100))).toFixed(1) + '"/>' +
+          "</svg>" +
+          '<div class="kpi-text"><b><span data-count="' + pct + '">' + pct + '</span>%</b>' +
+            "<small>Delivered</small><em>" + got.toLocaleString() + " of " + asked.toLocaleString() + "</em></div>" +
+        "</div>" +
+      "</div>" +
+      (total ? '<div class="pipe"><div class="pipe-bar">' + segments + '</div><div class="pipe-legend">' +
+               legend + "</div></div>" : "");
+    box.hidden = false;
+    paintIcons();
+    runCounters(box);
+  }
+
+  /* The same idea for stock: what was asked for, what arrived, what was given
+     out, what is held now, and per level what came against what went. */
+  function renderStockSummary(rows, types) {
+    var box = document.getElementById("stock-summary");
+    if (!box) return;
+    if (!rows || !rows.length) { box.hidden = true; box.innerHTML = ""; return; }
+
+    var asked = 0, came = 0, used = 0;
+    var cameBy = {}, usedBy = {}, heldBy = {};
+    var latest = {};
+    var nowKey = monthKeyOf(new Date());
+
+    rows.forEach(function (r) {
+      asked += sumOf(r.requisition);
+      came += sumOf(r.delivery);
+      used += sumOf(r.utilisation);
+      types.forEach(function (t) {
+        cameBy[t.id] = (cameBy[t.id] || 0) + (r.delivery[t.id] || 0);
+        usedBy[t.id] = (usedBy[t.id] || 0) + (r.utilisation[t.id] || 0);
+      });
+      // The balance a district holds today: its last row up to this month.
+      var cur = latest[r.district];
+      var ok = !r.monthKey || r.monthKey <= nowKey;
+      if (ok && (!cur || !cur.monthKey || (r.monthKey && r.monthKey >= cur.monthKey))) latest[r.district] = r;
+    });
+    var held = 0;
+    Object.keys(latest).forEach(function (d) {
+      types.forEach(function (t) {
+        var n = latest[d].balance[t.id] || 0;
+        heldBy[t.id] = (heldBy[t.id] || 0) + n;
+        held += n;
+      });
+    });
+
+    var scale = 1;
+    types.forEach(function (t) { scale = Math.max(scale, cameBy[t.id] || 0, usedBy[t.id] || 0, heldBy[t.id] || 0); });
+
+    var bars = types.map(function (t) {
+      var c = cameBy[t.id] || 0, u = usedBy[t.id] || 0, h = heldBy[t.id] || 0;
+      return '<div class="sbar">' +
+        '<span class="sbar-name">' + escapeHtml(shortType(t)) + "</span>" +
+        '<span class="sbar-lines">' +
+          '<span class="sbar-line"><i class="sb-came" style="--w:' + (c / scale * 100) + '%"></i><em>' + c.toLocaleString() + " arrived</em></span>" +
+          '<span class="sbar-line"><i class="sb-used" style="--w:' + (u / scale * 100) + '%"></i><em>' + u.toLocaleString() + " given out</em></span>" +
+        "</span>" +
+        '<span class="sbar-held' + (h < 0 ? " is-neg" : "") + '"><b>' + h.toLocaleString() + "</b><small>held</small></span>" +
+      "</div>";
+    }).join("");
+
+    box.innerHTML =
+      '<div class="kpis kpis-stock">' +
+        kpiHtml("doc", "total", asked, "Asked for", "") +
+        kpiHtml("truck", "move", came, "Arrived", "") +
+        kpiHtml("chart", "wait", used, "Given out", "") +
+        kpiHtml("layers", held < 0 ? "bad" : "good", held, "Held now", "across what is shown") +
+      "</div>" +
+      '<div class="sbars" aria-label="Arrived, given out and held, by level">' + bars + "</div>";
+    box.hidden = false;
+    paintIcons();
+    runCounters(box);
+  }
+
   function renderTable() {
     var stateFilter = el.filterState.value;
     var divisionFilter = el.filterDivision.value;
@@ -2437,6 +2635,8 @@ window.AWARD_CONFIG = {
       if (statusFilter && stageOf(row) !== statusFilter) return false;
       return true;
     });
+
+    renderReqSummary(rows);
 
     if (!allRequisitions.length) {
       placeholderRow("No requisitions yet.");
@@ -2484,6 +2684,7 @@ window.AWARD_CONFIG = {
       : rows.length + " of " + allRequisitions.length;
     el.footTotal.textContent = gotTotal.toLocaleString() + " / " + total.toLocaleString();
     el.tfoot.hidden = false;
+    paintIcons();
   }
 
   /* ------------------------------------------------------------- levels
@@ -2631,7 +2832,7 @@ window.AWARD_CONFIG = {
     var steps = trailOf(row);
     if (!steps.length) return '<span class="log-none">—</span>';
     return '<button type="button" class="btn btn-ghost btn-xs" data-aw-log="' +
-             escapeHtml(row.id) + '">View log <span class="log-count">' +
+             escapeHtml(row.id) + '"><i class="aw-icon" data-aw-icon="doc" aria-hidden="true"></i>View log <span class="log-count">' +
              steps.length + "</span></button>";
   }
 
@@ -2694,7 +2895,7 @@ window.AWARD_CONFIG = {
     return '<span class="lvl-summary" title="' + escapeHtml(names.join(", ")) + '">' +
              escapeHtml(names.join(" \u00b7 ")) + "</span>" +
            '<button type="button" class="btn btn-ghost btn-xs" data-aw-levels="' +
-             escapeHtml(row.id) + '">View <span class="log-count">' + awards.length + "</span></button>";
+             escapeHtml(row.id) + '"><i class="aw-icon" data-aw-icon="eye" aria-hidden="true"></i>View <span class="log-count">' + awards.length + "</span></button>";
   }
 
   function openLevels(id) {
@@ -3192,6 +3393,8 @@ window.AWARD_CONFIG = {
   function renderStock() {
     var wrap = document.getElementById("stock-table-wrap");
     if (!wrap) return;
+    var summaryBox = document.getElementById("stock-summary");
+    if (summaryBox) summaryBox.hidden = true;
 
     if (!stockShown) {
       wrap.innerHTML =
@@ -3262,6 +3465,8 @@ window.AWARD_CONFIG = {
         "</div>";
       return;
     }
+
+    renderStockSummary(rows, types);
 
     var head = groupHeadHtml(types, { before:
         '<th rowspan="2" class="col-month">Month</th>' +
