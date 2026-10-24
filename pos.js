@@ -925,6 +925,33 @@ async function saveAssignment() {
 }
 
 /* ====================================
+   ASSIGNMENTS — DOWNLOAD EXCEL
+   Everything in the list, plus the districts and blocks that the table
+   only shows inside the Edit modal. One row per person.
+==================================== */
+
+async function downloadAssignments() {
+    if (!posData.loaded) { window.notify("Assignments are still loading.", "warning"); return; }
+    if (!posData.assignments.length) { window.notify("No assignments to download.", "warning"); return; }
+    const XLSX = await loadXLSX();
+    const list = (v) => (Array.isArray(v) ? v : (v ? [v] : [])).join(", ");
+    const count = (v) => (Array.isArray(v) ? v.length : (v ? 1 : 0));
+    const head = ["Name", "Emp ID", "Email", "Role", "Status", "Districts", "No. of Districts", "Blocks", "No. of Blocks"];
+    const rows = posData.assignments.map(a => [
+        a.name || "", a.emp_id || "", a.email || "", a.designation || "",
+        a.status === "resigned" ? "Resigned" : "Active",
+        list(a.assigned_districts), count(a.assigned_districts),
+        list(a.assigned_blocks), count(a.assigned_blocks)
+    ]);
+    const ws = XLSX.utils.aoa_to_sheet([head].concat(rows));
+    ws["!cols"] = [{ wch: 28 }, { wch: 13 }, { wch: 34 }, { wch: 7 }, { wch: 10 }, { wch: 36 }, { wch: 9 }, { wch: 60 }, { wch: 9 }];
+    ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length, c: head.length - 1 } }) };
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Assignments");
+    XLSX.writeFile(wb, `Assignments_${todayStr()}.xlsx`);
+}
+
+/* ====================================
    RESIGNATION
    One click: archive the full current row to assignments_history,
    then remove it from assignments (the "currently active" table).
@@ -3154,7 +3181,7 @@ window.POSAdmin = {
     onEmpSearch, onEmpPicked, onEmpKey, onEmpBlur,
     refreshAssignModalUI, onDistrictCheckToggle, onBlockCheckToggle,
     onDistrictSearch, onBlockSearch,
-    markResigned,
+    markResigned, downloadAssignments,
     downloadVinobaTempl, uploadVinoba, deleteVinobaUpload,
     downloadErTempl, uploadEr, deleteErUpload,
     downloadKekaTempl, uploadKeka, deleteKekaUpload,
