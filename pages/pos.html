@@ -720,6 +720,23 @@
       </div>
     </div>
   </div>
+  <!-- Week dates editor: itadmin only (pos-review.js opens it from the week cards) -->
+  <div id="prWdModal" class="pr-modal" hidden>
+    <div class="pr-modal-box pr-wd-box">
+      <div class="pr-modal-title" id="prWdTitle">Week dates</div>
+      <div class="pr-wd-row">
+        <label class="pr-field pr-wd-field"><span>From</span><input type="date" id="prWdFrom"></label>
+        <label class="pr-field pr-wd-field"><span>To</span><input type="date" id="prWdTo"></label>
+      </div>
+      <div class="pr-modal-foot">
+        <span id="prWdMsg" class="pr-modal-msg"></span>
+        <span class="pr-modal-spacer"></span>
+        <button class="pr-btn" id="prWdClear" hidden>Remove dates</button>
+        <button class="pr-btn" id="prWdClose">Cancel</button>
+        <button class="pr-btn pr-btn-primary" id="prWdSave">Save</button>
+      </div>
+    </div>
+  </div>
       </div>
       <style>
         /* ════════════════════════════════════════════════════════════
@@ -928,6 +945,18 @@
         .pr-tbl td.pr-wkalt{background:#FAFBFE;}
         .pr-tbl th.pr-wkalt{background:#F2F5FA;}
         .pr-wkh-date{display:block;font-size:10.5px;font-weight:500;color:var(--mut);text-transform:none;letter-spacing:0;margin-top:2px;}
+        .pr-wkh-date:empty{display:none;}
+        /* week dates (set by itadmin) */
+        .pr-wkcard-date{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:18px;font-variant-numeric:tabular-nums;}
+        .pr-wkcard-date>span:empty{display:none;}
+        .pr-wkdate-btn{margin-left:auto;border:1px solid var(--acc-line);background:var(--acc-soft);color:var(--acc-ink);border-radius:999px;
+            height:22px;padding:0 9px;font:inherit;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;}
+        .pr-wkdate-btn:hover{background:#E1ECFF;}
+        .pr-wd-box{width:min(440px,94vw);}
+        .pr-wd-row{display:flex;gap:12px;flex-wrap:wrap;}
+        .pr-wd-field{flex:1;min-width:150px;}
+        .pr-wd-field input{height:40px;padding:0 12px;border:1px solid var(--l);border-radius:10px;font:inherit;font-size:13.5px;color:var(--ink);background:#fff;}
+        .pr-wd-field input:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px rgba(79,142,247,.16);}
         .pr-mtd{background:#fbfcfe;font-weight:600;}
         th.pr-mtd{background:#eef3f9;}
 

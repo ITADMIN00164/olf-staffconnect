@@ -257,8 +257,10 @@
       unitEmpId ? fetchAll(function () { return db().from("er_data").select("*").eq("year", y).eq("month", m).eq("employee_id", unitEmpId); }) : NONE,
       unitEmpId ? fetchAll(function () { return db().from("nimble_data").select("*").eq("year", y).eq("month", m).eq("emp_id", unitEmpId); }) : NONE,
       unitEmpId ? fetchAll(function () { return db().from("visitandactivity_data").select("*").eq("year", y).eq("month", m).eq("emp_id", unitEmpId); }) : NONE,
-      unitEmpId ? fetchAll(function () { return db().from("review_responses").select("*").eq("emp_id", unitEmpId).in("period_code", codes.concat(prevCodes)); }) : NONE
+      unitEmpId ? fetchAll(function () { return db().from("review_responses").select("*").eq("emp_id", unitEmpId).in("period_code", codes.concat(prevCodes)); }) : NONE,
+      sbGetWeekDates(y, m)
     ]);
+    var weekDates = q[8];
     var weeksWithData = {}; q[0].forEach(function (r) { weeksWithData[r.week] = 1; });
     var own = sectionsByCode(q[7]);
     var evMonth = MON_SHORT[m - 1] + "-" + y;   // Staff Connect "Month" column, e.g. "Sep-2026"
@@ -297,7 +299,31 @@
       });
       roster = { kind: unit === "PM" ? "PO" : "PM", members: members, byWeek: byWeek };
     }
-    return { header: header, unitEmpId: unitEmpId, month: month, weeks: weeks, roster: roster };
+    return { header: header, unitEmpId: unitEmpId, month: month, weeks: weeks, roster: roster, weekDates: weekDates };
+  }
+
+  /* ---------- week dates (set by itadmin, shown to everyone) ----------
+     Table week_dates: one row per year/month/week with from_date and to_date.
+     Never fails the review: if the table is missing or unreadable, no dates are shown. */
+  async function sbGetWeekDates(y, m) {
+    try {
+      var res = await db().from("week_dates").select("week,from_date,to_date").eq("year", y).eq("month", m);
+      if (res.error) { console.warn("week_dates:", res.error.message || res.error); return {}; }
+      var out = {};
+      (res.data || []).forEach(function (r) { if (r.from_date && r.to_date) out[r.week] = { from: r.from_date, to: r.to_date }; });
+      return out;
+    } catch (e) { console.warn("week_dates:", e); return {}; }
+  }
+  async function sbSaveWeekDates(y, m, wk, from, to) {
+    var res = await db().from("week_dates").upsert({
+      year: y, month: m, week: wk, from_date: from, to_date: to,
+      updated_by: currentEmail() || "unknown", updated_at: new Date().toISOString()
+    }, { onConflict: "year,month,week" });
+    if (res.error) throw res.error;
+  }
+  async function sbClearWeekDates(y, m, wk) {
+    var res = await db().from("week_dates").delete().eq("year", y).eq("month", m).eq("week", wk);
+    if (res.error) throw res.error;
   }
 
   function buildHeader(unit, value, self, districts, blockNames, team) {
@@ -505,6 +531,7 @@
     if (!window.posSupabase) { prBody('<div class="pr-empty pr-error">Supabase client not loaded — check that pos-supabase.js is included.</div>'); return; }
     wireNav(); wireFilters(); wireMonthly(); sumWire();
     if ($("prModalSave")) $("prModalSave").addEventListener("click", saveTextModal);
+    wireWeekDates();
     if ($("prModalClose")) $("prModalClose").addEventListener("click", closeTextModal);
     if ($("prModalText")) $("prModalText").addEventListener("input", updateModalMsg);
     if ($("prListClose")) $("prListClose").addEventListener("click", closeAcadList);
@@ -777,10 +804,88 @@
       el.classList.toggle("pr-wkalt", on && vis.indexOf(n) % 2 === 1);   // alternate tint between neighbouring weeks
     });
   }
+  /* ---------- week dates: display + itadmin editor ---------- */
+  function fmtDMY(iso) {               // "2026-10-01" -> "01/10/2026"
+    var p = String(iso || "").substring(0, 10).split("-");
+    return p.length === 3 ? p[2] + "/" + p[1] + "/" + p[0] : "";
+  }
+  function weekDateText(n) {
+    var d = VIEW && VIEW.weekDates && VIEW.weekDates[n];
+    return d ? fmtDMY(d.from) + " – " + fmtDMY(d.to) : "";
+  }
+  // Refresh the date text on the card and the column header without re-rendering the table
+  // (re-rendering would drop unsaved edits in the review cells).
+  function paintWeekDate(n) {
+    var t = weekDateText(n);
+    document.querySelectorAll('#prBody [data-wkdate="' + n + '"]').forEach(function (el) { el.textContent = t; });
+    var b = document.querySelector('#prBody [data-wkdatebtn="' + n + '"]');
+    if (b) b.textContent = t ? "Edit dates" : "Set dates";
+  }
+  var WD_WEEK = 0;
+  function wdMsg(s, bad) { var el = $("prWdMsg"); if (el) { el.textContent = s || ""; el.classList.toggle("is-over", !!bad); } }
+  function openWeekDates(n) {
+    if (!prIsAdmin() || !VIEW || !VIEW.month || !$("prWdModal")) return;
+    WD_WEEK = n;
+    var d = (VIEW.weekDates || {})[n] || {};
+    $("prWdTitle").textContent = "Week " + n + " dates · " + monthLabel(VIEW.month);
+    $("prWdFrom").value = d.from ? String(d.from).substring(0, 10) : "";
+    $("prWdTo").value = d.to ? String(d.to).substring(0, 10) : "";
+    $("prWdClear").hidden = !d.from;
+    wdMsg("Everyone sees these dates on the week card and the Week " + n + " column.");
+    $("prWdModal").hidden = false;
+    $("prWdFrom").focus();
+  }
+  function closeWeekDates() { if ($("prWdModal")) $("prWdModal").hidden = true; WD_WEEK = 0; }
+  function wdBusy(on) { ["prWdSave", "prWdClear", "prWdClose"].forEach(function (id) { if ($(id)) $(id).disabled = on; }); }
+  function saveWeekDates() {
+    if (!prIsAdmin() || !WD_WEEK || !VIEW) return;
+    var from = $("prWdFrom").value, to = $("prWdTo").value;
+    if (!from || !to) { wdMsg("Pick both a From and a To date.", true); return; }
+    if (from > to) { wdMsg("From date must be on or before the To date.", true); return; }
+    var y = Number(VIEW.month.substring(0, 4)), m = Number(VIEW.month.substring(4, 6)), n = WD_WEEK, month = VIEW.month;
+    wdBusy(true); wdMsg("Saving…");
+    sbSaveWeekDates(y, m, n, from, to).then(function () {
+      if (VIEW && VIEW.month === month) { VIEW.weekDates = VIEW.weekDates || {}; VIEW.weekDates[n] = { from: from, to: to }; paintWeekDate(n); }
+      closeWeekDates(); toast("Week " + n + " dates saved.");
+    }).catch(function (e) {
+      wdMsg("Couldn't save: " + (e.message || String(e)), true);
+    }).then(function () { wdBusy(false); });
+  }
+  function clearWeekDates() {
+    if (!prIsAdmin() || !WD_WEEK || !VIEW) return;
+    var y = Number(VIEW.month.substring(0, 4)), m = Number(VIEW.month.substring(4, 6)), n = WD_WEEK, month = VIEW.month;
+    wdBusy(true); wdMsg("Removing…");
+    sbClearWeekDates(y, m, n).then(function () {
+      if (VIEW && VIEW.month === month && VIEW.weekDates) { delete VIEW.weekDates[n]; paintWeekDate(n); }
+      closeWeekDates(); toast("Week " + n + " dates removed.");
+    }).catch(function (e) {
+      wdMsg("Couldn't remove: " + (e.message || String(e)), true);
+    }).then(function () { wdBusy(false); });
+  }
+  function wireWeekDates() {
+    if (!$("prWdModal")) return;
+    $("prWdSave").addEventListener("click", saveWeekDates);
+    $("prWdClear").addEventListener("click", clearWeekDates);
+    $("prWdClose").addEventListener("click", closeWeekDates);
+    $("prWdModal").addEventListener("click", function (e) { if (e.target === $("prWdModal")) closeWeekDates(); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("prWdModal").hidden) closeWeekDates(); });
+    ["prWdFrom", "prWdTo"].forEach(function (id) {
+      $(id).addEventListener("change", function () {
+        // Picking a From date first fills a sensible To (a week later) so admin needs fewer clicks.
+        if (id === "prWdFrom" && $("prWdFrom").value && !$("prWdTo").value) {
+          var d = new Date($("prWdFrom").value + "T00:00:00"); d.setDate(d.getDate() + 6);
+          $("prWdTo").value = d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+        }
+        wdMsg("");
+      });
+    });
+  }
+
   function bindWeekSel() {
     document.querySelectorAll("#prBody .pr-wkcard[data-wk]").forEach(function (c) {
-      c.addEventListener("click", function () {
+      c.addEventListener("click", function (e) {
         var n = Number(c.dataset.wk);
+        if (e.target.closest && e.target.closest("[data-wkdatebtn]")) { e.stopPropagation(); openWeekDates(n); return; }
         if (SELWK[n] && [1, 2, 3, 4, 5].filter(function (k) { return SELWK[k]; }).length === 1) { toast("At least one week stays visible."); return; }
         SELWK[n] = !SELWK[n]; applyWeekSel();
       });
@@ -799,8 +904,14 @@
     var state = filled === 4 ? " complete" : filled > 0 ? " partial" : "";
     var remark = filled === 4 ? "Completed" : filled > 0 ? "Partially completed" : "Not started yet";
     var lock = "";   // no time-based locking — owners can edit any week
+    // Dates: everyone sees them once set; only itadmin gets the button to set or change them.
+    var dt = weekDateText(w.week);
+    var dateLine = !(dt || prIsAdmin()) ? "" : '<div class="pr-wkcard-date"><span data-wkdate="' + w.week + '">' + esc(dt) + '</span>'
+      + (prIsAdmin() ? '<button type="button" class="pr-wkdate-btn" data-wkdatebtn="' + w.week + '" title="Set the dates for Week ' + w.week + '">'
+          + (dt ? "Edit dates" : "Set dates") + '</button>' : "") + '</div>';
     return '<div class="pr-card pr-wkcard' + state + '" data-wk="' + w.week + '" role="button" tabindex="0" title="Click to show or hide Week ' + w.week + '">'
       + '<div class="pr-card-k"><span>Week ' + w.week + '</span>' + lock + '<span class="pr-wk-vis">Shown</span></div>'
+      + dateLine
       + '<div class="pr-bars">' + bars + '</div>'
       + '<div class="pr-wkcard-foot"><span>' + remark + '</span><span></span></div></div>';
   }
@@ -876,7 +987,8 @@
     var head = '<tr><th class="pr-item">Item</th>';
     present.forEach(function (w) {
       var c = CAL[w.week] || {};
-      head += '<th class="pr-num pr-wkh" data-wk="' + w.week + '">Week ' + w.week + '</th>';   // weeks are upload slots, not dates
+      head += '<th class="pr-num pr-wkh" data-wk="' + w.week + '">Week ' + w.week
+        + '<span class="pr-wkh-date" data-wkdate="' + w.week + '">' + esc(weekDateText(w.week)) + '</span></th>';   // dates only when itadmin has set them
     });
     if (mtd) head += '<th class="pr-num pr-mtd">MTD</th>';
     head += '</tr>';
