@@ -1,4 +1,4 @@
-import { app } from "./firebase-config.js";
+import { app, trackEvent } from "./firebase-config.js";
 
 import {
     getAuth,
@@ -1412,6 +1412,13 @@ function writeCachedRole(scope, email, isAdmin) {
 
 window.navigate = async function (page) {
     currentPage = page;
+
+    // Google Analytics: one page_view per Staff Connect page opened
+    trackEvent("page_view", {
+        page_title: page,
+        page_location: location.origin + "/" + page,
+        page_path: "/" + page
+    });
 
     // Stop auto-refreshing news banners when leaving the Home page
     if (newsRefreshInterval) {
