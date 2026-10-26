@@ -293,7 +293,6 @@ async function loadVerifierStatus() {
     const snap = await fsMod.getDocs(fsMod.collection(db, VERIFIER_COLLECTION));
     const me = (email || "").trim().toLowerCase();
     isVerifier = snap.docs.some(d => String(d.data().Email || "").trim().toLowerCase() === me);
-    console.log("POM verifier check:", me || "(no email)", "→", isVerifier);
   } catch (e) {
     console.error("Verifier check failed:", e);
     isVerifier = false;
@@ -346,7 +345,10 @@ async function loadFilters() {
 // Re-pull one month from the database (authoritative) and refresh the cache.
 async function refetchMonth(month) {
   const district = document.getElementById("awmDistrict").value;
-  monthCache[month] = await dbMonthRows(district, month);
+  const seq = loadSeq;
+  const rows = await dbMonthRows(district, month);
+  if (seq !== loadSeq) return;              // the district changed while this was loading
+  monthCache[month] = rows;
 }
 
 // Pull the current month's authoritative records WITHOUT touching the cache.
@@ -360,8 +362,11 @@ async function getFreshRecords() {
 // ===============================
 // LOAD DISTRICT SUMMARY
 // ===============================
+let loadSeq = 0;               // counts district loads, so a slow answer for an earlier choice is dropped
+
 async function loadDistrictSummary() {
   const district = document.getElementById("awmDistrict").value;
+  const seq = ++loadSeq;
 
   monthCache = {};
   selectedMonth = "";
@@ -382,15 +387,17 @@ async function loadDistrictSummary() {
 
   try {
     const rows = await dbDistrictRows(district);
+    if (seq !== loadSeq) return;            // another district was chosen meanwhile
     allMonths.forEach(m => { monthCache[m] = []; });
     rows.forEach(r => { (monthCache[r.month] || (monthCache[r.month] = [])).push(r); });
     renderMonthTable();
   } catch (e) {
+    if (seq !== loadSeq) return;
     console.error(e);
     body.innerHTML = `<tr><td colspan="8" class="pom-msg error">Failed to load months. Try again.</td></tr>`;
     showToast("Failed to load months.", "error");
   } finally {
-    hideLoader();
+    if (seq === loadSeq) hideLoader();
   }
 }
 
@@ -399,19 +406,22 @@ async function loadDistrictSummary() {
 // ===============================
 const MONTHS = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
 
-function monthEnd(label) {
+// The last day of a month as "2026-05-31". Dates are compared as text, never as Date objects: a date
+// read as midnight UTC is already later than local midnight east of Greenwich (India), which made a
+// post awarded on the last day of its month count as late.
+function monthEndStr(label) {
   const [mon, yr] = String(label).split("-");
   const mi = MONTHS[mon];
-  if (mi == null || !yr) return null;
-  return new Date(Number(yr), mi + 1, 0);
+  if (mi == null || !yr) return "";
+  return new Date(Date.UTC(Number(yr), mi + 1, 0)).toISOString().slice(0, 10);
 }
 
 function isLate(record, month) {
   if (record.awarded !== "Yes") return false;
   const d = formatDate(record.awardedDate);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d || "")) return false;
-  const end = monthEnd(month);
-  return end ? new Date(d) > end : false;
+  const end = monthEndStr(month);
+  return end ? d > end : false;
 }
 
 function counts(records, month) {
@@ -502,7 +512,7 @@ async function refreshRecords() {
   showLoader();
   try {
     await refetchMonth(selectedMonth);
-    currentRecords = monthCache[selectedMonth];
+    currentRecords = monthCache[selectedMonth] || [];
     markExisting(currentRecords);
     dirty = false;
     renderTable();
@@ -1650,6 +1660,27 @@ function formatDate(value) {
 // ===============================
 // INITIALIZER
 // ===============================
+// What award-admin.js (the IT admin's edit and delete tools) needs from this view.
+window.awmApi = {
+  records: function () { return currentRecords; },
+  visible: function () { return currentRecords.filter(function (r) { return recPasses(r); }); },
+  rerender: function () { renderTable(); },
+  isDirty: function () { return dirty; },
+  refresh: async function () {
+    if (!selectedMonth) return;
+    await refetchMonth(selectedMonth);
+    currentRecords = monthCache[selectedMonth] || [];
+    markExisting(currentRecords);
+    dirty = false;
+    renderTable();
+    updateMonthRow(selectedMonth);
+  },
+  showToast: showToast,
+  showModal: showModal,
+  showLoader: showLoader,
+  hideLoader: hideLoader
+};
+
 window.initAwardManageUI = function () {
   // A fresh page: nothing carried over from the last visit.
   currentRecords = [];
@@ -1667,8 +1698,17 @@ window.initAwardManageUI = function () {
     fresh.addEventListener("change", loadDistrictSummary);
   }
 
+  // The academic year runs June to May; the badge follows the date instead of staying on one year.
+  const ay = document.querySelector(".awm-ay");
+  if (ay) {
+    const now = new Date();
+    const y = now.getMonth() + 1 >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+    ay.textContent = "AY " + y + "-" + String((y + 1) % 100).padStart(2, "0");
+  }
+
   loadFilters();
   if (typeof window.awardAppendInit === "function") window.awardAppendInit();
+  if (typeof window.awmAdminInit === "function") window.awmAdminInit();
   loadVerifierStatus().then(() => { if (selectedMonth) renderTable(); });
 
   const backBtn = document.getElementById("awmBackBtn");

@@ -185,3 +185,41 @@
 .awm-view .awm-pop-item span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .awm-view .awm-pop-item em { font-style: normal; font-size: 11px; color: #9ca3af; }
 .awm-view .awm-pop-none { margin: 6px; font-size: 12px; color: #9ca3af; }
+
+/* IT admin: edit and delete on each record, the bar above the table, and its windows. */
+.awm-view .awm-adm { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.awm-view .awm-adm-pick { display: inline-flex; align-items: center; }
+.awm-view .awm-adm-pick input { accent-color: #b91c1c; width: 14px; height: 14px; margin: 0; cursor: pointer; }
+.awm-view .awm-adm-btn { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border: 1px solid #e5e7eb; background: #fff; border-radius: 7px; font-size: 11px; font-weight: 700; color: #374151; cursor: pointer; font-family: inherit; text-transform: none; letter-spacing: normal; }
+.awm-view .awm-adm-btn:hover { background: #f3f4f6; }
+.awm-view .awm-adm-btn.bad { color: #b91c1c; border-color: #fecaca; }
+.awm-view .awm-adm-btn.bad:hover { background: #fef2f2; }
+.awm-view .awm-adm-btn:disabled { opacity: .45; cursor: default; background: #fff; }
+.awm-view .awm-adminbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0 0 10px; padding: 8px 12px; border: 1px dashed #d9c9a8; background: #fffbf0; border-radius: 10px; font-size: 12.5px; color: #4b5563; flex-shrink: 0; }
+.awm-view .awm-adm-tag { font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #92400e; background: #fde8b8; padding: 3px 8px; border-radius: 999px; }
+.awm-view .awm-adm-all { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.awm-view .awm-adm-all input { accent-color: #b91c1c; width: 14px; height: 14px; margin: 0; }
+.awm-view .awm-adminbar-gap { flex: 1; }
+.awm-view .awm-edit-box { width: 640px; max-width: 100%; max-height: 90vh; overflow-y: auto; }
+.awm-view .awm-edit-sub { margin: 0 0 12px; font-size: 12.5px; color: #6b7280; }
+.awm-view .awm-edit-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; }
+.awm-view .awm-ef { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.awm-view .awm-ef > span { font-size: 10.5px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: .4px; }
+.awm-view .awm-ef b { color: #b91c1c; }
+.awm-view .awm-ef input, .awm-view .awm-ef select { padding: 8px 10px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 13px; font-family: inherit; outline: none; background: #fff; min-width: 0; }
+.awm-view .awm-ef input:focus, .awm-view .awm-ef select:focus { border-color: #4f8ef7; box-shadow: 0 0 0 3px rgba(79,142,247,.1); }
+.awm-view .awm-edit-err { min-height: 18px; margin: 10px 0 12px; font-size: 12px; color: #b91c1c; }
+.awm-view .awm-trash-list { max-height: 340px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 10px; }
+.awm-view .awm-trash { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.awm-view .awm-trash th { position: sticky; top: 0; background: #fafafa; text-align: left; padding: 8px 10px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .4px; color: #6b7280; border-bottom: 1px solid #e5e7eb; }
+.awm-view .awm-trash td { padding: 8px 10px; border-bottom: 1px solid #f1f3f7; vertical-align: top; color: #374151; }
+.awm-view .awm-trash td small { display: block; color: #9ca3af; font-size: 11px; margin-top: 1px; }
+.awm-view .awm-trash td input { accent-color: #4f8ef7; }
+.awm-view .awm-type-input { width: 100%; box-sizing: border-box; padding: 9px 11px; border: 1px solid #fecaca; border-radius: 8px; font-size: 14px; font-family: inherit; margin: 0 0 14px; outline: none; }
+.awm-view .awm-type-input:focus { border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,.12); }
+/* The lists in the admin windows wrap their text instead of running past the edge (award.css keeps table cells on one line). */
+.awm-view .awm-trash td { white-space: normal; overflow-wrap: anywhere; }
+.awm-view .awm-trash td:last-child { text-align: right; white-space: nowrap; }
+.awm-view .awm-trash-list { overflow-x: hidden; }
+/* Questions asked from inside another window (All uploads, Deleted records, Edit) must show above it. */
+.awm-view #awmModal, .awm-view #awmTypeModal, .awm-view #awmPrompt { z-index: 790; }

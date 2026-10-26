@@ -431,13 +431,37 @@
             <p class="awa-month" id="awaMonth"></p>
             <div class="awa-step"><b>1</b><div><span>Get the template</span>
                 <button type="button" id="awaTemplate" class="awa-tpl">⬇ Download template</button>
-                <small>The Raw Data headings, with Community and District Name as dropdowns.</small></div></div>
+                <small>The Raw Data headings, with Community and District Name as dropdowns. <button type="button" id="awaManage" class="awa-link">Manage the dropdown lists</button> · <button type="button" id="awaUploads" class="awa-link">All uploads</button></small></div></div>
             <div class="awa-step"><b>2</b><div><span>Choose the filled sheet</span>
                 <input type="file" id="awaFile" class="awa-file" accept=".xlsx,.xls,.csv"></div></div>
+            <div class="awa-step" id="awaWhenStep" hidden><b>3</b><div><span>Choose the month and year</span>
+                <div class="awa-when"><select id="awaMonthSel"></select><select id="awaYearSel"></select></div>
+                <small id="awaWhenNote">Nothing is added until both are chosen.</small></div></div>
             <div id="awaResult" class="awa-result"></div>
             <div class="pom-modal-actions">
                 <button type="button" id="awaCancel" class="pmbtn cancel">Close</button>
                 <button type="button" id="awaGo" class="pmbtn primary" disabled>Add records</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dropdown lists: the values Community and District Name accept. IT admin only. -->
+    <div id="awaListsModal" class="pom-modal-overlay">
+        <div class="pom-modal-box awa-box">
+            <div class="pom-modal-title">Dropdown lists</div>
+            <p class="awa-month">The values the template dropdowns and the upload accept.</p>
+            <div class="awa-seg">
+                <button type="button" class="is-active" data-akind="community">Community</button>
+                <button type="button" data-akind="district">District Name</button>
+            </div>
+            <div id="awaListMsg" class="awa-list-msg"></div>
+            <div id="awaListBody" class="awa-listbody"></div>
+            <div class="awa-add">
+                <input type="text" id="awaNew" maxlength="80" placeholder="New name" autocomplete="off">
+                <button type="button" id="awaAdd" class="pmbtn primary">Add</button>
+            </div>
+            <div class="pom-modal-actions">
+                <button type="button" id="awaListsClose" class="pmbtn cancel">Close</button>
             </div>
         </div>
     </div>
