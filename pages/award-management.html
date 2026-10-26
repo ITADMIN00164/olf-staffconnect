@@ -24,9 +24,9 @@
          actions on the right while Stock Management is showing. -->
     <div class="aw-topbar">
       <nav class="aw-toptabs" role="tablist" aria-label="Test">
-        <button type="button" role="tab" class="aw-toptab is-active" data-aw-top="stock" aria-selected="true"><i class="aw-icon" data-aw-icon="stock" aria-hidden="true"></i>Stock Management</button>
         <button type="button" role="tab" class="aw-toptab" data-aw-top="util" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="trophy" aria-hidden="true"></i>Award Utilisation</button>
         <button type="button" role="tab" class="aw-toptab" data-aw-top="event" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="calendar" aria-hidden="true"></i>Event Management</button>
+        <button type="button" role="tab" class="aw-toptab is-active" data-aw-top="stock" aria-selected="true"><i class="aw-icon" data-aw-icon="stock" aria-hidden="true"></i>Stock Management</button>
       </nav>
       <div class="aw-top-actions" id="aw-stock-actions">
         <button type="button" id="refresh-btn" class="btn btn-ghost btn-sm"><i class="aw-icon" data-aw-icon="refresh" aria-hidden="true"></i>Refresh</button>
@@ -383,18 +383,21 @@
             <button id="awmRefreshBtn" class="pom-back-btn pom-refresh-btn" title="Reload latest records">⟳ Refresh Records</button>
         </div>
 
+        <!-- Filters on the records of the month that is open; award-manage.js builds it. -->
+        <div class="awm-filters" id="awmFilters" hidden></div>
+
         <div class="pom-card scroll">
             <table class="pom-table fixed">
                 <colgroup>
-                    <col style="width:14%"><col style="width:12%"><col style="width:11%"><col style="width:6%">
-                    <col style="width:10%"><col style="width:9%"><col style="width:7%">
-                    <col style="width:7%"><col style="width:7%"><col style="width:9%"><col style="width:8%">
+                    <col style="width:14%"><col style="width:10%"><col style="width:12%"><col style="width:7%">
+                    <col style="width:10%"><col style="width:10%"><col style="width:8%">
+                    <col style="width:9%"><col style="width:6%"><col style="width:8%"><col style="width:6%">
                 </colgroup>
                 <thead>
                     <tr>
-                        <th>Name</th><th>Award</th><th>Category</th><th>Awarded</th>
-                        <th>Awarded By</th><th>Date</th><th class="col-center">Image</th><th class="col-center">Description</th>
-                        <th class="col-center">Save</th><th class="col-center">Verify</th><th class="col-center">Unlock</th>
+                        <th><span class="awm-th">Name<button type="button" class="awm-fbtn" data-fcol="q"></button></span></th><th><span class="awm-th">Award<button type="button" class="awm-fbtn" data-fcol="award"></button></span></th><th><span class="awm-th">Category<button type="button" class="awm-fbtn" data-fcol="category"></button></span></th><th><span class="awm-th">Awarded<button type="button" class="awm-fbtn" data-fcol="awarded"></button></span></th>
+                        <th><span class="awm-th">Awarded By<button type="button" class="awm-fbtn" data-fcol="by"></button></span></th><th>Date</th><th class="col-center">Image</th><th class="col-center">Description</th>
+                        <th class="col-center">Save</th><th class="col-center"><span class="awm-th">Verify<button type="button" class="awm-fbtn" data-fcol="status"></button></span></th><th class="col-center">Unlock</th>
                     </tr>
                 </thead>
                 <tbody id="awmTableBody">

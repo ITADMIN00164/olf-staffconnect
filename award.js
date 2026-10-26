@@ -1611,6 +1611,9 @@ window.AWARD_CONFIG = {
       }
     );
 
+    // The Test tab opens on its first tab, Award Utilisation.
+    showTopView("util");
+
     Array.prototype.forEach.call(
       el.hoModal.querySelectorAll("[data-aw-close-ho]"),
       function (node) { node.addEventListener("click", closeHo); }

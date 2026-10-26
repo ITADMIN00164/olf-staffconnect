@@ -541,6 +541,7 @@ function selectMonth(month) {
   currentRecords = monthCache[month] || [];
   markExisting(currentRecords);
   dirty = false;
+  resetFilters();
   document.querySelectorAll(".month-row").forEach(r =>
     r.classList.toggle("active", r.dataset.month === month)
   );
@@ -733,15 +734,256 @@ function updateSaveAllBar() {
   bar.style.display = (anyUnsavedComplete || anyPendingDelete) ? "block" : "none";
 }
 
+// ===============================
+// FILTERS, in the column headings, as in a spreadsheet.
+// A funnel in a heading opens a list of that column's values to tick (the Name
+// heading opens a search box). Each list offers only what the other filters leave,
+// with how many records each value has. A row keeps its place in currentRecords
+// whatever is shown, so every handler still finds it by index.
+// ===============================
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function recStatus(r) {
+  return r.verified === "Yes" ? "Verified" : r.verified === "Rejected" ? "Rejected" : "Not verified yet";
+}
+
+const AWM_BLANK = "(blank)";
+const AWM_COLS = {
+  q:        { label: "Name" },                                   // a search, not a list
+  award:    { label: "Award",      get: r => r.awardName },
+  category: { label: "Category",   get: r => r.awardCategory },
+  awarded:  { label: "Awarded",    get: r => r.awarded },
+  by:       { label: "Awarded By", get: r => r.awardedBy },
+  status:   { label: "Verify",     get: recStatus }
+};
+const AWM_LISTS = ["award", "category", "awarded", "by", "status"];
+const AWM_STATUS_ORDER = ["Verified", "Not verified yet", "Rejected"];
+const FUNNEL_SVG = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18l-7 8.5V19l-4 2v-8.5L3 4z"/></svg>';
+
+function blankFilter() { return { q: "", award: [], category: [], awarded: [], by: [], status: [] }; }
+let awmFilter = blankFilter();
+let awmPopOpenedAt = 0;            // when it opened, so the scroll that opening can cause does not close it
+let awmPopKey = "";                 // the heading whose list is open, "" when none
+
+function resetFilters() {
+  awmFilter = blankFilter();
+  closeFilterPop();
+}
+
+function filtersActive() {
+  return !!awmFilter.q.trim() || AWM_LISTS.some(k => awmFilter[k].length);
+}
+
+function colValue(key, r) {
+  return String(AWM_COLS[key].get(r) || "") || AWM_BLANK;
+}
+
+// Does a record pass every filter except, perhaps, one (the one whose list is being worked out)?
+function recPasses(r, except) {
+  const q = awmFilter.q.trim().toLowerCase();
+  if (q && except !== "q") {
+    const hay = [r.fullName, r.mobile, r.schoolName, r.blockName, r.community].join(" ").toLowerCase();
+    if (hay.indexOf(q) === -1) return false;
+  }
+  return AWM_LISTS.every(k => k === except || !awmFilter[k].length || awmFilter[k].indexOf(colValue(k, r)) !== -1);
+}
+
+// The values a heading can offer, each with the number of records that have it.
+function filterOptions(key) {
+  const count = {};
+  currentRecords.forEach(r => {
+    if (!recPasses(r, key)) return;
+    const v = colValue(key, r);
+    count[v] = (count[v] || 0) + 1;
+  });
+  const names = Object.keys(count);
+  names.sort((a, b) => {
+    if (a === AWM_BLANK) return 1;
+    if (b === AWM_BLANK) return -1;
+    if (key === "status") return AWM_STATUS_ORDER.indexOf(a) - AWM_STATUS_ORDER.indexOf(b);
+    return a.localeCompare(b);
+  });
+  return names.map(n => ({ value: n, count: count[n] }));
+}
+
+function popEl() {
+  let pop = document.getElementById("awmFpop");
+  if (pop) return pop;
+  pop = document.createElement("div");
+  pop.id = "awmFpop";
+  pop.className = "awm-pop";
+  pop.hidden = true;
+  const wrap = document.getElementById("awmDetailWrap");
+  (wrap || document.body).appendChild(pop);
+
+  let timer = null;
+  pop.addEventListener("input", function (e) {
+    if (e.target.matches("[data-fq]")) {
+      awmFilter.q = e.target.value;
+      clearTimeout(timer);
+      timer = setTimeout(renderTable, 150);
+    } else if (e.target.matches("[data-fsearch]")) {
+      const t = e.target.value.trim().toLowerCase();
+      pop.querySelectorAll(".awm-pop-item").forEach(l => {
+        l.hidden = !!t && l.textContent.toLowerCase().indexOf(t) === -1;
+      });
+    }
+  });
+  pop.addEventListener("change", function (e) {
+    if (!e.target.matches("[data-fv]")) return;
+    const sel = awmFilter[awmPopKey];
+    const v = e.target.value;
+    const i = sel.indexOf(v);
+    if (e.target.checked && i === -1) sel.push(v);
+    if (!e.target.checked && i !== -1) sel.splice(i, 1);
+    renderTable();
+  });
+  pop.addEventListener("click", function (e) {
+    if (e.target.closest("[data-fclear]")) {
+      if (awmPopKey === "q") awmFilter.q = "";
+      else awmFilter[awmPopKey] = [];
+      renderTable();
+    }
+  });
+  pop.addEventListener("keydown", function (e) { if (e.key === "Escape") closeFilterPop(); });
+  return pop;
+}
+
+function closeFilterPop() {
+  awmPopKey = "";
+  const pop = document.getElementById("awmFpop");
+  if (pop) pop.hidden = true;
+  document.querySelectorAll(".awm-fbtn.is-open").forEach(b => b.classList.remove("is-open"));
+}
+
+// Draw the open list (again, after a choice has changed what the others offer).
+function renderFilterPop() {
+  const pop = popEl();
+  const key = awmPopKey;
+  if (!key) { pop.hidden = true; return; }
+  const col = AWM_COLS[key];
+  let body;
+  if (key === "q") {
+    body = '<input type="search" data-fq placeholder="Name, mobile, school or block" autocomplete="off" value="' + esc(awmFilter.q) + '">';
+  } else {
+    const opts = filterOptions(key);
+    const sel = awmFilter[key];
+    const searchBox = opts.length > 7
+      ? '<input type="search" data-fsearch placeholder="Search" autocomplete="off">' : "";
+    body = searchBox + '<div class="awm-pop-list">' +
+      (opts.length ? opts.map(o =>
+        '<label class="awm-pop-item"><input type="checkbox" data-fv value="' + esc(o.value) + '"' +
+        (sel.indexOf(o.value) !== -1 ? " checked" : "") + '><span>' + esc(o.value) +
+        '</span><em>' + o.count + "</em></label>").join("")
+        : '<p class="awm-pop-none">Nothing to choose from</p>') + "</div>";
+  }
+  const listBox = pop.querySelector(".awm-pop-list");
+  const listTop = listBox ? listBox.scrollTop : 0;
+  const typing = pop.contains(document.activeElement) && document.activeElement.matches("input[type=search]");
+  const keepSearch = typing ? document.activeElement.value : null;
+  const wasFocus = typing ? document.activeElement.getAttribute("data-fq") !== null ? "q" : "s" : "";
+  pop.innerHTML = '<div class="awm-pop-head"><b>' + col.label + '</b>' +
+    '<button type="button" data-fclear>Clear</button></div>' + body;
+  // typing in a box must not lose its place when the list is drawn again
+  if (wasFocus) {
+    const box = pop.querySelector(wasFocus === "q" ? "[data-fq]" : "[data-fsearch]");
+    if (box) { if (keepSearch !== null) box.value = keepSearch; box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
+    if (wasFocus === "s") pop.dispatchEvent(new Event("input"));
+  }
+  const newList = pop.querySelector(".awm-pop-list");
+  if (newList) newList.scrollTop = listTop;
+  pop.hidden = false;
+}
+
+function openFilterPop(key, btn) {
+  if (awmPopKey === key) { closeFilterPop(); return; }
+  closeFilterPop();
+  awmPopKey = key;
+  btn.classList.add("is-open");
+  renderFilterPop();
+  const pop = popEl();
+  const r = btn.getBoundingClientRect();
+  const w = pop.offsetWidth || 240;
+  pop.style.left = Math.max(8, Math.min(r.left - 8, window.innerWidth - w - 12)) + "px";
+  pop.style.top = (r.bottom + 6) + "px";
+  const first = pop.querySelector("[data-fq], [data-fsearch], [data-fv]");
+  if (first) first.focus({ preventScroll: true });
+  awmPopOpenedAt = Date.now();
+}
+
+// The funnels in the headings and the line above the table; both follow the filters.
+function renderFilterBar() {
+  const strip = document.getElementById("awmFilters");
+  if (strip) {
+    strip.hidden = !currentRecords.length;
+    const shown = currentRecords.filter(r => recPasses(r)).length;
+    strip.innerHTML = filtersActive()
+      ? 'Showing <b>' + shown + '</b> of ' + currentRecords.length + ' records' +
+        '<button type="button" class="awm-f-clear" id="awmFclear">Clear filters</button>'
+      : '<b>' + currentRecords.length + '</b> record' + (currentRecords.length === 1 ? "" : "s") +
+        ' <span class="awm-f-tip">Use the funnels in the column headings to filter.</span>';
+    const clear = document.getElementById("awmFclear");
+    if (clear) clear.addEventListener("click", function () { resetFilters(); renderTable(); });
+  }
+
+  document.querySelectorAll(".awm-fbtn").forEach(b => {
+    if (!b.dataset.ready) {
+      b.dataset.ready = "1";
+      b.innerHTML = FUNNEL_SVG;
+      b.addEventListener("click", function (e) {
+        e.stopPropagation();
+        openFilterPop(b.getAttribute("data-fcol"), b);
+      });
+    }
+    const k = b.getAttribute("data-fcol");
+    const on = k === "q" ? !!awmFilter.q.trim() : awmFilter[k].length > 0;
+    b.classList.toggle("is-on", on);
+    b.title = on ? "Filtered — click to change" : "Filter " + AWM_COLS[k].label;
+  });
+
+  // A tick that the other filters have since ruled out cannot stay ticked.
+  AWM_LISTS.forEach(k => {
+    if (!awmFilter[k].length) return;
+    const have = filterOptions(k).map(o => o.value);
+    awmFilter[k] = awmFilter[k].filter(v => have.indexOf(v) !== -1);
+  });
+  if (awmPopKey) renderFilterPop();
+}
+
+if (!window.__awmFilterOutside) {
+  window.__awmFilterOutside = true;
+  document.addEventListener("click", function (e) {
+    if (!awmPopKey) return;
+    if (e.target.closest && (e.target.closest("#awmFpop") || e.target.closest(".awm-fbtn"))) return;
+    closeFilterPop();
+  });
+  window.addEventListener("resize", function () { closeFilterPop(); });
+  window.addEventListener("scroll", function (e) {
+    if (e.target && e.target.closest && e.target.closest("#awmFpop")) return;   // the list scrolling is fine
+    if (Date.now() - awmPopOpenedAt < 400) return;
+    closeFilterPop();
+  }, true);
+}
+
 function renderTable() {
   const tbody = document.getElementById("awmTableBody");
 
   if (!currentRecords || currentRecords.length === 0) {
+    renderFilterBar();
     resetDetail("No Records Found");
     return;
   }
 
+  renderFilterBar();
+  if (!currentRecords.some(r => recPasses(r))) {
+    resetDetail("No records match these filters");
+    return;
+  }
+
   tbody.innerHTML = currentRecords.map((r, i) => {
+    if (!recPasses(r)) return "";
     const locked   = r.verified === "Yes";       // verified → locked for the user
     const viewOnly = locked || isVerifier;        // editing controls disabled (verified row, or verifier)
     const dis = viewOnly ? "disabled" : "";
@@ -1488,6 +1730,7 @@ window.initAwardManageUI = function () {
       selectedMonth = this.value;
       currentRecords = monthCache[selectedMonth] || [];
       markExisting(currentRecords);
+      resetFilters();
       document.querySelectorAll(".month-row").forEach(r =>
         r.classList.toggle("active", r.dataset.month === selectedMonth)
       );
