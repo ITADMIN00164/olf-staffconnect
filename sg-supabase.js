@@ -116,7 +116,10 @@
         goals: goals.map(function (g) {
           return { id: String(g.id || ''), year: g.year || '', dept: g.dept || '', member: g.member || '',
                    goal: g.goal || '', weightage: sgNum0(g.weightage), description: g.description || '',
-                   cat: g.cat || '', particulars: g.particulars || '', maxScore: sgNum0(g.max_score) };
+                   cat: g.cat || '', particulars: g.particulars || '', maxScore: sgNum0(g.max_score),
+                   // Success Measures (SMART Goal level). Left undefined when the column
+                   // does not exist yet, so saves keep working before the migration.
+                   successMeasures: (g.success_measures == null ? undefined : g.success_measures) };
         }),
         tasks: tasks.map(function (t) {
           return { id: String(t.id || ''), year: t.year || '', month: t.month || '', week: t.week || '',
@@ -178,6 +181,8 @@
                 goal: g.goal || '', weightage: (g.weightage === '' || g.weightage == null) ? 0 : Number(g.weightage),
                 description: g.description || '', cat: g.cat || '', particulars: g.particulars || '',
                 max_score: (g.maxScore === '' || g.maxScore == null) ? 0 : Number(g.maxScore) };
+    // Only send success_measures when the goal carries it (needs the goals.success_measures column).
+    if (g.successMeasures !== undefined) row.success_measures = g.successMeasures || '';
     // mirror GAS side-effect: register new goal name + category (idempotent)
     return Promise.all([
       g.goal ? ensureListValue('goal_names', g.goal) : null,
