@@ -707,19 +707,28 @@ window.AWARD_CONFIG = {
   var dashViewStarted = false;
   var eventViewStarted = false;
 
+  /* The top tabs are Stock Management, Award Utilisation and Event Management.
+     Award Utilisation holds two views of its own, Award Management and the Award
+     Data Dashboard, chosen with the small tabs under it. */
+  var utilView = "award";
+
   function showTopView(which) {
-    var award = which === "award";
-    var dash = which === "dash";
+    var util = which === "util";
     var event = which === "event";
     var stock = document.getElementById("aw-view-stock");
     var awardView = document.getElementById("aw-view-award");
     var dashView = document.getElementById("aw-view-dash");
     var eventView = document.getElementById("aw-view-event");
-    if (!stock || !awardView || !dashView || !eventView) return;
+    var utilBar = document.getElementById("aw-util-bar");
+    if (!stock || !awardView || !dashView || !eventView || !utilBar) return;
 
-    stock.hidden = award || dash || event;
+    var award = util && utilView === "award";
+    var dash = util && utilView === "dash";
+
+    stock.hidden = util || event;
     var actions = document.getElementById("aw-stock-actions");
-    if (actions) actions.hidden = award || dash || event;
+    if (actions) actions.hidden = util || event;
+    utilBar.hidden = !util;
     awardView.hidden = !award;
     dashView.hidden = !dash;
     eventView.hidden = !event;
@@ -727,6 +736,15 @@ window.AWARD_CONFIG = {
       document.querySelectorAll(".award-page .aw-toptab"),
       function (tab) {
         var on = tab.getAttribute("data-aw-top") === which;
+        tab.classList.toggle("is-active", on);
+        tab.setAttribute("aria-selected", on ? "true" : "false");
+        tab.tabIndex = on ? 0 : -1;
+      }
+    );
+    Array.prototype.forEach.call(
+      document.querySelectorAll(".award-page .aw-utiltab"),
+      function (tab) {
+        var on = tab.getAttribute("data-aw-util") === utilView;
         tab.classList.toggle("is-active", on);
         tab.setAttribute("aria-selected", on ? "true" : "false");
         tab.tabIndex = on ? 0 : -1;
@@ -747,6 +765,11 @@ window.AWARD_CONFIG = {
     }
   }
 
+  function showUtilView(which) {
+    utilView = which === "dash" ? "dash" : "award";
+    showTopView("util");
+  }
+
   function mount() {
     cacheElements();
     if (!el.form) return;        // the tab is not on screen
@@ -754,6 +777,7 @@ window.AWARD_CONFIG = {
     awardViewStarted = false;      // a fresh page has a fresh Award Management view
     dashViewStarted = false;       // and a fresh dashboard
     eventViewStarted = false;      // and fresh event counts
+    utilView = "award";            // Award Utilisation opens on Award Management
     juteView = "stock";
     stockScope = "awards";
 
@@ -1574,6 +1598,15 @@ window.AWARD_CONFIG = {
       function (tab) {
         tab.addEventListener("click", function () {
           showTopView(tab.getAttribute("data-aw-top"));
+        });
+      }
+    );
+
+    Array.prototype.forEach.call(
+      document.querySelectorAll(".award-page .aw-utiltab"),
+      function (tab) {
+        tab.addEventListener("click", function () {
+          showUtilView(tab.getAttribute("data-aw-util"));
         });
       }
     );
