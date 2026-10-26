@@ -599,6 +599,12 @@ window.AWARD_CONFIG = {
             'stroke-linecap="round" stroke-linejoin="round">' +
             '<path d="M8 4h8v5a4 4 0 0 1-8 0V4Z"/>' +
             '<path d="M8 6H4v2a3 3 0 0 0 4 2.8M16 6h4v2a3 3 0 0 1-4 2.8M12 13v4M8.5 20h7M10 17h4"/></svg>',
+    chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+           'stroke-linecap="round" stroke-linejoin="round">' +
+           '<path d="M4 20V4M4 20h16"/><path d="M8 16v-4M12 16V8M16 16v-6"/></svg>',
+    calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+              'stroke-linecap="round" stroke-linejoin="round">' +
+              '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>',
     doc:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
            'stroke-linecap="round" stroke-linejoin="round">' +
            '<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 16h5"/></svg>',
@@ -698,17 +704,25 @@ window.AWARD_CONFIG = {
      award-manage.js. That one starts the first time it is opened, since it
      fetches the district list and nothing else needs it. */
   var awardViewStarted = false;
+  var dashViewStarted = false;
+  var eventViewStarted = false;
 
   function showTopView(which) {
     var award = which === "award";
+    var dash = which === "dash";
+    var event = which === "event";
     var stock = document.getElementById("aw-view-stock");
     var awardView = document.getElementById("aw-view-award");
-    if (!stock || !awardView) return;
+    var dashView = document.getElementById("aw-view-dash");
+    var eventView = document.getElementById("aw-view-event");
+    if (!stock || !awardView || !dashView || !eventView) return;
 
-    stock.hidden = award;
+    stock.hidden = award || dash || event;
     var actions = document.getElementById("aw-stock-actions");
-    if (actions) actions.hidden = award;
+    if (actions) actions.hidden = award || dash || event;
     awardView.hidden = !award;
+    dashView.hidden = !dash;
+    eventView.hidden = !event;
     Array.prototype.forEach.call(
       document.querySelectorAll(".award-page .aw-toptab"),
       function (tab) {
@@ -723,6 +737,14 @@ window.AWARD_CONFIG = {
       awardViewStarted = true;
       window.initAwardManageUI();
     }
+    if (dash && !dashViewStarted && typeof window.initAwardDashUI === "function") {
+      dashViewStarted = true;
+      window.initAwardDashUI();
+    }
+    if (event && !eventViewStarted && typeof window.initAwardEventUI === "function") {
+      eventViewStarted = true;
+      window.initAwardEventUI();
+    }
   }
 
   function mount() {
@@ -730,6 +752,8 @@ window.AWARD_CONFIG = {
     if (!el.form) return;        // the tab is not on screen
 
     awardViewStarted = false;      // a fresh page has a fresh Award Management view
+    dashViewStarted = false;       // and a fresh dashboard
+    eventViewStarted = false;      // and fresh event counts
     juteView = "stock";
     stockScope = "awards";
 

@@ -1790,7 +1790,7 @@
 
 /* a tab's content fades in when it is chosen */
 .award-page .aw-subpanel:not([hidden]) { animation: aw-fade .28s ease both; }
-.award-page #aw-view-stock:not([hidden]), .award-page #aw-view-award:not([hidden]) { animation: aw-fade .3s ease both; }
+.award-page #aw-view-stock:not([hidden]), .award-page #aw-view-award:not([hidden]), .award-page #aw-view-dash:not([hidden]), .award-page #aw-view-event:not([hidden]) { animation: aw-fade .3s ease both; }
 
 /* rows settle in, one after another, and light up under the pointer */
 .award-page #requisitions-body tr, .award-page #delivery-body tr { animation: aw-row .32s ease both; }

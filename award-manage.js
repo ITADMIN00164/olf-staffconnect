@@ -81,6 +81,24 @@ async function sbSend(method, path, body) {
 }
 
 // A database row, in the shape the rest of this file was written for.
+// The level (Block / District / Cluster) belongs to the category, not to the award's
+// name: "Post of the Month, Block Level" + POM becomes "Post of the Month" and
+// "Block Level - POM". A life-skill award is a district-level one. Safe to run on
+// a row that is already split.
+function splitAward(name, category) {
+  let award = String(name || "").trim();
+  let cat = String(category || "").trim();
+  if (cat.includes(" - ")) return { awardName: award, awardCategory: cat };
+  if (cat === "LIFESKILL") return { awardName: award, awardCategory: "District Level - LIFESKILL" };
+  const m = award.match(/[,\s-]*\b(Block|District|Cluster) Level\s*$/i);
+  if (cat === "POM" && m) {
+    const level = m[1][0].toUpperCase() + m[1].slice(1).toLowerCase();
+    award = award.slice(0, m.index).trim();
+    cat = level + " Level - POM";
+  }
+  return { awardName: award, awardCategory: cat };
+}
+
 function toRec(row) {
   if ("rejected" in row) hasRejected = true;
   return {
@@ -95,8 +113,7 @@ function toRec(row) {
     circleName: row.circle_name || "",
     blockName: row.block_name || "",
     pmName: row.pm_name || "",
-    awardName: row.award_name || "",
-    awardCategory: row.award_category || "",
+    ...splitAward(row.award_name, row.award_category),
     postLink: row.post_url || "",
     postScore: row.post_score,
     awarded: row.awarded ? "Yes" : "No",
@@ -736,6 +753,7 @@ function renderTable() {
         <div class="nc-sub">${r.mobile || ""}${r.mobile && r.schoolName ? " · " : ""}${r.schoolName || ""}</div>
       </td>
       <td class="award-col">${r.awardName || ""}</td>
+      <td class="award-col">${r.awardCategory || ""}</td>
       <td>
         <select class="award-select" ${dis} ${lt} onchange="awmUpdateField(${i},'awarded',this.value)">
           <option value="No"  ${r.awarded === "No"  ? "selected" : ""}>No</option>
@@ -761,7 +779,7 @@ function renderTable() {
 
 function resetDetail(msg) {
   document.getElementById("awmTableBody").innerHTML =
-    `<tr><td colspan="10" style="text-align:center;color:#9ca3af;padding:28px;">${msg}</td></tr>`;
+    `<tr><td colspan="11" style="text-align:center;color:#9ca3af;padding:28px;">${msg}</td></tr>`;
   updateSaveAllBar();
 }
 
