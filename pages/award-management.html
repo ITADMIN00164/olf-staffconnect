@@ -26,6 +26,8 @@
       <nav class="aw-toptabs" role="tablist" aria-label="Test">
         <button type="button" role="tab" class="aw-toptab is-active" data-aw-top="stock" aria-selected="true"><i class="aw-icon" data-aw-icon="stock" aria-hidden="true"></i>Stock Management</button>
         <button type="button" role="tab" class="aw-toptab" data-aw-top="award" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="trophy" aria-hidden="true"></i>Award Management</button>
+        <button type="button" role="tab" class="aw-toptab" data-aw-top="dash" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="chart" aria-hidden="true"></i>Award Data Dashboard</button>
+        <button type="button" role="tab" class="aw-toptab" data-aw-top="event" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="calendar" aria-hidden="true"></i>Event Management</button>
       </nav>
       <div class="aw-top-actions" id="aw-stock-actions">
         <button type="button" id="refresh-btn" class="btn btn-ghost btn-sm"><i class="aw-icon" data-aw-icon="refresh" aria-hidden="true"></i>Refresh</button>
@@ -379,19 +381,19 @@
         <div class="pom-card scroll">
             <table class="pom-table fixed">
                 <colgroup>
-                    <col style="width:15%"><col style="width:12%"><col style="width:7%">
-                    <col style="width:11%"><col style="width:10%"><col style="width:8%">
-                    <col style="width:8%"><col style="width:9%"><col style="width:9%"><col style="width:8%">
+                    <col style="width:14%"><col style="width:12%"><col style="width:11%"><col style="width:6%">
+                    <col style="width:10%"><col style="width:9%"><col style="width:7%">
+                    <col style="width:7%"><col style="width:7%"><col style="width:9%"><col style="width:8%">
                 </colgroup>
                 <thead>
                     <tr>
-                        <th>Name</th><th>Award</th><th>Awarded</th>
+                        <th>Name</th><th>Award</th><th>Category</th><th>Awarded</th>
                         <th>Awarded By</th><th>Date</th><th class="col-center">Image</th><th class="col-center">Description</th>
                         <th class="col-center">Save</th><th class="col-center">Verify</th><th class="col-center">Unlock</th>
                     </tr>
                 </thead>
                 <tbody id="awmTableBody">
-                    <tr><td colspan="10" style="text-align:center;color:#9ca3af;padding:28px;">No month selected</td></tr>
+                    <tr><td colspan="11" style="text-align:center;color:#9ca3af;padding:28px;">No month selected</td></tr>
                 </tbody>
             </table>
         </div>
@@ -437,6 +439,87 @@
       </div>
     </div>
 
+    <!-- Award Data Dashboard: the POM page's dashboard, copied here. Its styles are
+         award-dash.css (scoped to .awd-view) and its behaviour is award-dash.js. -->
+    <div id="aw-view-dash" class="awd-view" hidden>
+      <div class="dash-filter-bar" id="awdFilterBar"></div>
+      <div class="dash-content-row">
+        <div class="dash-table-wrap">
+          <table class="dash-tbl">
+            <thead>
+              <tr>
+                <th class="left">Month</th>
+                <th>Total<br>Awards</th>
+                <th>Awarded<br>In Time</th><th>%</th>
+                <th>Awarded<br>Late</th><th>%</th>
+                <th>Pending</th><th>%</th>
+                <th>Total<br>Awarded</th><th>%</th>
+                <th>Verified</th><th>%</th>
+              </tr>
+            </thead>
+            <tbody id="awdTableBody">
+              <tr><td colspan="12" class="dash-empty">Loading data…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="dash-chart-wrap">
+          <div class="dash-chart-title">Award Distribution</div>
+          <canvas id="awdPieCanvas" width="200" height="200"></canvas>
+          <div class="dash-legend" id="awdLegend"></div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- Event Management: the POM page's event counts, copied here. Its styles are
+         award-event.css (and award-manage.css, which it borrows from) and its behaviour
+         is award-event.js. -->
+    <div id="aw-view-event" class="awm-view awe-view" hidden>
+      <div class="pom-page">
+        <div class="awe-wrap">
+          <div class="pev-toolbar">
+            <select id="aweDistrict" class="pom-select">
+              <option value="">Select District</option>
+            </select>
+            <select id="aweBlock" class="pom-select pev-block" title="Block (choose a district first)" disabled>
+              <option value="">Select a district first</option>
+            </select>
+            <select id="aweYear" class="pom-select pev-year" title="Academic year (June to May)"></select>
+            <button id="aweExportBtn" class="pev-export-btn pev-refresh" title="Download every saved event row as an Excel file">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span>Download Excel</span>
+            </button>
+            <button id="aweRefreshBtn" class="pom-back-btn" title="Reload the latest saved event data and district list">⟳ Refresh</button>
+          </div>
+
+          <div class="pev-note" id="aweNote" style="display:none;"></div>
+
+          <div class="pom-card scroll">
+            <table class="pom-table centered pev-tbl">
+              <colgroup id="aweColgroup"></colgroup>
+              <thead id="aweThead"></thead>
+              <tbody id="aweTableBody">
+                <tr><td colspan="9" class="pom-msg">Select a District to begin</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="save-bar" id="aweSaveBar" style="display:none;">
+            <button class="save-btn" id="aweSaveAllBtn">💾 Save All Changes</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="aweLoader" class="pom-loader-overlay"><div class="pom-spinner"></div></div>
+      <div id="aweToasts" class="pom-toasts"></div>
+      <div id="aweModal" class="pom-modal-overlay">
+        <div class="pom-modal-box">
+          <div class="pom-modal-title" id="aweModalTitle"></div>
+          <div class="pom-modal-msg" id="aweModalMsg"></div>
+          <div class="pom-modal-actions" id="aweModalActions"></div>
+        </div>
+      </div>
+    </div>
 
     <!-- New requisition.
 
@@ -749,3 +832,7 @@
       </div>
     </div>
 </div>
+
+<!-- Live Server (VS Code) puts its reload script before the first closing body tag it finds, or
+     inside the first svg when there is none, which breaks a page fragment like this one. A closing
+     tag in a comment gives it somewhere harmless to go: </body> -->

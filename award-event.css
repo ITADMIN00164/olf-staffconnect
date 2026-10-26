@@ -1,0 +1,33 @@
+/* The Event Management view in the Test tab: a copy of the one on the POM page.
+   It borrows the table, button, notice and dialog styles of award-manage.css (it is an
+   .awm-view too) and adds what is its own here, scoped to .awe-view. */
+.awe-view .awe-wrap { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.awe-view[hidden] { display: none; }
+.awe-view .pev-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-shrink: 0; flex-wrap: wrap; }
+.awe-view .pev-hint { font-size: 11.5px; color: #9ca3af; }
+.awe-view .pev-refresh { margin-left: auto; }
+.awe-view .pev-tbl th { vertical-align: bottom; }
+.awe-view .pev-month { font-weight: 600; color: #1a1d23; }
+.awe-view .pev-input { width: 100%; max-width: 84px; padding: 6px 8px; background: #fff; border: 1px solid #e5e7eb; color: #1a1d23; border-radius: 6px; font-size: 12px; font-family: inherit; outline: none; text-align: center; transition: border 0.2s; -moz-appearance: textfield; }
+.awe-view .pev-input:focus { border-color: #4f8ef7; box-shadow: 0 0 0 3px rgba(79,142,247,0.1); }
+.awe-view .pev-input.bad { border-color: #ef4444; background: #fef2f2; }
+.awe-view .pev-input::-webkit-outer-spin-button, .awe-view .pev-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.awe-view .pev-year { min-width: 130px; max-width: 160px; }
+.awe-view .pev-block { min-width: 210px; max-width: 260px; }
+.awe-view .pev-block:disabled { background: #f3f4f6; color: #9ca3af; cursor: not-allowed; }
+
+/* District view: the two block-level columns are a read-only roll-up of
+   the district's block rows. */
+.awe-view .pev-rollup { text-align: center; background: #fafbfc; cursor: help; }
+.awe-view .pev-rollup-val { display: inline-block; min-width: 52px; padding: 5px 8px; border: 1px dashed #d1d5db; border-radius: 6px; font-size: 12px; font-weight: 700; color: #6b7280; background: #fff; }
+.awe-view .pev-rollup-th { cursor: help; }
+/* Columns that carry an explanation on hover */
+.awe-view .pev-tip-th { cursor: help; text-decoration: underline dotted #cbd5e1; text-underline-offset: 3px; }
+.awe-view .pev-export-btn { display: inline-flex; align-items: center; gap: 7px; background: #ecfdf5; border: 1px solid #bbf7d0; color: #15803d; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background .15s, border-color .15s; white-space: nowrap; }
+.awe-view .pev-export-btn:hover { background: #d1fae5; border-color: #16a34a; }
+.awe-view .pev-rollup-th::after { content: " \2211"; color: #9ca3af; font-weight: 400; }
+.awe-view .pev-note { font-size: 11.5px; color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; flex-shrink: 0; }
+.awe-view .pev-updated { font-size: 10px; color: #9ca3af; line-height: 1.4; }
+.awe-view .pev-who { display: block; font-weight: 600; color: #6b7280; }
+.awe-view .pev-when { display: block; }
+.awe-view .pev-totals td { background: #f8faff; font-weight: 700; color: #1a1d23; border-top: 2px solid #eef2ff; }
