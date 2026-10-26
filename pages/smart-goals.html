@@ -246,9 +246,27 @@
 #sg-app .remark-icon-btn { border: 1px solid var(--border2); background: #fff; border-radius: 6px; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px; line-height: 1; padding: 0; transition: all .12s; }
 #sg-app .remark-icon-btn:hover { background: var(--brand-lt); border-color: var(--brand); }
 #sg-app .remark-icon-btn.has-remark { border-color: var(--brand); background: var(--brand-lt); }
+/* Success Measures eye button + popup */
+#sg-app .sm-eye-btn { border: 1px solid var(--border2); background: #fff; color: var(--text3); border-radius: 6px; width: 28px; height: 26px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; transition: all .12s; vertical-align: middle; }
+#sg-app .sm-eye-btn:hover { background: var(--brand-lt); border-color: var(--brand); color: var(--brand); }
+#sg-app .sm-eye-btn.has-sm { border-color: var(--brand); background: var(--brand-lt); color: var(--brand); }
+#sg-app .actions-cell .sm-eye-btn { margin-right: 4px; }
+#sg-app #sm-view { font-size: 13px; color: var(--text); line-height: 1.5; }
+#sg-app #sm-view .sm-bullet { position: relative; padding-left: 16px; margin: 3px 0; }
+#sg-app #sm-view .sm-bullet::before { content: ''; position: absolute; left: 4px; top: .62em; width: 5px; height: 5px; border-radius: 50%; background: var(--brand); }
+#sg-app #sm-view .sm-sub { font-weight: 700; margin: 8px 0 2px; }
+#sg-app #sm-view .sm-head { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--brand); margin: 16px 0 6px; padding-top: 12px; border-top: 1px solid var(--border); }
+#sg-app #sm-view .sm-head:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+#sg-app #sm-view .sm-tbl { width: 100%; border-collapse: collapse; font-size: 12px; margin: 4px 0 8px; }
+#sg-app #sm-view .sm-tbl th { background: var(--brand); color: #fff; font-weight: 700; text-align: left; padding: 6px 8px; font-size: 11px; white-space: normal; }
+#sg-app #sm-view .sm-tbl td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; white-space: normal; overflow-wrap: anywhere; }
+#sg-app #sm-view .sm-tbl td.nw { white-space: nowrap; }
+#sg-app #sm-view .sm-tbl tr.sm-sec td { background: var(--brand-lt); font-weight: 700; color: var(--brand); }
+#sg-app #sm-view .sm-empty { color: var(--text3); font-style: italic; }
+#sg-app #sm-text { min-height: 320px; font-family: inherit; font-size: 12.5px; line-height: 1.5; }
 
 /* ── Grouped review detail table: flat background (no zebra) + column-group colour bands ──
-   Columns 1–2 (Category, Particulars): default. Columns 3–7 (Target…Member Score): band A.
+   Columns 1–2 (Activity, Particulars): default. Columns 3–7 (Target…Member Score): band A.
    Column 8 (Manager Score): band B. Rules sit after the generic .tbl rules so they win. */
 #sg-app .tbl.tbl-grouped tbody tr td { background: transparent; }
 #sg-app .tbl.tbl-grouped tbody td:nth-child(3),
@@ -271,6 +289,21 @@
 #sg-app .sg-detail-inner { padding: 12px 22px 18px; background: var(--brand-lt); }
 #sg-app .sg-detail-panel { border: 1px solid var(--border); border-left: 3px solid var(--brand); border-radius: var(--radius); overflow: hidden; background: var(--surface); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
 
+/* Review summary: a CSS grid, so header, rows and total always share the same columns */
+#sg-app .sg-sum { font-size: 12.5px; }
+#sg-app .sg-sum-hd, #sg-app .sg-sum-row, #sg-app .sg-sum-total { display: grid; grid-template-columns: 5% 20% 10% 39% 13% 13%; }
+#sg-app .sg-sum-hd > div, #sg-app .sg-sum-row > div, #sg-app .sg-sum-total > div { min-width: 0; display: flex; align-items: center; overflow-wrap: anywhere; word-break: break-word; }
+#sg-app .sg-sum .c { justify-content: center; text-align: center; }
+#sg-app .sg-sum-hd { background: linear-gradient(180deg, var(--brand) 0%, var(--brand-dark, var(--brand)) 100%); color: #fff; }
+#sg-app .sg-sum-hd > div { padding: 10px 14px; font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
+#sg-app .sg-sum-row { cursor: pointer; transition: background .12s; }
+#sg-app .sg-sum-row > div { padding: 8px 12px; border-bottom: 1px solid rgba(13,107,94,0.08); }
+#sg-app .sg-sum-row.alt > div { background: rgba(255,255,255,0.42); }
+#sg-app .sg-sum-row:hover > div { background: rgba(13,107,94,0.07); }
+#sg-app .sg-sum-row.open > div { background: var(--brand-lt); }
+#sg-app .sg-sum-total { background: var(--surface2); font-weight: 700; }
+#sg-app .sg-sum-total > div { padding: 8px 12px; }
+#sg-app .sg-sum-total-lbl { grid-column: 1 / span 4; justify-content: flex-end; }
 /* Summary-table expandable rows */
 #sg-app .sg-sum-caret { display: inline-block; width: 14px; color: var(--brand); font-size: 10px; }
 #sg-app .tbl .sg-sum-row.open td { background: var(--brand-lt); }
@@ -1027,7 +1060,7 @@
   <div class="page-header">
     <div>
       <h1 style="font-size:20px;font-weight:800;letter-spacing:-.02em">SMART Goals</h1>
-      <p style="font-size:12px;color:var(--text3);margin-top:3px" id="sg-dept-label">Define goals → categories, specific to each member</p>
+      <p style="font-size:12px;color:var(--text3);margin-top:3px" id="sg-dept-label">Define goals → activities, specific to each member</p>
     </div>
     <button class="btn btn-primary" onclick="openGoalModal()">+ Add SMART Goal</button>
   </div>
@@ -1157,14 +1190,14 @@
 
       <div style="height:1px;background:var(--border);margin-bottom:14px"></div>
 
-      <!-- SMART Goal + Category -->
+      <!-- SMART Goal + Activity -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
         <div class="field"><label>SMART Goal <span class="req">*</span></label><select id="tf-goal" onchange="populateCatDropdown()"><option value="">Select…</option></select></div>
-        <div class="field"><label>Category <span class="req">*</span></label><select id="tf-cat"><option value="">Select…</option></select></div>
+        <div class="field"><label>Activity <span class="req">*</span></label><select id="tf-cat"><option value="">Select…</option></select></div>
       </div>
 
       <div style="margin-bottom:14px">
-        <div class="field"><label>Sub-category</label><input id="tf-subcat" placeholder="(optional)"></div>
+        <div class="field"><label>Sub-Activity</label><input id="tf-subcat" placeholder="(optional)"></div>
       </div>
 
       <div style="margin-bottom:14px">
@@ -1212,11 +1245,11 @@
       <div class="field" style="margin-bottom:14px"><label>Description</label><textarea id="gf-description" placeholder="(optional) — description of this SMART Goal"></textarea></div>
 
       <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px">
-        <div class="field"><label>Category <span class="req">*</span></label><input id="gf-cat" placeholder="e.g. BA & Product"></div>
+        <div class="field"><label>Activity <span class="req">*</span></label><input id="gf-cat" placeholder="e.g. BA & Product"></div>
         <div class="field"><label>Max Score <span class="req">*</span></label><input id="gf-maxscore" type="number" min="0" placeholder="e.g. 10"></div>
       </div>
 
-      <div class="field"><label>Particulars</label><textarea id="gf-particulars" placeholder="(optional) — specific to this Category"></textarea></div>
+      <div class="field"><label>Particulars</label><textarea id="gf-particulars" placeholder="(optional) — specific to this Activity"></textarea></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeModal('goal-modal')">Cancel</button>
@@ -1233,14 +1266,37 @@
     </div>
     <div class="modal-body">
       <p style="font-size:12px;color:var(--text3);margin-bottom:6px" id="gg-context"></p>
-      <p style="font-size:11px;color:var(--text3);margin-bottom:16px">Changes apply to every category under this SMART Goal.</p>
+      <p style="font-size:11px;color:var(--text3);margin-bottom:16px">Changes apply to every activity under this SMART Goal.</p>
       <div class="field" style="margin-bottom:14px"><label>SMART Goal <span class="req">*</span></label><input id="gg-goal" list="goalnames-list" placeholder="e.g. Program Implementation"></div>
       <div class="field" style="margin-bottom:14px"><label>Description</label><textarea id="gg-description" placeholder="(optional) — description of this SMART Goal"></textarea></div>
+      <div class="field" style="margin-bottom:14px"><label>Success Measures</label><textarea id="gg-success" rows="5" placeholder="(optional) — one point per line. Grading schema: start with &quot;Grading Schema&quot;, then table rows as  a | b | c"></textarea></div>
       <div class="field"><label>Weightage (%) <span class="req">*</span></label><input id="gg-weightage" type="number" min="0" max="100" placeholder="e.g. 25"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeModal('goalgroup-modal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveGoalGroup()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="success-measures-modal">
+  <div class="modal" style="max-width:760px">
+    <div class="modal-head">
+      <span class="modal-title" id="success-measures-modal-title">Success Measures</span>
+      <button class="modal-close" onclick="closeModal('success-measures-modal')">×</button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto">
+      <p style="font-size:11.5px;color:var(--text3);margin-bottom:12px" id="sm-context"></p>
+      <div id="sm-view"></div>
+      <div id="sm-edit" style="display:none">
+        <p style="font-size:11px;color:var(--text3);margin-bottom:8px">One point per line. For the grading schema, add a line starting with <b>Grading Schema</b>, then table rows with cells separated by <b>|</b> (first row = column headings, <b>▸</b> = section row).</p>
+        <div class="field"><textarea id="sm-text" placeholder="e.g. &gt; 95% LAR score for monitoring reports&#10;&#10;Grading Schema — Annexure A&#10;# | Objective | Weightage&#10;1 | Spot-check 5% of data | 10%"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('success-measures-modal')">Close</button>
+      <button class="btn btn-secondary" id="sm-edit-btn" onclick="sgEditSuccessMeasures()">✏️ Edit</button>
+      <button class="btn btn-primary" id="sm-save-btn" onclick="sgSaveSuccessMeasures()" style="display:none">Save</button>
     </div>
   </div>
 </div>
@@ -1316,7 +1372,7 @@
         <div class="field form-full"><label>Help Needed</label><input id="rf-helpneeded" placeholder="What help is needed…"></div>
         <div class="field form-full"><label>Areas of Improvement</label><input id="rf-areas" placeholder="Areas to improve…"></div>
       </div>
-      <div class="section-label">Score each SMART Goal / Category</div>
+      <div class="section-label">Score each SMART Goal / Activity</div>
       <p style="font-size:12px;color:var(--text3);margin-bottom:12px">
         Select year, dept &amp; member above, then click <strong>Load Goals</strong>.
         <span style="color:var(--green);font-weight:600">Member Score</span> = filled by team member &nbsp;·&nbsp;

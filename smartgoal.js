@@ -230,6 +230,31 @@ function canEditGoal(g) {
   if (g && g.member === currentUser.name && currentUser.name) return true; // owner
   return false;
 }
+// Success Measures of a SMART Goal: editable by the member, their reporting
+// manager and anyone above that manager in the reporting chain, plus the
+// member's Dept Head and Admins. Everyone who can see the goal can view them.
+function canEditSuccessMeasures(g) {
+  if (!g) return false;
+  if (currentUser.role === ROLES.ADMIN) return true;
+  if (currentUser.role === ROLES.DEPT_HEAD && g.dept === currentUser.dept) return true;
+  if (g.member && currentUser.name && g.member === currentUser.name) return true;
+  return isAboveInChain(g.member, g.dept);
+}
+// True when the logged-in user is the member's reporting manager, or that
+// manager's manager, and so on up the chain (followed by manager email).
+function isAboveInChain(memberName, dept) {
+  var me = _myEmail(); if (!me || !memberName) return false;
+  var ms = (DB.settings && DB.settings.members) || [];
+  var m = memberRecordByName(memberName, dept), seen = {};
+  for (var hop = 0; m && hop < 12; hop++) {
+    var mgr = _lc(m.managerEmail);
+    if (!mgr || seen[mgr]) return false;
+    if (mgr === me) return true;
+    seen[mgr] = 1;
+    m = ms.find(function (x) { return _lc(x.email) === mgr; }) || null;
+  }
+  return false;
+}
 function canEditTask(task) {
   if (currentUser.role === ROLES.ADMIN) return true;
   if (currentUser.role === ROLES.DEPT_HEAD && task.dept === currentUser.dept) return true;
@@ -682,7 +707,7 @@ function populateTaskGoalDropdown() {
   populateCatDropdown();
 }
 
-// Category dropdown is likewise scoped to the selected Dept + Member + SMART Goal only.
+// Activity dropdown is likewise scoped to the selected Dept + Member + SMART Goal only.
 function populateCatDropdown() {
   const dept = document.getElementById('tf-dept').value;
   const member = document.getElementById('tf-member').value;
@@ -695,7 +720,7 @@ function populateCatDropdown() {
   const goals = DB.goals.filter(g => g.dept===dept && g.member===member && g.goal===goal);
   const cats = [...new Set(goals.map(g=>g.cat))];
   if (!cats.length) {
-    el.innerHTML = `<option value="">No categories found</option>`;
+    el.innerHTML = `<option value="">No activities found</option>`;
     return;
   }
   el.innerHTML = `<option value="">Select…</option>` + cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
@@ -1409,14 +1434,15 @@ function renderSmartGoals() {
           <span class="goal-group-title">${esc(grp.goal)} <b>(${grp.weightage}%)</b></span>
           <span style="font-size:12px;color:var(--text2);font-style:${r0.description?'normal':'italic'}">${esc(r0.description||'—')}</span>
           <span class="actions-cell" onclick="event.stopPropagation()">
+            ${sgSuccessEyeBtn(r0.year, r0.dept, r0.member, grp.goal, r0.id)}
             ${canEdit ? `<button class="btn btn-secondary btn-sm" onclick="editGoalGroup('${escJs(r0.year)}','${escJs(r0.dept)}','${escJs(r0.member)}','${escJs(grp.goal)}')" title="Edit SMART Goal">✏️</button>
             <button class="btn btn-danger btn-sm" onclick="deleteGoalGroup('${escJs(r0.year)}','${escJs(r0.dept)}','${escJs(r0.member)}','${escJs(grp.goal)}')" title="Delete SMART Goal">🗑️</button>
-            <button class="btn btn-secondary btn-sm" onclick="openGoalModal(null,{year:'${escJs(r0.year)}',dept:'${escJs(r0.dept)}',member:'${escJs(r0.member)}',goal:'${escJs(grp.goal)}',weightage:${grp.weightage},description:'${escJs(r0.description||'')}'})">+ Add Category</button>` : `<span style="font-size:11px;color:var(--text3)">View only</span>`}
+            <button class="btn btn-secondary btn-sm" onclick="openGoalModal(null,{year:'${escJs(r0.year)}',dept:'${escJs(r0.dept)}',member:'${escJs(r0.member)}',goal:'${escJs(grp.goal)}',weightage:${grp.weightage},description:'${escJs(r0.description||'')}'})">+ Add Activity</button>` : `<span style="font-size:11px;color:var(--text3)">View only</span>`}
           </span>
         </div>
         <div class="goal-items-list" style="display:none">
           <div class="goal-item-row goal-col-head" style="grid-template-columns:1.6fr 2fr 90px 70px">
-            <span>Category</span><span>Particulars</span><span style="text-align:center">Max Score</span><span></span>
+            <span>Activity</span><span>Particulars</span><span style="text-align:center">Max Score</span><span></span>
           </div>
           ${grp.rows.map(r=>`<div class="goal-item-row" style="grid-template-columns:1.6fr 2fr 90px 70px">
             <span class="gi-name">${esc(r.cat)}</span>
@@ -1436,12 +1462,12 @@ function renderSmartGoals() {
 }
 
 function openGoalModal(id, prefill) {
-  // permission gate: editing an existing row, or adding a category to a group
+  // permission gate: editing an existing row, or adding an activity to a group
   if (id) {
     const gExisting = DB.goals.find(x=>x.id===id);
     if (gExisting && !canEditGoal(gExisting)) { toast('You can only edit your own SMART Goals'); return; }
   } else if (prefill && (prefill.dept || prefill.member) && !canEditGoal({ dept: prefill.dept, member: prefill.member })) {
-    toast('You can only add categories to your own SMART Goals'); return;
+    toast('You can only add activities to your own SMART Goals'); return;
   }
   editingGoalId = id || null;
   document.getElementById('goal-modal-title').textContent = id ? 'Edit SMART Goal' : 'Add SMART Goal';
@@ -1514,7 +1540,13 @@ function saveGoal() {
   if (!DB.settings.goalNames.includes(goal)) DB.settings.goalNames.push(goal);
   if (!DB.settings.categories.includes(cat)) DB.settings.categories.push(cat);
 
+  // Success Measures live at SMART Goal level: keep the row's own value when
+  // editing, otherwise inherit it from a sibling activity of the same goal.
+  const prevRow = editingGoalId ? DB.goals.find(x=>x.id===editingGoalId) : null;
+  const sibling = DB.goals.find(x=>x.year===year && x.dept===dept && x.member===member && x.goal===goal && x.successMeasures);
+  const successMeasures = (prevRow && prevRow.goal===goal && prevRow.successMeasures) || (sibling && sibling.successMeasures) || (prevRow && prevRow.successMeasures);
   const g = { id: editingGoalId||uid(), year, dept, member, goal, weightage, description, cat, particulars, maxScore };
+  if (successMeasures !== undefined) g.successMeasures = successMeasures;
   if (editingGoalId) { const i=DB.goals.findIndex(x=>x.id===editingGoalId); if(i>-1) DB.goals[i]=g; }
   else DB.goals.push(g);
   save(); populateAllSelects(); closeModal('goal-modal'); renderSmartGoals(); renderSidebar();
@@ -1524,7 +1556,7 @@ function saveGoal() {
 function deleteGoal(id) {
   const g0 = DB.goals.find(g=>g.id===id);
   if (g0 && !canEditGoal(g0)) { toast('You can only delete your own SMART Goals'); return; }
-  sgConfirm('Are you sure you want to delete this record?', {title:'Delete category', danger:true, okText:'Delete'}).then(function (ok) {
+  sgConfirm('Are you sure you want to delete this record?', {title:'Delete activity', danger:true, okText:'Delete'}).then(function (ok) {
     if (!ok) return;
     DB.goals = DB.goals.filter(g=>g.id!==id);
     save(); populateAllSelects(); renderSmartGoals(); renderSidebar();
@@ -1551,6 +1583,8 @@ function editGoalGroup(year, dept, member, goal) {
   document.getElementById('gg-goal').value = goal;
   document.getElementById('gg-weightage').value = rows.length ? rows[0].weightage : '';
   document.getElementById('gg-description').value = rows.length ? (rows[0].description || '') : '';
+  const smRow = rows.find(x => x.successMeasures);
+  document.getElementById('gg-success').value = smRow ? smRow.successMeasures : '';
   document.getElementById('gg-context').textContent = `${member} · ${dept} · ${academicYearShort(year)}`;
   openModal('goalgroup-modal');
 }
@@ -1560,11 +1594,13 @@ function saveGoalGroup() {
   const newGoal = document.getElementById('gg-goal').value.trim();
   const weightage = parseFloat(document.getElementById('gg-weightage').value);
   const description = document.getElementById('gg-description').value.trim();
+  const successMeasures = document.getElementById('gg-success').value.replace(/\s+$/,'');
   if (!newGoal || isNaN(weightage)) { toast('SMART Goal name and weightage are required'); return; }
   if (!DB.settings.goalNames.includes(newGoal)) DB.settings.goalNames.push(newGoal);
   DB.goals.forEach(g => {
     if (g.year===year && g.dept===dept && g.member===member && g.goal===oldGoal) {
       g.goal = newGoal; g.weightage = weightage; g.description = description;
+      if (successMeasures || g.successMeasures) g.successMeasures = successMeasures;
     }
   });
   editingGoalGroup = null;
@@ -1574,7 +1610,7 @@ function saveGoalGroup() {
 function deleteGoalGroup(year, dept, member, goal) {
   if (!canEditGoal({ dept: dept, member: member })) { toast('You can only delete your own SMART Goals'); return; }
   const rows = DB.goals.filter(g => g.year===year && g.dept===dept && g.member===member && g.goal===goal);
-  sgConfirm(`Are you sure you want to delete SMART Goal "${goal}" and all ${rows.length} categor${rows.length===1?'y':'ies'}? This cannot be undone.`, {title:'Delete SMART Goal', danger:true, okText:'Delete'}).then(function (ok) {
+  sgConfirm(`Are you sure you want to delete SMART Goal "${goal}" and all ${rows.length} activit${rows.length===1?'y':'ies'}? This cannot be undone.`, {title:'Delete SMART Goal', danger:true, okText:'Delete'}).then(function (ok) {
     if (!ok) return;
     DB.goals = DB.goals.filter(g => !(g.year===year && g.dept===dept && g.member===member && g.goal===goal));
     save(); populateAllSelects(); renderSmartGoals(); renderSidebar();
@@ -1620,8 +1656,8 @@ const COL_DEFS = [
   {key:'dept',      grp:'plan',   label:'Dept', w:90},
   {key:'member',    grp:'plan',   label:'Member', w:130},
   {key:'goal',      grp:'plan',   label:'SMART Goal', w:140},
-  {key:'cat',       grp:'plan',   label:'Category', w:120},
-  {key:'subcat',    grp:'plan',   label:'Sub-category', w:120},
+  {key:'cat',       grp:'plan',   label:'Activity', w:120},
+  {key:'subcat',    grp:'plan',   label:'Sub-Activity', w:120},
   {key:'action',    grp:'plan',   label:'Action Point', w:230},
   {key:'planned',   grp:'plan',   label:'Planned', w:70},
   {key:'plannedItems', grp:'plan',label:'Planned Items', w:80},
@@ -2199,7 +2235,7 @@ function renderReviews() {
           <col style="width:8%"><col style="width:8%"><col style="width:11%"><col style="width:11%">
         </colgroup>
         <thead><tr>
-          <th>Category</th><th>Particulars</th>
+          <th>Activity</th><th>Particulars</th>
           <th class="sg-th-nowrap" style="text-align:center">Target</th>
           <th class="sg-th-nowrap" style="text-align:center">Actual</th>
           <th class="sg-th-nowrap" style="text-align:center">Remark</th>
@@ -2218,18 +2254,18 @@ function renderReviews() {
         </tbody>
       </table>`;
 
-      bodyRows += `<tr class="sg-sum-row" id="sgsum-${r.id}-${gi}" onclick="sgToggleGoalDetail('${r.id}',${gi})" style="cursor:pointer">
-          <td style="text-align:center;color:var(--text3)">${gi+1}</td>
-          <td style="font-weight:600"><span class="sg-sum-caret">▸</span>${esc(grp.goal)}</td>
-          <td style="color:var(--text2)">${esc(desc||'—')}</td>
-          <td style="text-align:center;font-weight:600">${weightage}%</td>
-          <td style="text-align:center;font-weight:700;background:${pctColor(performance)}22;color:${pctColor(performance)}">${performance}%</td>
-        </tr>
-        <tr class="sg-detail-row">
-          <td colspan="5" style="padding:0;border:none;background:transparent">
-            <div class="sg-detail-wrap" id="sgd-${r.id}-${gi}"><div class="sg-detail-inner"><div class="sg-detail-panel">${detailTable}</div></div></div>
-          </td>
-        </tr>`;
+      // Summary rows are a CSS grid (not a <table>): header, rows and total share
+      // one grid-template-columns, so a row can never be laid out narrower than
+      // the header, and each goal's detail panel sits between rows as a plain block.
+      bodyRows += `<div class="sg-sum-row ${gi%2?'alt':''}" role="row" id="sgsum-${r.id}-${gi}" onclick="sgToggleGoalDetail('${r.id}',${gi})" style="display:grid !important">
+          <div class="c" style="color:var(--text3)">${gi+1}</div>
+          <div style="font-weight:600"><span class="sg-sum-caret">▸</span>${esc(grp.goal)}</div>
+          <div class="c">${sgSuccessEyeBtn(r.year, r.dept, r.member, grp.goal, grp.rows[0].goalItemId)}</div>
+          <div style="color:var(--text2)">${esc(desc||'—')}</div>
+          <div class="c" style="font-weight:600">${weightage}%</div>
+          <div class="c" style="font-weight:700;background:${pctColor(performance)}22;color:${pctColor(performance)}">${performance}%</div>
+        </div>
+        <div class="sg-detail-wrap" id="sgd-${r.id}-${gi}"><div class="sg-detail-inner"><div class="sg-detail-panel">${detailTable}</div></div></div>`;
     });
 
     const overallHtml = sgOverallHtml(r.remarks);
@@ -2239,23 +2275,18 @@ function renderReviews() {
     const summaryHtml = `<div style="margin-bottom:18px">
       <div class="review-section-hd">Summary of Review — ${monthYearLabel(r.year,r.month)} <span style="font-weight:400;font-size:11px;color:var(--text3);text-transform:none;letter-spacing:0">— click a SMART Goal to view its details</span></div>
       ${(overallHtml || sheetBHtml) ? `<div style="margin:10px 0 8px;display:grid;grid-template-columns:minmax(0,1fr) 200px;gap:8px;align-items:start">${overallHtml||'<span></span>'}${sheetBHtml||'<span></span>'}</div>` : ''}
-      <div class="tbl-wrap"><table class="tbl tbl-fixed">
-        <colgroup>
-          <col style="width:5%"><col style="width:22%"><col style="width:47%"><col style="width:13%"><col style="width:13%">
-        </colgroup>
-        <thead><tr>
-          <th style="text-align:center">#</th><th>SMART Goal</th><th>Description</th>
-          <th style="text-align:center">Weightage</th><th style="text-align:center">Performance</th>
-        </tr></thead>
-        <tbody>
-          ${bodyRows}
-          <tr style="background:var(--surface2);font-weight:700">
-            <td colspan="3" style="text-align:right">Total</td>
-            <td style="text-align:center">${totalWeightage}%</td>
-            <td style="text-align:center">${totalPerformance}%</td>
-          </tr>
-        </tbody>
-      </table></div>
+      <div class="tbl-wrap"><div class="sg-sum" role="table">
+        <div class="sg-sum-hd" role="row">
+          <div class="c">#</div><div>SMART Goal</div><div class="c">Success Measures</div><div>Description</div>
+          <div class="c">Weightage</div><div class="c">Performance</div>
+        </div>
+        ${bodyRows}
+        <div class="sg-sum-total" role="row">
+          <div class="sg-sum-total-lbl">Total</div>
+          <div class="c">${totalWeightage}%</div>
+          <div class="c">${totalPerformance}%</div>
+        </div>
+      </div></div>
       ${(helpHtml || areasHtml) ? `<div style="margin:12px 0 0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:start">${helpHtml||'<span></span>'}${areasHtml||'<span></span>'}</div>` : ''}
     </div>`;
 
@@ -2382,7 +2413,7 @@ function loadGoalsForReview() {
           <col style="width:16%"><col style="width:8%"><col style="width:10%"><col style="width:10%">
         </colgroup>
         <thead><tr>
-          <th>Category</th><th>Particulars</th>
+          <th>Activity</th><th>Particulars</th>
           <th style="text-align:center">Target</th><th style="text-align:center">Actual</th><th style="text-align:center">Remark</th>
           <th style="text-align:center">Max Score</th>
           <th style="text-align:center">Member Score</th>
@@ -2494,6 +2525,100 @@ function sgToggleGoalDetail(reviewId, groupIndex) {
     if (caret) caret.textContent = '▸';
     wrap.style.maxHeight = '0px';                      // animate content height → 0
   }
+}
+
+// ── Success Measures popup (eye icon on the Review summary and the SMART Goals tab) ──
+// Success Measures are stored per SMART Goal (copied on every activity row of that
+// goal, like Description) as plain text. Display rules, so plain text still reads
+// like the Org Chart annexures:
+//   a line with " | " is a table row (the first row of a run, if it does not start
+//   with "•", is the header); "▸ text" is a section row; a line starting with
+//   "Grading Schema" or "Annexure X —" is a heading; any other line is a bullet.
+function sgGoalGroupRows(year, dept, member, goal, goalItemId) {
+  let rows = DB.goals.filter(g => g.year===year && g.dept===dept && g.member===member && g.goal===goal);
+  if (!rows.length) rows = DB.goals.filter(g => g.year===year && g.member===member && g.goal===goal);
+  if (!rows.length && goalItemId) {
+    const g0 = DB.goals.find(g => g.id===goalItemId);
+    if (g0) rows = DB.goals.filter(g => g.year===g0.year && g.dept===g0.dept && g.member===g0.member && g.goal===g0.goal);
+  }
+  return rows;
+}
+function sgSmKey(year, member, goal) { return [year, member, goal].join('\u0001'); }
+function sgSuccessMeasuresOf(rows) { const r = rows.find(x => x.successMeasures); return r ? r.successMeasures : ''; }
+const SG_EYE_SVG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+function sgSuccessEyeBtn(year, dept, member, goal, goalItemId) {
+  const has = !!sgSuccessMeasuresOf(sgGoalGroupRows(year, dept, member, goal, goalItemId));
+  return `<button type="button" class="sm-eye-btn ${has?'has-sm':''}" data-smk="${esc(sgSmKey(year, member, goal))}" title="${has?'View Success Measures':'No Success Measures yet'}" onclick="event.stopPropagation();sgOpenSuccessMeasures('${escJs(year)}','${escJs(dept)}','${escJs(member)}','${escJs(goal)}','${escJs(goalItemId||'')}')">${SG_EYE_SVG}</button>`;
+}
+function sgSuccessMeasuresHtml(text) {
+  const lines = String(text||'').split(/\r?\n/);
+  let html = '', table = null;
+  const closeTable = () => { if (table) { html += `<table class="sm-tbl">${table.join('')}</table>`; table = null; } };
+  lines.forEach(raw => {
+    const t = raw.trim();
+    if (!t) { closeTable(); return; }
+    if (/^grading schema\b/i.test(t) || /^annexure\s+[a-z0-9]+\s*[—–-]/i.test(t)) { closeTable(); html += `<div class="sm-head">${esc(t)}</div>`; return; }
+    if (t.indexOf(' | ') > -1 || (table && /^▸/.test(t))) {
+      const isSection = /^▸/.test(t);
+      const isBullet = /^•/.test(t);
+      if (isSection) { (table = table || []).push(`<tr class="sm-sec"><td colspan="12">${esc(t.replace(/^▸\s*/, ''))}</td></tr>`); return; }
+      // keep the spaces after the bullet so empty first cells ("•  | x") survive the split
+      const cells = (isBullet ? raw.replace(/^\s*•/, '') : t).split(' | ').map(c => c.trim());
+      if (!table && !isBullet) { table = [`<tr>${cells.map(c=>`<th>${esc(c)}</th>`).join('')}</tr>`]; table.cols = cells.length; return; }
+      table = table || [];
+      while (table.cols && cells.length < table.cols) cells.push('');   // rows under a merged (rowspan) cell
+      table.push(`<tr>${cells.map(c=>`<td${c.length && c.length<=8?' class="nw"':''}>${esc(c)}</td>`).join('')}</tr>`);
+      return;
+    }
+    closeTable();
+    if (/^▸/.test(t)) { html += `<div class="sm-sub">${esc(t.replace(/^▸\s*/,''))}</div>`; return; }
+    html += `<div class="sm-bullet">${esc(t.replace(/^[•●\-–]\s*/,''))}</div>`;
+  });
+  closeTable();
+  return html;
+}
+let sgSmTarget = null;
+function sgOpenSuccessMeasures(year, dept, member, goal, goalItemId) {
+  const rows = sgGoalGroupRows(year, dept, member, goal, goalItemId);
+  const g0 = rows[0] || { year, dept, member, goal };
+  const editable = rows.length > 0 && canEditSuccessMeasures(g0);
+  sgSmTarget = { year: g0.year, dept: g0.dept, member: g0.member, goal: g0.goal, editable };
+  const text = sgSuccessMeasuresOf(rows);
+  document.getElementById('sm-context').textContent = [g0.goal, g0.member, academicYearShort(g0.year)].filter(Boolean).join(' · ');
+  document.getElementById('sm-view').innerHTML = text ? sgSuccessMeasuresHtml(text)
+    : `<p class="sm-empty">${rows.length ? 'No Success Measures have been added for this SMART Goal yet.' : 'This SMART Goal no longer exists in SMART Goals, so its Success Measures are not available.'}</p>`;
+  document.getElementById('sm-text').value = text;
+  sgSmSetMode('view');
+  document.getElementById('sm-edit-btn').style.display = editable ? '' : 'none';
+  openModal('success-measures-modal');
+}
+function sgSmSetMode(mode) {
+  const edit = mode === 'edit' && sgSmTarget && sgSmTarget.editable;
+  document.getElementById('sm-view').style.display = edit ? 'none' : '';
+  document.getElementById('sm-edit').style.display = edit ? '' : 'none';
+  document.getElementById('sm-save-btn').style.display = edit ? '' : 'none';
+  document.getElementById('sm-edit-btn').style.display = (!edit && sgSmTarget && sgSmTarget.editable) ? '' : 'none';
+  document.getElementById('success-measures-modal-title').textContent = edit ? 'Edit Success Measures' : 'Success Measures';
+  if (edit) setTimeout(() => { try { document.getElementById('sm-text').focus(); } catch (e) {} }, 30);
+}
+function sgEditSuccessMeasures() { sgSmSetMode('edit'); }
+function sgSaveSuccessMeasures() {
+  if (!sgSmTarget || !sgSmTarget.editable) return;
+  const { year, dept, member, goal } = sgSmTarget;
+  const text = document.getElementById('sm-text').value.replace(/\s+$/,'');
+  const rows = DB.goals.filter(g => g.year===year && g.dept===dept && g.member===member && g.goal===goal);
+  if (!rows.length) { toast('This SMART Goal no longer exists'); return; }
+  rows.forEach(g => { g.successMeasures = text; });
+  save();
+  closeModal('success-measures-modal');
+  // Refresh the eye icons in place, so open review cards / goal groups stay open.
+  const key = sgSmKey(year, member, goal);
+  document.querySelectorAll('#sg-app .sm-eye-btn').forEach(b => {
+    if (b.getAttribute('data-smk') !== key) return;
+    b.classList.toggle('has-sm', !!text);
+    b.title = text ? 'View Success Measures' : 'No Success Measures yet';
+  });
+  toast('Success Measures saved');
 }
 
 // ── Per-item Remark popup (view/add/edit a single row's remark without opening the full Edit modal) ──
@@ -3525,6 +3650,10 @@ try { window.sgConfirmOk = sgConfirmOk; } catch(e){}
 try { window.sgConfirmCancel = sgConfirmCancel; } catch(e){}
 try { window.deleteReview = deleteReview; } catch(e){}
 try { window.sgOpenItemRemarkModal = sgOpenItemRemarkModal; } catch(e){}
+try { window.sgOpenSuccessMeasures = sgOpenSuccessMeasures; } catch(e){}
+try { window.sgEditSuccessMeasures = sgEditSuccessMeasures; } catch(e){}
+try { window.sgSaveSuccessMeasures = sgSaveSuccessMeasures; } catch(e){}
+try { window.sgSmSetMode = sgSmSetMode; } catch(e){}
 try { window.sgSaveItemRemark = sgSaveItemRemark; } catch(e){}
 try { window.sgToggleGoalDetail = sgToggleGoalDetail; } catch(e){}
 try { window.deleteTask = deleteTask; } catch(e){}
@@ -4286,7 +4415,7 @@ function tfOpenDrawer(t) {
     (t.due ? '<dt>Due date</dt><dd>' + tfD(t.due) + (t.overdue ? ' <span class="tf-chip bad">⏰ ' + tfH(t.overdue) + ' overdue</span>' : '') + '</dd>' : '') +
     (t.blocked ? '<dt>Blocked</dt><dd><span class="tf-chip bad">⛔</span> ' + esc(t.blocked) + '</dd>' : '') +
     (t.requestedBy ? '<dt>Requested by</dt><dd>' + esc(t.requestedBy) + '</dd>' : '') +
-    (t.category ? '<dt>Category</dt><dd>' + esc(t.category) + '</dd>' : '') +
+    (t.category ? '<dt>Activity</dt><dd>' + esc(t.category) + '</dd>' : '') +
     (t.nwStatus ? '<dt>NimbleWork</dt><dd>' + esc(t.nwStatus) + (t.nwClosed && !isNaN(Date.parse(t.nwClosed)) ? ' · closed ' + tfD(tfWall(Date.parse(t.nwClosed))) : '') + '</dd>' : '') +
     (t.changedBy ? '<dt>Last change</dt><dd>' + esc(t.changedBy) + (t.changedAt ? ' · ' + tfAgo(t.changedAt) : '') + '</dd>' : '') +
     '<dt>Created</dt><dd>' + tfDT(t.created) + '</dd>' +
