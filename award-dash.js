@@ -482,7 +482,8 @@ function colLetter(n) {
   while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
   return s;
 }
-function sheetXml(aoa) {
+function sheetXml(aoa, opts) {
+  opts = opts || {};
   let body = "";
   aoa.forEach(function (row, r) {
     const cells = (row || []).map(function (val, c) {
@@ -493,9 +494,49 @@ function sheetXml(aoa) {
     }).join("");
     body += '<row r="' + (r + 1) + '">' + cells + '</row>';
   });
+  const cols = opts.widths
+    ? '<cols>' + opts.widths.map(function (w, i) {
+        return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>';
+      }).join("") + '</cols>'
+    : "";
+  const checks = (opts.validations || []).length
+    ? '<dataValidations count="' + opts.validations.length + '">' + opts.validations.map(function (v) {
+        return '<dataValidation type="list" allowBlank="1" showErrorMessage="1" errorTitle="Not in the list" ' +
+          'error="' + xmlEsc(v.message || "Choose a value from the list.") + '" sqref="' + v.sqref + '">' +
+          '<formula1>' + xmlEsc(v.formula) + '</formula1></dataValidation>';
+      }).join("") + '</dataValidations>'
+    : "";
   return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
-    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>' + body + '</sheetData></worksheet>';
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' + cols +
+    '<sheetData>' + body + '</sheetData>' + checks + '</worksheet>';
 }
+
+// A workbook of several sheets: [{ name, rows, widths, validations: [{ sqref, formula, message }] }].
+// A validation is a dropdown that only accepts what the list holds, for example
+// { sqref: "F2:F5000", formula: "Lists!$A$2:$A$6" }.
+function buildWorkbook(sheets) {
+  const head = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+  const types = sheets.map(function (s, i) {
+    return '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
+  }).join("");
+  const names = sheets.map(function (s, i) {
+    return '<sheet name="' + xmlEsc(String(s.name).slice(0, 31)) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>';
+  }).join("");
+  const rels = sheets.map(function (s, i) {
+    return '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>';
+  }).join("");
+  const files = [
+    ["[Content_Types].xml", head + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' + types + '</Types>'],
+    ["_rels/.rels", head + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+    ["xl/workbook.xml", head + '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' + names + '</sheets></workbook>'],
+    ["xl/_rels/workbook.xml.rels", head + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + rels + '</Relationships>']
+  ];
+  sheets.forEach(function (s, i) {
+    files.push(["xl/worksheets/sheet" + (i + 1) + ".xml", sheetXml(s.rows, { widths: s.widths, validations: s.validations })]);
+  });
+  return zipStore(files);
+}
+
 function buildXlsx(aoa, sheetName) {
   const name = xmlEsc((sheetName || "Sheet1").slice(0, 31));
   const head = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
@@ -517,7 +558,7 @@ function downloadXlsx(bytes, filename) {
   setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
 }
 // The Event Management view of this tab writes its report the same way.
-window.awardXlsx = { build: buildXlsx, download: downloadXlsx };
+window.awardXlsx = { build: buildXlsx, buildWorkbook: buildWorkbook, download: downloadXlsx };
 
 function crc32(bytes) {
   let crc = 0xFFFFFFFF;

@@ -1668,6 +1668,7 @@ window.initAwardManageUI = function () {
   }
 
   loadFilters();
+  if (typeof window.awardAppendInit === "function") window.awardAppendInit();
   loadVerifierStatus().then(() => { if (selectedMonth) renderTable(); });
 
   const backBtn = document.getElementById("awmBackBtn");
