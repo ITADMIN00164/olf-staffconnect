@@ -1658,7 +1658,9 @@
 .award-page #requisitions-table thead th + th, .award-page #delivery-table thead th + th { border-left: 1px solid rgba(255,255,255,.18); }
 
 /* A requisition's levels in a row: their names, and the button that opens the detail. */
-.award-page .lvl-summary { margin-right: 10px; font-size: .8rem; font-weight: 700; color: var(--text); }
+.award-page .lvl-cell { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-width: 260px; }
+.award-page .lvl-cell .btn { flex-shrink: 0; }
+.award-page .lvl-summary { font-size: .8rem; font-weight: 700; color: var(--text); }
 
 /* In the pop-up the three columns have room, and are headed. */
 .award-page #levels-modal .lvls { min-width: 0; }
