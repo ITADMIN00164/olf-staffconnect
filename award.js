@@ -3287,10 +3287,12 @@ window.AWARD_CONFIG = {
       var n = m ? m[1] : a.name;
       if (names.indexOf(n) === -1) names.push(n);
     });
-    return '<span class="lvl-summary" title="' + escapeHtml(names.join(", ")) + '">' +
+    // The names on the left and the button on the right, so the buttons of every row
+    // stand in one column.
+    return '<div class="lvl-cell"><span class="lvl-summary" title="' + escapeHtml(names.join(", ")) + '">' +
              escapeHtml(names.join(" \u00b7 ")) + "</span>" +
            '<button type="button" class="btn btn-ghost btn-xs" data-aw-levels="' +
-             escapeHtml(row.id) + '"><i class="aw-icon" data-aw-icon="eye" aria-hidden="true"></i>View <span class="log-count">' + awards.length + "</span></button>";
+             escapeHtml(row.id) + '"><i class="aw-icon" data-aw-icon="eye" aria-hidden="true"></i>View <span class="log-count">' + awards.length + "</span></button></div>";
   }
 
   function openLevels(id) {
