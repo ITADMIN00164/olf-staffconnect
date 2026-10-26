@@ -25,8 +25,7 @@
     <div class="aw-topbar">
       <nav class="aw-toptabs" role="tablist" aria-label="Test">
         <button type="button" role="tab" class="aw-toptab is-active" data-aw-top="stock" aria-selected="true"><i class="aw-icon" data-aw-icon="stock" aria-hidden="true"></i>Stock Management</button>
-        <button type="button" role="tab" class="aw-toptab" data-aw-top="award" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="trophy" aria-hidden="true"></i>Award Management</button>
-        <button type="button" role="tab" class="aw-toptab" data-aw-top="dash" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="chart" aria-hidden="true"></i>Award Data Dashboard</button>
+        <button type="button" role="tab" class="aw-toptab" data-aw-top="util" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="trophy" aria-hidden="true"></i>Award Utilisation</button>
         <button type="button" role="tab" class="aw-toptab" data-aw-top="event" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="calendar" aria-hidden="true"></i>Event Management</button>
       </nav>
       <div class="aw-top-actions" id="aw-stock-actions">
@@ -37,6 +36,12 @@
         </button>
       </div>
     </div>
+
+    <!-- Award Utilisation: its two views, Award Management and Award Data Dashboard. -->
+    <nav class="aw-subtabs aw-utiltabs" id="aw-util-bar" role="tablist" aria-label="Award Utilisation views" hidden>
+      <button type="button" role="tab" class="aw-utiltab is-active" data-aw-util="award" aria-selected="true"><i class="aw-icon" data-aw-icon="trophy" aria-hidden="true"></i>Award Management</button>
+      <button type="button" role="tab" class="aw-utiltab" data-aw-util="dash" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="chart" aria-hidden="true"></i>Award Data Dashboard</button>
+    </nav>
 
     <div id="aw-view-stock">
     <div class="aw-body">
@@ -485,6 +490,7 @@
               <option value="">Select a district first</option>
             </select>
             <select id="aweYear" class="pom-select pev-year" title="Academic year (June to May)"></select>
+            <span class="pev-hint">Counts are saved to the database.</span>
             <button id="aweExportBtn" class="pev-export-btn pev-refresh" title="Download every saved event row as an Excel file">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               <span>Download Excel</span>
@@ -833,6 +839,7 @@
     </div>
 </div>
 
-<!-- Live Server (VS Code) puts its reload script before the first closing body tag it finds, or
-     inside the first svg when there is none, which breaks a page fragment like this one. A closing
-     tag in a comment gives it somewhere harmless to go: </body> -->
+<!-- Live Server (VS Code) puts its reload script before the first closing body tag it finds,
+     or inside the first svg when there is none, which breaks a page fragment like this one.
+     This real closing tag, after everything else, gives it somewhere harmless to go. -->
+</body>

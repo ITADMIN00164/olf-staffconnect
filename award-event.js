@@ -433,10 +433,12 @@ function renderHead() {
     return "<th" + (cls ? ' class="' + cls + '"' : "") + (tip ? ' title="' + esc(tip) + '"' : "") + ">" + c.head + "</th>";
   }).join("");
 
-  // Widths: month, one per count, save, last updated.
-  const each = Math.floor(58 / Math.max(cols.length, 1));
-  const group = '<col style="width:12%">' + cols.map(() => '<col style="width:' + each + '%">').join("") +
-    '<col style="width:10%"><col style="width:' + (100 - 12 - each * cols.length - 10) + '%">';
+  // Widths: month, one per count, save, last updated. They add up to 100% so the
+  // table always fits its card; the headings wrap to the width they are given.
+  const MONTH_W = 8, SAVE_W = 7, UPDATED_W = 9;
+  const each = ((100 - MONTH_W - SAVE_W - UPDATED_W) / Math.max(cols.length, 1)).toFixed(2);
+  const group = '<col style="width:' + MONTH_W + '%">' + cols.map(() => '<col style="width:' + each + '%">').join("") +
+    '<col style="width:' + SAVE_W + '%"><col style="width:' + UPDATED_W + '%">';
 
   thead.innerHTML = '<tr><th>Month</th>' + cells + '<th class="col-center">Save</th><th>Last Updated</th></tr>';
   const cg = el("aweColgroup");

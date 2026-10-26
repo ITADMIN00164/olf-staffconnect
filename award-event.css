@@ -31,3 +31,20 @@
 .awe-view .pev-who { display: block; font-weight: 600; color: #6b7280; }
 .awe-view .pev-when { display: block; }
 .awe-view .pev-totals td { background: #f8faff; font-weight: 700; color: #1a1d23; border-top: 2px solid #eef2ff; }
+
+/* The table fits its card: fixed column widths (set in the script) and headings that wrap.
+   A narrow window scrolls sideways instead of cutting the last columns off. */
+.awe-view .pom-card.scroll { overflow-x: auto; }
+.awe-view .pev-tbl { table-layout: fixed; width: 100%; min-width: 1100px; }
+.awe-view .pev-tbl th { white-space: normal; overflow-wrap: normal; word-break: normal; line-height: 1.35; }
+.awe-view .pev-tbl td { overflow-wrap: anywhere; }
+
+/* The same size and spacing as the table on the POM page. award.css sizes every table of
+   this tab, so the event table says its own, and says it more specifically. */
+.awe-view .pom-table.pev-tbl thead th { background: #fafafa; color: #6b7280; font-size: 10px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; padding: 9px 10px; border-bottom: 2px solid #f3f4f6; text-align: center; }
+.awe-view .pom-table.pev-tbl tbody td { font-size: 12px; font-weight: 400; color: #374151; padding: 9px 10px; vertical-align: middle; border-bottom: 1px solid #f3f4f6; text-align: center; }
+.awe-view .pom-table.pev-tbl tbody tr:hover td { background: transparent; }
+.awe-view .pom-table.pev-tbl tbody td.pev-month { font-weight: 600; color: #1a1d23; }
+.awe-view .pom-table.pev-tbl tbody td.pev-rollup { background: #fafbfc; }
+.awe-view .pom-table.pev-tbl tbody td.pev-updated { font-size: 10px; color: #9ca3af; line-height: 1.4; }
+.awe-view .pom-table.pev-tbl tbody tr.pev-totals td { background: #f8faff; font-weight: 700; color: #1a1d23; border-top: 2px solid #eef2ff; border-bottom: none; }

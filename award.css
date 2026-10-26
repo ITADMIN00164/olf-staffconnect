@@ -587,7 +587,8 @@
 /* ---- the views inside a section ---------------------------------- */
 .award-page .aw-subtabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 14px; }
 
-.award-page .aw-subtab {
+.award-page .aw-subtab,
+.award-page .aw-utiltab {
   padding: 6px 12px;
   border: 1px solid var(--border);
   background: var(--surface);
@@ -600,15 +601,18 @@
   white-space: nowrap;
 }
 
-.award-page .aw-subtab:hover { color: var(--accent); border-color: var(--border-strong); }
+.award-page .aw-subtab:hover,
+.award-page .aw-utiltab:hover { color: var(--accent); border-color: var(--border-strong); }
 
-.award-page .aw-subtab.is-active {
+.award-page .aw-subtab.is-active,
+.award-page .aw-utiltab.is-active {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
 }
 
-.award-page .aw-subtab:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.award-page .aw-subtab:focus-visible,
+.award-page .aw-utiltab:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 /* Solid and dark, the same slate as the stock sheet. */
 .award-page #requisitions-table th,
@@ -1672,9 +1676,11 @@
 /* ---- icons that sit in labels ---- */
 .award-page .aw-toptab .aw-icon,
 .award-page .aw-subtab .aw-icon,
+.award-page .aw-utiltab .aw-icon,
 .award-page .btn .aw-icon { margin-right: 7px; vertical-align: -3px; }
 .award-page .aw-toptab .aw-icon svg { width: 18px; height: 18px; }
-.award-page .aw-subtab .aw-icon svg { width: 15px; height: 15px; }
+.award-page .aw-subtab .aw-icon svg,
+.award-page .aw-utiltab .aw-icon svg { width: 15px; height: 15px; }
 .award-page .btn-sm .aw-icon svg, .award-page .btn-xs .aw-icon svg { width: 14px; height: 14px; }
 .award-page .btn:hover .aw-icon svg { transform: scale(1.12); }
 .award-page .aw-icon svg { transition: transform .18s ease; }
@@ -1808,8 +1814,8 @@
 .award-page .btn { transition: transform .12s ease, box-shadow .15s ease, background-color .15s ease, border-color .15s ease; }
 .award-page .btn:hover { transform: translateY(-1px); }
 .award-page .btn:active { transform: translateY(0) scale(.98); }
-.award-page .aw-toptab, .award-page .aw-subtab { transition: color .15s ease, border-color .15s ease, background-color .15s ease, transform .12s ease; }
-.award-page .aw-subtab:active { transform: scale(.97); }
+.award-page .aw-toptab, .award-page .aw-subtab, .award-page .aw-utiltab { transition: color .15s ease, border-color .15s ease, background-color .15s ease, transform .12s ease; }
+.award-page .aw-subtab:active, .award-page .aw-utiltab:active { transform: scale(.97); }
 
 /* the stage badges have a pulse when something is still moving */
 .award-page .chip-status.is-progress { position: relative; }
