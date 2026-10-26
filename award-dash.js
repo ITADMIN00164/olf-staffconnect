@@ -29,6 +29,7 @@ let sel = {};                  // committed selection per filter (null = not cho
 let lastRows = [];             // what the table shows now (for the Excel file)
 let lastTotals = null;
 let outsideClickBound = false;
+let loadedAt = 0;                // when the data last came in
 
 // ── helpers ──
 function el(id) { return document.getElementById(id); }
@@ -75,11 +76,14 @@ function byMonth(a, b) {
   return ka - kb;
 }
 
+// The last day of a month as "2026-05-31". Dates are compared as text: read as Date objects, a date is
+// midnight UTC, which is already after local midnight in India, so a post awarded on the last day of
+// its month would count as late.
 function monthEnd(label) {
   const p = String(label).split("-");
   const mi = MONTHS[p[0]];
-  if (mi == null || !p[1]) return null;
-  return new Date(Number(p[1]), mi + 1, 0);
+  if (mi == null || !p[1]) return "";
+  return new Date(Date.UTC(Number(p[1]), mi + 1, 0)).toISOString().slice(0, 10);
 }
 
 function formatDate(value) {
@@ -98,7 +102,7 @@ function isLate(r) {
   const d = formatDate(r.awardedDate);
   if (!/^\d{4}-\d{2}-\d{2}/.test(d)) return false;
   const end = monthEnd(r.month);
-  return end ? new Date(d.slice(0, 10)) > end : false;
+  return end ? d.slice(0, 10) > end : false;
 }
 
 function counts(recs) {
@@ -151,6 +155,7 @@ function start() {
   fetchAll().then(function (data) {
     rows = data;
     loaded = true;
+    loadedAt = Date.now();
     loading = false;
     buildFilters();
     render();
@@ -482,20 +487,77 @@ function colLetter(n) {
   while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); }
   return s;
 }
-function sheetXml(aoa) {
+function sheetXml(aoa, opts) {
+  opts = opts || {};
   let body = "";
   aoa.forEach(function (row, r) {
     const cells = (row || []).map(function (val, c) {
       if (val === null || val === undefined || val === "") return "";
       const ref = colLetter(c) + (r + 1);
+      // A cell can carry a style (s) and a formula (f): { s: 3, v: "Month" } or { f: "IF(B2<>\"\",1,0)" }.
+      if (typeof val === "object") {
+        const sa = val.s != null ? ' s="' + val.s + '"' : "";
+        if (val.f) return '<c r="' + ref + '"' + sa + '><f>' + xmlEsc(val.f) + "</f></c>";
+        if (typeof val.v === "number") return '<c r="' + ref + '"' + sa + '><v>' + val.v + "</v></c>";
+        return '<c r="' + ref + '"' + sa + ' t="inlineStr"><is><t xml:space="preserve">' + xmlEsc(val.v == null ? "" : val.v) + "</t></is></c>";
+      }
       if (typeof val === "number" && isFinite(val)) return '<c r="' + ref + '"><v>' + val + '</v></c>';
       return '<c r="' + ref + '" t="inlineStr"><is><t xml:space="preserve">' + xmlEsc(val) + '</t></is></c>';
     }).join("");
     body += '<row r="' + (r + 1) + '">' + cells + '</row>';
   });
+  // Column widths, and the style that empty cells of a column take (a style can unlock them).
+  const colDefs = opts.cols || (opts.widths || []).map(function (w) { return { width: w }; });
+  const cols = colDefs.length
+    ? '<cols>' + colDefs.map(function (d, i) {
+        return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + d.width + '" customWidth="1"' +
+          (d.style != null ? ' style="' + d.style + '"' : "") + "/>";
+      }).join("") + '</cols>'
+    : "";
+  const protection = opts.protect
+    ? '<sheetProtection sheet="1" objects="1" scenarios="1" formatColumns="0" formatRows="0"/>' : "";
+  const checks = (opts.validations || []).length
+    ? '<dataValidations count="' + opts.validations.length + '">' + opts.validations.map(function (v) {
+        return '<dataValidation type="list" allowBlank="1" showErrorMessage="1" errorTitle="Not in the list" ' +
+          'error="' + xmlEsc(v.message || "Choose a value from the list.") + '" sqref="' + v.sqref + '">' +
+          '<formula1>' + xmlEsc(v.formula) + '</formula1></dataValidation>';
+      }).join("") + '</dataValidations>'
+    : "";
   return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
-    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>' + body + '</sheetData></worksheet>';
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' + cols +
+    '<sheetData>' + body + '</sheetData>' + protection + checks + '</worksheet>';
 }
+
+// A workbook of several sheets: [{ name, rows, widths, validations: [{ sqref, formula, message }] }].
+// A validation is a dropdown that only accepts what the list holds, for example
+// { sqref: "F2:F5000", formula: "Lists!$A$2:$A$6" }.
+function buildWorkbook(sheets, options) {
+  options = options || {};
+  const head = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+  const types = sheets.map(function (s, i) {
+    return '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';
+  }).join("");
+  const names = sheets.map(function (s, i) {
+    return '<sheet name="' + xmlEsc(String(s.name).slice(0, 31)) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>';
+  }).join("");
+  const rels = sheets.map(function (s, i) {
+    return '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>';
+  }).join("");
+  const files = [
+    ["[Content_Types].xml", head + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' + types +
+      (options.styles ? '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' : "") + '</Types>'],
+    ["_rels/.rels", head + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+    ["xl/workbook.xml", head + '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' + names + '</sheets><calcPr fullCalcOnLoad="1"/></workbook>'],
+    ["xl/_rels/workbook.xml.rels", head + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + rels +
+      (options.styles ? '<Relationship Id="rId' + (sheets.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' : "") + '</Relationships>']
+  ];
+  if (options.styles) files.push(["xl/styles.xml", head + options.styles]);
+  sheets.forEach(function (s, i) {
+    files.push(["xl/worksheets/sheet" + (i + 1) + ".xml", sheetXml(s.rows, { widths: s.widths, cols: s.cols, protect: s.protect, validations: s.validations })]);
+  });
+  return zipStore(files);
+}
+
 function buildXlsx(aoa, sheetName) {
   const name = xmlEsc((sheetName || "Sheet1").slice(0, 31));
   const head = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
@@ -517,7 +579,7 @@ function downloadXlsx(bytes, filename) {
   setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
 }
 // The Event Management view of this tab writes its report the same way.
-window.awardXlsx = { build: buildXlsx, download: downloadXlsx };
+window.awardXlsx = { build: buildXlsx, buildWorkbook: buildWorkbook, download: downloadXlsx };
 
 function crc32(bytes) {
   let crc = 0xFFFFFFFF;
@@ -555,6 +617,12 @@ function zipStore(files) {
 
 // The Test tab calls this the first time Award Data Dashboard is opened, and
 // again after the page was left and come back to.
+// Called each time the dashboard is shown again: records are edited, added and deleted elsewhere in this
+// tab, so data older than half a minute is read again instead of being shown stale.
+window.awardDashShown = function () {
+  if (loaded && !loading && Date.now() - loadedAt > 30000) refresh();
+};
+
 window.initAwardDashUI = function () {
   rows = []; loaded = false; loading = false;
   const bar = el("awdFilterBar");

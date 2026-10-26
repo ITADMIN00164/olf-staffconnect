@@ -599,9 +599,6 @@ window.AWARD_CONFIG = {
             'stroke-linecap="round" stroke-linejoin="round">' +
             '<path d="M8 4h8v5a4 4 0 0 1-8 0V4Z"/>' +
             '<path d="M8 6H4v2a3 3 0 0 0 4 2.8M16 6h4v2a3 3 0 0 1-4 2.8M12 13v4M8.5 20h7M10 17h4"/></svg>',
-    chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
-           'stroke-linecap="round" stroke-linejoin="round">' +
-           '<path d="M4 20V4M4 20h16"/><path d="M8 16v-4M12 16V8M16 16v-6"/></svg>',
     calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
               'stroke-linecap="round" stroke-linejoin="round">' +
               '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>',
@@ -758,6 +755,8 @@ window.AWARD_CONFIG = {
     if (dash && !dashViewStarted && typeof window.initAwardDashUI === "function") {
       dashViewStarted = true;
       window.initAwardDashUI();
+    } else if (dash && typeof window.awardDashShown === "function") {
+      window.awardDashShown();
     }
     if (event && !eventViewStarted && typeof window.initAwardEventUI === "function") {
       eventViewStarted = true;
@@ -1610,6 +1609,9 @@ window.AWARD_CONFIG = {
         });
       }
     );
+
+    // The Test tab opens on its first tab, Award Utilisation.
+    showTopView("util");
 
     Array.prototype.forEach.call(
       el.hoModal.querySelectorAll("[data-aw-close-ho]"),
