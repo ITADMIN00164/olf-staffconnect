@@ -5,7 +5,7 @@
    after the sheet is picked, and nothing is sent until they are. Before anything is sent the file is checked
    row by row, and the sheet is added only if EVERY row passes, so one wrong row stops the whole upload:
      - the columns are found by their headings, so their order does not matter;
-     - Community and District Name must be one of the values in the dropdown lists
+     - Community, District Name and Award Category must be one of the values in the dropdown lists
        (public.award_lists), exactly as written;
      - every column must be filled in, and the mobile number must have 10 digits.
    A row is a DUPLICATE, and is not added, when its Month + Full Name + School name + Award name are the
@@ -121,13 +121,22 @@ async function sbGet(path) {
   return res.json();
 }
 
+function listsProblem(e, fallback) {
+  const m = (e && e.message) || "";
+  if (/Award Category values/i.test(m)) return "The Award Category list is not in the database yet. Run sql/award-lists-category.sql in Supabase, then try again.";
+  if (/award_lists/i.test(m)) return "The dropdown lists are not in the database yet. Run sql/award-lists-setup.sql in Supabase, then try again.";
+  return m || fallback;
+}
+
 async function loadLists() {
   const rows = await sbGet("award_lists?select=kind,value&limit=10000");
-  const out = { community: [], district: [] };
+  const out = { community: [], district: [], category: [] };
   rows.forEach(r => { if (out[r.kind]) out[r.kind].push(r.value); });
   out.community.sort((a, b) => a.localeCompare(b));
   out.district.sort((a, b) => a.localeCompare(b));
+  out.category.sort((a, b) => a.localeCompare(b));
   if (!out.community.length || !out.district.length) throw new Error("award_lists is empty");
+  if (!out.category.length) throw new Error("award_lists has no Award Category values");
   return out;
 }
 
@@ -215,6 +224,10 @@ function checkRow(r, lists) {
 
   if (!rec.awardName) problems.push("Award name is empty");
   if (!rec.awardCategory) problems.push("Award Category is empty");
+  else if (lists.category.indexOf(rec.awardCategory) === -1) {
+    const s = suggest(lists.category, rec.awardCategory);
+    problems.push("Award Category \u201c" + rec.awardCategory + "\u201d is not in the list" + (s ? " (\u201c" + s + "\u201d?)" : ""));
+  }
   if (!rec.email) problems.push("Email is empty");
   else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(rec.email)) problems.push("Email \u201c" + rec.email + "\u201d is not valid");
   if (!rec.circle) problems.push("Circle name is empty");
@@ -237,9 +250,10 @@ async function analyse(buffer) {
   rows.forEach(r => {
     const checked = checkRow(r, lists);
     if (checked.problems.length) { errors.push({ line: r.line, name: checked.rec.fullName, problems: checked.problems }); return; }
-    const split = splitAward(checked.rec.awardName, checked.rec.awardCategory);
-    checked.rec.awardName = split.awardName;
-    checked.rec.awardCategory = split.awardCategory;
+    // "Post of the Month, Block Level" under "Block Level - POM": the level is in the category already.
+    if (/^(Block|District|Cluster) Level - /.test(checked.rec.awardCategory)) {
+      checked.rec.awardName = checked.rec.awardName.replace(/[,\s-]*\b(Block|District|Cluster) Level\s*$/i, "").trim() || checked.rec.awardName;
+    }
     checked.rec.line = r.line;
     ok.push(checked.rec);
   });
@@ -275,9 +289,9 @@ async function downloadTemplate() {
   try {
     if (!window.awardXlsx || !window.awardXlsx.buildWorkbook) throw new Error("The spreadsheet writer did not load.");
     const lists = await loadLists();
-    const listRows = [[{ s: 3, v: "community" }, { s: 3, v: "District Name" }]];
-    for (let i = 0; i < Math.max(lists.community.length, lists.district.length); i++) {
-      listRows.push([lists.community[i] || "", lists.district[i] || ""]);
+    const listRows = [[{ s: 3, v: "community" }, { s: 3, v: "District Name" }, { s: 3, v: "Award Category" }]];
+    for (let i = 0; i < Math.max(lists.community.length, lists.district.length, lists.category.length); i++) {
+      listRows.push([lists.community[i] || "", lists.district[i] || "", lists.category[i] || ""]);
     }
     const widths = [24, 16, 26, 36, 18, 22, 28, 20, 20, 34, 18, 34, 12];
     const bytes = window.awardXlsx.buildWorkbook([
@@ -290,10 +304,12 @@ async function downloadTemplate() {
           { sqref: "E2:E" + TEMPLATE_ROWS, formula: "Lists!$A$2:$A$" + (lists.community.length + 1),
             message: "Choose a community from the list." },
           { sqref: "H2:H" + TEMPLATE_ROWS, formula: "Lists!$B$2:$B$" + (lists.district.length + 1),
-            message: "Choose a district from the list." }
+            message: "Choose a district from the list." },
+          { sqref: "K2:K" + TEMPLATE_ROWS, formula: "Lists!$C$2:$C$" + (lists.category.length + 1),
+            message: "Choose an award category from the list." }
         ]
       },
-      { name: "Lists", rows: listRows, widths: [22, 24], protect: true },
+      { name: "Lists", rows: listRows, widths: [22, 24, 30], protect: true },
       {
         name: "How to fill",
         widths: [110],
@@ -302,7 +318,7 @@ async function downloadTemplate() {
           [{ s: 3, v: "How to fill this sheet" }],
           [""],
           ["1. Fill one row per record on the Raw Data sheet, starting on row 2. Keep the headings as they are."],
-          ["2. community and District Name: choose from the dropdown. Anything not in the list (see the Lists sheet) is not added."],
+          ["2. community, District Name and Award Category: choose from the dropdown. Anything not in the list (see the Lists sheet) is not added."],
           ["3. Save as .xlsx, then upload it in Add records and choose the month and year it belongs to."]
         ]
       }
@@ -310,9 +326,7 @@ async function downloadTemplate() {
     window.awardXlsx.download(bytes, "Raw-Data-template.xlsx");
   } catch (e) {
     console.error("Template failed:", e);
-    el("awaResult").innerHTML = '<p class="awa-note awa-err">' + esc(/award_lists/i.test(e.message || "")
-      ? "The dropdown lists are not in the database yet. Run sql/award-lists-setup.sql in Supabase, then try again."
-      : (e.message || "Could not make the template.")) + "</p>";
+    el("awaResult").innerHTML = '<p class="awa-note awa-err">' + esc(listsProblem(e, "Could not make the template.")) + "</p>";
   } finally {
     btn.disabled = false;
   }
@@ -434,7 +448,7 @@ function openModal() {
   el("awaYearSel").value = "";
   showWhen(false);
   el("awaMonth").textContent = "After you choose the sheet, you choose the month and year its records belong to.";
-  el("awaResult").innerHTML = '<p class="awa-note">Community and District Name must come from the dropdown lists; the template has them built in.</p>';
+  el("awaResult").innerHTML = '<p class="awa-note">Community, District Name and Award Category must come from the dropdown lists; the template has them built in.</p>';
   el("awaGo").disabled = true;
   el("awaGo").textContent = "Add records";
   el("awaModal").classList.add("open");
@@ -459,10 +473,7 @@ async function onFile() {
     if (chosenMonth()) refreshView();
   } catch (e) {
     console.error("Upload check failed:", e);
-    const missingLists = /award_lists/i.test(e.message || "");
-    el("awaResult").innerHTML = '<p class="awa-note awa-err">' + esc(missingLists
-      ? "The dropdown lists are not in the database yet. Run sql/award-lists-setup.sql in Supabase, then try again."
-      : (e.message || "Could not read that file.")) + "</p>";
+    el("awaResult").innerHTML = '<p class="awa-note awa-err">' + esc(listsProblem(e, "Could not read that file.")) + "</p>";
     el("awaGo").disabled = true;
   }
 }
@@ -530,7 +541,7 @@ async function add() {
 // ── The dropdown lists: add, rename and delete values (IT admin only) ──
 let listKind = "community";
 let listRowsCache = [];            // [{ id, kind, value }]
-let listUse = { community: {}, district: {} };   // value -> how many records use it
+let listUse = { community: {}, district: {}, category: {} };   // value -> how many records use it
 let editingId = null;
 let deletingId = null;
 
@@ -562,12 +573,13 @@ async function loadListRows() {
 
 // How many records use each value, so a rename or delete is made knowing what it touches.
 async function loadUse() {
-  const use = { community: {}, district: {} };
+  const use = { community: {}, district: {}, category: {} };
   for (let offset = 0; ; offset += 1000) {
-    const rows = await sbGet("award_records?select=community,district_name&order=id.asc&limit=1000&offset=" + offset);
+    const rows = await sbGet("award_records?select=community,district_name,award_category&order=id.asc&limit=1000&offset=" + offset);
     rows.forEach(r => {
       if (r.community) use.community[r.community] = (use.community[r.community] || 0) + 1;
       if (r.district_name) use.district[r.district_name] = (use.district[r.district_name] || 0) + 1;
+      if (r.award_category) use.category[r.award_category] = (use.category[r.award_category] || 0) + 1;
     });
     if (rows.length < 1000) break;
   }
@@ -579,7 +591,7 @@ function renderListManager() {
   const items = listRowsCache.filter(r => r.kind === listKind).sort((a, b) => a.value.localeCompare(b.value));
   document.querySelectorAll("#awaListsModal [data-akind]").forEach(b =>
     b.classList.toggle("is-active", b.getAttribute("data-akind") === listKind));
-  const label = listKind === "community" ? "community" : "district";
+  const label = listKind === "community" ? "community" : listKind === "district" ? "district" : "award category";
   el("awaNew").placeholder = "New " + label + " name";
   if (!items.length) { body.innerHTML = '<p class="awa-note">Nothing in this list yet.</p>'; return; }
   body.innerHTML = '<ul class="awa-values">' + items.map(r => {
