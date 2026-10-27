@@ -20,7 +20,8 @@ import {
     doc,
     query,
     where,
-    serverTimestamp
+    serverTimestamp,
+    onSnapshot
 } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 
 /* ====================================
@@ -347,6 +348,8 @@ onAuthStateChanged(auth, async (user) => {
 
         currentRole = isAdmin ? "Admin" : "User";
         updateTopbar(user);
+        applyPomNavState();            // locked by default until the switch is read
+        watchPageAccess();             // live: follows IT Admin's on/off switch
         showApp();
         loadMyEmployeeRecord(email);   // fills the profile chip / ID card
         prefetchPages();               // warm page fragments while idle
@@ -355,6 +358,7 @@ onAuthStateChanged(auth, async (user) => {
         await navigate("home");
     } else {
         currentRole = "User";
+        stopWatchingPageAccess();
         showSignin();
     }
     hideLoading();
@@ -1405,12 +1409,164 @@ function writeCachedRole(scope, email, isAdmin) {
 }
 
 /* ====================================
+   PAGE ACCESS SWITCH (POM)
+   IT Admin can switch the POM page off for everyone else.
+   The switch lives in Firestore at appSettings/pageAccess
+   ({ pomEnabled: true|false }) so it applies to every user at
+   once, and is watched live: flipping it updates every open
+   session without a reload.
+     - Off (or not set yet): POM shows greyed out with a lock in
+       the menu and cannot be opened. IT Admin still can, and sees
+       an "Enable page for all users" bar at the top of the page.
+     - On: POM behaves normally; IT Admin sees "Disable for all".
+   Like the other role checks here this is a UI gate; Firestore
+   rules should also limit writes to appSettings to IT Admin.
+==================================== */
+
+const PAGE_ACCESS_DOC = doc(db, "appSettings", "pageAccess");
+let pomEnabled       = false;   // safe default until Firestore answers
+let pageAccessLoaded = false;
+let pageAccessUnsub  = null;
+let markPageAccessReady;
+let pageAccessReady  = new Promise(r => { markPageAccessReady = r; });
+
+function isItAdmin() {
+    return String(auth.currentUser?.email || "").toLowerCase() === ORG_ADMIN_EMAIL;
+}
+
+function watchPageAccess() {
+    if (pageAccessUnsub) return;
+    pageAccessUnsub = onSnapshot(PAGE_ACCESS_DOC, (snap) => {
+        pomEnabled = snap.exists() && snap.data().pomEnabled === true;
+        pageAccessLoaded = true;
+        markPageAccessReady();
+        applyPomNavState();
+        if (currentPage === "pom") {
+            if (!pomEnabled && !isItAdmin()) {
+                notify("The POM page has been switched off by IT Admin.", "info");
+                navigate("home");
+            } else {
+                renderPomAdminBar();
+            }
+        }
+    }, (err) => {
+        // Can't read the switch: keep POM closed rather than guess.
+        console.warn("Page access check failed:", err);
+        pomEnabled = false;
+        pageAccessLoaded = true;
+        markPageAccessReady();
+        applyPomNavState();
+    });
+}
+
+function stopWatchingPageAccess() {
+    if (pageAccessUnsub) { pageAccessUnsub(); pageAccessUnsub = null; }
+    pomEnabled = false;
+    pageAccessLoaded = false;
+    pageAccessReady = new Promise(r => { markPageAccessReady = r; });
+}
+
+// Menu item: greyed out with a lock while POM is off. Users can't open it;
+// IT Admin can (it stays clickable for them, still marked with the lock).
+function applyPomNavState() {
+    const btn = document.querySelector('#appSidebar .nav-item[data-page="pom"]');
+    if (!btn) return;
+    const locked = !pomEnabled;
+    const admin  = isItAdmin();
+    btn.classList.toggle("nav-item--locked", locked && !admin);
+    btn.classList.toggle("nav-item--locked-admin", locked && admin);
+    btn.setAttribute("aria-disabled", locked && !admin ? "true" : "false");
+    btn.title = !locked ? "POM"
+        : (admin ? "POM - disabled for users (only IT Admin can open it)"
+                 : "POM - temporarily unavailable");
+    let lock = btn.querySelector(".nav-lock");
+    if (locked && !lock) {
+        lock = document.createElement("span");
+        lock.className = "nav-lock";
+        lock.setAttribute("aria-hidden", "true");
+        lock.textContent = "\uD83D\uDD12";
+        btn.appendChild(lock);
+    } else if (!locked && lock) {
+        lock.remove();
+    }
+}
+
+// The bar IT Admin sees at the top of the POM page.
+function renderPomAdminBar() {
+    if (currentPage !== "pom") return;
+    let bar = document.getElementById("pomAccessBar");
+    if (!isItAdmin()) { if (bar) bar.remove(); return; }
+    if (!bar) {
+        bar = document.createElement("div");
+        bar.id = "pomAccessBar";
+        bar.setAttribute("role", "region");
+        bar.setAttribute("aria-label", "POM page access");
+        pageContent.prepend(bar);
+    }
+    bar.className = "page-access-bar " + (pomEnabled ? "is-on" : "is-off");
+    bar.innerHTML = pomEnabled
+        ? `<span class="page-access-ic" aria-hidden="true">\u2713</span>
+           <div class="page-access-txt"><b>POM is open to all users.</b>
+           <span>Only you (IT Admin) see this bar.</span></div>
+           <button type="button" class="page-access-btn page-access-btn--off">Disable for all users</button>`
+        : `<span class="page-access-ic" aria-hidden="true">\uD83D\uDD12</span>
+           <div class="page-access-txt"><b>POM is disabled for all users.</b>
+           <span>It shows greyed out in their menu. Only you (IT Admin) can open this page.</span></div>
+           <button type="button" class="page-access-btn page-access-btn--on">Enable page for all users</button>`;
+    bar.querySelector("button").addEventListener("click", () => setPomEnabled(!pomEnabled));
+}
+
+async function setPomEnabled(on) {
+    if (!isItAdmin()) return;
+    const ok = await showAppConfirm({
+        title: on ? "Enable POM for all users?" : "Disable POM for all users?",
+        message: on
+            ? "Everyone will be able to open the POM page again, straight away."
+            : "Users will see POM greyed out in the menu and won't be able to open it. Anyone on the page now is sent to Home. You can still open it.",
+        type: on ? "info" : "warning",
+        confirmText: on ? "Enable for all" : "Disable for all"
+    });
+    if (!ok) return;
+
+    const btn = document.querySelector("#pomAccessBar .page-access-btn");
+    if (btn) { btn.disabled = true; btn.textContent = "Saving\u2026"; }
+    try {
+        await setDoc(PAGE_ACCESS_DOC, {
+            pomEnabled: on,
+            updatedBy: auth.currentUser?.email || "",
+            updatedAt: serverTimestamp()
+        }, { merge: true });
+        logAudit(on ? "page-enabled" : "page-disabled", { page: "pom" });
+        notify(on ? "POM is now open to all users." : "POM is now disabled for users.", "success");
+        // The live listener repaints the menu and this bar.
+    } catch (err) {
+        console.error(err);
+        renderPomAdminBar();
+        await showAppAlert({
+            title: "Could not change POM access",
+            message: "Firestore did not accept the change (" + (err.code || err.message) + "). " +
+                     "Check that the Firestore rules allow IT Admin to write to appSettings.",
+            type: "error"
+        });
+    }
+}
+
+/* ====================================
    ROUTER
    Nav IDs use data-page attribute to
    avoid issues with hyphens in IDs.
 ==================================== */
 
 window.navigate = async function (page) {
+    // POM can be switched off for everyone except IT Admin (see PAGE ACCESS
+    // SWITCH below). Every route into it - menu, home links - passes here.
+    if (page === "pom" && !isItAdmin()) {
+        if (!pageAccessLoaded) await Promise.race([pageAccessReady, new Promise(r => setTimeout(r, 3000))]);
+        if (!pomEnabled) {
+            notify("The POM page is temporarily unavailable.", "info");
+            return;
+        }
+    }
     currentPage = page;
 
     // Google Analytics: one page_view per Staff Connect page opened
@@ -1443,6 +1599,7 @@ window.navigate = async function (page) {
         if (typeof window.initPomPageUI === "function") {
             window.initPomPageUI();
         }
+        renderPomAdminBar();   // IT Admin only: the enable / disable switch
     }
 
     else if (page === "calendar") {
