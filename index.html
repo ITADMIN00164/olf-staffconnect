@@ -2416,6 +2416,49 @@
             .news-popup { right: 10px; left: 10px; bottom: 10px; width: auto; }
             .dtp { width: 100%; max-width: 340px; }
         }
+
+        /* ── Page access switch: locked POM menu item + IT Admin bar ── */
+        .nav-item .nav-lock {
+            margin-left: auto; font-size: 11px; opacity: .85; line-height: 1;
+        }
+        .sidebar.collapsed .nav-item .nav-lock {
+            position: absolute; right: 6px; top: 5px; margin: 0; font-size: 9px;
+        }
+        .nav-item.nav-item--locked {
+            opacity: .42; cursor: not-allowed; filter: grayscale(1);
+        }
+        .nav-item.nav-item--locked:hover {
+            background: transparent; color: #9AA6B8; transform: none;
+        }
+        .nav-item.nav-item--locked-admin .label { opacity: .7; }
+
+        .page-access-bar {
+            max-width: var(--page-max, 1680px); margin: 0 auto 18px;
+            display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+            padding: 14px 18px; border-radius: 14px; font-size: 13px;
+            border: 1px solid;
+        }
+        .page-access-bar.is-off { background: #fff7ed; border-color: #fed7aa; color: #9a3412; }
+        .page-access-bar.is-on  { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+        .page-access-ic {
+            width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+            display: grid; place-items: center; font-size: 15px; font-weight: 800;
+            background: rgba(255,255,255,.8);
+        }
+        .page-access-txt { flex: 1; min-width: 220px; line-height: 1.4; }
+        .page-access-txt b { display: block; font-size: 13.5px; }
+        .page-access-txt span { opacity: .85; }
+        .page-access-btn {
+            border: 0; border-radius: 10px; padding: 9px 16px; cursor: pointer;
+            font: inherit; font-weight: 700; color: #fff; white-space: nowrap;
+            transition: filter .15s, transform .1s;
+        }
+        .page-access-btn--on  { background: #16a34a; }
+        .page-access-btn--off { background: #fff; color: #b91c1c; box-shadow: inset 0 0 0 1px #fecaca; }
+        .page-access-btn:hover { filter: brightness(.95); }
+        .page-access-btn:active { transform: translateY(1px); }
+        .page-access-btn:disabled { opacity: .6; cursor: default; }
+        .page-access-btn:focus-visible { outline: 2px solid #4f8ef7; outline-offset: 2px; }
     </style>
 
 <!-- Award Management's styles. They live in a file rather than inside

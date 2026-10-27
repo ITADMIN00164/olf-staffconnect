@@ -841,7 +841,12 @@
         tabs.forEach(tab => {
             tab.addEventListener("click", () => {
                 const target = tab.dataset.tab;
-                tabs.forEach(t => t.classList.toggle("active", t === tab));
+                tabs.forEach(t => {
+                    const on = t === tab;
+                    t.classList.toggle("active", on);
+                    t.setAttribute("aria-selected", on ? "true" : "false");
+                    t.setAttribute("tabindex", on ? "0" : "-1");
+                });
                 document.querySelectorAll("#grPage .gr-panel").forEach(p => {
                     p.classList.toggle("active", p.dataset.panel === target);
                 });
@@ -849,6 +854,20 @@
                 if (target === "summary") renderSummary();
                 if (target === "analytics") renderAnalytics();
                 if (target === "upload") renderMyUploads();
+            });
+            // Keyboard: Left / Right / Home / End move between tabs (WAI-ARIA tabs pattern).
+            tab.addEventListener("keydown", (e) => {
+                const list = Array.from(tabs);
+                const i = list.indexOf(tab);
+                let next = -1;
+                if (e.key === "ArrowRight") next = (i + 1) % list.length;
+                else if (e.key === "ArrowLeft") next = (i - 1 + list.length) % list.length;
+                else if (e.key === "Home") next = 0;
+                else if (e.key === "End") next = list.length - 1;
+                if (next < 0) return;
+                e.preventDefault();
+                list[next].focus();
+                list[next].click();
             });
         });
     }
@@ -1024,7 +1043,10 @@
             row.querySelectorAll(".gr-mystat").forEach(btn => {
                 btn.addEventListener("click", () => {
                     myStatFilter = btn.dataset.filter;
-                    row.querySelectorAll(".gr-mystat").forEach(b => b.classList.toggle("active", b === btn));
+                    row.querySelectorAll(".gr-mystat").forEach(b => {
+                        b.classList.toggle("active", b === btn);
+                        b.setAttribute("aria-pressed", b === btn ? "true" : "false");
+                    });
                     renderMyUploads();
                 });
             });
@@ -1799,7 +1821,10 @@
             statRow.querySelectorAll(".gr-mystat").forEach(btn => {
                 btn.addEventListener("click", () => {
                     dashStatFilter = btn.dataset.filter;
-                    statRow.querySelectorAll(".gr-mystat").forEach(b => b.classList.toggle("active", b === btn));
+                    statRow.querySelectorAll(".gr-mystat").forEach(b => {
+                        b.classList.toggle("active", b === btn);
+                        b.setAttribute("aria-pressed", b === btn ? "true" : "false");
+                    });
                     renderDetailed();
                 });
             });
@@ -2315,6 +2340,13 @@
             '<button type="button" class="gr-ms-apply">Apply</button>' +
             '</span></div></div>';
 
+        // Accessible name comes from the filter's visible label.
+        const msBtn = wrap.querySelector(".gr-ms-btn");
+        const msLbl = wrap.parentElement && wrap.parentElement.querySelector("label");
+        msBtn.setAttribute("aria-haspopup", "true");
+        msBtn.setAttribute("aria-expanded", "false");
+        if (msLbl) msBtn.setAttribute("aria-label", msLbl.textContent.trim() + " filter");
+
         wrap.querySelector(".gr-ms-btn").addEventListener("click", (e) => {
             e.stopPropagation();
             if (wrap.classList.contains("gr-ms--off")) return;
@@ -2323,6 +2355,7 @@
             if (!wasOpen) {
                 renderMultiSelect(wrap);   // repaint from live state before showing
                 wrap.classList.add("open");
+                e.currentTarget.setAttribute("aria-expanded", "true");
             }
         });
         // Clicks inside the panel must not bubble to the document closer.
@@ -2355,7 +2388,11 @@
     }
 
     function closeAllMultiSelects() {
-        document.querySelectorAll("#grPage .gr-ms.open").forEach(w => w.classList.remove("open"));
+        document.querySelectorAll("#grPage .gr-ms.open").forEach(w => {
+            w.classList.remove("open");
+            const b = w.querySelector(".gr-ms-btn");
+            if (b) b.setAttribute("aria-expanded", "false");
+        });
     }
 
     function renderMultiSelect(wrap) {
@@ -2368,7 +2405,10 @@
         const btn = wrap.querySelector(".gr-ms-btn");
         wrap.classList.toggle("gr-ms--off", !!off);
         if (off) wrap.classList.remove("open");
-        if (btn) btn.disabled = !!off;
+        if (btn) {
+            btn.disabled = !!off;
+            btn.setAttribute("aria-expanded", wrap.classList.contains("open") ? "true" : "false");
+        }
 
         const labelEl = wrap.querySelector(".gr-ms-label");
         if (labelEl) {
@@ -2446,6 +2486,80 @@
         return [{ label: "All communities", match: () => true }];
     }
 
+    /* ====================================================
+       SUMMARY DASHBOARD
+       One screen that answers "where do GR & Circular uploads stand?"
+         1. KPI strip       — total, validated, pending, rejected,
+                              median time to validate
+         2. Validated by validator   |  Status overview (donut + by type)
+         3. Monthly trend            |  By community / district
+         4. Top uploaders            |  Pending queue age
+       Every panel follows the Community / District / Month filters,
+       except the monthly trend, which always shows every month and
+       highlights the chosen one (click a month column to filter by it).
+       The Validator filter narrows the validator panel and splits
+       "validated" into "by this validator" and "by others".
+       Everything is plain HTML/CSS (no chart library), so it renders
+       instantly and inherits the page's fonts.
+    ==================================================== */
+    const GR_T = { gr: "#4f46e5", circ: "#0891b2" };   // type colours: GR / Circular
+
+    function sxPct(n, d) { return d ? Math.round((n / d) * 100) : 0; }
+    function sxInt(n) { return Number(n || 0).toLocaleString("en-IN"); }
+
+    // "validated" / "rejected" / everything else counts as pending.
+    function sxStatus(r) {
+        const s = String(r.status || "").toLowerCase();
+        return s === "validated" ? "val" : (s === "rejected" ? "rej" : "pend");
+    }
+    function sxMs(v) {
+        if (!v) return null;
+        const t = new Date(v).getTime();
+        return isNaN(t) ? null : t;
+    }
+    function sxDuration(ms) {
+        if (ms == null) return "—";
+        const h = ms / 36e5;
+        if (h < 1) return Math.max(1, Math.round(ms / 6e4)) + " min";
+        if (h < 48) return Number(h.toFixed(h < 10 ? 1 : 0)) + " hrs";
+        const d = h / 24;
+        return Number(d.toFixed(d < 10 ? 1 : 0)) + " days";
+    }
+    // "2026-08" -> "Aug ’26"
+    function sxShortMonth(key) {
+        const names = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const [y, m] = String(key).split("-");
+        return (names[parseInt(m, 10)] || m) + " ’" + String(y).slice(2);
+    }
+    function sxTitleCase(s) {
+        return String(s || "").replace(/\b([a-z])/g, c => c.toUpperCase());
+    }
+    // Friendly name for a person: a saved display name if there is one,
+    // else the part of the email before the @.
+    function sxPersonName(email, names) {
+        for (let i = 0; i < names.length; i++) {
+            const n = String(names[i] || "").trim();
+            if (n && n.indexOf("@") < 0) return sxTitleCase(n);
+        }
+        return String(email || "—").split("@")[0];
+    }
+
+    let sxPanelSeq = 0;
+    function sxPanel(title, meta, body, cls) {
+        const id = "grSxH" + (++sxPanelSeq);
+        return `
+            <section class="gr-sx-panel ${cls || ""}" aria-labelledby="${id}">
+                <header class="gr-sx-head">
+                    <h3 id="${id}">${title}</h3>
+                    ${meta ? `<span class="gr-sx-meta">${meta}</span>` : ""}
+                </header>
+                ${body}
+            </section>`;
+    }
+    function sxEmpty(msg) {
+        return `<div class="gr-sx-empty">${escHtml(msg)}</div>`;
+    }
+
     function renderSummary() {
         const wrap = document.getElementById("grSummaryWrap");
         if (!wrap) return;
@@ -2455,157 +2569,427 @@
         const validatorSel = document.getElementById("grSumValidator");
         const validator = validatorSel ? validatorSel.value.toLowerCase() : "";
 
-        const pool = allRecords.filter(r => !month || monthKeyFromDate(r.docDate) === month);
         const groups = summaryGroups();
-
-        let totalUp = 0, totalVal = 0, totalPend = 0, totalRej = 0;
-        let validatorValCount = 0;   // validated by the selected validator only
-
-        const data = groups.map(g => {
-            const rows = pool.filter(g.match);
-            // val  = validated by the selected validator (or by anyone when
-            //        no validator is picked)
-            // vOth = validated by someone else, so the bar still adds up to
-            //        the total when a validator is selected
-            const blank = () => ({ up: 0, val: 0, vOth: 0, pend: 0, rej: 0 });
-            const stat = { GR: blank(), Circular: blank() };
-            rows.forEach(r => {
-                const key = isGrType(r.type) ? "GR" : "Circular";
-                const status = String(r.status || "").toLowerCase();
-                stat[key].up += 1;
-                if (status === "validated") {
-                    totalVal += 1;
-                    const mine = String(r.validatedBy || "").toLowerCase() === validator;
-                    if (!validator || mine) stat[key].val += 1;
-                    else stat[key].vOth += 1;
-                    if (validator && mine) validatorValCount += 1;
-                } else if (status === "rejected") {
-                    stat[key].rej += 1;
-                    totalRej += 1;
-                } else {
-                    stat[key].pend += 1;   // "Pending", blank, anything else
-                    totalPend += 1;
-                }
-            });
-            totalUp += rows.length;
-            return { label: g.label, stat };
-        });
-
-        // Pending and Rejected are now their own cards, and the four numbers
-        // always reconcile: validated + pending + rejected = total uploaded.
-        const cardsHtml = `
-            ${sumCard("Total uploaded", totalUp, GR_C.total)}
-            ${sumCard("Validated", totalVal, GR_C.validated,
-                      validator ? `${escHtml(validator)}: ${validatorValCount}` : "")}
-            ${sumCard("Pending", totalPend, GR_C.pending)}
-            ${sumCard("Rejected", totalRej, GR_C.rejected)}`;
-
-        const periodLabel = month ? monthLabel(month) : "All months";
+        const scoped = allRecords.filter(r => groups.some(g => g.match(r)));   // all months
+        const pool = scoped.filter(r => !month || monthKeyFromDate(r.docDate) === month);
 
         wrap.innerHTML = `
-            <div class="gr-sum-cards">
-                ${cardsHtml}
-            </div>
-            <div class="gr-chart-card">
-                <div class="gr-chart-title">Status breakdown — ${escHtml(periodLabel)}</div>
-                ${stackedChartHtml(data, !!validator)}
-                <div class="gr-legend">
-                    <span><i class="gr-swatch" style="background:${GR_C.validated}"></i>Validated${validator ? ` by ${escHtml(validator)}` : ""}</span>
-                    ${validator ? `<span><i class="gr-swatch" style="background:${GR_C.validatedOther}"></i>Validated by others</span>` : ""}
-                    <span><i class="gr-swatch" style="background:${GR_C.pending}"></i>Pending</span>
-                    <span><i class="gr-swatch" style="background:${GR_C.rejected}"></i>Rejected</span>
+            <div class="gr-sx">
+                ${sxKpis(pool, validator)}
+                <div class="gr-sx-row">
+                    ${sxValidators(pool, validator, month)}
+                    ${sxStatusPanel(pool, groups, validator)}
+                </div>
+                <div class="gr-sx-row">
+                    ${sxTrend(scoped, month)}
+                    ${sxBreakdown(pool)}
+                </div>
+                <div class="gr-sx-row gr-sx-row--even">
+                    ${sxUploaders(pool)}
+                    ${sxAgeing(pool)}
                 </div>
             </div>`;
+
+        // Click a month column in the trend to filter the whole page by it
+        // (click the highlighted month again to go back to all months).
+        if (!wrap.dataset.sxWired) {
+            wrap.dataset.sxWired = "1";
+            wrap.addEventListener("click", (e) => {
+                const col = e.target.closest("[data-sx-month]");
+                if (!col) return;
+                const sel = document.getElementById("grSumMonth");
+                if (!sel) return;
+                const m = col.dataset.sxMonth;
+                sel.value = sel.value === m ? "" : m;
+                sel.dataset.touched = sel.value ? "1" : "";
+                renderSummary();
+                const again = wrap.querySelector(`[data-sx-month="${m}"]`);
+                if (again && e.detail === 0) again.focus();   // keep keyboard focus in place
+            });
+            // Month columns are role="button": Enter / Space activate them.
+            wrap.addEventListener("keydown", (e) => {
+                if (e.key !== "Enter" && e.key !== " ") return;
+                const col = e.target.closest("[data-sx-month]");
+                if (!col) return;
+                e.preventDefault();
+                col.click();
+            });
+        }
     }
 
+    /* ---------- 1. KPI strip ---------- */
+    function sxKpis(pool, validator) {
+        let gr = 0, circ = 0, val = 0, pend = 0, rej = 0, mine = 0, oldest = null;
+        const turn = [];
+        pool.forEach(r => {
+            if (isGrType(r.type)) gr += 1; else circ += 1;
+            const k = sxStatus(r);
+            if (k === "val") {
+                val += 1;
+                if (validator && String(r.validatedBy || "").toLowerCase() === validator) mine += 1;
+                const a = sxMs(r.uploadTimestamp), b = sxMs(r.validatedTimestamp);
+                if (a != null && b != null && b >= a) turn.push(b - a);
+            } else if (k === "rej") {
+                rej += 1;
+            } else {
+                pend += 1;
+                const a = sxMs(r.uploadTimestamp);
+                if (a != null && (oldest == null || a < oldest)) oldest = a;
+            }
+        });
+        const total = pool.length;
+        turn.sort((a, b) => a - b);
+        const mid = turn.length >> 1;
+        const median = !turn.length ? null
+            : (turn.length % 2 ? turn[mid] : (turn[mid - 1] + turn[mid]) / 2);
+        const oldestDays = oldest == null ? null : Math.floor((Date.now() - oldest) / 864e5);
 
-    function sumCard(label, value, color, sub) {
+        const card = (label, value, color, chip, bar, sub) => `
+            <div class="gr-sx-kpi" style="--c:${color}">
+                <div class="gr-sx-kpi-top">
+                    <span class="gr-sx-kpi-label">${label}</span>
+                    ${chip ? `<span class="gr-sx-chip">${chip}</span>` : ""}
+                </div>
+                <div class="gr-sx-kpi-val">${value}</div>
+                <div class="gr-sx-kpi-bar">${bar}</div>
+                <div class="gr-sx-kpi-sub">${sub}</div>
+            </div>`;
+        const fill = p => `<i style="width:${p}%;background:var(--c)"></i>`;
+
+        const vName = validator
+            ? sxPersonName(validator, allRecords.filter(r => String(r.validatedBy || "").toLowerCase() === validator).map(r => r.validatedByName))
+            : "";
+
         return `
-            <div class="gr-sum-card">
-                <div class="gr-sum-val" style="color:${color}">${value}</div>
-                <div class="gr-sum-label">${escHtml(label)}</div>
-                ${sub ? `<div class="gr-sum-sub">${sub}</div>` : ""}
+            <div class="gr-sx-kpis">
+                ${card("Total uploaded", sxInt(total), GR_C.total, "",
+                    `<i style="width:${sxPct(gr, total)}%;background:${GR_T.gr}"></i><i style="width:${sxPct(circ, total) || 0}%;background:${GR_T.circ}"></i>`,
+                    `<span class="gr-sx-dot" style="background:${GR_T.gr}"></span><b>${sxInt(gr)}</b> GRs
+                     <span class="gr-sx-dot" style="background:${GR_T.circ}"></span><b>${sxInt(circ)}</b> Circulars`)}
+                ${card("Validated", sxInt(val), GR_C.validated, sxPct(val, total) + "%", fill(sxPct(val, total)),
+                    validator ? `<b>${sxInt(mine)}</b> by ${escHtml(vName)}` : "of all uploads, signed off")}
+                ${card("Pending", sxInt(pend), GR_C.pending, sxPct(pend, total) + "%", fill(sxPct(pend, total)),
+                    pend ? (oldestDays == null ? "waiting for a validator"
+                                               : `oldest waiting <b>${oldestDays} day${oldestDays === 1 ? "" : "s"}</b>`)
+                         : "nothing waiting")}
+                ${card("Rejected", sxInt(rej), GR_C.rejected, sxPct(rej, total) + "%", fill(sxPct(rej, total)),
+                    "sent back with a remark")}
+                ${card("Time to validate", sxDuration(median), "#7c3aed", "", "",
+                    turn.length ? `median, upload → validated <span class="gr-sx-muted">(${sxInt(turn.length)})</span>` : "no validations yet")}
             </div>`;
     }
 
-    // One bar per type per group. The full bar is everything uploaded; the
-    // green block filling it from the bottom is the validated share. The
-    // total sits above the bar, the validated count inside the green block
-    // (dropped when the block is too short for the text to fit).
-    // Smallest segment that can hold a number legibly; anything shorter
-    // gets its number printed beside the bar instead of inside it.
-    const SEG_MIN_LABEL = 15;
+    /* ---------- 2a. Validated by validator ---------- */
+    function sxValidators(pool, validator, month) {
+        const byV = Object.create(null);
+        let allVal = 0;
+        pool.forEach(r => {
+            const email = String(r.validatedBy || "").trim().toLowerCase();
+            const k = sxStatus(r);
+            if (k === "val") allVal += 1;
+            if (!email || k === "pend") return;
+            if (validator && email !== validator) return;
+            const v = byV[email] || (byV[email] = { email, names: [], gr: 0, circ: 0, rej: 0 });
+            v.names.push(r.validatedByName);
+            if (k === "rej") v.rej += 1;
+            else if (isGrType(r.type)) v.gr += 1;
+            else v.circ += 1;
+        });
 
-    function stackedChartHtml(data, hasValidator) {
-        const H = 170;
-        let max = 1;
-        data.forEach(d => { max = Math.max(max, d.stat.GR.up, d.stat.Circular.up); });
+        const list = Object.keys(byV).map(k => byV[k])
+            .map(v => ({ ...v, name: sxPersonName(v.email, v.names), total: v.gr + v.circ }))
+            .filter(v => v.total > 0)
+            .sort((a, b) => (b.total - a.total) || cmpStr(a.name, b.name));
 
-        const bar = (short, name, d) => {
-            const upH = Math.max(4, Math.round((d.up / max) * H));
+        const meta = list.length
+            ? `${list.length} validator${list.length === 1 ? "" : "s"} · ${month ? escHtml(monthLabel(month)) : "all months"}`
+            : "";
+        if (!list.length) return sxPanel("Validated by validator", meta, sxEmpty("No validations for the selected filters."));
 
-            // Build the stack bottom-up. Heights are apportioned by running
-            // total so rounding can never make the segments overflow the bar.
-            const parts = [
-                { key: "val",  n: d.val,  color: GR_C.validated,      word: "validated" },
-                { key: "vOth", n: d.vOth, color: GR_C.validatedOther, word: "validated by others" },
-                { key: "pend", n: d.pend, color: GR_C.pending,        word: "pending" },
-                { key: "rej",  n: d.rej,  color: GR_C.rejected,       word: "rejected" }
-            ].filter(p => p.n > 0);
-
-            let acc = 0, used = 0;
-            const segs = parts.map(p => {
-                acc += p.n;
-                const edge = d.up ? Math.round((acc / d.up) * upH) : 0;
-                const h = Math.max(0, edge - used);
-                const seg = { ...p, h, bottom: used };   // bottom = offset from bar base
-                used = edge;
-                return seg;
-            });
-
-            const inside = segs.filter(s => s.h >= SEG_MIN_LABEL);
-            const outside = segs.filter(s => s.h < SEG_MIN_LABEL);
-
-            // Anchor each overflow number beside its own segment rather than
-            // in a pile at the base, then nudge them apart so two adjacent
-            // thin segments can't print on top of each other.
-            const OUT_GAP = 15;   // chip is ~12px tall, so this clears it
-            let lastY = -Infinity;
-            outside.forEach(s => {
-                let y = s.bottom + (s.h / 2) - 6;
-                if (y < lastY + OUT_GAP) y = lastY + OUT_GAP;
-                s.y = Math.max(0, Math.round(y));
-                lastY = s.y;
-            });
-
-            const tip = `${name} — ${d.up} uploaded` +
-                        segs.map(s => `, ${s.n} ${s.word}`).join("");
-
+        const max = Math.max(1, ...list.map(v => v.total));
+        const rows = list.map((v, i) => {
+            const tip = `${v.name} (${v.email}) — ${v.gr} GRs, ${v.circ} Circulars validated` +
+                        (v.rej ? `, ${v.rej} rejected` : "");
             return `
-                <div class="gr-bar-col" title="${escHtml(tip)}">
-                    <div class="gr-bar-num">${d.up}</div>
-                    <div class="gr-bar-slot">
-                        <div class="gr-bar gr-bar--stack" style="height:${upH}px">
-                            ${segs.map(s => `
-                                <div class="gr-seg" style="height:${s.h}px;background:${s.color}">
-                                    ${inside.indexOf(s) >= 0 ? `<span class="gr-seg-num">${s.n}</span>` : ""}
-                                </div>`).join("")}
-                        </div>
-                        ${outside.map(s => `
-                            <span class="gr-out-num" style="bottom:${s.y}px;color:${s.color}">${s.n}</span>`).join("")}
+                <div class="gr-sx-vrow" title="${escHtml(tip)}">
+                    <span class="gr-sx-rank${i < 3 ? " gr-sx-rank--top" : ""}">${i + 1}</span>
+                    <div class="gr-sx-who">
+                        <b>${escHtml(v.name)}</b>
+                        <small>${v.rej ? `<span class="gr-sx-rej">${sxInt(v.rej)} rejected</span>` : escHtml(v.email)}</small>
                     </div>
-                    <div class="gr-bar-label">${escHtml(short)}</div>
+                    <div class="gr-sx-track">
+                        <div class="gr-sx-stack" style="width:${Math.max(2, (v.total / max) * 100)}%">
+                            ${v.gr ? `<i style="flex:${v.gr};background:${GR_T.gr}"></i>` : ""}
+                            ${v.circ ? `<i style="flex:${v.circ};background:${GR_T.circ}"></i>` : ""}
+                        </div>
+                    </div>
+                    <span class="gr-sx-num" style="color:${GR_T.gr}">${sxInt(v.gr)}</span>
+                    <span class="gr-sx-num" style="color:${GR_T.circ}">${sxInt(v.circ)}</span>
+                    <span class="gr-sx-total">${sxInt(v.total)}<small>${sxPct(v.total, allVal)}%</small></span>
+                </div>`;
+        }).join("");
+
+        return sxPanel("Validated by validator", meta, `
+            <div class="gr-sx-vhead">
+                <span>#</span><span>Validator</span>
+                <span class="gr-sx-legend-inline">
+                    <span><i style="background:${GR_T.gr}"></i>GRs</span>
+                    <span><i style="background:${GR_T.circ}"></i>Circulars</span>
+                </span>
+                <span class="r">GRs</span><span class="r">Circ.</span><span class="r">Total</span>
+            </div>
+            <div class="gr-sx-vlist">${rows}</div>`, "gr-sx-panel--validators");
+    }
+
+    /* ---------- 2b. Status overview ---------- */
+    function sxStatusPanel(pool, groups, validator) {
+        const isMine = r => validator && String(r.validatedBy || "").toLowerCase() === validator;
+        const tally = rows => {
+            const t = { n: rows.length, val: 0, vOth: 0, pend: 0, rej: 0 };
+            rows.forEach(r => {
+                const k = sxStatus(r);
+                if (k === "val") { if (!validator || isMine(r)) t.val += 1; else t.vOth += 1; }
+                else t[k] += 1;
+            });
+            return t;
+        };
+        const segDefs = [
+            { k: "val",  color: GR_C.validated,      label: validator ? "Validated by selected" : "Validated" },
+            { k: "vOth", color: GR_C.validatedOther, label: "Validated by others" },
+            { k: "pend", color: GR_C.pending,        label: "Pending" },
+            { k: "rej",  color: GR_C.rejected,       label: "Rejected" }
+        ].filter(s => validator || s.k !== "vOth");
+
+        const all = tally(pool);
+        if (!all.n) return sxPanel("Status overview", "", sxEmpty("Nothing uploaded for the selected filters."));
+
+        // Donut: a conic gradient, one arc per status.
+        let acc = 0;
+        const stops = segDefs.map(s => {
+            const from = acc; acc += (all[s.k] / all.n) * 100;
+            return `${s.color} ${from}% ${acc}%`;
+        }).join(",");
+        const doneRate = sxPct(all.val + all.vOth, all.n);
+
+        const legend = segDefs.map(s => `
+            <li><i style="background:${s.color}"></i><span>${s.label}</span>
+                <b>${sxInt(all[s.k])}</b><small>${sxPct(all[s.k], all.n)}%</small></li>`).join("");
+
+        // One 100% bar per type, per group (communities / districts picked).
+        const typeBar = (label, color, t) => {
+            const segs = segDefs.filter(s => t[s.k] > 0).map(s => {
+                const p = (t[s.k] / t.n) * 100;
+                return `<i style="flex:${t[s.k]};background:${s.color}" title="${escHtml(label)}: ${t[s.k]} ${s.label.toLowerCase()} (${Math.round(p)}%)">${p >= 9 ? sxInt(t[s.k]) : ""}</i>`;
+            }).join("");
+            return `
+                <div class="gr-sx-trow">
+                    <span class="gr-sx-tlabel"><span class="gr-sx-dot" style="background:${color}"></span>${label}</span>
+                    <div class="gr-sx-tbar">${t.n ? segs : `<em>none</em>`}</div>
+                    <span class="gr-sx-tnum">${sxInt(t.n)}</span>
                 </div>`;
         };
+        const typeRows = groups.map(g => {
+            const rows = pool.filter(g.match);
+            return `
+                ${groups.length > 1 ? `<div class="gr-sx-tgroup">${escHtml(g.label)}</div>` : ""}
+                ${typeBar("GRs", GR_T.gr, tally(rows.filter(r => isGrType(r.type))))}
+                ${typeBar("Circulars", GR_T.circ, tally(rows.filter(r => !isGrType(r.type))))}`;
+        }).join("");
 
-        return `
-            <div class="gr-chart">
-                ${data.map(g => `
-                    <div class="gr-group">
-                        <div class="gr-bars">${bar("G", "GRs", g.stat.GR)}${bar("C", "Circulars", g.stat.Circular)}</div>
-                        <div class="gr-group-label" title="${escHtml(g.label)}">${escHtml(g.label)}</div>
-                    </div>`).join("")}
-            </div>`;
+        return sxPanel("Status overview", `${sxInt(all.n)} records`, `
+            <div class="gr-sx-donutwrap">
+                <div class="gr-sx-donut" style="background:conic-gradient(${stops})" role="img"
+                     aria-label="${escHtml(`${doneRate}% validated. ` + segDefs.map(s => `${s.label}: ${all[s.k]}`).join(", "))}">
+                    <div class="gr-sx-donut-hole"><b>${doneRate}%</b><span>validated</span></div>
+                </div>
+                <ul class="gr-sx-dlegend">${legend}</ul>
+            </div>
+            <div class="gr-sx-sub">By type</div>
+            <div class="gr-sx-types">${typeRows}</div>`);
+    }
+
+    /* ---------- 3a. Monthly trend (by the GR / Circular date) ---------- */
+    function sxTrend(scoped, month) {
+        const byM = Object.create(null);
+        let undated = 0;
+        scoped.forEach(r => {
+            const m = monthKeyFromDate(r.docDate);
+            if (!m) { undated += 1; return; }
+            const t = byM[m] || (byM[m] = { n: 0, val: 0, pend: 0, rej: 0, gr: 0, circ: 0 });
+            t.n += 1; t[sxStatus(r)] += 1;
+            if (isGrType(r.type)) t.gr += 1; else t.circ += 1;
+        });
+        const keys = Object.keys(byM).sort().slice(-12);
+        const meta = `by GR / Circular date · last ${keys.length} month${keys.length === 1 ? "" : "s"}` +
+                     (undated ? ` · ${undated} undated` : "");
+        if (!keys.length) return sxPanel("Monthly trend", "", sxEmpty("No dated records yet."));
+
+        const H = 150;
+        const max = Math.max(1, ...keys.map(k => byM[k].n));
+        const cols = keys.map(k => {
+            const t = byM[k];
+            const h = Math.max(3, Math.round((t.n / max) * H));
+            const seg = (n, c) => n ? `<i style="flex:${n};background:${c}"></i>` : "";
+            const tip = `${monthLabel(k)} — ${t.n} uploaded (${t.gr} GRs, ${t.circ} Circulars): ` +
+                        `${t.val} validated, ${t.pend} pending, ${t.rej} rejected. Click to filter.`;
+            const cls = month ? (k === month ? " is-on" : " is-dim") : "";
+            return `
+                <div class="gr-sx-mcol${cls}" data-sx-month="${escHtml(k)}" title="${escHtml(tip)}"
+                     role="button" tabindex="0" aria-pressed="${k === month ? "true" : "false"}" aria-label="${escHtml(tip)}">
+                    <span class="gr-sx-mnum">${sxInt(t.n)}</span>
+                    <div class="gr-sx-mbar" style="height:${h}px">
+                        ${seg(t.rej, GR_C.rejected)}${seg(t.pend, GR_C.pending)}${seg(t.val, GR_C.validated)}
+                    </div>
+                    <span class="gr-sx-mlabel">${escHtml(sxShortMonth(k))}</span>
+                    <span class="gr-sx-mrate">${sxPct(t.val, t.n)}%</span>
+                </div>`;
+        }).join("");
+
+        return sxPanel("Monthly trend", meta, `
+            <div class="gr-sx-months" style="--h:${H}px">${cols}</div>
+            <div class="gr-sx-foot">
+                <span><i style="background:${GR_C.validated}"></i>Validated</span>
+                <span><i style="background:${GR_C.pending}"></i>Pending</span>
+                <span><i style="background:${GR_C.rejected}"></i>Rejected</span>
+                <span class="gr-sx-muted">% under each month = validated share · click a month to filter</span>
+            </div>`);
+    }
+
+    /* ---------- 3b. By community, or by district inside one community ---------- */
+    function sxBreakdown(pool) {
+        let title, rows;
+        const tally = recs => {
+            const t = { n: recs.length, gr: 0, circ: 0, val: 0, pend: 0, rej: 0 };
+            recs.forEach(r => { t[sxStatus(r)] += 1; if (isGrType(r.type)) t.gr += 1; else t.circ += 1; });
+            return t;
+        };
+        if (sumStates.length === 1) {
+            const code = sumStates[0];
+            title = `By district — ${escHtml(STATE_LABELS[code] || code)}`;
+            const names = sumDistricts.length ? sumDistricts.slice() : (STATE_DISTRICTS[code] || []).slice();
+            // Keep any district present in the data but missing from the master list.
+            pool.forEach(r => { if (r.district && names.indexOf(r.district) < 0 && !sumDistricts.length) names.push(r.district); });
+            rows = names.map(d => ({ label: d, t: tally(pool.filter(r => r.district === d)) }));
+        } else {
+            title = "By community";
+            const codes = sumStates.length ? sumStates : Object.keys(STATE_LABELS);
+            rows = codes.map(c => ({ label: STATE_LABELS[c] || c, t: tally(pool.filter(r => r.state === c)) }));
+        }
+        rows.sort((a, b) => (b.t.n - a.t.n) || cmpStr(a.label, b.label));
+        const zero = rows.filter(r => !r.t.n).length;
+
+        const body = rows.map(({ label, t }) => {
+            const rate = sxPct(t.val, t.n);
+            return `
+                <tr class="${t.n ? "" : "is-zero"}">
+                    <td class="gr-sx-bname" title="${escHtml(label)}">${escHtml(label)}</td>
+                    <td class="r"><b>${sxInt(t.n)}</b></td>
+                    <td class="r" style="color:${GR_T.gr}">${sxInt(t.gr)}</td>
+                    <td class="r" style="color:${GR_T.circ}">${sxInt(t.circ)}</td>
+                    <td>
+                        ${t.n ? `<div class="gr-sx-rate"><div class="gr-sx-rate-bar"><i style="width:${rate}%"></i></div><span>${rate}%</span></div>`
+                              : `<span class="gr-sx-muted">no uploads</span>`}
+                    </td>
+                    <td class="r">${t.pend ? `<span class="gr-sx-pill gr-sx-pill--pend">${sxInt(t.pend)}</span>` : `<span class="gr-sx-muted">0</span>`}</td>
+                    <td class="r">${t.rej ? `<span class="gr-sx-pill gr-sx-pill--rej">${sxInt(t.rej)}</span>` : `<span class="gr-sx-muted">0</span>`}</td>
+                </tr>`;
+        }).join("");
+
+        return sxPanel(title, zero ? `${zero} with no uploads` : `${rows.length} listed`, `
+            <div class="gr-sx-tablewrap">
+                <table class="gr-sx-table">
+                    <thead><tr>
+                        <th>${sumStates.length === 1 ? "District" : "Community"}</th>
+                        <th class="r">Total</th><th class="r">GRs</th><th class="r">Circ.</th>
+                        <th>Validated</th><th class="r">Pending</th><th class="r">Rejected</th>
+                    </tr></thead>
+                    <tbody>${body}</tbody>
+                </table>
+            </div>`);
+    }
+
+    /* ---------- 4a. Top uploaders ---------- */
+    function sxUploaders(pool) {
+        const byU = Object.create(null);
+        pool.forEach(r => {
+            const key = String(r.uploadedByEmail || r.uploadedBy || "").trim().toLowerCase();
+            if (!key) return;
+            const u = byU[key] || (byU[key] = { key, names: [], gr: 0, circ: 0, val: 0, n: 0 });
+            u.names.push(r.uploadedBy);
+            u.n += 1;
+            if (isGrType(r.type)) u.gr += 1; else u.circ += 1;
+            if (sxStatus(r) === "val") u.val += 1;
+        });
+        const list = Object.keys(byU).map(k => byU[k])
+            .map(u => ({ ...u, name: sxPersonName(u.key, u.names) }))
+            .sort((a, b) => (b.n - a.n) || cmpStr(a.name, b.name));
+        if (!list.length) return sxPanel("Top uploaders", "", sxEmpty("No uploads for the selected filters."));
+
+        const top = list.slice(0, 8);
+        const max = Math.max(1, top[0].n);
+        const rows = top.map((u, i) => `
+            <div class="gr-sx-urow" title="${escHtml(`${u.name} — ${u.n} uploaded (${u.gr} GRs, ${u.circ} Circulars), ${u.val} validated`)}">
+                <span class="gr-sx-rank${i < 3 ? " gr-sx-rank--top" : ""}">${i + 1}</span>
+                <b class="gr-sx-uname">${escHtml(u.name)}</b>
+                <div class="gr-sx-track">
+                    <div class="gr-sx-stack" style="width:${Math.max(2, (u.n / max) * 100)}%">
+                        ${u.gr ? `<i style="flex:${u.gr};background:${GR_T.gr}"></i>` : ""}
+                        ${u.circ ? `<i style="flex:${u.circ};background:${GR_T.circ}"></i>` : ""}
+                    </div>
+                </div>
+                <span class="gr-sx-total">${sxInt(u.n)}<small>${sxPct(u.val, u.n)}% validated</small></span>
+            </div>`).join("");
+
+        return sxPanel("Top uploaders",
+            `${list.length} people uploaded${list.length > 8 ? " · top 8 shown" : ""}`,
+            `<div class="gr-sx-ulist">${rows}</div>`);
+    }
+
+    /* ---------- 4b. Pending queue age (since upload) ---------- */
+    function sxAgeing(pool) {
+        const now = Date.now();
+        const pend = pool.filter(r => sxStatus(r) === "pend");
+        if (!pend.length) {
+            return sxPanel("Pending queue", "", `
+                <div class="gr-sx-allclear"><span>✓</span>Nothing is waiting for validation.</div>`);
+        }
+        const buckets = [
+            { label: "Under 2 days", max: 2,        color: "#fcd34d" },
+            { label: "2 – 7 days",   max: 7,        color: "#f59e0b" },
+            { label: "1 – 2 weeks",  max: 14,       color: "#ea580c" },
+            { label: "2 – 4 weeks",  max: 30,       color: "#dc2626" },
+            { label: "Over a month", max: Infinity, color: "#991b1b" }
+        ].map(b => ({ ...b, n: 0 }));
+        let unknown = 0;
+        const aged = [];
+        pend.forEach(r => {
+            const t = sxMs(r.uploadTimestamp);
+            if (t == null) { unknown += 1; return; }
+            const days = (now - t) / 864e5;
+            aged.push({ r, days });
+            for (let i = 0; i < buckets.length; i++) {
+                if (days < buckets[i].max) { buckets[i].n += 1; break; }
+            }
+        });
+        const max = Math.max(1, ...buckets.map(b => b.n));
+        const bars = buckets.map(b => `
+            <div class="gr-sx-arow">
+                <span>${b.label}</span>
+                <div class="gr-sx-track"><div class="gr-sx-stack" style="width:${b.n ? Math.max(2, (b.n / max) * 100) : 0}%"><i style="flex:1;background:${b.color}"></i></div></div>
+                <b>${sxInt(b.n)}</b>
+            </div>`).join("");
+
+        const oldest = aged.sort((a, b) => b.days - a.days).slice(0, 4).map(({ r, days }) => `
+            <li title="${escHtml(r.title || "")}">
+                <span class="gr-sx-tag" style="background:${isGrType(r.type) ? GR_T.gr : GR_T.circ}">${isGrType(r.type) ? "G" : "C"}</span>
+                <span class="gr-sx-otitle">${escHtml(r.title || "(untitled)")}</span>
+                <span class="gr-sx-odist">${escHtml(r.district || "")}</span>
+                <b>${Math.floor(days)}d</b>
+            </li>`).join("");
+
+        return sxPanel("Pending queue", `${sxInt(pend.length)} waiting · age since upload${unknown ? ` · ${unknown} without upload time` : ""}`, `
+            <div class="gr-sx-ages">${bars}</div>
+            ${oldest ? `<div class="gr-sx-sub">Waiting longest</div><ul class="gr-sx-oldest">${oldest}</ul>` : ""}`);
     }
 
 
@@ -2719,7 +3103,7 @@
 
         wrap.innerHTML = tabs.map(t =>
             '<button type="button" class="gr-an-tab' + (t.code === active ? " active" : "") +
-            '" data-comm="' + escHtml(t.code) + '" role="tab">' +
+            '" data-comm="' + escHtml(t.code) + '" role="tab" aria-selected="' + (t.code === active ? "true" : "false") + '">' +
             escHtml(t.label) +
             '<span class="gr-an-tab-count' + (t.n ? "" : " gr-an-tab-count--zero") + '">' + t.n + "</span>" +
             "</button>"

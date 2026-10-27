@@ -1584,7 +1584,8 @@ function editGoalGroup(year, dept, member, goal) {
   document.getElementById('gg-weightage').value = rows.length ? rows[0].weightage : '';
   document.getElementById('gg-description').value = rows.length ? (rows[0].description || '') : '';
   const smRow = rows.find(x => x.successMeasures);
-  document.getElementById('gg-success').value = smRow ? smRow.successMeasures : '';
+  const smBtn = document.getElementById('gg-success-btn');
+  if (smBtn) smBtn.textContent = smRow ? '👁 View / Edit Success Measures' : '+ Add Success Measures';
   document.getElementById('gg-context').textContent = `${member} · ${dept} · ${academicYearShort(year)}`;
   openModal('goalgroup-modal');
 }
@@ -1594,13 +1595,11 @@ function saveGoalGroup() {
   const newGoal = document.getElementById('gg-goal').value.trim();
   const weightage = parseFloat(document.getElementById('gg-weightage').value);
   const description = document.getElementById('gg-description').value.trim();
-  const successMeasures = document.getElementById('gg-success').value.replace(/\s+$/,'');
   if (!newGoal || isNaN(weightage)) { toast('SMART Goal name and weightage are required'); return; }
   if (!DB.settings.goalNames.includes(newGoal)) DB.settings.goalNames.push(newGoal);
   DB.goals.forEach(g => {
     if (g.year===year && g.dept===dept && g.member===member && g.goal===oldGoal) {
       g.goal = newGoal; g.weightage = weightage; g.description = description;
-      if (successMeasures || g.successMeasures) g.successMeasures = successMeasures;
     }
   });
   editingGoalGroup = null;
@@ -2550,46 +2549,129 @@ function sgSuccessEyeBtn(year, dept, member, goal, goalItemId) {
   const has = !!sgSuccessMeasuresOf(sgGoalGroupRows(year, dept, member, goal, goalItemId));
   return `<button type="button" class="sm-eye-btn ${has?'has-sm':''}" data-smk="${esc(sgSmKey(year, member, goal))}" title="${has?'View Success Measures':'No Success Measures yet'}" onclick="event.stopPropagation();sgOpenSuccessMeasures('${escJs(year)}','${escJs(dept)}','${escJs(member)}','${escJs(goal)}','${escJs(goalItemId||'')}')">${SG_EYE_SVG}</button>`;
 }
-function sgSuccessMeasuresHtml(text) {
-  const lines = String(text||'').split(/\r?\n/);
-  let html = '', table = null;
-  const closeTable = () => { if (table) { html += `<table class="sm-tbl">${table.join('')}</table>`; table = null; } };
-  lines.forEach(raw => {
+// ── Success Measures model ───────────────────────────────────────────────────
+// The stored text is parsed into ONE structure that both the view and the editor
+// use, so what you edit is exactly what you see:
+//   { points: ['…', …],                         ← free-text success measures
+//     blocks: [ { title: 'Annexure C — …',      ← one grading schema each
+//                 items: [ {type:'text', text, sub}            ← note / sub-heading
+//                        | {type:'table', head:[…]|null,
+//                           rows:[ {cells:[…]} | {section:'…'} ]} ] } ] }
+// Storage format (unchanged, plain text): a "Grading Schema — <title>" line starts a
+// block; inside a block "a | b | c" is a header row, "• a | b | c" a table row,
+// "▸ text" a section row (inside a table) or a sub-heading (outside one).
+function sgSmIsHeading(t) { return /^grading schema\b/i.test(t) || /^annexure\s+[a-z0-9]+\s*[—–-]/i.test(t); }
+function sgSmParse(text) {
+  const model = { points: [], blocks: [] };
+  let block = null, table = null;
+  const closeTable = () => { table = null; };
+  String(text || '').split(/\r?\n/).forEach(raw => {
     const t = raw.trim();
     if (!t) { closeTable(); return; }
-    if (/^grading schema\b/i.test(t) || /^annexure\s+[a-z0-9]+\s*[—–-]/i.test(t)) { closeTable(); html += `<div class="sm-head">${esc(t)}</div>`; return; }
-    if (t.indexOf(' | ') > -1 || (table && /^▸/.test(t))) {
-      const isSection = /^▸/.test(t);
-      const isBullet = /^•/.test(t);
-      if (isSection) { (table = table || []).push(`<tr class="sm-sec"><td colspan="12">${esc(t.replace(/^▸\s*/, ''))}</td></tr>`); return; }
+    if (sgSmIsHeading(t)) {
+      closeTable();
+      block = { title: t.replace(/^grading schema\s*[—–:-]?\s*/i, ''), items: [] };
+      model.blocks.push(block);
+      return;
+    }
+    if (!block) { model.points.push(t.replace(/^[•●▸]\s*/, '')); return; }
+    const isBullet = /^•/.test(t), isSection = /^▸/.test(t);
+    if (t.indexOf(' | ') > -1 || (table && isSection)) {
+      if (!table) { table = { type: 'table', head: null, rows: [] }; block.items.push(table); }
+      if (isSection) { table.rows.push({ section: t.replace(/^▸\s*/, '') }); return; }
       // keep the spaces after the bullet so empty first cells ("•  | x") survive the split
-      const cells = (isBullet ? raw.replace(/^\s*•/, '') : t).split(' | ').map(c => c.trim());
-      if (!table && !isBullet) { table = [`<tr>${cells.map(c=>`<th>${esc(c)}</th>`).join('')}</tr>`]; table.cols = cells.length; return; }
-      table = table || [];
-      while (table.cols && cells.length < table.cols) cells.push('');   // rows under a merged (rowspan) cell
-      table.push(`<tr>${cells.map(c=>`<td${c.length && c.length<=8?' class="nw"':''}>${esc(c)}</td>`).join('')}</tr>`);
+      const cells = (isBullet ? raw.replace(/^\s*•/, '') : raw).replace(/\s+$/, ' ').split(' | ').map(c => c.trim());
+      while (cells.length > 1 && cells[cells.length - 1] === '' && /\|\s*$/.test(raw)) cells.pop();
+      if (!isBullet && !table.head && !table.rows.length) table.head = cells;
+      else table.rows.push({ cells });
       return;
     }
     closeTable();
-    if (/^▸/.test(t)) { html += `<div class="sm-sub">${esc(t.replace(/^▸\s*/,''))}</div>`; return; }
-    html += `<div class="sm-bullet">${esc(t.replace(/^[•●\-–]\s*/,''))}</div>`;
+    block.items.push({ type: 'text', text: t.replace(/^[▸•●]\s*/, ''), sub: isSection });
   });
-  closeTable();
+  model.blocks.forEach(b => b.items.forEach(it => { if (it.type === 'table') sgSmNormTable(it); }));
+  return model;
+}
+function sgSmCols(tb) {
+  let n = tb.head ? tb.head.length : 0;
+  tb.rows.forEach(r => { if (r.cells) n = Math.max(n, r.cells.length); });
+  return Math.max(n, 2);
+}
+function sgSmNormTable(tb) {
+  const n = sgSmCols(tb);
+  if (tb.head) while (tb.head.length < n) tb.head.push('');
+  tb.rows.forEach(r => { if (r.cells) while (r.cells.length < n) r.cells.push(''); });   // rows under a merged (rowspan) cell
+  return tb;
+}
+function sgSmSerialize(model) {
+  const clean = s => String(s == null ? '' : s).replace(/[\r\n]+/g, ' ').replace(/ \| /g, ' / ').trim();
+  const out = [];
+  (model.points || []).forEach(p => { p = clean(p); if (p) out.push(p); });
+  (model.blocks || []).forEach(b => {
+    const items = [];
+    (b.items || []).forEach(it => {
+      if (it.type === 'text') {
+        const lines = String(it.text || '').split(/\r?\n/).map(clean).filter(Boolean);
+        if (!lines.length) return;
+        items.push(lines.map((l, i) => (it.sub && i === 0 ? '▸ ' : '') + l).join('\n'));
+      } else {
+        const n = sgSmCols(it), rows = [];
+        const pad = a => { a = (a || []).map(clean); while (a.length < n) a.push(''); return a.slice(0, n); };
+        if (it.head && it.head.some(c => clean(c))) rows.push(pad(it.head).join(' | '));
+        (it.rows || []).forEach(r => {
+          if (r.section != null) { const s = clean(r.section); if (s) rows.push('▸ ' + s); return; }
+          const c = pad(r.cells);
+          if (!c.some(Boolean)) return;
+          while (c.length > 1 && c[c.length - 1] === '') c.pop();   // trailing blanks come back as padding
+          rows.push('• ' + c.join(' | '));
+        });
+        if (rows.length) items.push(rows.join('\n'));
+      }
+    });
+    const title = clean(b.title);
+    if (!title && !items.length) return;
+    out.push('');
+    out.push('Grading Schema — ' + (title || 'Untitled'));
+    items.forEach((s, i) => { if (i) out.push(''); out.push(s); });
+  });
+  return out.join('\n').replace(/^\n+/, '').replace(/\s+$/, '');
+}
+function sgSmIsEmpty(model) { return !sgSmSerialize(model); }
+
+// ── View ──
+function sgSuccessMeasuresHtml(text) {
+  const m = typeof text === 'string' ? sgSmParse(text) : text;
+  let html = '';
+  if (m.points.length) html += `<div class="sm-label">Success Measures</div>` + m.points.map(p => `<div class="sm-bullet">${esc(p)}</div>`).join('');
+  m.blocks.forEach(b => {
+    html += `<div class="sm-head">Grading Schema — ${esc(b.title || 'Untitled')}</div>`;
+    b.items.forEach(it => {
+      if (it.type === 'text') { html += it.sub ? `<div class="sm-sub">${esc(it.text)}</div>` : `<p class="sm-note">${esc(it.text)}</p>`; return; }
+      const n = sgSmCols(it);
+      let t = '<div class="sm-tbl-wrap"><table class="sm-tbl">';
+      if (it.head) t += `<thead><tr>${it.head.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead>`;
+      t += '<tbody>' + it.rows.map(r => r.section != null
+        ? `<tr class="sm-sec"><td colspan="${n}">${esc(r.section)}</td></tr>`
+        : `<tr>${r.cells.map(c => `<td${c.length && c.length <= 8 ? ' class="nw"' : ''}>${esc(c)}</td>`).join('')}</tr>`).join('') + '</tbody>';
+      html += t + '</table></div>';
+    });
+  });
   return html;
 }
-let sgSmTarget = null;
-function sgOpenSuccessMeasures(year, dept, member, goal, goalItemId) {
+
+// ── Editor (free text in a text box, every table as an editable table) ──
+let sgSmTarget = null, sgSmModel = null;
+function sgOpenSuccessMeasures(year, dept, member, goal, goalItemId, startInEdit) {
   const rows = sgGoalGroupRows(year, dept, member, goal, goalItemId);
   const g0 = rows[0] || { year, dept, member, goal };
   const editable = rows.length > 0 && canEditSuccessMeasures(g0);
   sgSmTarget = { year: g0.year, dept: g0.dept, member: g0.member, goal: g0.goal, editable };
   const text = sgSuccessMeasuresOf(rows);
+  sgSmModel = sgSmParse(text);
   document.getElementById('sm-context').textContent = [g0.goal, g0.member, academicYearShort(g0.year)].filter(Boolean).join(' · ');
-  document.getElementById('sm-view').innerHTML = text ? sgSuccessMeasuresHtml(text)
+  document.getElementById('sm-view').innerHTML = text ? sgSuccessMeasuresHtml(sgSmModel)
     : `<p class="sm-empty">${rows.length ? 'No Success Measures have been added for this SMART Goal yet.' : 'This SMART Goal no longer exists in SMART Goals, so its Success Measures are not available.'}</p>`;
-  document.getElementById('sm-text').value = text;
-  sgSmSetMode('view');
-  document.getElementById('sm-edit-btn').style.display = editable ? '' : 'none';
+  sgSmSetMode(startInEdit && editable ? 'edit' : 'view');
   openModal('success-measures-modal');
 }
 function sgSmSetMode(mode) {
@@ -2599,13 +2681,119 @@ function sgSmSetMode(mode) {
   document.getElementById('sm-save-btn').style.display = edit ? '' : 'none';
   document.getElementById('sm-edit-btn').style.display = (!edit && sgSmTarget && sgSmTarget.editable) ? '' : 'none';
   document.getElementById('success-measures-modal-title').textContent = edit ? 'Edit Success Measures' : 'Success Measures';
-  if (edit) setTimeout(() => { try { document.getElementById('sm-text').focus(); } catch (e) {} }, 30);
+  const box = document.querySelector('#success-measures-modal .modal');
+  if (box) box.style.maxWidth = edit ? '1100px' : '760px';
+  if (edit) { sgSmRenderEditor(); setTimeout(() => { try { document.getElementById('sm-points').focus(); } catch (e) {} }, 30); }
 }
 function sgEditSuccessMeasures() { sgSmSetMode('edit'); }
+
+function sgSmCellBox(val, path, cls) {
+  return `<textarea rows="1" class="sm-cell ${cls || ''}" data-p="${path}" oninput="sgSmInput(this)">${esc(val)}</textarea>`;
+}
+function sgSmRenderEditor() {
+  const m = sgSmModel || (sgSmModel = { points: [], blocks: [] });
+  let h = `<div class="sm-ed-sec">
+      <div class="sm-label">Success Measures <span class="sm-hint">— one point per line</span></div>
+      <textarea id="sm-points" class="sm-points" rows="5" placeholder="e.g. &gt; 95% LAR (Light and Right) score for academic reports and forms." oninput="sgSmPoints(this)">${esc(m.points.join('\n'))}</textarea>
+    </div>`;
+  m.blocks.forEach((b, bi) => {
+    h += `<div class="sm-ed-block">
+      <div class="sm-ed-blockhd">
+        <span class="sm-label" style="margin:0">Grading Schema —</span>
+        <input class="sm-title" value="${esc(b.title)}" placeholder="e.g. Annexure C — Light and Right Academic Reports and Forms" data-p="${bi}.t" oninput="sgSmInput(this)">
+        <button type="button" class="btn btn-danger btn-sm" onclick="sgSmAct('delBlock',${bi})" title="Remove this grading schema">🗑️</button>
+      </div>`;
+    b.items.forEach((it, ii) => {
+      if (it.type === 'text') {
+        h += `<div class="sm-ed-item">
+          <div class="sm-ed-itemhd"><span>${it.sub ? 'Sub-heading' : 'Note'}</span>
+            <button type="button" class="sm-mini" onclick="sgSmAct('toggleSub',${bi},${ii})">${it.sub ? 'Make note' : 'Make sub-heading'}</button>
+            <button type="button" class="sm-mini sm-del" onclick="sgSmAct('delItem',${bi},${ii})" title="Remove">✕</button></div>
+          <textarea rows="2" class="sm-note-box ${it.sub ? 'is-sub' : ''}" data-p="${bi}.${ii}.x" oninput="sgSmInput(this)">${esc(it.text)}</textarea>
+        </div>`;
+        return;
+      }
+      const n = sgSmCols(it);
+      let t = `<div class="sm-ed-item"><div class="sm-ed-itemhd"><span>Table</span>
+          <button type="button" class="sm-mini" onclick="sgSmAct('addCol',${bi},${ii})">+ Column</button>
+          <button type="button" class="sm-mini" onclick="sgSmAct('delCol',${bi},${ii})" ${n <= 2 ? 'disabled' : ''}>− Column</button>
+          <button type="button" class="sm-mini sm-del" onclick="sgSmAct('delItem',${bi},${ii})" title="Remove table">✕ Table</button></div>
+        <div class="sm-tbl-wrap"><table class="sm-etbl">${sgSmColgroup(it)}<thead><tr>`;
+      for (let c = 0; c < n; c++) t += `<th>${sgSmCellBox(it.head ? it.head[c] : '', `${bi}.${ii}.h.${c}`, 'is-head')}</th>`;
+      t += `<th class="sm-x"></th></tr></thead><tbody>`;
+      it.rows.forEach((r, ri) => {
+        if (r.section != null) t += `<tr class="sm-sec"><td colspan="${n}">${sgSmCellBox(r.section, `${bi}.${ii}.${ri}.s`, 'is-sec')}</td>`;
+        else { t += '<tr>'; for (let c = 0; c < n; c++) t += `<td>${sgSmCellBox(r.cells[c], `${bi}.${ii}.${ri}.${c}`)}</td>`; }
+        t += `<td class="sm-x"><button type="button" class="sm-mini sm-del" onclick="sgSmAct('delRow',${bi},${ii},${ri})" title="Remove row">✕</button></td></tr>`;
+      });
+      t += `</tbody></table></div>
+        <div class="sm-ed-actions"><button type="button" class="sm-mini" onclick="sgSmAct('addRow',${bi},${ii})">+ Row</button>
+          <button type="button" class="sm-mini" onclick="sgSmAct('addSec',${bi},${ii})">+ Section row</button></div></div>`;
+      h += t;
+    });
+    h += `<div class="sm-ed-actions"><button type="button" class="btn btn-secondary btn-sm" onclick="sgSmAct('addTable',${bi})">+ Table</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="sgSmAct('addNote',${bi})">+ Note</button></div></div>`;
+  });
+  h += `<div class="sm-ed-actions" style="margin-top:14px"><button type="button" class="btn btn-secondary btn-sm" onclick="sgSmAct('addBlock')">+ Add Grading Schema</button></div>`;
+  const box = document.getElementById('sm-edit');
+  box.innerHTML = h;
+  box.querySelectorAll('textarea.sm-cell, textarea.sm-note-box').forEach(sgSmAutoGrow);
+}
+// Column widths follow the content (a short "#" column stays narrow), with the
+// last 30px kept for the row's remove button.
+function sgSmColgroup(tb) {
+  const n = sgSmCols(tb), w = [];
+  for (let c = 0; c < n; c++) {
+    let mx = tb.head ? String(tb.head[c] || '').length : 0;
+    tb.rows.forEach(r => { if (r.cells) mx = Math.max(mx, String(r.cells[c] || '').length); });
+    w.push(Math.min(60, Math.max(9, mx)));
+  }
+  const tot = w.reduce((a, x) => a + x, 0);
+  return '<colgroup>' + w.map(x => `<col style="width:${(x / tot * 100).toFixed(1)}%">`).join('') + '<col style="width:30px"></colgroup>';
+}
+function sgSmAutoGrow(el) { el.style.height = 'auto'; el.style.height = (el.scrollHeight + 2) + 'px'; }
+function sgSmPoints(el) { sgSmModel.points = el.value.split(/\r?\n/); }
+function sgSmInput(el) {
+  const p = el.getAttribute('data-p').split('.');
+  const b = sgSmModel.blocks[+p[0]];
+  if (el.tagName === 'TEXTAREA') sgSmAutoGrow(el);
+  if (!b) return;
+  if (p[1] === 't') { b.title = el.value; return; }
+  const it = b.items[+p[1]];
+  if (!it) return;
+  if (p[2] === 'x') { it.text = el.value; return; }
+  if (p[2] === 'h') { it.head = it.head || new Array(sgSmCols(it)).fill(''); it.head[+p[3]] = el.value; return; }
+  const r = it.rows[+p[2]];
+  if (!r) return;
+  if (p[3] === 's') r.section = el.value; else r.cells[+p[3]] = el.value;
+}
+function sgSmAct(act, bi, ii, ri) {
+  const m = sgSmModel, b = m.blocks[bi], it = b && b.items[ii];
+  switch (act) {
+    case 'addBlock': m.blocks.push({ title: '', items: [{ type: 'table', head: ['#', 'Objective', 'Weightage'], rows: [{ cells: ['1', '', ''] }] }] }); break;
+    case 'delBlock': m.blocks.splice(bi, 1); break;
+    case 'addTable': b.items.push({ type: 'table', head: ['#', 'Objective', 'Weightage'], rows: [{ cells: ['1', '', ''] }] }); break;
+    case 'addNote':  b.items.push({ type: 'text', text: '', sub: false }); break;
+    case 'delItem':  b.items.splice(ii, 1); break;
+    case 'toggleSub': it.sub = !it.sub; break;
+    case 'addRow':   it.rows.push({ cells: new Array(sgSmCols(it)).fill('') }); break;
+    case 'addSec':   it.rows.push({ section: '' }); break;
+    case 'delRow':   it.rows.splice(ri, 1); break;
+    case 'addCol':   if (it.head) it.head.push(''); else it.head = new Array(sgSmCols(it) + 1).fill(''); it.rows.forEach(r => { if (r.cells) r.cells.push(''); }); break;
+    case 'delCol': {
+      const n = sgSmCols(it); if (n <= 2) break;
+      if (it.head) it.head.length = n - 1;
+      it.rows.forEach(r => { if (r.cells) r.cells.length = n - 1; });
+      break;
+    }
+  }
+  if (it && it.type === 'table') sgSmNormTable(it);
+  sgSmRenderEditor();
+}
 function sgSaveSuccessMeasures() {
   if (!sgSmTarget || !sgSmTarget.editable) return;
   const { year, dept, member, goal } = sgSmTarget;
-  const text = document.getElementById('sm-text').value.replace(/\s+$/,'');
+  const text = sgSmSerialize(sgSmModel);
   const rows = DB.goals.filter(g => g.year===year && g.dept===dept && g.member===member && g.goal===goal);
   if (!rows.length) { toast('This SMART Goal no longer exists'); return; }
   rows.forEach(g => { g.successMeasures = text; });
@@ -2618,7 +2806,15 @@ function sgSaveSuccessMeasures() {
     b.classList.toggle('has-sm', !!text);
     b.title = text ? 'View Success Measures' : 'No Success Measures yet';
   });
+  const smBtn = document.getElementById('gg-success-btn');
+  if (smBtn && editingGoalGroup) smBtn.textContent = text ? '👁 View / Edit Success Measures' : '+ Add Success Measures';
   toast('Success Measures saved');
+}
+// From the Edit SMART Goal form: open the same structured editor.
+function sgEditGroupSuccessMeasures() {
+  if (!editingGoalGroup) return;
+  const g = editingGoalGroup;
+  sgOpenSuccessMeasures(g.year, g.dept, g.member, g.goal, '', true);
 }
 
 // ── Per-item Remark popup (view/add/edit a single row's remark without opening the full Edit modal) ──
@@ -3654,6 +3850,10 @@ try { window.sgOpenSuccessMeasures = sgOpenSuccessMeasures; } catch(e){}
 try { window.sgEditSuccessMeasures = sgEditSuccessMeasures; } catch(e){}
 try { window.sgSaveSuccessMeasures = sgSaveSuccessMeasures; } catch(e){}
 try { window.sgSmSetMode = sgSmSetMode; } catch(e){}
+try { window.sgSmInput = sgSmInput; } catch(e){}
+try { window.sgSmPoints = sgSmPoints; } catch(e){}
+try { window.sgSmAct = sgSmAct; } catch(e){}
+try { window.sgEditGroupSuccessMeasures = sgEditGroupSuccessMeasures; } catch(e){}
 try { window.sgSaveItemRemark = sgSaveItemRemark; } catch(e){}
 try { window.sgToggleGoalDetail = sgToggleGoalDetail; } catch(e){}
 try { window.deleteTask = deleteTask; } catch(e){}
