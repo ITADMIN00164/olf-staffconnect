@@ -1118,6 +1118,26 @@
     #grPage .gr-an-table tfoot td.gr-an-total { background: #d0dbf0; }
     #grPage .gr-an-warn { background: var(--nm-bg); border: 0; box-shadow: var(--nm-in-sm); }
 
+    /* Frozen totals row. Earlier rules give the district and Total cells
+       position:relative (for the share bar), which knocked those two cells
+       out of the sticky footer. Re-pin every footer cell to the bottom, keep
+       the district cell pinned to the left too, and drop the wrapper's bottom
+       padding so no rows show through underneath. */
+    #grPage .gr-an-wrap { padding-bottom: 0; }
+    #grPage .gr-an-table tfoot td,
+    #grPage .gr-an-table tfoot td:first-child,
+    #grPage .gr-an-table tfoot td.gr-an-total {
+        position: sticky; bottom: 0; z-index: 3;
+        border-top: 0;
+        box-shadow: 0 -2px 0 rgba(150, 166, 192, 0.45), 0 -8px 14px -8px rgba(110, 126, 155, 0.45);
+    }
+    #grPage .gr-an-table tfoot td:first-child { left: 0; z-index: 5; }
+    #grPage .gr-an-table tr.gr-an-zero td.gr-an-total,
+    #grPage .gr-an-table tbody tr.gr-an-zero:nth-child(even) td.gr-an-total { background: #e6d8e3; }
+    /* Body district column stays pinned left while scrolling sideways
+       (sticky is still a positioned box, so the share bar inside works). */
+    #grPage .gr-an-table tbody td:first-child { position: sticky; left: 0; z-index: 1; }
+
     /* Analytics community tabs */
     #grPage .gr-an-tabs { padding: 6px 4px 14px; gap: 12px; }
     #grPage .gr-an-tab {

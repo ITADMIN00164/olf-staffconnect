@@ -195,19 +195,113 @@ document.getElementById("closeNewsDetailBtn")?.addEventListener("click",
 document.getElementById("closeNewsDetailBtn2")?.addEventListener("click",
     () => document.getElementById("newsDetailModal").classList.remove("open"));
 
-// Sidebar collapse/expand
+/* ====================================
+   SIDEBAR: compact + auto-hide
+   - Docked when the app opens, so people can see where to go.
+   - Picking a page hides it; the page then uses the full width.
+   - Hovering the left edge (or the glowing tab there) slides it
+     back over the page; it tucks away again when the mouse leaves.
+   - Tap the tab on touch screens; Esc or a tap outside closes it.
+   - The pin button keeps it docked (remembered per browser).
+==================================== */
 const sidebarToggleBtn = document.getElementById("sidebarToggleBtn");
 const appSidebar       = document.getElementById("appSidebar");
+const sidebarEdge      = document.getElementById("sidebarEdge");
+const appBody          = appSidebar ? appSidebar.closest(".app-body") : null;
 
-if (sidebarToggleBtn && appSidebar) {
-    if (localStorage.getItem("olf_sidebar_collapsed") === "1") {
-        appSidebar.classList.add("collapsed");
-        sidebarToggleBtn.title = "Expand sidebar";
-    }
+if (sidebarToggleBtn && appSidebar && appBody) {
+    appSidebar.classList.remove("collapsed");          // old icon-rail mode is retired
+    try { localStorage.removeItem("olf_sidebar_collapsed"); } catch (e) {}
+
+    let pinned = false;
+    try { pinned = localStorage.getItem("olf_sidebar_pinned") === "1"; } catch (e) {}
+    let openTimer = null, closeTimer = null;
+
+    const isAuto = () => appBody.classList.contains("sb-auto");
+    // A pop-up dialog is showing if a fixed, (near) full-screen layer sits on
+    // top of the middle of the window. The menu stays tucked away then, so it
+    // never covers a dialog.
+    const dialogOpen = () => {
+        let n = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
+        if (!n || appSidebar.contains(n) || n === sidebarEdge) return false;
+        for (; n && n !== document.body; n = n.parentElement) {
+            if (getComputedStyle(n).position !== "fixed") continue;
+            const r = n.getBoundingClientRect();
+            return r.width >= window.innerWidth * 0.9 && r.height >= window.innerHeight * 0.9;
+        }
+        return false;
+    };
+    const setOpen = (open) => {
+        clearTimeout(openTimer); clearTimeout(closeTimer);
+        appBody.classList.toggle("sb-open", open);
+        if (sidebarEdge) sidebarEdge.setAttribute("aria-expanded", open ? "true" : "false");
+    };
+    const autoHide = () => {
+        if (pinned) return;
+        if (!isAuto()) {
+            // Switch from docked to floating while still visible, then slide out.
+            appBody.classList.add("sb-auto", "sb-open");
+            requestAnimationFrame(() => requestAnimationFrame(() => setOpen(false)));
+        } else {
+            setOpen(false);
+        }
+    };
+    const paintPin = () => {
+        sidebarToggleBtn.setAttribute("aria-pressed", pinned ? "true" : "false");
+        const t = pinned ? "Let the menu hide automatically" : "Keep the menu open";
+        sidebarToggleBtn.title = t;
+        sidebarToggleBtn.setAttribute("aria-label", t);
+    };
+    paintPin();
+
     sidebarToggleBtn.addEventListener("click", () => {
-        const collapsed = appSidebar.classList.toggle("collapsed");
-        localStorage.setItem("olf_sidebar_collapsed", collapsed ? "1" : "0");
-        sidebarToggleBtn.title = collapsed ? "Expand sidebar" : "Collapse sidebar";
+        pinned = !pinned;
+        try { localStorage.setItem("olf_sidebar_pinned", pinned ? "1" : "0"); } catch (e) {}
+        paintPin();
+        if (pinned) appBody.classList.remove("sb-auto", "sb-open");   // dock it
+        else autoHide();
+    });
+
+    // Choosing a page tucks the menu away.
+    appSidebar.addEventListener("click", (e) => {
+        if (e.target.closest(".nav-item") && !e.target.closest('[aria-disabled="true"]')) autoHide();
+    });
+
+    // Reveal on hover of the left edge (short delay avoids accidental pops).
+    if (sidebarEdge) {
+        sidebarEdge.addEventListener("mouseenter", () => {
+            if (!isAuto()) return;
+            clearTimeout(closeTimer);
+            openTimer = setTimeout(() => { if (!dialogOpen()) setOpen(true); }, 90);
+        });
+        sidebarEdge.addEventListener("mouseleave", () => clearTimeout(openTimer));
+        sidebarEdge.addEventListener("click", () => { if (isAuto() && !dialogOpen()) setOpen(!appBody.classList.contains("sb-open")); });
+        sidebarEdge.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setOpen(true);
+                const first = appSidebar.querySelector(".nav-item.active") || appSidebar.querySelector(".nav-item");
+                if (first) first.focus();
+            }
+        });
+    }
+    appSidebar.addEventListener("mouseenter", () => clearTimeout(closeTimer));
+    appSidebar.addEventListener("mouseleave", () => {
+        if (!isAuto()) return;
+        closeTimer = setTimeout(() => setOpen(false), 280);
+    });
+    // Keyboard users: open while focus is inside, close when it leaves.
+    appSidebar.addEventListener("focusin", () => { if (isAuto()) setOpen(true); });
+    appSidebar.addEventListener("focusout", (e) => {
+        if (isAuto() && !appSidebar.contains(e.relatedTarget)) setOpen(false);
+    });
+    // Tap outside / Esc closes the floating menu.
+    document.addEventListener("pointerdown", (e) => {
+        if (isAuto() && appBody.classList.contains("sb-open") &&
+            !appSidebar.contains(e.target) && e.target !== sidebarEdge) setOpen(false);
+    });
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && isAuto() && appBody.classList.contains("sb-open")) setOpen(false);
     });
 }
 
@@ -348,7 +442,7 @@ onAuthStateChanged(auth, async (user) => {
 
         currentRole = isAdmin ? "Admin" : "User";
         updateTopbar(user);
-        applyPomNavState();            // locked by default until the switch is read
+        applyPageAccessNav();          // POM locked by default until the switches are read
         watchPageAccess();             // live: follows IT Admin's on/off switch
         showApp();
         loadMyEmployeeRecord(email);   // fills the profile chip / ID card
@@ -1409,145 +1503,177 @@ function writeCachedRole(scope, email, isAdmin) {
 }
 
 /* ====================================
-   PAGE ACCESS SWITCH (POM)
-   IT Admin can switch the POM page off for everyone else.
-   The switch lives in Firestore at appSettings/pageAccess
-   ({ pomEnabled: true|false }) so it applies to every user at
-   once, and is watched live: flipping it updates every open
-   session without a reload.
-     - Off (or not set yet): POM shows greyed out with a lock in
-       the menu and cannot be opened. IT Admin still can, and sees
-       an "Enable page for all users" bar at the top of the page.
-     - On: POM behaves normally; IT Admin sees "Disable for all".
-   Like the other role checks here this is a UI gate; Firestore
-   rules should also limit writes to appSettings to IT Admin.
+   PAGE ACCESS SWITCHES (all pages)
+   IT Admin can switch any page (except Home) off for everyone else.
+   Stored in Firestore at appSettings/pageAccess:
+       { pages: { pom: false, gr: true, ... } }
+   A page missing from the map is open, except POM, which keeps its
+   original switch (pomEnabled) and stays off until enabled.
+   Watched live, so a flip reaches every open session at once.
+     - Users: a switched-off page stays in the menu, greyed out with a
+       lock, and cannot be opened (anyone on it is sent to Home).
+     - IT Admin: every page always opens. Each menu item carries a small
+       toggle - green = visible to all users, grey = hidden from users.
+   Like the other role checks here this is a UI gate; Firestore rules
+   should also limit writes to appSettings to IT Admin.
 ==================================== */
 
 const PAGE_ACCESS_DOC = doc(db, "appSettings", "pageAccess");
-let pomEnabled       = false;   // safe default until Firestore answers
-let pageAccessLoaded = false;
-let pageAccessUnsub  = null;
+const ALWAYS_OPEN     = new Set(["home"]);
+let pageAccessData    = null;      // last snapshot's data (null = not read yet)
+let pageAccessLoaded  = false;
+let pageAccessUnsub   = null;
 let markPageAccessReady;
-let pageAccessReady  = new Promise(r => { markPageAccessReady = r; });
+let pageAccessReady   = new Promise(r => { markPageAccessReady = r; });
 
 function isItAdmin() {
     return String(auth.currentUser?.email || "").toLowerCase() === ORG_ADMIN_EMAIL;
 }
 
+// Is this page open to ordinary users?
+function isPageEnabled(page) {
+    if (!page || ALWAYS_OPEN.has(page)) return true;
+    const d = pageAccessData || {};
+    if (d.pages && typeof d.pages[page] === "boolean") return d.pages[page];
+    if (page === "pom") return d.pomEnabled === true;   // original POM switch; off until enabled
+    return true;
+}
+
+function pageLabel(page) {
+    const el = document.querySelector(`#appSidebar .nav-item[data-page="${page}"] .label`);
+    return el ? el.textContent.trim() : page;
+}
+
 function watchPageAccess() {
     if (pageAccessUnsub) return;
     pageAccessUnsub = onSnapshot(PAGE_ACCESS_DOC, (snap) => {
-        pomEnabled = snap.exists() && snap.data().pomEnabled === true;
+        pageAccessData = snap.exists() ? snap.data() : {};
         pageAccessLoaded = true;
         markPageAccessReady();
-        applyPomNavState();
-        if (currentPage === "pom") {
-            if (!pomEnabled && !isItAdmin()) {
-                notify("The POM page has been switched off by IT Admin.", "info");
-                navigate("home");
-            } else {
-                renderPomAdminBar();
-            }
+        applyPageAccessNav();
+        if (currentPage && !isPageEnabled(currentPage) && !isItAdmin()) {
+            notify(`${pageLabel(currentPage)} has been switched off by IT Admin.`, "info");
+            navigate("home");
         }
     }, (err) => {
-        // Can't read the switch: keep POM closed rather than guess.
+        // Can't read the switches: keep POM closed (its old default), leave the rest open.
         console.warn("Page access check failed:", err);
-        pomEnabled = false;
+        pageAccessData = {};
         pageAccessLoaded = true;
         markPageAccessReady();
-        applyPomNavState();
+        applyPageAccessNav();
     });
 }
 
 function stopWatchingPageAccess() {
     if (pageAccessUnsub) { pageAccessUnsub(); pageAccessUnsub = null; }
-    pomEnabled = false;
+    pageAccessData = null;
     pageAccessLoaded = false;
     pageAccessReady = new Promise(r => { markPageAccessReady = r; });
+    applyPageAccessNav();
 }
 
-// Menu item: greyed out with a lock while POM is off. Users can't open it;
-// IT Admin can (it stays clickable for them, still marked with the lock).
-function applyPomNavState() {
-    const btn = document.querySelector('#appSidebar .nav-item[data-page="pom"]');
-    if (!btn) return;
-    const locked = !pomEnabled;
-    const admin  = isItAdmin();
-    btn.classList.toggle("nav-item--locked", locked && !admin);
-    btn.classList.toggle("nav-item--locked-admin", locked && admin);
-    btn.setAttribute("aria-disabled", locked && !admin ? "true" : "false");
-    btn.title = !locked ? "POM"
-        : (admin ? "POM - disabled for users (only IT Admin can open it)"
-                 : "POM - temporarily unavailable");
-    let lock = btn.querySelector(".nav-lock");
-    if (locked && !lock) {
-        lock = document.createElement("span");
-        lock.className = "nav-lock";
-        lock.setAttribute("aria-hidden", "true");
-        lock.textContent = "\uD83D\uDD12";
-        btn.appendChild(lock);
-    } else if (!locked && lock) {
-        lock.remove();
-    }
-}
+// Paint every menu item: users see switched-off pages greyed out with a
+// lock; IT Admin gets a toggle on each item instead.
+function applyPageAccessNav() {
+    const sidebar = document.getElementById("appSidebar");
+    if (!sidebar) return;
+    const admin = isItAdmin();
+    sidebar.classList.toggle("sb-admin", admin);
 
-// The bar IT Admin sees at the top of the POM page.
-function renderPomAdminBar() {
-    if (currentPage !== "pom") return;
-    let bar = document.getElementById("pomAccessBar");
-    if (!isItAdmin()) { if (bar) bar.remove(); return; }
-    if (!bar) {
-        bar = document.createElement("div");
-        bar.id = "pomAccessBar";
-        bar.setAttribute("role", "region");
-        bar.setAttribute("aria-label", "POM page access");
-        pageContent.prepend(bar);
-    }
-    bar.className = "page-access-bar " + (pomEnabled ? "is-on" : "is-off");
-    bar.innerHTML = pomEnabled
-        ? `<span class="page-access-ic" aria-hidden="true">\u2713</span>
-           <div class="page-access-txt"><b>POM is open to all users.</b>
-           <span>Only you (IT Admin) see this bar.</span></div>
-           <button type="button" class="page-access-btn page-access-btn--off">Disable for all users</button>`
-        : `<span class="page-access-ic" aria-hidden="true">\uD83D\uDD12</span>
-           <div class="page-access-txt"><b>POM is disabled for all users.</b>
-           <span>It shows greyed out in their menu. Only you (IT Admin) can open this page.</span></div>
-           <button type="button" class="page-access-btn page-access-btn--on">Enable page for all users</button>`;
-    bar.querySelector("button").addEventListener("click", () => setPomEnabled(!pomEnabled));
-}
+    sidebar.querySelectorAll(".nav-item[data-page]").forEach(btn => {
+        const page = btn.dataset.page;
+        const on = isPageEnabled(page);
+        const label = pageLabel(page);
+        const lockedForMe = !on && !admin;
 
-async function setPomEnabled(on) {
-    if (!isItAdmin()) return;
-    const ok = await showAppConfirm({
-        title: on ? "Enable POM for all users?" : "Disable POM for all users?",
-        message: on
-            ? "Everyone will be able to open the POM page again, straight away."
-            : "Users will see POM greyed out in the menu and won't be able to open it. Anyone on the page now is sent to Home. You can still open it.",
-        type: on ? "info" : "warning",
-        confirmText: on ? "Enable for all" : "Disable for all"
+        btn.classList.toggle("nav-item--locked", lockedForMe);
+        btn.classList.toggle("nav-item--locked-admin", !on && admin);
+        btn.setAttribute("aria-disabled", lockedForMe ? "true" : "false");
+        btn.title = on ? label
+            : (admin ? `${label} - hidden from users (only IT Admin can open it)`
+                     : `${label} - temporarily unavailable`);
+
+        // Lock badge: users only (IT Admin reads the toggle instead).
+        let lock = btn.querySelector(".nav-lock");
+        if (lockedForMe && !lock) {
+            lock = document.createElement("span");
+            lock.className = "nav-lock";
+            lock.setAttribute("aria-hidden", "true");
+            lock.textContent = "🔒";
+            btn.appendChild(lock);
+        } else if (!lockedForMe && lock) {
+            lock.remove();
+        }
+
+        // IT Admin toggle. It sits beside the menu button (never inside it,
+        // a button can't hold another control), in a shared row.
+        let row = btn.parentElement.classList.contains("nav-row") ? btn.parentElement : null;
+        let tgl = row ? row.querySelector(".nav-access-toggle") : null;
+        if (!admin || ALWAYS_OPEN.has(page)) { if (tgl) tgl.remove(); return; }
+        if (!row) {
+            row = document.createElement("div");
+            row.className = "nav-row";
+            btn.parentNode.insertBefore(row, btn);
+            row.appendChild(btn);
+        }
+        if (!tgl) {
+            tgl = document.createElement("button");
+            tgl.type = "button";
+            tgl.className = "nav-access-toggle";
+            tgl.setAttribute("role", "switch");
+            tgl.innerHTML = '<span class="nat-knob" aria-hidden="true"></span>';
+            tgl.addEventListener("click", (e) => {
+                e.stopPropagation();
+                setPageEnabled(page, !isPageEnabled(page));
+            });
+            row.appendChild(tgl);
+        }
+        tgl.hidden = row.hidden = btn.hidden;           // follows items that hide themselves
+        tgl.setAttribute("aria-checked", on ? "true" : "false");
+        tgl.setAttribute("aria-label", `${label}: ${on ? "visible to all users" : "hidden from users"}`);
+        tgl.title = on ? `${label} is visible to all users - click to hide it from users`
+                       : `${label} is hidden from users - click to show it to everyone`;
     });
-    if (!ok) return;
+}
 
-    const btn = document.querySelector("#pomAccessBar .page-access-btn");
-    if (btn) { btn.disabled = true; btn.textContent = "Saving\u2026"; }
+async function setPageEnabled(page, on) {
+    if (!isItAdmin() || ALWAYS_OPEN.has(page)) return;
+    const label = pageLabel(page);
+    if (!on) {
+        const ok = await showAppConfirm({
+            title: `Hide ${label} from users?`,
+            message: `Users will see ${label} greyed out in the menu and won't be able to open it. Anyone on it now is sent to Home. You can still open it.`,
+            type: "warning",
+            confirmText: "Hide from users"
+        });
+        if (!ok) return;
+    }
+    const tgl = document.querySelector(`#appSidebar .nav-item[data-page="${page}"]`)
+        ?.parentElement?.querySelector(".nav-access-toggle");
+    if (tgl) { tgl.disabled = true; tgl.setAttribute("aria-checked", on ? "true" : "false"); }
     try {
-        await setDoc(PAGE_ACCESS_DOC, {
-            pomEnabled: on,
+        const patch = {
+            pages: { [page]: on },
             updatedBy: auth.currentUser?.email || "",
             updatedAt: serverTimestamp()
-        }, { merge: true });
-        logAudit(on ? "page-enabled" : "page-disabled", { page: "pom" });
-        notify(on ? "POM is now open to all users." : "POM is now disabled for users.", "success");
-        // The live listener repaints the menu and this bar.
+        };
+        if (page === "pom") patch.pomEnabled = on;       // keep the original POM switch in step
+        await setDoc(PAGE_ACCESS_DOC, patch, { merge: true });
+        logAudit(on ? "page-enabled" : "page-disabled", { page });
+        notify(on ? `${label} is now visible to all users.` : `${label} is now hidden from users.`, "success");
+        // The live listener repaints the menu.
     } catch (err) {
         console.error(err);
-        renderPomAdminBar();
         await showAppAlert({
-            title: "Could not change POM access",
+            title: `Could not change ${label}`,
             message: "Firestore did not accept the change (" + (err.code || err.message) + "). " +
                      "Check that the Firestore rules allow IT Admin to write to appSettings.",
             type: "error"
         });
+    } finally {
+        if (tgl) tgl.disabled = false;
+        applyPageAccessNav();
     }
 }
 
@@ -1557,13 +1683,17 @@ async function setPomEnabled(on) {
    avoid issues with hyphens in IDs.
 ==================================== */
 
+// Retired page names still lead somewhere sensible (old links, bookmarks).
+const PAGE_ALIASES = { "expense-report": "er-dashboards", "data-dashboards": "er-dashboards" };
+
 window.navigate = async function (page) {
-    // POM can be switched off for everyone except IT Admin (see PAGE ACCESS
-    // SWITCH below). Every route into it - menu, home links - passes here.
-    if (page === "pom" && !isItAdmin()) {
+    page = PAGE_ALIASES[page] || page;
+    // Any page except Home can be switched off for everyone but IT Admin
+    // (see PAGE ACCESS SWITCHES). Every route in - menu, home links - passes here.
+    if (!ALWAYS_OPEN.has(page) && !isItAdmin()) {
         if (!pageAccessLoaded) await Promise.race([pageAccessReady, new Promise(r => setTimeout(r, 3000))]);
-        if (!pomEnabled) {
-            notify("The POM page is temporarily unavailable.", "info");
+        if (!isPageEnabled(page)) {
+            notify(`${pageLabel(page)} is temporarily unavailable.`, "info");
             return;
         }
     }
@@ -1599,7 +1729,6 @@ window.navigate = async function (page) {
         if (typeof window.initPomPageUI === "function") {
             window.initPomPageUI();
         }
-        renderPomAdminBar();   // IT Admin only: the enable / disable switch
     }
 
     else if (page === "calendar") {
@@ -1695,15 +1824,12 @@ window.navigate = async function (page) {
         }
     }
 
-    else if (
-    page === "data-dashboards" ||
-    page === "expense-report"
-    ) {
-        // Inject user info for pages that show signed-in user
+    else if (page === "er-dashboards") {
+        // ER & Dashboards (links only): show who the user is signed in as
         const user = window.__olfUser;
         if (user) {
-            const emailEl  = pageContent.querySelector("[id$='UserEmail'], #erUserEmail, #ddUserEmail");
-            const avatarEl = pageContent.querySelector("[id$='Avatar'], #erAvatar, #ddAvatar");
+            const emailEl  = pageContent.querySelector("#erdUserEmail");
+            const avatarEl = pageContent.querySelector("#erdAvatar");
             if (emailEl)  emailEl.textContent  = user.email;
             if (avatarEl) avatarEl.textContent = user.email.charAt(0).toUpperCase();
         }

@@ -1,0 +1,230 @@
+<!-- pages/er-dashboards.html
+     ER & Dashboards: one launch pad for OLF's external apps.
+     Replaces pages/expense-report.html and pages/data-dashboards.html
+     (same links, one screen, no scrolling). Keep inline <svg> out of this
+     file: Live Server breaks fragments that contain it (see the icon CSS). Every tile is a plain link
+     that opens in a new tab; nothing here reads or writes data. -->
+<style>
+.erd-page {
+    max-width: var(--page-max, 1680px); margin: 0 auto;
+    display: flex; flex-direction: column; gap: 18px;
+    min-height: calc(100vh - 140px);
+}
+
+/* Header */
+.erd-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+.erd-title { margin: 0 0 4px; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; color: #0f172a; }
+.erd-title span {
+    background: linear-gradient(92deg, #4f8ef7, #10b197);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.erd-sub { margin: 0; font-size: 13px; color: #5a6577; }
+.erd-user {
+    display: inline-flex; align-items: center; gap: 10px; padding: 6px 14px 6px 6px;
+    background: #ffffff; border: 1px solid #e3e8f0; border-radius: 999px;
+    box-shadow: 0 1px 2px rgba(15,23,42,0.05);
+}
+.erd-avatar {
+    width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+    display: grid; place-items: center; font-size: 13px; font-weight: 700; color: #fff;
+    background: linear-gradient(135deg, #4f8ef7, #10b197);
+}
+.erd-user-text { display: flex; flex-direction: column; line-height: 1.2; }
+.erd-user-text small { font-size: 10.5px; color: #8a94a6; font-weight: 600; }
+.erd-user-text b { font-size: 12.5px; color: #1e40af; font-weight: 600; }
+
+/* Grid: 4 x 2 on laptops; Expense Report takes two slots. Rows share the
+   available height so the whole set fits without scrolling. */
+.erd-grid {
+    flex: 1; display: grid; gap: 16px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-rows: minmax(168px, 1fr);
+    max-height: 520px;
+}
+.erd-tile--feature { grid-column: span 2; }
+
+.erd-tile {
+    position: relative; display: flex; flex-direction: column; gap: 12px;
+    padding: 18px 18px 14px; border-radius: 16px; text-decoration: none; color: inherit;
+    background: #ffffff; border: 1px solid #e6ebf2;
+    box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 6px 18px rgba(15,23,42,0.05);
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    overflow: hidden; min-width: 0;
+}
+.erd-tile::before {          /* thin colour cue along the top edge */
+    content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+    background: var(--c); opacity: .85;
+}
+.erd-tile:hover {
+    transform: translateY(-3px); border-color: #d5deeb;
+    box-shadow: 0 2px 4px rgba(15,23,42,0.05), 0 14px 30px rgba(15,23,42,0.10);
+}
+.erd-tile:focus-visible { outline: 3px solid #4f8ef7; outline-offset: 3px; }
+.erd-tile:active { transform: translateY(-1px); }
+
+.erd-icon {
+    width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0;
+    display: grid; place-items: center; box-shadow: 0 6px 14px -6px rgba(15,23,42,0.35);
+}
+.erd-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.erd-tag { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--c); }
+.erd-name { font-size: 15px; font-weight: 700; color: #0f172a; line-height: 1.3; }
+.erd-desc {
+    font-size: 12.5px; color: #5a6577; line-height: 1.5;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.erd-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.erd-host { font-size: 11px; color: #8a94a6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.erd-go {
+    flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px;
+    font-size: 12.5px; font-weight: 700; color: var(--c);
+    padding: 5px 11px; border-radius: 999px; background: #f4f7fb;
+    transition: background .18s ease, color .18s ease;
+}
+.erd-go i { font-style: normal; transition: transform .18s ease; }
+.erd-tile:hover .erd-go { background: var(--c); color: #ffffff; }
+.erd-tile:hover .erd-go i { transform: translate(2px, -2px); }
+
+/* Featured tile: icon beside the text, a little more presence */
+.erd-tile--feature {
+    display: grid; grid-template-columns: auto 1fr; grid-template-rows: 1fr auto;
+    column-gap: 16px; padding: 20px 22px 16px;
+    background: linear-gradient(135deg, #ffffff 55%, #eef4ff);
+}
+.erd-tile--feature .erd-icon { width: 52px; height: 52px; border-radius: 14px; }
+.erd-tile--feature .erd-name { font-size: 19px; }
+.erd-tile--feature .erd-desc { font-size: 13px; }
+.erd-tile--feature .erd-foot { grid-column: 1 / -1; }
+.erd-tile--feature .erd-go { background: var(--c); color: #ffffff; padding: 6px 14px; }
+.erd-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.erd-chips span {
+    font-size: 11.5px; font-weight: 600; color: #3a4557;
+    background: #ffffff; border: 1px solid #e3e8f0; border-radius: 999px; padding: 3px 10px;
+}
+
+/* Smaller screens: fewer columns; scrolling is fine there */
+@media (max-width: 1180px) {
+    .erd-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: none; grid-auto-rows: minmax(150px, auto); }
+}
+@media (max-width: 640px) {
+    .erd-grid { grid-template-columns: 1fr; }
+    .erd-tile--feature { grid-column: auto; grid-template-columns: 1fr; }
+    .erd-head { align-items: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .erd-tile, .erd-go, .erd-go i { transition: none; }
+    .erd-tile:hover { transform: none; }
+}
+/* Icons are CSS masks, not inline <svg>: Live Server injects its reload
+   script at every closing svg tag of a page fragment and then cuts the
+   response short, which used to drop this whole stylesheet locally. */
+.erd-icon::before { content: ""; width: 21px; height: 21px; background: #fff;
+    -webkit-mask: var(--i) center / contain no-repeat; mask: var(--i) center / contain no-repeat; }
+.erd-tile--feature .erd-icon::before { width: 26px; height: 26px; }
+.erd-i-doc { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 2h9l5 5v15H6z'/%3E%3Cpath d='M14 2v6h6'/%3E%3Cpath d='M9 13h7M9 17h5'/%3E%3C/svg%3E"); }
+.erd-i-reg { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='9' cy='7' r='4'/%3E%3Cline x1='19' y1='8' x2='19' y2='14'/%3E%3Cline x1='22' y1='11' x2='16' y2='11'/%3E%3C/svg%3E"); }
+.erd-i-life { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E"); }
+.erd-i-club { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2' y='3' width='20' height='14' rx='2'/%3E%3Cline x1='8' y1='21' x2='16' y2='21'/%3E%3Cline x1='12' y1='17' x2='12' y2='21'/%3E%3C/svg%3E"); }
+.erd-i-attn { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='22 12 18 12 15 21 9 3 6 12 2 12'/%3E%3C/svg%3E"); }
+.erd-i-field { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='9' cy='7' r='4'/%3E%3Cpath d='M23 21v-2a4 4 0 0 0-3-3.87'/%3E%3Cpath d='M16 3.13a4 4 0 0 1 0 7.75'/%3E%3C/svg%3E"); }
+.erd-i-help { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3'/%3E%3Cline x1='12' y1='17' x2='12.01' y2='17'/%3E%3C/svg%3E"); }
+</style>
+<div class="erd-page">
+
+    <header class="erd-head">
+        <div>
+            <h1 class="erd-title">ER &amp; <span>Dashboards</span></h1>
+            <p class="erd-sub">OLF apps and program dashboards. Each opens in a new tab &middot; sign in with your OLF Google account.</p>
+        </div>
+        <div class="erd-user" title="Use this Google account when an app asks you to sign in">
+            <span class="erd-avatar" id="erdAvatar" aria-hidden="true">?</span>
+            <span class="erd-user-text"><small>Signed in as</small><b id="erdUserEmail">—</b></span>
+        </div>
+    </header>
+
+    <nav class="erd-grid" aria-label="External apps and dashboards">
+
+        <!-- Featured: Expense Report -->
+        <a class="erd-tile erd-tile--feature" style="--c:#4f8ef7" href="https://olf-expense-report.web.app/" target="_blank" rel="noopener"
+           aria-label="Open Expense Report (opens in a new tab)">
+            <span class="erd-icon erd-i-doc" style="background:linear-gradient(135deg,#4f8ef7,#3a6fd8)" aria-hidden="true"></span>
+            <span class="erd-body">
+                <span class="erd-tag">Expense Report &middot; Finance</span>
+                <span class="erd-name">Expense Report (ER)</span>
+                <span class="erd-desc">Submit travel, operational and program expenses for reimbursement.</span>
+                <span class="erd-chips" aria-hidden="true">
+                    <span>📤 Submit expenses</span><span>📊 Track approval status</span><span>🔐 Google sign-in</span>
+                </span>
+            </span>
+            <span class="erd-foot"><span class="erd-host">olf-expense-report.web.app</span><span class="erd-go">Open ER <i aria-hidden="true">↗</i></span></span>
+        </a>
+
+        <a class="erd-tile" style="--c:#7b68ee" href="https://script.google.com/a/macros/openlinksfoundation.org/s/AKfycbxDVQy83GjdHCKPhKETItk91Obq_xXfulyrZGf0TqP2M-fvRDUrCHZPuCKKqfeO2Gd0/exec" target="_blank" rel="noopener"
+           aria-label="Open Vinoba User Registration 2026–27 dashboard (opens in a new tab)">
+            <span class="erd-icon erd-i-reg" style="background:linear-gradient(135deg,#7b68ee,#6a4fb8)" aria-hidden="true"></span>
+            <span class="erd-body">
+                <span class="erd-tag">Registration</span>
+                <span class="erd-name">Vinoba User Registration 2026–27</span>
+                <span class="erd-desc">Enrolments, batch data and registration trends across Vinoba centres.</span>
+            </span>
+            <span class="erd-foot"><span class="erd-host">script.google.com</span><span class="erd-go">Open <i aria-hidden="true">↗</i></span></span>
+        </a>
+
+        <a class="erd-tile" style="--c:#d97706" href="https://script.google.com/a/macros/openlinksfoundation.org/s/AKfycbyVEDBtZE1nK_Iwhjv7LCOelf62hETAqDye13rQ1o8rSiTw5tS3Ap0ZAjAx0EmKPm56/exec" target="_blank" rel="noopener"
+           aria-label="Open Vinoba Lifeskills Daily Dashboard (opens in a new tab)">
+            <span class="erd-icon erd-i-life" style="background:linear-gradient(135deg,#f59e0b,#d97706)" aria-hidden="true"></span>
+            <span class="erd-body">
+                <span class="erd-tag">Lifeskills</span>
+                <span class="erd-name">Vinoba Lifeskills Daily</span>
+                <span class="erd-desc">Daily sessions, attendance records and topics covered across cohorts.</span>
+            </span>
+            <span class="erd-foot"><span class="erd-host">script.google.com</span><span class="erd-go">Open <i aria-hidden="true">↗</i></span></span>
+        </a>
+
+        <a class="erd-tile" style="--c:#059669" href="https://script.google.com/a/macros/openlinksfoundation.org/s/AKfycbyVxAKA3vF1yUHnV5kRRc1t2upLAlq7B7-2gmc5oB5e0JICPbf9AmUmhOpLWHlvJs2v/exec" target="_blank" rel="noopener"
+           aria-label="Open Club Activity Dashboard (opens in a new tab)">
+            <span class="erd-icon erd-i-club" style="background:linear-gradient(135deg,#10b981,#059669)" aria-hidden="true"></span>
+            <span class="erd-body">
+                <span class="erd-tag">Club Activity</span>
+                <span class="erd-name">Club Activity Dashboard</span>
+                <span class="erd-desc">Participation for Sports, Arts, Tech and other clubs, with attendance.</span>
+            </span>
+            <span class="erd-foot"><span class="erd-host">script.google.com</span><span class="erd-go">Open <i aria-hidden="true">↗</i></span></span>
+        </a>
+
+        <a class="erd-tile" style="--c:#dc2626" href="https://script.google.com/a/macros/openlinksfoundation.org/s/AKfycbyR7JViMgO_rmBwx7RtmfkjxJPJgtzfeYAF_CPErabW_0pa4fRcIfqf7tvvuFun4Tlz/exec" target="_blank" rel="noopener"
+           aria-label="Open Active Users and Morning Assembly dashboard (opens in a new tab)">
+            <span class="erd-icon erd-i-attn" style="background:linear-gradient(135deg,#ef4444,#dc2626)" aria-hidden="true"></span>
+            <span class="erd-body">
+                <span class="erd-tag">Attendance</span>
+                <span class="erd-name">Active Users / Morning Assembly</span>
+                <span class="erd-desc">Daily active users and morning assembly attendance, with engagement.</span>
+            </span>
+            <span class="erd-foot"><span class="erd-host">script.google.com</span><span class="erd-go">Open <i aria-hidden="true">↗</i></span></span>
+        </a>
+
+        <a class="erd-tile" style="--c:#2563eb" href="https://docs.google.com/spreadsheets/d/e/2PACX-1vR-_NY9VmuVPZEwMxpdrL6xXFU__bsIVVs-iZuFfbV1VJ_24Mi4vY69tgbAvvpskSg8rkr1y6ONcsXU/pubhtml?gid=1423399678&amp;single=true" target="_blank" rel="noopener"
+           aria-label="Open PO Activity and Visits (opens in a new tab)">
+            <span class="erd-icon erd-i-field" style="background:linear-gradient(135deg,#3b82f6,#2563eb)" aria-hidden="true"></span>
+            <span class="erd-body">
+                <span class="erd-tag">Field Ops</span>
+                <span class="erd-name">PO Activity / Visits</span>
+                <span class="erd-desc">Programme Officer visit logs, outreach and activity summaries by area.</span>
+            </span>
+            <span class="erd-foot"><span class="erd-host">docs.google.com</span><span class="erd-go">Open <i aria-hidden="true">↗</i></span></span>
+        </a>
+
+        <a class="erd-tile" style="--c:#0891b2" href="https://vinoba-help-faq.web.app/" target="_blank" rel="noopener"
+           aria-label="Open Vinoba FAQ help centre (opens in a new tab)">
+            <span class="erd-icon erd-i-help" style="background:linear-gradient(135deg,#06b6d4,#0891b2)" aria-hidden="true"></span>
+            <span class="erd-body">
+                <span class="erd-tag">Help</span>
+                <span class="erd-name">Vinoba FAQ</span>
+                <span class="erd-desc">Help centre for Vinoba staff: frequently asked questions and guides.</span>
+            </span>
+            <span class="erd-foot"><span class="erd-host">vinoba-help-faq.web.app</span><span class="erd-go">Open <i aria-hidden="true">↗</i></span></span>
+        </a>
+
+    </nav>
+</div>
+

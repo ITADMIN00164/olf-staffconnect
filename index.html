@@ -11,7 +11,10 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-    <meta name="theme-color" content="#0B1220">
+    <meta name="theme-color" content="#E0E8F6">
+    <!-- Light / Dark / System theme. Loaded first so the right theme is
+         applied before anything paints (no white flash in dark mode). -->
+    <script src="theme.js?v=2026-10-28b"></script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -2432,33 +2435,360 @@
         }
         .nav-item.nav-item--locked-admin .label { opacity: .7; }
 
-        .page-access-bar {
-            max-width: var(--page-max, 1680px); margin: 0 auto 18px;
-            display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-            padding: 14px 18px; border-radius: 14px; font-size: 13px;
-            border: 1px solid;
+
+        /* ── Compact, auto-hiding sidebar ─────────────────────────
+           Docked (in the layout) when the app opens. Once a page is
+           picked it slides away and the page gets the full width; a
+           slim strip on the left edge brings it back on hover. The
+           pin button keeps it docked for people who prefer that.
+           States on .app-body:  (none) docked · .sb-auto hidden
+           overlay · .sb-auto.sb-open revealed overlay.            */
+        .app-body { position: relative; }
+        .sidebar {
+            width: 196px;
+            padding: 12px 8px 10px;
+            gap: 2px;
         }
-        .page-access-bar.is-off { background: #fff7ed; border-color: #fed7aa; color: #9a3412; }
-        .page-access-bar.is-on  { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
-        .page-access-ic {
-            width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
-            display: grid; place-items: center; font-size: 15px; font-weight: 800;
-            background: rgba(255,255,255,.8);
+        .sidebar-nav { gap: 1px; }
+        /* The single "Main" heading is redundant next to the "Menu" title. */
+        .sidebar .sidebar-section { display: none; }
+        .sidebar .nav-item { padding: 7px 10px; font-size: 13px; gap: 9px; }
+        .sidebar .nav-item .icon { font-size: 14.5px; width: 18px; }
+        .sidebar .nav-item .label { overflow: hidden; text-overflow: ellipsis; }
+
+        .sidebar-toggle-row {
+            align-items: center; justify-content: space-between;
+            margin-bottom: 4px; padding: 0 2px 0 10px;
         }
-        .page-access-txt { flex: 1; min-width: 220px; line-height: 1.4; }
-        .page-access-txt b { display: block; font-size: 13.5px; }
-        .page-access-txt span { opacity: .85; }
-        .page-access-btn {
-            border: 0; border-radius: 10px; padding: 9px 16px; cursor: pointer;
-            font: inherit; font-weight: 700; color: #fff; white-space: nowrap;
-            transition: filter .15s, transform .1s;
+        .sidebar-menu-title {
+            font-size: 10.5px; font-weight: 700; letter-spacing: .9px;
+            text-transform: uppercase; color: var(--text-faint, #5c6070);
         }
-        .page-access-btn--on  { background: #16a34a; }
-        .page-access-btn--off { background: #fff; color: #b91c1c; box-shadow: inset 0 0 0 1px #fecaca; }
-        .page-access-btn:hover { filter: brightness(.95); }
-        .page-access-btn:active { transform: translateY(1px); }
-        .page-access-btn:disabled { opacity: .6; cursor: default; }
-        .page-access-btn:focus-visible { outline: 2px solid #4f8ef7; outline-offset: 2px; }
+        .sidebar-pin-btn { width: 28px; height: 28px; font-size: 12px; }
+        .sidebar-pin-btn .pin { display: inline-block; transform: rotate(45deg); opacity: .55; transition: transform .2s, opacity .2s; }
+        .sidebar-pin-btn[aria-pressed="true"] { background: rgba(79,142,247,0.28); border-color: rgba(79,142,247,0.7); }
+        .sidebar-pin-btn[aria-pressed="true"] .pin { transform: none; opacity: 1; }
+
+        /* Auto-hide: the sidebar floats over the page instead of taking space */
+        .app-body.sb-auto .sidebar {
+            position: absolute; left: 0; top: 0; bottom: 0; z-index: 900;
+            transform: translateX(-102%);
+            transition: transform .24s cubic-bezier(.2,.8,.2,1), box-shadow .24s;
+            box-shadow: none;
+        }
+        .app-body.sb-auto.sb-open .sidebar {
+            transform: none;
+            box-shadow: 12px 0 32px rgba(8,14,28,.35);
+        }
+
+        /* Left-edge strip + small glowing tab that says "menu lives here" */
+        .sidebar-edge { display: none; }
+        .app-body.sb-auto .sidebar-edge {
+            display: block; position: absolute; left: 0; top: 0; bottom: 0;
+            width: 14px; z-index: 899; cursor: pointer; outline: none;
+        }
+        .sidebar-edge::before {
+            content: ""; position: absolute; left: 3px; top: 50%;
+            width: 5px; height: 64px; margin-top: -32px; border-radius: 99px;
+            background: linear-gradient(180deg, var(--teal, #10B197), var(--brand, #4F8EF7));
+            opacity: .55; box-shadow: 0 0 10px rgba(79,142,247,.45);
+            transition: opacity .2s, width .2s, height .2s, margin-top .2s;
+        }
+        .sidebar-edge:hover::before, .sidebar-edge:focus-visible::before {
+            opacity: 1; width: 6px; height: 96px; margin-top: -48px;
+        }
+        .app-body.sb-auto.sb-open .sidebar-edge::before { opacity: 0; }
+
+        /* Hidden menu: nothing in the collapsed icon-rail mode applies any more */
+        .app-body .sidebar.collapsed { width: 196px; padding: 12px 8px 10px; }
+
+        @media (max-width: 768px) {
+            /* Phones: same auto-hide menu (tap the edge tab to open), full labels */
+            .app-body.sb-auto .sidebar { width: 210px; padding: 12px 8px 10px; }
+            .app-body.sb-auto .sidebar .nav-item .label { display: inline; }
+            .app-body.sb-auto .sidebar .nav-item { justify-content: flex-start; padding: 8px 10px; }
+            .app-body.sb-auto .sidebar-toggle-row { display: flex; }
+            .app-body.sb-auto .sidebar-edge { width: 18px; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .app-body.sb-auto .sidebar, .sidebar-edge::before { transition: none; }
+        }
+
+        /* ── Sidebar: Soft UI (neumorphic) skin ──────────────────
+           Same language as the GRs & Circulars page: one pale surface,
+           depth from paired light/dark shadows only. Items are flat;
+           hover lifts them, the current page is pressed in. Declared
+           with #appSidebar so it wins over the earlier dark-glass skin. */
+        #appSidebar {
+            --sb-bg: #E0E8F6;
+            --sb-hi: rgba(255,255,255,0.9);
+            --sb-lo: rgba(163,177,198,0.62);
+            --sb-out:    -4px -4px 10px var(--sb-hi), 4px 4px 10px var(--sb-lo);
+            --sb-out-sm: -3px -3px 7px var(--sb-hi), 3px 3px 7px var(--sb-lo);
+            --sb-in:     inset -3px -3px 7px var(--sb-hi), inset 3px 3px 7px var(--sb-lo);
+            --sb-ink: #273142; --sb-text: #46526a; --sb-faint: #75819a;
+            --sb-accent: #3567d4;
+            background: var(--sb-bg);
+            -webkit-backdrop-filter: none; backdrop-filter: none;
+            border-right: 0;
+            box-shadow: 6px 0 16px rgba(163,177,198,0.45), inset -1px 0 0 rgba(255,255,255,0.6);
+            width: 208px;
+            padding: 14px 8px 12px;
+            z-index: 5;
+        }
+        #appSidebar .sidebar-nav { gap: 4px; padding: 4px 3px 8px; }
+        @media (max-width: 768px) { .app-body:not(.sb-auto) #appSidebar { width: 62px; padding: 14px 7px; } }
+        #appSidebar .sidebar-nav::-webkit-scrollbar-thumb { background: #c3cee0; }
+        #appSidebar .sidebar-menu-title { color: var(--sb-faint); }
+
+        #appSidebar .nav-item {
+            background: transparent; color: var(--sb-text); font-weight: 600;
+            border-radius: 12px; padding: 8px 10px;
+            transition: box-shadow .18s ease, color .15s ease, background .15s ease;
+        }
+        #appSidebar .nav-item .icon { opacity: .9; }
+        #appSidebar .nav-item:hover {
+            background: var(--sb-bg); color: var(--sb-ink);
+            box-shadow: var(--sb-out-sm); transform: none;
+        }
+        #appSidebar .nav-item.active {
+            background: var(--sb-bg); color: var(--sb-accent); font-weight: 700;
+            box-shadow: var(--sb-in);
+        }
+        #appSidebar .nav-item.active::before {
+            /* small accent dot instead of the old glowing rail */
+            left: 5px; width: 4px; height: 4px; border-radius: 50%;
+            background: var(--sb-accent); box-shadow: none;
+        }
+        #appSidebar .nav-item:active { box-shadow: var(--sb-in); }
+        #appSidebar .nav-item:focus-visible { outline: 2px solid var(--sb-accent); outline-offset: 2px; }
+
+        /* Locked POM keeps reading as unavailable on the light surface */
+        #appSidebar .nav-item.nav-item--locked { opacity: .5; }
+        #appSidebar .nav-item.nav-item--locked:hover { background: transparent; box-shadow: none; color: var(--sb-text); }
+
+        /* Pin: a raised key, pressed in while the menu is pinned */
+        #appSidebar .sidebar-pin-btn {
+            background: var(--sb-bg); border: 0; color: var(--sb-accent);
+            border-radius: 10px; box-shadow: var(--sb-out-sm);
+        }
+        #appSidebar .sidebar-pin-btn:hover { background: var(--sb-bg); border: 0; box-shadow: var(--sb-out); }
+        #appSidebar .sidebar-pin-btn[aria-pressed="true"] { background: var(--sb-bg); box-shadow: var(--sb-in); }
+
+        /* Floating (auto-hide) state: a softer, lighter drop shadow */
+        .app-body.sb-auto.sb-open #appSidebar {
+            box-shadow: 10px 0 28px rgba(110,126,155,0.38), inset -1px 0 0 rgba(255,255,255,0.6);
+        }
+    </style>
+    <style id="olfThemeChrome" data-theme-skip>
+    /* =====================================================================
+       THEME CHROME — hand-designed shell for Light / Dark
+       One surface per theme: top bar, sidebar and page canvas share it, so
+       every page sits in the same frame. Cards float on it. The theme.js
+       adaptive layer skips this sheet (data-theme-skip).
+       ===================================================================== */
+    html[data-theme] {
+        --chrome-bg:      #E0E8F6;
+        --chrome-hi:      rgba(255,255,255,0.90);
+        --chrome-lo:      rgba(163,177,198,0.62);
+        --chrome-lo-soft: rgba(140,156,184,0.32);
+        --chrome-edge:    rgba(255,255,255,0.60);
+        --chrome-ink:     #273142;
+        --chrome-text:    #46526a;
+        --chrome-faint:   #6f7b93;
+        --chrome-accent:  #3567d4;
+        --canvas-top:     #E4EBF7;
+        --canvas-bottom:  #E0E8F6;
+        --canvas-tint-a:  rgba(16,177,151,0.10);
+        --canvas-tint-b:  rgba(79,142,247,0.12);
+    }
+    html[data-theme="dark"] {
+        --chrome-bg:      #1A1F27;
+        --chrome-hi:      rgba(255,255,255,0.045);
+        --chrome-lo:      rgba(0,0,0,0.55);
+        --chrome-lo-soft: rgba(0,0,0,0.45);
+        --chrome-edge:    rgba(255,255,255,0.05);
+        --chrome-ink:     #E8ECF4;
+        --chrome-text:    #B7C0D0;
+        --chrome-faint:   #8390A6;
+        --chrome-accent:  #7AA8FF;
+        --canvas-top:     #1B2029;
+        --canvas-bottom:  #191E26;
+        --canvas-tint-a:  rgba(16,177,151,0.06);
+        --canvas-tint-b:  rgba(79,142,247,0.08);
+
+        /* App-wide tokens from the base design layer, re-pointed for dark.
+           Pages that already use var(--text…) follow automatically. */
+        --canvas:       #191E26;
+        --text:         #E6EAF2;
+        --text-soft:    #A9B3C4;
+        --text-faint:   #7F8BA1;
+        --glass:        rgba(34,40,51,0.78);
+        --glass-strong: rgba(34,40,51,0.92);
+        --hairline:     rgba(255,255,255,0.08);
+        --hairline-dk:  rgba(255,255,255,0.06);
+        --shadow-sm: 0 1px 2px rgba(0,0,0,0.35), 0 1px 3px rgba(0,0,0,0.30);
+        --shadow-md: 0 2px 4px rgba(0,0,0,0.30), 0 8px 24px rgba(0,0,0,0.35);
+        --shadow-lg: 0 12px 32px rgba(0,0,0,0.50), 0 2px 8px rgba(0,0,0,0.35);
+        color-scheme: dark;
+    }
+    html[data-theme="light"] { color-scheme: light; }
+
+    /* Gentle cross-fade only while the user flips the switch */
+    html.theme-switching *, html.theme-switching *::before, html.theme-switching *::after {
+        transition: background-color .28s ease, color .28s ease, border-color .28s ease, box-shadow .28s ease !important;
+    }
+
+    /* ── Canvas: same surface behind every page ── */
+    html[data-theme] body {
+        background:
+            radial-gradient(820px 560px at 8% -6%, var(--canvas-tint-a), transparent 58%),
+            radial-gradient(980px 680px at 102% 4%, var(--canvas-tint-b), transparent 60%),
+            linear-gradient(180deg, var(--canvas-top) 0%, var(--canvas-bottom) 100%);
+        background-attachment: fixed;
+        color: var(--text);
+    }
+    html[data-theme] .content-area,
+    html[data-theme] .content-area:has(> #grPage) { background: transparent; }
+    html[data-theme="dark"] .content-area { scrollbar-color: #3a4352 transparent; }
+
+    /* ── Top bar: same surface as the sidebar, lifted by a soft shadow ── */
+    html[data-theme] .topbar {
+        background: var(--chrome-bg);
+        -webkit-backdrop-filter: none; backdrop-filter: none;
+        border-bottom: 0;
+        box-shadow: 0 6px 18px -8px var(--chrome-lo-soft), inset 0 -1px 0 var(--chrome-edge);
+        position: relative; z-index: 120;
+    }
+    html[data-theme] .topbar-logo { color: var(--chrome-ink); }
+    html[data-theme] .topbar-profile {
+        background: var(--chrome-bg); border: 0;
+        box-shadow: -3px -3px 7px var(--chrome-hi), 3px 3px 7px var(--chrome-lo);
+        transition: box-shadow .18s ease;
+    }
+    html[data-theme] .topbar-profile:hover {
+        background: var(--chrome-bg); border: 0;
+        box-shadow: -4px -4px 10px var(--chrome-hi), 4px 4px 10px var(--chrome-lo);
+    }
+    html[data-theme] .topbar-profile[aria-expanded="true"],
+    html[data-theme] .topbar-profile:active {
+        box-shadow: inset -2px -2px 5px var(--chrome-hi), inset 2px 2px 5px var(--chrome-lo);
+    }
+    html[data-theme] .tp-name  { color: var(--chrome-ink); }
+    html[data-theme] .tp-dept  { color: var(--chrome-accent); }
+    html[data-theme] .tp-caret { color: var(--chrome-faint); }
+
+    /* ── Theme switcher: sunken track, the chosen option raised ── */
+    .theme-switch {
+        display: inline-flex; align-items: center; gap: 2px; padding: 3px;
+        border-radius: 999px; background: var(--chrome-bg);
+        box-shadow: inset -2px -2px 5px var(--chrome-hi), inset 2px 2px 5px var(--chrome-lo);
+        flex-shrink: 0;
+    }
+    .theme-switch button {
+        width: 30px; height: 26px; border: 0; border-radius: 999px; padding: 0;
+        display: grid; place-items: center; cursor: pointer;
+        background: transparent; color: var(--chrome-faint);
+        transition: color .15s ease, box-shadow .18s ease, background .18s ease;
+    }
+    .theme-switch button svg { width: 15px; height: 15px; }
+    .theme-switch button:hover { color: var(--chrome-ink); }
+    .theme-switch button[aria-checked="true"] {
+        background: var(--chrome-bg); color: var(--chrome-accent);
+        box-shadow: -2px -2px 5px var(--chrome-hi), 2px 2px 5px var(--chrome-lo);
+    }
+    .theme-switch button:focus-visible { outline: 2px solid var(--chrome-accent); outline-offset: 1px; }
+    @media (max-width: 520px) { .theme-switch button { width: 26px; } }
+
+    /* ── Sidebar: the soft-UI skin, re-pointed at the shared tokens ── */
+    html[data-theme] #appSidebar {
+        --sb-bg: var(--chrome-bg);
+        --sb-hi: var(--chrome-hi);
+        --sb-lo: var(--chrome-lo);
+        --sb-ink: var(--chrome-ink);
+        --sb-text: var(--chrome-text);
+        --sb-faint: var(--chrome-faint);
+        --sb-accent: var(--chrome-accent);
+        box-shadow: 6px 0 16px -6px var(--chrome-lo-soft), inset -1px 0 0 var(--chrome-edge);
+    }
+    html[data-theme] #appSidebar .sidebar-nav::-webkit-scrollbar-thumb { background: var(--chrome-lo-soft); }
+    html[data-theme] .app-body.sb-auto.sb-open #appSidebar {
+        box-shadow: 10px 0 28px var(--chrome-lo-soft), inset -1px 0 0 var(--chrome-edge);
+    }
+
+    /* Pages that painted their own page-wide backdrop now let the shared
+       canvas show through, so every page sits on the same surface. */
+    html[data-theme] body #sg-app { background-image: none; }
+    html[data-theme] body #tpRoot.tp-module { background: transparent; }
+    html[data-theme] body .pom-page { background: transparent; }
+
+
+    /* ── IT Admin page-access toggles (one per menu item) ── */
+    html[data-theme] #appSidebar.sb-admin { width: 232px; }
+    #appSidebar .nav-row { position: relative; display: flex; }
+    #appSidebar .nav-row[hidden] { display: none; }
+    #appSidebar .nav-row > .nav-item { flex: 1; min-width: 0; }
+    #appSidebar.sb-admin .nav-row > .nav-item { padding-right: 42px; }
+    #appSidebar .nav-access-toggle {
+        position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+        width: 30px; height: 17px; padding: 0; border: 0; border-radius: 999px; cursor: pointer;
+        background: var(--chrome-bg);
+        box-shadow: inset -1.5px -1.5px 3px var(--chrome-hi), inset 1.5px 1.5px 3px var(--chrome-lo);
+        transition: background .2s ease, box-shadow .2s ease, opacity .2s ease;
+        opacity: .9;
+    }
+    #appSidebar .nav-access-toggle .nat-knob {
+        position: absolute; top: 2.5px; left: 3px; width: 12px; height: 12px; border-radius: 50%;
+        background: var(--chrome-faint);
+        box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+        transition: transform .2s cubic-bezier(.2,.8,.2,1), background .2s ease;
+    }
+    #appSidebar .nav-access-toggle[aria-checked="true"] {
+        background: #22c55e;
+        box-shadow: inset 0 1px 2px rgba(0,0,0,0.18);
+    }
+    #appSidebar .nav-access-toggle[aria-checked="true"] .nat-knob { transform: translateX(12px); background: #fff; }
+    #appSidebar .nav-access-toggle:hover { opacity: 1; }
+    #appSidebar .nav-access-toggle:focus-visible { outline: 2px solid var(--chrome-accent); outline-offset: 2px; }
+    #appSidebar .nav-access-toggle:disabled { cursor: progress; opacity: .55; }
+    html[data-theme="dark"] #appSidebar .nav-access-toggle[aria-checked="true"] { background: #16a34a; }
+    /* Hidden-from-users pages read softer for IT Admin, so they stand out */
+    #appSidebar .nav-item.nav-item--locked-admin .label { opacity: .55; }
+    #appSidebar .nav-item.nav-item--locked-admin .icon  { filter: grayscale(1); opacity: .55; }
+    /* Icon-only sidebar (narrow screens / collapsed): no room for toggles */
+    #appSidebar.collapsed .nav-access-toggle { display: none; }
+    @media (max-width: 768px) {
+        .app-body:not(.sb-auto) #appSidebar .nav-access-toggle { display: none; }
+        .app-body:not(.sb-auto) #appSidebar.sb-admin { width: 62px; }
+        .app-body:not(.sb-auto) #appSidebar.sb-admin .nav-row > .nav-item { padding-right: 10px; }
+        .app-body.sb-auto #appSidebar.sb-admin { width: 232px; }
+    }
+
+    /* ── Layer order for the floating menu ──
+       page content (sticky bars, dropdowns…)  <  edge tab (450)
+       <  pop-up dialogs (500+)  ;  floating menu (1050) sits above all page
+       content and only opens when no dialog is showing (see app.js). */
+    html[data-theme] .app-body.sb-auto #appSidebar { z-index: 1050; }
+    html[data-theme] .app-body.sb-auto .sidebar-edge { z-index: 450; }
+
+    /* ── GRs & Circulars: dark soft-UI palette (same tokens, new values) ── */
+    /* The GR page sits straight on the canvas (no seam) in both themes */
+    html[data-theme] body #grPage { background: transparent; }
+    html[data-theme="dark"] body #grPage {
+        --nm-bg: #1A1F27;
+        --nm-hi: rgba(255,255,255,0.045);
+        --nm-lo: rgba(0,0,0,0.55);
+        --nm-ink: #E8ECF4;
+        --nm-text: #C3CBDA;
+        --nm-mute: #9AA6BA;
+        --nm-faint: #7F8BA1;
+        --nm-accent: #7AA8FF;
+        --nm-line: rgba(255,255,255,0.07);
+        --nm-ring: 0 0 0 3px rgba(122,168,255,0.35);
+    }
+    html[data-theme="dark"] body #grPage .gr-sx {
+        --sx-line: var(--nm-line); --sx-ink: var(--nm-ink); --sx-mute: var(--nm-mute); --sx-faint: var(--nm-faint);
+    }
     </style>
 
 <!-- Award Management's styles. They live in a file rather than inside
@@ -2517,6 +2847,17 @@
     <div class="topbar">
         <div class="topbar-logo">OLF <span>Staff Connect</span></div>
         <div class="tp-group">
+            <div class="theme-switch" id="olfThemeSwitch" role="radiogroup" aria-label="Colour theme">
+                <button type="button" role="radio" data-theme-choice="light" aria-checked="false" title="Light theme" aria-label="Light theme">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"/></svg>
+                </button>
+                <button type="button" role="radio" data-theme-choice="dark" aria-checked="false" title="Dark theme" aria-label="Dark theme">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.3A8.5 8.5 0 0 1 9.7 3.5a8.5 8.5 0 1 0 10.8 10.8z"/></svg>
+                </button>
+                <button type="button" role="radio" data-theme-choice="system" aria-checked="false" title="Match system setting" aria-label="Match system setting">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12.5" rx="2"/><path d="M8.5 20.5h7M12 16.5v4"/></svg>
+                </button>
+            </div>
             <button class="topbar-profile" id="olfProfileBtn" type="button"
                     aria-haspopup="dialog" aria-expanded="false" title="View your ID card">
                 <span class="tp-avatar" id="topbarAvatar">?</span>
@@ -2612,11 +2953,17 @@
 
     <div class="app-body">
 
+        <!-- Hover strip on the left edge: brings the auto-hidden menu back. -->
+        <div class="sidebar-edge" id="sidebarEdge" role="button" tabindex="0"
+             aria-label="Show menu" aria-controls="appSidebar" title="Menu"></div>
+
         <!-- Sidebar -->
-        <div class="sidebar" id="appSidebar">
+        <div class="sidebar" id="appSidebar" role="navigation" aria-label="Main menu">
             <div class="sidebar-toggle-row">
-                <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Collapse sidebar">
-                    <span class="arrow">◂</span>
+                <span class="sidebar-menu-title">Menu</span>
+                <button class="sidebar-toggle-btn sidebar-pin-btn" id="sidebarToggleBtn" type="button"
+                        title="Keep the menu open" aria-label="Keep the menu open" aria-pressed="false">
+                    <span class="pin" aria-hidden="true">📌</span>
                 </button>
             </div>
 
@@ -2628,11 +2975,9 @@
             <button class="nav-item" data-page="employees" onclick="navigate('employees')" title="Employees">
                 <span class="icon">👥</span><span class="label">Employees</span>
             </button>
-            <button class="nav-item" data-page="expense-report" onclick="navigate('expense-report')" title="Expense Report (ER)">
-                <span class="icon">🧾</span><span class="label">Expense Report (ER)</span>
-            </button>
-            <button class="nav-item" data-page="data-dashboards" onclick="navigate('data-dashboards')" title="Data Dashboards">
-                <span class="icon">📊</span><span class="label">Data Dashboards</span>
+            <!-- Expense Report + Data Dashboards merged into one links page (2026-10-28) -->
+            <button class="nav-item" data-page="er-dashboards" onclick="navigate('er-dashboards')" title="ER & Dashboards">
+                <span class="icon">🔗</span><span class="label">ER &amp; Dashboards</span>
             </button>
             <button class="nav-item" data-page="pom" onclick="navigate('pom')" title="POM">
                 <span class="icon">📋</span><span class="label">POM</span>
@@ -2640,12 +2985,8 @@
             <button class="nav-item" data-page="calendar" onclick="navigate('calendar')" title="Program Calendar">
                 <span class="icon">📅</span><span class="label">Program Calendar</span>
             </button>
-            <!-- The two review modules sit together: HO (head office) above, Field below. -->
             <button class="nav-item" data-page="smart-goals" onclick="navigate('smart-goals')" title="HO Plan & Review">
                 <span class="icon">🎯</span><span class="label">HO Plan & Review</span>
-            </button>
-            <button class="nav-item" data-page="team-performance" onclick="navigate('team-performance')" title="Program Team: Goals, Plan and Review">
-                <span class="icon">👥</span><span class="label">Program Team: Goals, Plan and Review</span>
             </button>
             <!-- ARCHIVED 2026-10-07: the old PO Review page (pages/po.html + po.js) is
                  retired. Its files are still in the repo for reference but nothing links
@@ -2661,6 +3002,10 @@
             </button>
             <button class="nav-item" data-page="award-management" onclick="navigate('award-management')" title="Test">
                 <span class="icon">🏆</span><span class="label">Test</span>
+            </button>
+            <!-- "Test 2" is the Program Team: Goals, Plan and Review page (moved here, renamed 2026-10-28). -->
+            <button class="nav-item" data-page="team-performance" onclick="navigate('team-performance')" title="Test 2">
+                <span class="icon">🧪</span><span class="label">Test 2</span>
             </button>
             </div><!-- /.sidebar-nav -->
 
@@ -2760,14 +3105,14 @@
     </div>
 </div>
 
-<script type="module" src="app.js"></script>
+<script type="module" src="app.js?v=2026-10-28c"></script>
 <script src="profile.js"></script>
 <script src="pom.js"></script>
 <script src="calendar.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="sg-supabase.js"></script>
 <script src="smartgoal.js"></script>
-<script src="gr.js"></script>
+<script src="gr.js?v=2026-10-28b"></script>
 <script src="forms.js"></script>
 <!-- ARCHIVED 2026-10-07: <script src="po.js"></script> - old PO Review page, no longer loaded. -->
 <script src="pos-supabase.js"></script>
