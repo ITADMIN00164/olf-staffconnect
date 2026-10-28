@@ -431,7 +431,7 @@
             <p class="awa-month" id="awaMonth"></p>
             <div class="awa-step"><b>1</b><div><span>Get the template</span>
                 <button type="button" id="awaTemplate" class="awa-tpl">⬇ Download template</button>
-                <small>The Raw Data headings, with Community and District Name as dropdowns. <button type="button" id="awaManage" class="awa-link">Manage the dropdown lists</button> · <button type="button" id="awaUploads" class="awa-link">All uploads</button></small></div></div>
+                <small>The Raw Data headings, with Community, District Name and Award Category as dropdowns. <button type="button" id="awaManage" class="awa-link">Manage the dropdown lists</button> · <button type="button" id="awaUploads" class="awa-link">All uploads</button></small></div></div>
             <div class="awa-step"><b>2</b><div><span>Choose the filled sheet</span>
                 <input type="file" id="awaFile" class="awa-file" accept=".xlsx,.xls,.csv"></div></div>
             <div class="awa-step" id="awaWhenStep" hidden><b>3</b><div><span>Choose the month and year</span>
@@ -453,6 +453,7 @@
             <div class="awa-seg">
                 <button type="button" class="is-active" data-akind="community">Community</button>
                 <button type="button" data-akind="district">District Name</button>
+                <button type="button" data-akind="category">Award Category</button>
             </div>
             <div id="awaListMsg" class="awa-list-msg"></div>
             <div id="awaListBody" class="awa-listbody"></div>
