@@ -1291,6 +1291,24 @@ async function decideRecord(index, decision) {   // decision: "Yes" (verify) | "
     const decided = { ...match, verified: decision, verifiedBy: me };
     decided.late = isLate(decided, selectedMonth) ? "Yes" : "No";
 
+    /* Verifying takes the award off the district's stock. When there is none
+       left, say so first: the award may well have been given, and verifying
+       is a fact worth recording, but the shortfall is somebody's to fix. */
+    if (decision === "Yes" && window.awardStockApi) {
+      const held = await window.awardStockApi.balanceFor(decided.districtName || district, decided.awardCategory);
+      if (held !== null && held <= 0) {
+        const go = await showModal({
+          title: "No stock left for this award",
+          message: `${decided.districtName || district} has ${held} of this gift in stock. Verifying will take it ${held < 0 ? "further " : ""}below zero, and the stock sheet will show a shortfall. Verify anyway?`,
+          buttons: [
+            { label: "Cancel", value: "no", variant: "cancel" },
+            { label: "Verify anyway", value: "yes", variant: "primary" }
+          ]
+        });
+        if (go !== "yes") { if (cell) cell.innerHTML = renderVerifyCell(index); return; }
+      }
+    }
+
     await dbDecide(decided, decision === "Yes" ? "verified" : "rejected");
 
     // 4) Reflect the decision locally (adopt fresh data for this row).

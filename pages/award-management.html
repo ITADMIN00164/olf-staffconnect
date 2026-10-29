@@ -187,6 +187,8 @@
            aria-labelledby="aw-subtab-stock" hidden>
         <section class="card" id="stock-host">
           <div id="stock-sheet">
+          <!-- The day this tab becomes the stock book. -->
+          <div class="stock-golive" id="stock-golive"></div>
           <div class="stock-controls">
             <div class="field field-sm">
               <label for="stock-year">Year</label>
@@ -663,6 +665,45 @@
         </button>
       </div>
     </form>        </div>
+      </div>
+    </div>
+
+    <!-- Reset the data: Staff Connect admins only, typed to confirm. -->
+    <div class="aw-overlay" id="reset-modal">
+      <div class="aw-overlay-backdrop" data-aw-close-reset></div>
+
+      <div class="aw-box aw-box-sm" role="dialog" aria-modal="true"
+           aria-labelledby="reset-heading">
+        <div class="aw-box-head">
+          <span class="rule rule-accent" aria-hidden="true"></span>
+          <div class="aw-box-heading">
+            <h2 id="reset-heading">Reset data</h2>
+            <p class="aw-box-sub">Deletes for good. It cannot be undone.</p>
+          </div>
+          <button type="button" class="aw-box-close" data-aw-close-reset aria-label="Close">
+            <i class="aw-icon" data-aw-icon="close" aria-hidden="true"></i>
+          </button>
+        </div>
+
+        <div class="aw-box-body" id="reset-body">
+          <label class="reset-opt"><input type="checkbox" id="reset-req" checked />
+            <span>All requisitions <em>(awards and jute bags)</em></span></label>
+          <label class="reset-opt"><input type="checkbox" id="reset-award" checked />
+            <span>Award stock figures <em>(opening balance, typed figures, utilisation, corrections)</em></span></label>
+          <label class="reset-opt"><input type="checkbox" id="reset-jute" checked />
+            <span>Jute bag stock figures</span></label>
+          <label class="reset-opt"><input type="checkbox" id="reset-golive" />
+            <span>The go-live date</span></label>
+          <p class="reset-keep">Award records, the dropdown lists, the gift types and the Head Office list are kept.</p>
+          <label for="reset-confirm" class="reset-ask">Type <b>DELETE</b> to confirm</label>
+          <input type="text" id="reset-confirm" autocomplete="off" />
+          <p class="error" id="reset-error" hidden role="alert"></p>
+        </div>
+
+        <div class="form-actions" id="reset-actions">
+          <button type="button" class="btn btn-ghost" data-aw-close-reset>Cancel</button>
+          <button type="button" class="btn btn-danger" id="reset-go">Delete</button>
+        </div>
       </div>
     </div>
 

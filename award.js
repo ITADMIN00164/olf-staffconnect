@@ -51,6 +51,8 @@ window.AWARD_CONFIG = {
     reqStock: document.getElementById("req-stock"),
     stockTemplate: document.getElementById("stock-template"),
     stockImport: document.getElementById("stock-import"),
+    goLiveBar: document.getElementById("stock-golive"),
+    resetModal: document.getElementById("reset-modal"),
     stockFile: document.getElementById("stock-file"),
     importModal: document.getElementById("import-modal"),
     importSub: document.getElementById("import-sub"),
@@ -1718,15 +1720,29 @@ window.AWARD_CONFIG = {
     el.newReqBtn.addEventListener("click", openRequisitionModal);
 
     if (el.stockTemplate) {
-      el.stockTemplate.addEventListener("click", downloadStockTemplate);
+      el.stockTemplate.addEventListener("click", downloadOpeningTemplate);
     }
     if (el.stockImport) {
       el.stockImport.addEventListener("click", function () { el.stockFile.click(); });
     }
     if (el.stockFile) {
       el.stockFile.addEventListener("change", function () {
-        importStockFile(this.files && this.files[0]);
+        importOpeningFile(this.files && this.files[0]);
         this.value = "";              // the same file again still counts
+      });
+    }
+    if (el.resetModal) {
+      el.resetModal.addEventListener("click", function (event) {
+        if (event.target.closest("[data-aw-close-reset]")) closeReset();
+        else if (event.target.closest("#reset-go")) runReset();
+      });
+    }
+    if (el.goLiveBar) {
+      el.goLiveBar.addEventListener("click", function (event) {
+        var t = event.target.closest && event.target.closest("[data-golive]");
+        if (!t) return;
+        var what = t.getAttribute("data-golive");
+        if (what === "reset") openReset();
       });
     }
     if (el.importModal) {
@@ -3563,8 +3579,9 @@ window.AWARD_CONFIG = {
                       quantities: quantitiesOf(row, "items") });
       }
 
-      // what arrived, which does
-      if (stageOf(row) === "received" && row.received_at) {
+      // what arrived, which does - unless it arrived before go-live, when the opening balance already holds it
+      if (stageOf(row) === "received" && row.received_at &&
+          !(goLive && String(row.received_at).slice(0, 10) < goLive)) {
         // No note: what was said about the parcel belongs on the
         // requisition. The sheet's Remark column is for the stock itself.
         events.push({ district: district, month: monthKeyOf(row.received_at),
@@ -3590,6 +3607,25 @@ window.AWARD_CONFIG = {
       });
     });
 
+    /* Awards verified since go-live come off the stock, on the day they were
+       verified: an April award verified in November is November's use. */
+    verifiedUse.forEach(function (u) {
+      var t = typeForCategory(u.award_category);
+      var district = String(u.district_name || "").trim();
+      if (!t || !district) return;
+      var q = {};
+      q[t.id] = Number(u.n) || 0;
+      events.push({ district: district, month: String(u.verified_on).slice(0, 7),
+                    column: "utilisation", sign: -1, quantities: q, note: "" });
+    });
+
+    /* The months of the go-live year before it are not part of the live
+       books: the opening balance stands for them. */
+    if (goLive) {
+      var from = goLiveFy() + "-04", to = goLive.slice(0, 7);
+      events = events.filter(function (e) { return !(e.month >= from && e.month < to); });
+    }
+
     // One sheet counts its own types and no others.
     var allow = {};
     (ids || scopeIds()).forEach(function (i) { allow[i] = true; });
@@ -3606,6 +3642,8 @@ window.AWARD_CONFIG = {
   function stockRows(fyStart, requisitions, movements, places, ids) {
     var events = stockEvents(requisitions, movements, ids);
     var months = fyMonthKeys(fyStart);
+    var live = goLiveFy() === fyStart;
+    if (live) months = months.filter(function (k) { return k >= goLive.slice(0, 7); });
     var rows = [];
 
     places.forEach(function (place) {
@@ -3624,7 +3662,7 @@ window.AWARD_CONFIG = {
       });
 
       rows.push(Object.assign({}, place, {
-        month: "Carry forward", monthKey: "", remark: "",
+        month: live ? "Opening" : "Carry forward", monthKey: "", remark: "",
         requisition: {}, delivery: {}, utilisation: {},
         balance: Object.assign({}, balance)
       }));
@@ -3692,7 +3730,245 @@ window.AWARD_CONFIG = {
   var stockMovements = [];
   var hasStock = true;             // false until the stock migration is run
 
+  /* The go-live date, and what has been verified since. Until a date is set
+     stock behaves as it always did and verifying moves nothing. Utilisation
+     follows the day an award is VERIFIED, not the month it was for. */
+  var goLive = "";                 // YYYY-MM-DD, or "" while unset
+  var verifiedUse = [];            // award_verified_use rows from the go-live date on
+  var goLiveProblem = "";          // what is missing, if the SQL has not been run
+
   function loadStock(done) {
+    loadStockMovements(function () {
+      loadGoLive(function () { loadVerifiedUse(done); });
+    });
+  }
+
+  function loadGoLive(done) {
+    db.from("award_settings").select("value").eq("key", "stock_go_live")
+      .then(function (res) {
+        goLiveProblem = "";
+        if (res.error) {
+          goLive = "";
+          if (/award_settings/i.test(res.error.message || "")) {
+            goLiveProblem = "Run sql/award-stock-golive.sql in the Supabase SQL Editor to set up the go-live date.";
+          } else reportError("load the go-live date", res.error);
+        } else {
+          var v = res.data && res.data[0] && res.data[0].value;
+          goLive = /^\d{4}-\d{2}-\d{2}$/.test(v || "") ? v : "";
+        }
+        done && done();
+      })
+      .catch(function (err) {
+        reportError("load the go-live date", err);
+        goLive = "";
+        done && done();
+      });
+  }
+
+  function loadVerifiedUse(done) {
+    verifiedUse = [];
+    if (!goLive) return done && done();
+    var all = [];
+    (function page(from) {
+      db.from("award_verified_use")
+        .select("district_name, award_category, verified_on, n")
+        .gte("verified_on", goLive)
+        .order("verified_on").order("district_name").order("award_category")
+        .range(from, from + 999)
+        .then(function (res) {
+          if (res.error) {
+            if (/award_verified_use/i.test(res.error.message || "")) {
+              goLiveProblem = "Run sql/award-stock-golive.sql in the Supabase SQL Editor to count verified awards.";
+            } else reportError("load verified awards", res.error);
+            verifiedUse = [];
+            return done && done();
+          }
+          var rows = res.data || [];
+          all = all.concat(rows);
+          if (rows.length === 1000) return page(from + 1000);
+          verifiedUse = all;
+          done && done();
+        })
+        .catch(function (err) {
+          reportError("load verified awards", err);
+          verifiedUse = [];
+          done && done();
+        });
+    })(0);
+  }
+
+  // The year the go-live date falls in, and the first month that counts.
+  function goLiveFy() {
+    if (!goLive) return null;
+    var y = Number(goLive.slice(0, 4)), m = Number(goLive.slice(5, 7));
+    return m >= 4 ? y : y - 1;
+  }
+
+  /* Which stock column an Award Category comes off. Block and District by
+     level, NS and SU by name, Other by itself; anything else moves no stock. */
+  function typeForCategory(category) {
+    var c = String(category || "").trim();
+    var want = /^block level/i.test(c) ? "Block"
+             : /^district level/i.test(c) ? "District"
+             : /nanhe sitare|\(ns\)/i.test(c) ? "NS"
+             : /shikshan utsav|\(su\)/i.test(c) ? "SU"
+             : /^other$/i.test(c) ? "Other" : "";
+    if (!want) return null;
+    for (var i = 0; i < awardTypes.length; i++) {
+      if (shortType(awardTypes[i]) === want) return awardTypes[i];
+    }
+    return null;
+  }
+
+  function goLiveText() {
+    var p = goLive.split("-");
+    return Number(p[2]) + " " + MONTH_NAMES[Number(p[1]) - 1] + " " + p[0];
+  }
+
+  function renderGoLive() {
+    if (!el.goLiveBar) return;
+    var admin = canSetStock();
+    var html = "";
+    if (goLiveProblem) {
+      html = '<span class="golive-note is-bad">' + escapeHtml(goLiveProblem) + "</span>";
+    } else if (goLive) {
+      html = '<span class="golive-note">Stock is live from <b>' + escapeHtml(goLiveText()) +
+        "</b>, the month after the opening balance. Awards verified from that day come off the stock, in the month they are verified.</span>";
+    }
+    if (admin) {
+      html += ' <button type="button" class="btn btn-ghost btn-xs golive-reset" data-golive="reset">Reset data\u2026</button>';
+    }
+    el.goLiveBar.classList.toggle("has-note", !!(goLiveProblem || goLive));
+    el.goLiveBar.innerHTML = html;
+  }
+
+  /* Wipes what testing left behind, as ticked. Admins only - and the
+     database has a switch of its own (award_settings.allow_reset) that is
+     turned off when the tab goes live, because the check here is only in
+     the page. */
+  function openReset() {
+    if (!canSetStock() || !el.resetModal) return;
+    ["reset-req", "reset-award", "reset-jute"].forEach(function (id) { document.getElementById(id).checked = true; });
+    document.getElementById("reset-golive").checked = false;
+    document.getElementById("reset-confirm").value = "";
+    document.getElementById("reset-error").hidden = true;
+    document.getElementById("reset-go").disabled = false;
+    document.getElementById("reset-actions").hidden = false;
+    el.resetModal.classList.add("is-open");
+    document.addEventListener("keydown", onResetKeydown);
+    document.getElementById("reset-confirm").focus();
+  }
+
+  function closeReset() {
+    if (el.resetModal) el.resetModal.classList.remove("is-open");
+    document.removeEventListener("keydown", onResetKeydown);
+  }
+
+  function onResetKeydown(event) {
+    if (event.key === "Escape") closeReset();
+  }
+
+  function resetFail(message) {
+    var bar = document.getElementById("reset-error");
+    bar.textContent = message;
+    bar.hidden = false;
+    document.getElementById("reset-go").disabled = false;
+  }
+
+  function runReset() {
+    if (!canSetStock()) return;
+    var want = {
+      p_requisitions: document.getElementById("reset-req").checked,
+      p_award_stock: document.getElementById("reset-award").checked,
+      p_jute_stock: document.getElementById("reset-jute").checked,
+      p_go_live: document.getElementById("reset-golive").checked
+    };
+    if (!want.p_requisitions && !want.p_award_stock && !want.p_jute_stock && !want.p_go_live) {
+      return resetFail("Tick what to delete.");
+    }
+    if (document.getElementById("reset-confirm").value.trim() !== "DELETE") {
+      return resetFail("Type DELETE, in capitals, to confirm.");
+    }
+    document.getElementById("reset-go").disabled = true;
+    document.getElementById("reset-error").hidden = true;
+
+    db.rpc("award_reset_data", want).then(function (res) {
+      if (res.error) {
+        var m = res.error.message || "";
+        if (/switched off/i.test(m)) return resetFail("Reset is switched off in the database. It is turned off once the tab is live.");
+        if (/award_reset_data|function/i.test(m)) return resetFail("Run sql/award-reset-data.sql in the Supabase SQL Editor to set this up.");
+        reportError("reset the data", res.error);
+        return resetFail("The data could not be deleted.");
+      }
+      var r = res.data || {};
+      pendingEdits = {};
+      var parts = [];
+      if (want.p_requisitions) parts.push((r.requisitions || 0) + " requisitions");
+      if (want.p_award_stock) parts.push((r.award_stock || 0) + " award stock figures");
+      if (want.p_jute_stock) parts.push((r.jute_stock || 0) + " jute stock figures");
+      if (want.p_go_live) parts.push("the go-live date");
+      document.getElementById("reset-body").innerHTML =
+        '<p class="import-said">Deleted: ' + escapeHtml(parts.join(", ")) + ".</p>";
+      document.getElementById("reset-actions").hidden = true;
+      var close = document.createElement("div");
+      close.className = "form-actions";
+      close.innerHTML = '<button type="button" class="btn btn-primary" data-aw-close-reset>Close</button>';
+      document.getElementById("reset-body").appendChild(close);
+      loadRequisitions();
+      loadStock(function () { refreshStockControls(); renderStock(); renderReqStock(); });
+    }).catch(function (err) {
+      reportError("reset the data", err);
+      resetFail("The data could not be deleted.");
+    });
+  }
+
+  function saveGoLive(value, then, confirmed) {
+    if (!canSetStock()) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value || "")) { showStockEditError("Choose the go-live date."); return; }
+    if (!confirmed && goLive && goLive !== value && !window.confirm(
+      "Change the go-live date from " + goLiveText() + "?\n\n" +
+      "Deliveries and verified awards are counted from this day, so every balance " +
+      "will be added up again. The opening balance you uploaded stays as it is.")) return;
+    db.from("award_settings")
+      .upsert({ key: "stock_go_live", value: value, updated_by: myEmail() || null,
+                updated_at: new Date().toISOString() })
+      .then(function (res) {
+        if (res.error) { reportError("save the go-live date", res.error); showStockEditError("The go-live date could not be saved."); return; }
+        showStockEditError("");
+        goLive = value;
+        loadVerifiedUse(function () {
+          refreshStockControls(); renderStock(); renderReqStock();
+          if (then) then();
+        });
+      })
+      .catch(function (err) { reportError("save the go-live date", err); });
+  }
+
+  /* What a district holds today in the column an award comes off, for the
+     warning before a verify that would take it below nothing. null means
+     there is nothing to say: no go-live date, or a category with no column. */
+  window.awardStockApi = {
+    balanceFor: function (district, category) {
+      return new Promise(function (resolve) {
+        try {
+          var t = typeForCategory(category);
+          if (!db || !t || !district) return resolve(null);
+          loadStock(function () {
+            if (!goLive || todayLocalISO() < goLive) return resolve(null);
+            var fy = fyStartOf(new Date());
+            var rows = stockRows(fy, allRequisitions, stockMovements,
+              [{ state: "", division: "", district: district, pm: "" }], [t.id]);
+            var now = monthKeyOf(new Date());
+            var row = rows.filter(function (r) { return r.monthKey === now; })[0] ||
+                      rows.filter(function (r) { return r.monthKey === ""; })[0];
+            resolve(row ? (row.balance[t.id] || 0) : null);
+          });
+        } catch (e) { resolve(null); }
+      });
+    }
+  };
+
+  function loadStockMovements(done) {
     if (!hasStock) { stockMovements = []; return done && done(); }
 
     db.from("award_stock_movements")
@@ -3722,6 +3998,7 @@ window.AWARD_CONFIG = {
     var years = {};
     var now = fyStartOf(new Date());
     years[now] = true;
+    if (goLive) years[goLiveFy()] = true;
 
     allRequisitions.forEach(function (r) {
       var y = fyStartOf(r.created_at); if (y) years[y] = true;
@@ -3807,6 +4084,7 @@ window.AWARD_CONFIG = {
 
     if (el.stockTemplate) el.stockTemplate.hidden = !canSetStock();
     if (el.stockImport) el.stockImport.hidden = !canSetStock();
+    renderGoLive();
   }
 
   /* Whether the sheet has been asked for. The tab opens on its filters and
@@ -3830,7 +4108,8 @@ window.AWARD_CONFIG = {
         '<div class="stock-prompt">' +
           "<p><b>Choose a year, and narrow it if you want to.</b></p>" +
           "<p>Then press Fetch. Leaving the places on " +
-          "<i>All</i> shows the districts something has happened in; " +
+          "<i>All</i> shows the districts something has happened in " +
+          (canSetStock() ? "(every district, for the year the stock goes live); " : "; ") +
           "choosing a state, a division or a district shows every district " +
           "in it, whether or not anything has.</p>" +
         "</div>";
@@ -3872,6 +4151,8 @@ window.AWARD_CONFIG = {
        something in them, stock sitting there included. */
     var narrowed = !!(el.stockState.value || el.stockDivision.value ||
                       el.stockDistrict.value);
+    // The year opening balances are typed into - the go-live year, or this one before a date is set - shows an admin every district.
+    if (!narrowed && canSetStock() && fy === (goLive ? goLiveFy() : fyStartOf(new Date()))) narrowed = true;
     if (!narrowed) {
       var busy = {};
       rows.forEach(function (r) {
@@ -3947,8 +4228,8 @@ window.AWARD_CONFIG = {
       (canSetStock()
         ? '<p class="stock-howto">Click a cell with a line under it to type a ' +
           "figure — <b>Requisition</b>, <b>Delivery</b> and <b>Utilisation</b> " +
-          "on any month that has happened, and the opening <b>Balance</b> on the " +
-          "carry-forward row. The rest is added up.</p>"
+          "on any month that has happened, and the <b>Balance</b> on the first " +
+          "row (<b>Opening</b>, or <b>Carry forward</b> in other years). The rest is added up.</p>"
         : "") +
       '<div class="stock-editbar" id="stock-editbar"' + (waiting ? "" : " hidden") + ">" +
         "<span>" + (waiting === 1 ? "One figure changed"
@@ -4122,13 +4403,6 @@ window.AWARD_CONFIG = {
      unsaved edits typing would have made - so Save is still the one thing
      that writes, and the sheet still shows every change before it does. */
 
-  var CSV_GROUPS = [
-    { col: "req", label: "Requisition" },
-    { col: "del", label: "Delivery" },
-    { col: "use", label: "Utilisation" },
-    { col: "bal", label: "Balance" }
-  ];
-
   function csvField(value) {
     var text = value === null || value === undefined ? "" : String(value);
     return /[",\r\n;\t]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
@@ -4167,64 +4441,6 @@ window.AWARD_CONFIG = {
     return String(text || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   }
 
-  /* Every spelling of a column that means something, so a header typed by
-     hand or renamed by a spreadsheet still finds its place. */
-  function csvColumnMap(types) {
-    var map = {};
-    map["month"] = { what: "month" };
-    map["district"] = { what: "district" };
-
-    CSV_GROUPS.forEach(function (g) {
-      types.forEach(function (t) {
-        var names = [shortType(t), t.code, t.name];
-        [g.label, g.col].forEach(function (lead) {
-          names.forEach(function (name) {
-            if (!name) return;
-            map[normalHeader(lead + " " + name)] =
-              { what: "figure", col: g.col, typeId: Number(t.id) };
-          });
-        });
-      });
-    });
-    return map;
-  }
-
-  function parseMonthCell(text) {
-    var raw = String(text || "").trim();
-    if (!raw || /^(carry|opening|brought)/i.test(raw)) return { key: "" };
-
-    var pad = function (n) { return String(Number(n)).padStart(2, "0"); };
-    var m = raw.match(/^(\d{4})[-\/.](\d{1,2})(?:[-\/.]\d{1,2})?$/);
-    if (m && Number(m[2]) >= 1 && Number(m[2]) <= 12) {
-      return { key: m[1] + "-" + pad(m[2]) };
-    }
-
-    /* A spreadsheet may have turned the month into a date. The day is always
-       the first, so whichever number is not 1 is the month - and when
-       neither is, there is no telling which way round it meant. */
-    m = raw.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/);
-    if (m) {
-      var a = Number(m[1]), b = Number(m[2]);
-      if (a === 1 && b >= 1 && b <= 12) return { key: m[3] + "-" + pad(b) };
-      if (b === 1 && a >= 1 && a <= 12) return { key: m[3] + "-" + pad(a) };
-      return { error: 'cannot tell which number is the month in "' + raw +
-                      '" - write it as ' + MONTH_NAMES[3] + "'" +
-                      String(m[3]).slice(2) };
-    }
-
-    m = raw.match(/^([A-Za-z]{3,9})[^0-9]*(\d{2,4})$/);
-    if (m) {
-      var want = m[1].slice(0, 3).toLowerCase();
-      for (var i = 0; i < MONTH_NAMES.length; i++) {
-        if (MONTH_NAMES[i].toLowerCase() === want) {
-          var year = Number(m[2]);
-          return { key: (year < 100 ? 2000 + year : year) + "-" + pad(i + 1) };
-        }
-      }
-    }
-    return { error: 'no month called "' + raw + '"' };
-  }
-
   /* A figure in the file replaces what is recorded for that cell. An empty
      one is not an answer - it is a cell nobody filled in - so what is there
      is left alone. A dash or a nought are answers: they mean nothing held,
@@ -4241,82 +4457,93 @@ window.AWARD_CONFIG = {
     return { value: Number(cleaned) };
   }
 
-  function stockFileName(fy) {
-    var where = el.stockDistrict.value || el.stockDivision.value ||
-                el.stockState.value || "all districts";
-    return "award-stock-" + fyLabel(fy) + "-" +
-           where.toLowerCase().replace(/[^a-z0-9]+/g, "-") + ".csv";
+  /* The opening balance: what each district holds on the go-live date, one
+     row to a district. It is used once, to start the book. It lands as the
+     opening figure of the go-live year, as unsaved edits, so the sheet shows
+     what it would do before Save writes it. Every figure is required (a
+     district holding none writes 0), a district the staff directory does not
+     know turns the whole file away, and what it holds replaces what is
+     recorded. */
+  function oncePerDistrict() {
+    var seen = {}, out = [];
+    stockPlaces().forEach(function (p) {
+      var k = p.district.trim().toLowerCase();
+      if (seen[k]) return;
+      seen[k] = true;
+      out.push(p);
+    });
+    return out.sort(function (a, b) {
+      return a.state.localeCompare(b.state) || a.district.localeCompare(b.district);
+    });
   }
 
-  /* The sheet as it stands, for the districts on screen: April to March,
-     every month of the year, whether anything has happened in it or not.
-     The places are the staff directory's - the same ones the sheet and the
-     requisition form read. */
-  function stockTemplate(fy, places, types) {
-    var head = ["Month", "State", "Division", "District"];
-    CSV_GROUPS.forEach(function (g) {
-      types.forEach(function (t) { head.push(g.label + " " + shortType(t)); });
-    });
-
-    /* The sheet draws a district under every division the directory posts
-       anybody to, but what it is holding is one figure either way - stock is
-       kept by district. So the file names it once. */
-    var once = [];
-    var already = {};
-    places.forEach(function (p) {
-      var key = p.district.trim().toLowerCase();
-      if (already[key]) return;
-      already[key] = true;
-      once.push(p);
-    });
-
-    var lines = [head];
-    var figures = function (row, group) {
-      return types.map(function (t) {
-        var n = (row[EDIT_COLUMNS[group].column] || {})[t.id] || 0;
-        return n ? String(n) : "";
-      });
-    };
-
-    once.forEach(function (place) {
-      stockRows(fy, allRequisitions, stockMovements, [place])
-        .forEach(function (row) {
-          var line = [row.month, row.state, place.division || "", row.district];
-          CSV_GROUPS.forEach(function (g) {
-            /* The carry forward is one opening balance and nothing else;
-               every other month is the three that are recorded. Blank is
-               what the import reads as "not mine to change". */
-            var typed = row.monthKey === "" ? g.col === "bal" : g.col !== "bal";
-            line = line.concat(typed ? figures(row, g.col)
-                                     : types.map(function () { return ""; }));
-          });
-          lines.push(line);
-        });
-    });
-
-    return lines.map(function (line) {
-      return line.map(csvField).join(",");
-    }).join("\r\n");
-  }
-
-  function downloadStockTemplate() {
+  function downloadOpeningTemplate() {
     if (!canSetStock()) return;
-
-    var fy = Number(el.stockYear.value) || fyStartOf(new Date());
-    var places = visibleStockPlaces();
-    if (!places.length) { showStockEditError("No districts match."); return; }
-
+    var types = stockTypes();
+    if (!types.length) { showStockEditError("There are no gift types for this sheet yet."); return; }
+    var fy = goLive ? goLiveFy() : fyStartOf(new Date());
+    // The closing balance of the month before this one is the opening stock.
+    var now = new Date();
+    var last = monthKeyOf(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+    var lastLabel = MONTH_NAMES[Number(last.slice(5, 7)) - 1] + " " + last.slice(0, 4);
+    var lines = [["State", "District name", "Balance month"].concat(types.map(shortType))];
+    oncePerDistrict().forEach(function (p) {
+      var row = stockRows(fy, allRequisitions, stockMovements, [p])[0];
+      lines.push([p.state, p.district, lastLabel].concat(types.map(function (t) {
+        var n = row ? (row.balance[t.id] || 0) : 0;
+        return n ? String(n) : "";
+      })));
+    });
+    var text = lines.map(function (l) { return l.map(csvField).join(","); }).join("\r\n");
     // The byte order mark is what makes a spreadsheet read it as UTF-8.
-    var blob = new Blob(["\uFEFF" + stockTemplate(fy, places, awardTypes)],
-                        { type: "text/csv;charset=utf-8" });
+    var blob = new Blob(["\uFEFF" + text], { type: "text/csv;charset=utf-8" });
     var url = URL.createObjectURL(blob);
     var link = document.createElement("a");
     link.href = url;
-    link.download = stockFileName(fy);
+    link.download = "opening-balance-" + (stockScope === "jute" ? "jute-bags" : "awards") + ".csv";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+  }
+
+  /* The month a balance is held for, from whatever a spreadsheet made of it:
+     "Oct'26", "Oct-26", "October 2026", "2026-10", or a date on the first. */
+  function parseBalanceMonth(text) {
+    var raw = String(text || "").trim();
+    var pad = function (n) { return String(Number(n)).padStart(2, "0"); };
+    var m = raw.match(/^(\d{4})[-\/.](\d{1,2})(?:[-\/.]\d{1,2})?$/);
+    if (m && Number(m[2]) >= 1 && Number(m[2]) <= 12) return m[1] + "-" + pad(m[2]);
+    m = raw.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/);
+    if (m) {
+      var a = Number(m[1]), b = Number(m[2]);
+      if (a === 1 && b >= 1 && b <= 12) return m[3] + "-" + pad(b);
+      if (b === 1 && a >= 1 && a <= 12) return m[3] + "-" + pad(a);
+      return "";
+    }
+    m = raw.match(/^([A-Za-z]{3,9})[^0-9]*(\d{2,4})$/);
+    if (m) {
+      var want = m[1].slice(0, 3).toLowerCase();
+      for (var i = 0; i < MONTH_NAMES.length; i++) {
+        if (MONTH_NAMES[i].toLowerCase() === want) {
+          var year = Number(m[2]);
+          return (year < 100 ? 2000 + year : year) + "-" + pad(i + 1);
+        }
+      }
+    }
+    return "";
+  }
+
+  // The first day of the month after a month key: the day stock goes live.
+  function dayAfterMonth(key) {
+    var y = Number(key.slice(0, 4)), mo = Number(key.slice(5, 7));
+    if (mo === 12) { y += 1; mo = 1; } else { mo += 1; }
+    return y + "-" + String(mo).padStart(2, "0") + "-01";
+  }
+
+  function fyOfDay(day) {
+    var y = Number(day.slice(0, 4)), mo = Number(day.slice(5, 7));
+    return mo >= 4 ? y : y - 1;
   }
 
   function visibleStockPlaces() {
@@ -4327,190 +4554,154 @@ window.AWARD_CONFIG = {
     });
   }
 
-  /* What a file would change, worked out without changing anything. Every
-     reason a figure cannot be taken is kept, named by the line it was on. */
-  function readStockImport(text, fy) {
+  function readOpeningImport(text) {
     var out = { edits: {}, problems: [], unchanged: 0, cleared: 0,
-                districts: {}, rows: 0 };
+                districts: {}, rows: 0, blocked: false };
     var rows = parseCsv(text);
-    if (!rows.length) {
-      out.problems.push({ line: 0, why: "The file is empty." });
-      return out;
-    }
+    if (!rows.length) { out.problems.push({ line: 0, why: "The file is empty." }); out.blocked = true; return out; }
 
-    var map = csvColumnMap(awardTypes);
-    var columns = rows[0].map(function (h) { return map[normalHeader(h)] || null; });
-    var monthAt = columns.findIndex(function (c) { return c && c.what === "month"; });
-    var districtAt = columns.findIndex(function (c) { return c && c.what === "district"; });
-
-    if (monthAt < 0 || districtAt < 0) {
-      out.problems.push({ line: 1, why:
-        "The first line has to name the columns, and must include Month and " +
-        "District. Download the template and fill that in." });
-      return out;
+    var types = stockTypes();
+    var heads = rows[0].map(normalHeader);
+    var nameAt = heads.indexOf("district name");
+    if (nameAt < 0) {
+      out.problems.push({ line: 1, why: 'The first line must have a "District name" column. Download the template and fill that in.' });
+      out.blocked = true; return out;
     }
-    if (!columns.some(function (c) { return c && c.what === "figure"; })) {
-      out.problems.push({ line: 1, why:
-        "No column of figures was recognised. They are named like " +
-        '"Requisition ' + shortType(awardTypes[0] || { code: "Block" }) + '".' });
-      return out;
+    var monthAt = heads.indexOf("balance month");
+    if (monthAt < 0) {
+      out.problems.push({ line: 1, why: 'The first line must have a "Balance month" column. Download the template and fill that in.' });
+      out.blocked = true; return out;
     }
+    var typeAt = {};
+    types.forEach(function (t) {
+      var at = [shortType(t), t.code, t.name].map(normalHeader).reduce(function (found, h) {
+        return found >= 0 ? found : heads.indexOf(h);
+      }, -1);
+      if (at < 0) out.problems.push({ line: 1, why: 'The column "' + shortType(t) + '" is missing.' });
+      typeAt[t.id] = at;
+    });
+    if (out.problems.length) { out.blocked = true; return out; }
 
     var known = {};
-    stockPlaces().forEach(function (p) {
-      known[p.district.trim().toLowerCase()] = p;
-    });
-
+    stockPlaces().forEach(function (p) { known[p.district.trim().toLowerCase()] = p; });
     var seen = {};
-    var months = fyMonthKeys(fy);
+    var monthKey = "";
+    var nowKey = monthKeyOf(new Date());
+
+    // The month first, because it decides which year the figures belong to.
+    rows.slice(1).forEach(function (row, index) {
+      if (row.length !== rows[0].length) return;
+      var k = parseBalanceMonth(row[monthAt]);
+      if (k && !monthKey) monthKey = k;
+    });
+    if (!monthKey) {
+      out.problems.push({ line: 2, why: "no balance month - write the month the figures are the closing balance of, like Oct 2026" });
+      out.blocked = true; return out;
+    }
+    if (monthKey > nowKey) {
+      out.problems.push({ line: 2, why: monthLabelOf(monthKey) + " has not started yet - a balance can only be for a month that has begun" });
+      out.blocked = true; return out;
+    }
+    out.goLive = dayAfterMonth(monthKey);
+    var fy = fyOfDay(out.goLive);
 
     rows.slice(1).forEach(function (row, index) {
       var line = index + 2;
       out.rows += 1;
-
-      /* A line with the wrong number of fields has had something shift along
-         it - a thousands comma typed without quotes around it, most likely -
-         and every figure after the shift would land in the wrong column. */
       if (row.length !== rows[0].length) {
-        out.problems.push({ line: line, why: "this line has " + row.length +
-          (row.length === 1 ? " field" : " fields") + " where the first line " +
-          "has " + rows[0].length + ". A number with a comma in it needs " +
-          'quotes around it, like "1,250".' });
+        out.problems.push({ line: line, why: "this line has " + row.length + " fields where the first line has " + rows[0].length + '. A number with a comma in it needs quotes around it, like "1,250".' });
         return;
       }
-
-      var name = String(row[districtAt] || "").trim();
+      var name = String(row[nameAt] || "").trim();
       var place = known[name.toLowerCase()];
-      if (!name) {
-        out.problems.push({ line: line, why: "no district on this line" });
-        return;
-      }
-      if (!place) {
-        out.problems.push({ line: line, why: '"' + name +
-          '" is not a district in the staff directory' });
-        return;
-      }
-      var month = parseMonthCell(row[monthAt]);
-      if (month.error) {
-        out.problems.push({ line: line, why: month.error });
-        return;
-      }
-      if (month.key && months.indexOf(month.key) === -1) {
-        out.problems.push({ line: line, why: monthLabelOf(month.key) +
-          " is not in " + fyLabel(fy) + ", which is the year on screen" });
-        return;
-      }
-      var at = place.district + "\u0000" + month.key;
-      if (seen[at]) {
-        out.problems.push({ line: line, why: place.district + " and " +
-          (month.key ? monthLabelOf(month.key) : "the carry forward") +
-          " are on line " + seen[at] + " as well" });
-        return;
-      }
-      seen[at] = line;
+      if (!name) { out.problems.push({ line: line, why: "no district name on this line" }); return; }
+      if (!place) { out.problems.push({ line: line, why: '"' + name + '" is not a district in the staff directory (Employees)' }); return; }
+      if (seen[place.district]) { out.problems.push({ line: line, why: place.district + " is on line " + seen[place.district] + " as well" }); return; }
+      seen[place.district] = line;
 
-      /* The template carries every month of the year, so one still to come
-         arrives empty and has nothing to answer for. Only a figure typed
-         into it is worth turning away. */
-      var typedInto = columns.some(function (c, at2) {
-        return c && c.what === "figure" && String(row[at2] || "").trim() !== "";
-      });
-      if (!monthHasHappened(month.key, fy)) {
-        if (typedInto) {
-          out.problems.push({ line: line, why: monthLabelOf(month.key) +
-            " has not happened yet" });
-        }
+      var rowMonth = parseBalanceMonth(row[monthAt]);
+      if (rowMonth !== monthKey) {
+        out.problems.push({ line: line, why: place.district + ": the balance month " +
+          (rowMonth ? monthLabelOf(rowMonth) : '"' + String(row[monthAt] || "").trim() + '"') +
+          " is not " + monthLabelOf(monthKey) + " - every row must be for the same month" });
         return;
       }
 
-      var carry = month.key === "";
-      columns.forEach(function (column, at2) {
-        if (!column || column.what !== "figure") return;
-
-        /* The carry forward is one opening balance; every other month is the
-           three that are recorded. A column this row cannot set is passed
-           over in silence when it is empty - the template leaves it so - and
-           complained about only when something was typed into it. */
-        var raw = String(row[at2] || "").trim();
-        if (carry !== (column.col === "bal")) {
-          if (raw) {
-            out.problems.push({ line: line, why: carry
-              ? "the carry forward holds one opening balance, so " +
-                escapeNothing(rows[0][at2]) + " cannot be set on it"
-              : escapeNothing(rows[0][at2]) + " is added up from what moved, " +
-                "so it cannot be typed on a month" });
-          }
-          return;
-        }
-
+      var edits = [];
+      var bad = false;
+      types.forEach(function (t) {
+        var raw = String(row[typeAt[t.id]] || "").trim();
+        if (!raw) { out.problems.push({ line: line, why: place.district + ": " + shortType(t) + " is empty (write 0 if it holds none)" }); bad = true; return; }
         var cell = parseFigureCell(raw);
-        if (cell.skip) return;
-        if (cell.error) {
-          out.problems.push({ line: line, why: cell.error + ", under " +
-            escapeNothing(rows[0][at2]) });
-          return;
-        }
+        if (cell.error) { out.problems.push({ line: line, why: place.district + ": " + cell.error + ", under " + shortType(t) }); bad = true; return; }
+        edits.push({ t: t, value: cell.value });
+      });
+      if (bad) return;
 
-        var have = recordedFigure(place.district, fy, month.key,
-                                  column.col, column.typeId);
-        if (cell.value === have) { out.unchanged += 1; return; }
-
-        if (!cell.value) out.cleared += 1;
-        out.edits[editKey(place.district, month.key, column.col, column.typeId)] =
-          cell.value;
+      edits.forEach(function (e) {
+        var have = recordedFigure(place.district, fy, "", "bal", e.t.id);
+        if (e.value === have) { out.unchanged += 1; return; }
+        if (!e.value) out.cleared += 1;
+        out.edits[editKey(place.district, "", "bal", e.t.id)] = e.value;
         out.districts[place.district] = true;
       });
     });
 
+    if (out.problems.length) { out.edits = {}; out.districts = {}; out.blocked = true; }
     return out;
   }
 
-  function escapeNothing(text) {
-    return String(text || "that column").trim() || "that column";
-  }
-
-  function importStockFile(file) {
+  function importOpeningFile(file) {
     if (!canSetStock() || !file) return;
-
     var reader = new FileReader();
-    reader.onerror = function () {
-      showImportResult(null, "That file could not be read.");
-    };
+    reader.onerror = function () { showImportResult(null, "That file could not be read."); };
     reader.onload = function () {
-      var fy = Number(el.stockYear.value) || fyStartOf(new Date());
-      var was = countPendingEdits();
       var result;
-      try {
-        result = readStockImport(String(reader.result || ""), fy);
-      } catch (err) {
-        showImportResult(null, "That file could not be read: " + messageOf(err));
-        return;
-      }
+      try { result = readOpeningImport(String(reader.result || "")); }
+      catch (err) { showImportResult(null, "That file could not be read: " + messageOf(err)); return; }
 
       var count = Object.keys(result.edits).length;
-      if (count) {
-        pendingEdits = result.edits;
+      if (!count) { showStockEditError(""); renderStock(); showImportResult(result, null); return; }
 
-        /* Everything about to be saved has to be on screen, so a file that
-           reaches past the filters opens them. */
-        var hidden = Object.keys(result.districts).filter(function (d) {
-          return !visibleStockPlaces().some(function (p) { return p.district === d; });
-        });
-        if (hidden.length) {
-          el.stockState.value = ""; el.stockDivision.value = "";
-          el.stockDistrict.value = "";
-          stockFiltersFor(null);
-          result.opened = hidden.length;
-        }
-        stockShown = true;
-      }
+      var already = stockMovements.some(function (m) {
+        return String(m.occurred_on || "").slice(0, 7) === fyOfDay(result.goLive) + "-03";
+      });
+      if (already && !window.confirm("Opening balances are already recorded.\n\n" +
+          "This file replaces them for the districts in it. Continue?")) return;
+      if (goLive && goLive !== result.goLive && !window.confirm(
+          "This file is the closing balance of " + monthLabelOf(monthBefore(result.goLive)) +
+          ", so stock goes live on " + result.goLive + " instead of " + goLive + ".\n\nContinue?")) return;
 
-      result.replaced = count && was ? was : 0;
-      showStockEditError("");
-      renderStock();
-      showImportResult(result, null);
+      var apply = function () { applyOpening(result); };
+      if (goLive !== result.goLive) saveGoLive(result.goLive, apply, true); else apply();
     };
     reader.readAsText(file);
+  }
+
+  function monthBefore(day) {
+    var y = Number(day.slice(0, 4)), mo = Number(day.slice(5, 7));
+    if (mo === 1) { y -= 1; mo = 12; } else { mo -= 1; }
+    return y + "-" + String(mo).padStart(2, "0");
+  }
+
+  // The opening figures belong to the go-live year, so that is the year shown.
+  function applyOpening(result) {
+    var fy = goLiveFy();
+    refreshStockControls();
+    el.stockYear.value = String(fy);
+    pendingEdits = result.edits;
+    var hidden = Object.keys(result.districts).filter(function (d) {
+      return !visibleStockPlaces().some(function (p) { return p.district === d; });
+    });
+    if (hidden.length) {
+      el.stockState.value = ""; el.stockDivision.value = ""; el.stockDistrict.value = "";
+      stockFiltersFor(null);
+      result.opened = hidden.length;
+    }
+    stockShown = true;
+    showStockEditError("");
+    renderStock();
+    showImportResult(result, null);
   }
 
   function showImportResult(result, failure) {
@@ -4524,7 +4715,9 @@ window.AWARD_CONFIG = {
       var count = Object.keys(result.edits).length;
       var districts = Object.keys(result.districts).length;
 
-      sub = count
+      sub = result.blocked
+        ? "Nothing was uploaded. Put these right in the file and upload it again."
+        : count
         ? (count === 1 ? "One figure is" : count + " figures are") +
           " waiting in the sheet across " +
           (districts === 1 ? "one district" : districts + " districts") +

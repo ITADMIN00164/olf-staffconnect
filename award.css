@@ -1884,4 +1884,27 @@
 
 /* The jute sheet is the stock sheet counting jute bags, so the awards' file
    template and import, which are about the four awards, are not offered on it. */
-.award-page #stock-sheet.is-jute #stock-template, .award-page #stock-sheet.is-jute #stock-import { display: none !important; }
+
+
+/* The go-live date: the day this tab becomes the stock book. */
+.award-page .stock-golive { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 10px; font-size: .88rem; }
+.award-page .stock-golive.has-note { margin-bottom: 12px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2, transparent); }
+.award-page .stock-golive:empty { display: none; }
+.award-page .stock-golive .golive-note.is-bad { color: var(--danger, #b42318); }
+.award-page .stock-golive input[type="date"] { padding: 4px 8px; border: 1px solid var(--border); border-radius: 8px; font: inherit; }
+
+.award-page .stock-golive .golive-reset { margin-left: auto; color: var(--danger, #b42318); }
+.award-page .reset-opt { display: flex; gap: 9px; align-items: flex-start; margin: 0 0 9px; font-size: .92rem; }
+.award-page .reset-opt em { color: var(--text-muted); font-style: normal; font-size: .84rem; }
+.award-page .reset-keep { margin: 12px 0; color: var(--text-muted); font-size: .84rem; }
+.award-page .reset-ask { display: block; margin: 0 0 6px; font-size: .9rem; }
+.award-page #reset-confirm { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font: inherit; }
+
+/* On a phone the three tabs are wider than the screen: let them scroll
+   sideways inside their own row instead of widening the page. */
+@media (max-width: 640px) {
+  .award-page .aw-topbar { min-width: 0; }
+  .award-page .aw-toptabs { max-width: 100%; gap: 20px; overflow-x: auto; scrollbar-width: none; }
+  .award-page .aw-toptabs::-webkit-scrollbar { display: none; }
+  .award-page .aw-top-actions { width: 100%; padding-bottom: 12px; }
+}
