@@ -20,20 +20,26 @@
       </span>
     </div>
 
-    <!-- The Test tab: Stock Management and Award Management, with the stock
+    <!-- The Award Management page: Stock Management and Award Management, with the stock
          actions on the right while Stock Management is showing. -->
     <div class="aw-topbar">
-      <nav class="aw-toptabs" role="tablist" aria-label="Test">
+      <nav class="aw-toptabs" role="tablist" aria-label="Award Management">
         <button type="button" role="tab" class="aw-toptab" data-aw-top="util" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="trophy" aria-hidden="true"></i>Award Utilisation</button>
         <button type="button" role="tab" class="aw-toptab" data-aw-top="event" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="calendar" aria-hidden="true"></i>Event Management</button>
         <button type="button" role="tab" class="aw-toptab is-active" data-aw-top="stock" aria-selected="true"><i class="aw-icon" data-aw-icon="stock" aria-hidden="true"></i>Stock Management</button>
       </nav>
-      <div class="aw-top-actions" id="aw-stock-actions">
-        <button type="button" id="refresh-btn" class="btn btn-ghost btn-sm"><i class="aw-icon" data-aw-icon="refresh" aria-hidden="true"></i>Refresh</button>
-        <button type="button" id="new-req-btn" class="btn btn-primary btn-sm">
-          <i class="aw-icon" data-aw-icon="plus" aria-hidden="true"></i>
-          New Requisition
-        </button>
+      <div class="aw-top-right">
+        <div class="aw-top-actions" id="aw-stock-actions">
+          <button type="button" id="refresh-btn" class="btn btn-ghost btn-sm"><i class="aw-icon" data-aw-icon="refresh" aria-hidden="true"></i>Refresh</button>
+          <button type="button" id="new-req-btn" class="btn btn-primary btn-sm">
+            <i class="aw-icon" data-aw-icon="plus" aria-hidden="true"></i>
+            New Requisition
+          </button>
+        </div>
+        <!-- One Refresh for the whole page: reloads the data of the tab on screen
+             (award.js refreshCurrentView). It replaces the separate Refresh buttons
+             each view used to carry, which are hidden in award.css. -->
+        <button type="button" id="aw-refresh-all" class="btn btn-ghost btn-sm aw-refresh-all" title="Reload the latest data for the tab you are on"><i class="aw-icon" data-aw-icon="refresh" aria-hidden="true"></i><span class="aw-refresh-label" aria-live="polite">Refresh data</span></button>
       </div>
     </div>
 

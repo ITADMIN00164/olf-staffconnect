@@ -1882,3 +1882,22 @@
 /* The jute sheet is the stock sheet counting jute bags, so the awards' file
    template and import, which are about the four awards, are not offered on it. */
 .award-page #stock-sheet.is-jute #stock-template, .award-page #stock-sheet.is-jute #stock-import { display: none !important; }
+
+/* ── One "Refresh data" button for the whole page (award.js runRefreshAll) ──
+   It sits at the right of the top tabs on every tab and reloads the tab on
+   screen. The separate Refresh buttons the views carried do the same job, so
+   they are hidden (kept in the markup, the code still uses them). */
+.award-page .aw-top-right { display: flex; align-items: center; gap: 10px; margin-left: auto; padding-bottom: 9px; }
+.award-page .aw-top-right > .aw-top-actions { padding-bottom: 0; }
+.award-page #refresh-btn,
+.award-page #awmRefreshBtn,
+.award-page #aweRefreshBtn,
+.award-page #awdRefreshBtn { display: none !important; }
+.award-page .aw-refresh-all { min-width: 132px; justify-content: center; }
+.award-page .aw-refresh-all .aw-icon svg { transform-origin: 50% 50%; }
+.award-page .aw-refresh-all.is-busy .aw-icon svg { animation: aw-refresh-spin .8s linear infinite; }
+.award-page .aw-refresh-all.is-done { color: var(--accent-ink); }
+@keyframes aw-refresh-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .award-page .aw-refresh-all.is-busy .aw-icon svg { animation: none; }
+}

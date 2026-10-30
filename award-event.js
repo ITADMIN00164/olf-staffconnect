@@ -143,17 +143,36 @@ let aweStates        = {};      // district -> its state
 // scope "district" -> district view only
 const OTHER_MSG = "Events other than POM, NS and SU.";
 
+// The table shows the columns in this order, grouped (block, then district, then the
+// rest) under a coloured heading per group, so each kind is easy to tell apart.
+// The Excel report keeps its own column order (EXPORT_HEADERS below).
 const COLUMNS = [
-  { key: "blockEvents",      head: "Total<br>Block Events",                    scope: "block"    },
-  { key: "districtEvents",   head: "Total<br>District Events",                 scope: "district" },
-  { key: "blockTeachers",    head: "Teachers Felicitated<br>(Block Level)",    scope: "block"    },
-  { key: "districtTeachers", head: "Teachers Felicitated<br>(District Level)", scope: "district" },
-  { key: "suNsEvents",       head: "SU/NS<br>Events",                          scope: "district" },
-  { key: "suNsTeachers",     head: "Teachers Felicitated<br>(SU/NS Events)",   scope: "district" },
-  { key: "otherEvents",      head: "Other<br>Events",                          scope: "district", tip: OTHER_MSG },
-  { key: "otherTeachers",    head: "Teachers Felicitated<br>(Other Events)",   scope: "district", tip: OTHER_MSG },
-  { key: "clusterHeads",     head: "Total Cluster<br>Heads Recognised",        scope: "district" }
+  { key: "blockEvents",      head: "Total<br>Block Events",                    scope: "block",    group: "block"    },
+  { key: "blockTeachers",    head: "Teachers Felicitated<br>(Block Level)",    scope: "block",    group: "block"    },
+  { key: "districtEvents",   head: "Total<br>District Events",                 scope: "district", group: "district" },
+  { key: "districtTeachers", head: "Teachers Felicitated<br>(District Level)", scope: "district", group: "district" },
+  { key: "suNsEvents",       head: "SU/NS<br>Events",                          scope: "district", group: "suns"     },
+  { key: "suNsTeachers",     head: "Teachers Felicitated<br>(SU/NS Events)",   scope: "district", group: "suns"     },
+  { key: "otherEvents",      head: "Other<br>Events",                          scope: "district", group: "other", tip: OTHER_MSG },
+  { key: "otherTeachers",    head: "Teachers Felicitated<br>(Other Events)",   scope: "district", group: "other", tip: OTHER_MSG },
+  { key: "clusterHeads",     head: "Total Cluster<br>Heads Recognised",        scope: "district", group: "cluster"  }
 ];
+
+const COLUMN_GROUPS = {
+  block:    "Block level",
+  district: "District level",
+  suns:     "SU / NS events",
+  other:    "Other events",
+  cluster:  "Cluster heads"
+};
+
+// The class a cell of column `ci` (in `cols`) carries: its group's colour, and a
+// divider where a new group starts.
+function groupClass(cols, ci) {
+  const c = cols[ci];
+  const starts = ci === 0 || cols[ci - 1].group !== c.group;
+  return "pev-g-" + c.group + (starts ? " pev-gs" : "");
+}
 
 const ROLLUP_MSG = "Select any block and fill these numbers — they are reconciled here automatically.";
 
@@ -426,12 +445,22 @@ function renderHead() {
   const thead = el("aweThead");
   if (!thead) return;
   const cols = visibleColumns();
-  const cells = cols.map(c => {
+  const cells = cols.map((c, ci) => {
     const rollup = !isBlockView() && c.scope === "block";
     const tip = rollup ? ROLLUP_MSG : (c.tip || "");
-    const cls = [rollup ? "pev-rollup-th" : "", c.tip ? "pev-tip-th" : ""].filter(Boolean).join(" ");
+    const cls = [rollup ? "pev-rollup-th" : "", c.tip ? "pev-tip-th" : "", groupClass(cols, ci)].filter(Boolean).join(" ");
     return "<th" + (cls ? ' class="' + cls + '"' : "") + (tip ? ' title="' + esc(tip) + '"' : "") + ">" + c.head + "</th>";
   }).join("");
+
+  // The group headings above: one per run of columns of the same group.
+  let groups = "";
+  for (let ci = 0; ci < cols.length; ) {
+    let span = 1;
+    while (ci + span < cols.length && cols[ci + span].group === cols[ci].group) span++;
+    groups += '<th colspan="' + span + '" scope="colgroup" class="pev-grp ' + groupClass(cols, ci) + '">' +
+      esc(COLUMN_GROUPS[cols[ci].group] || "") + "</th>";
+    ci += span;
+  }
 
   // Widths: month, one per count, save, last updated. They add up to 100% so the
   // table always fits its card; the headings wrap to the width they are given.
@@ -440,7 +469,10 @@ function renderHead() {
   const group = '<col style="width:' + MONTH_W + '%">' + cols.map(() => '<col style="width:' + each + '%">').join("") +
     '<col style="width:' + SAVE_W + '%"><col style="width:' + UPDATED_W + '%">';
 
-  thead.innerHTML = '<tr><th>Month</th>' + cells + '<th class="col-center">Save</th><th>Last Updated</th></tr>';
+  thead.innerHTML =
+    '<tr class="pev-grp-row"><th rowspan="2">Month</th>' + groups +
+    '<th rowspan="2" class="col-center">Save</th><th rowspan="2">Last Updated</th></tr>' +
+    '<tr class="pev-col-row">' + cells + '</tr>';
   const cg = el("aweColgroup");
   if (cg) cg.innerHTML = group;
 }
@@ -494,16 +526,19 @@ function render() {
   const blockView = isBlockView();
 
   tbody.innerHTML = aweRows.map((r, i) => {
-    const cells = cols.map(c => {
+    const cells = cols.map((c, ci) => {
+      const g = groupClass(cols, ci);
       // District view: the block-level columns are a read-only roll-up.
       if (!blockView && c.scope === "block") {
         const roll = blockRollup(r.month, aweDistrict, c.key);
         const text = roll.contributors ? roll.sum : "—";
-        return '<td class="pev-rollup" title="' + esc(ROLLUP_MSG) + '"><span class="pev-rollup-val">' + text + "</span></td>";
+        return '<td class="pev-rollup ' + g + '" title="' + esc(ROLLUP_MSG) + '" role="button" tabindex="0" ' +
+          'onclick="aweRollupHint(this)" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();aweRollupHint(this)}">' +
+          '<span class="pev-rollup-val">' + text + "</span></td>";
       }
       const val = str(r[c.key]);
       const bad = !valid(val);
-      return "<td" + (c.tip ? ' title="' + esc(c.tip) + '"' : "") + '><input type="number" min="0" step="1" inputmode="numeric" ' +
+      return '<td class="' + g + '"' + (c.tip ? ' title="' + esc(c.tip) + '"' : "") + '><input type="number" min="0" step="1" inputmode="numeric" ' +
         'class="pev-input' + (bad ? " bad" : "") + '" data-row="' + i + '" data-key="' + c.key + '" ' +
         'value="' + esc(val) + '" placeholder="—" oninput="aweUpdateField(' + i + ",'" + c.key + "',this.value)\"></td>";
     }).join("");
@@ -516,7 +551,7 @@ function render() {
   }).join("");
 
   tbody.innerHTML += '<tr class="pev-totals"><td>Total</td>' +
-    cols.map(c => "<td>" + columnTotal(c) + "</td>").join("") + "<td></td><td></td></tr>";
+    cols.map((c, ci) => '<td class="' + groupClass(cols, ci) + '">' + columnTotal(c) + "</td>").join("") + "<td></td><td></td></tr>";
 
   updateSaveBar();
 }
@@ -527,6 +562,61 @@ function updateSaveBar() {
   const bar = el("aweSaveBar");
   if (bar) bar.style.display = hasUnsaved() ? "block" : "none";
 }
+
+// District view: the block-level numbers are filled per block, so a click on one
+// says so in a small bubble on that cell, and points at the Block dropdown.
+let aweHintTimer = null;
+function hideRollupHint() {
+  const old = document.getElementById("aweHintPop");
+  if (old) old.remove();
+  clearTimeout(aweHintTimer);
+  window.removeEventListener("scroll", hideRollupHint, true);
+  window.removeEventListener("resize", hideRollupHint);
+}
+
+function showRollupHint(cell) {
+  hideRollupHint();
+  const pop = document.createElement("div");
+  pop.id = "aweHintPop";
+  pop.className = "pev-hint-pop";
+  pop.setAttribute("role", "status");
+  pop.textContent = "Select a block first to fill these numbers";
+  document.body.appendChild(pop);
+
+  // Above the cell, centred on it; below it when there is no room above.
+  // The app zooms the whole page (html { zoom } in index.html), so measured
+  // positions and CSS pixels can differ: work in measured units, then divide
+  // by the scale the bubble itself shows.
+  pop.style.left = "0px"; pop.style.top = "0px";
+  const pr = pop.getBoundingClientRect();
+  const scale = pop.offsetWidth ? (pr.width / pop.offsetWidth) || 1 : 1;
+  const r = (cell.querySelector(".pev-rollup-val") || cell).getBoundingClientRect();   // the number box itself
+  const w = pr.width, h = pr.height, gap = 9 * scale;
+  const vw = document.documentElement.clientWidth * scale;
+  const below = r.top - h - gap < 70 * scale;
+  const left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), vw - w - 8);
+  const top = below ? r.bottom + gap : r.top - h - gap;
+  pop.style.left = (left / scale) + "px";
+  pop.style.top = (top / scale) + "px";
+  pop.style.setProperty("--arrow-x", ((r.left + r.width / 2 - left) / scale) + "px");
+  pop.classList.add(below ? "is-below" : "is-above");
+
+  aweHintTimer = setTimeout(hideRollupHint, 2600);
+  window.addEventListener("scroll", hideRollupHint, true);
+  window.addEventListener("resize", hideRollupHint);
+}
+
+window.aweRollupHint = function (cell) {
+  if (cell && cell.getBoundingClientRect) showRollupHint(cell);
+  else showToast("Select a block first to fill these numbers.", "info");
+  const sel = el("aweBlock");
+  if (!sel || sel.disabled) return;
+  sel.focus({ preventScroll: true });   // scrolling would close the bubble
+  sel.classList.remove("pev-attn");
+  void sel.offsetWidth;                 // restart the highlight if it is already showing
+  sel.classList.add("pev-attn");
+  setTimeout(() => sel.classList.remove("pev-attn"), 2400);
+};
 
 window.aweUpdateField = function (index, key, value) {
   const r = aweRows[index];
@@ -855,6 +945,15 @@ async function saveAll() {
     showToast(okCount + " saved. Not confirmed: " + failed.join(", ") + " — still here, please retry.", "error");
   }
 }
+
+// The page-wide "Refresh data" button (award.js) while Event Management is showing.
+// Answers false when nothing was reloaded (a save in flight, or the user cancelled).
+window.aweRefresh = async function () {
+  if (aweSaving) return false;
+  const hadUnsaved = hasUnsaved();
+  await refresh();
+  return !(hadUnsaved && hasUnsaved());
+};
 
 // ── Refresh ──
 async function refresh() {

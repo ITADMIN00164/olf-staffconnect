@@ -708,8 +708,10 @@ window.AWARD_CONFIG = {
      Award Utilisation holds two views of its own, Award Management and the Award
      Data Dashboard, chosen with the small tabs under it. */
   var utilView = "award";
+  var currentTop = "util";       // the top tab on screen, for the page-wide Refresh data button
 
   function showTopView(which) {
+    currentTop = which;
     var util = which === "util";
     var event = which === "event";
     var stock = document.getElementById("aw-view-stock");
@@ -762,6 +764,71 @@ window.AWARD_CONFIG = {
       eventViewStarted = true;
       window.initAwardEventUI();
     }
+  }
+
+  /* The page-wide Refresh data button. It reloads what the tab on screen
+     shows, through the same code each view's own Refresh used, so unsaved
+     edits are still asked about first. A view answers false when the user
+     cancels. */
+  function waitUntil(test, ms) {
+    return new Promise(function (resolve) {
+      var end = Date.now() + (ms || 20000);
+      (function poll() {
+        if (test() || Date.now() > end) return resolve();
+        setTimeout(poll, 150);
+      })();
+    });
+  }
+
+  function refreshStockData() {
+    var stockDone = new Promise(function (resolve) {
+      loadStock(function () {
+        refreshStockControls(); renderStock(); renderReqStock();
+        resolve();
+      });
+    });
+    loadAwardTypes();
+    loadRequisitions();          // disables the Stock Refresh button until it has an answer
+    return Promise.all([stockDone, waitUntil(function () { return !el.refreshBtn.disabled; })]);
+  }
+
+  function refreshCurrentView() {
+    if (currentTop === "event") {
+      return typeof window.aweRefresh === "function" ? window.aweRefresh() : Promise.resolve(false);
+    }
+    if (currentTop === "util") {
+      var fn = utilView === "dash" ? window.awardDashRefresh : window.awmRefreshAll;
+      return typeof fn === "function" ? fn() : Promise.resolve(false);
+    }
+    return refreshStockData();
+  }
+
+  var refreshing = false;
+  function runRefreshAll() {
+    var btn = document.getElementById("aw-refresh-all");
+    if (refreshing || !btn) return;
+    var label = btn.querySelector(".aw-refresh-label");
+    refreshing = true;
+    btn.disabled = true;
+    btn.classList.remove("is-done");
+    btn.classList.add("is-busy");
+    if (label) label.textContent = "Refreshing…";
+    Promise.resolve()
+      .then(refreshCurrentView)
+      .catch(function (err) { console.error("Refresh failed:", err); return false; })
+      .then(function (result) {
+        refreshing = false;
+        btn.disabled = false;
+        btn.classList.remove("is-busy");
+        if (result === false) { if (label) label.textContent = "Refresh data"; return; }
+        btn.classList.add("is-done");
+        if (label) label.textContent = "Updated";
+        setTimeout(function () {
+          if (refreshing) return;
+          btn.classList.remove("is-done");
+          if (label) label.textContent = "Refresh data";
+        }, 1600);
+      });
   }
 
   function showUtilView(which) {
@@ -1612,6 +1679,9 @@ window.AWARD_CONFIG = {
 
     // The Test tab opens on its first tab, Award Utilisation.
     showTopView("util");
+
+    var refreshAll = document.getElementById("aw-refresh-all");
+    if (refreshAll) refreshAll.addEventListener("click", runRefreshAll);
 
     Array.prototype.forEach.call(
       el.hoModal.querySelectorAll("[data-aw-close-ho]"),
