@@ -2816,6 +2816,22 @@
     @media (prefers-reduced-motion: reduce) {
         html[data-theme] .award-page .awe-view .pev-block.pev-attn { animation: none; box-shadow: 0 0 0 3px rgba(37,99,235,.28); }
     }
+    /* Teachers Felicitated: filled from verified awards (award-event.js autoValue), never typed */
+    html[data-theme] .award-page .awe-view .pom-table.pev-tbl tbody td.pev-auto { cursor: pointer; }
+    html[data-theme] .award-page .awe-view .pev-auto-val {
+        display: inline-block; min-width: 52px; padding: 5px 8px; border-radius: 6px;
+        font-size: 12px; font-weight: 700; color: var(--gc); opacity: .55;
+        background: transparent; border: 1px solid transparent;
+    }
+    html[data-theme] .award-page .awe-view .pev-auto-val.has { opacity: 1; background: var(--gh); }
+    html[data-theme] .award-page .awe-view .pom-table.pev-tbl tbody td.pev-auto:hover .pev-auto-val { border-color: var(--gc); }
+    html[data-theme] .award-page .awe-view .pom-table.pev-tbl tbody td.pev-auto:focus-visible { outline: 2px solid var(--gc); outline-offset: -3px; }
+    html[data-theme] .award-page .awe-view .pom-table.pev-tbl thead th.pev-auto-th { cursor: help; }
+    html[data-theme] .award-page .awe-view .pom-table.pev-tbl thead th.pev-auto-th::after {
+        content: "Auto"; display: block; width: max-content; margin: 4px auto 0; padding: 1px 7px; border-radius: 999px;
+        font-size: 9px; font-weight: 800; letter-spacing: .06em; color: var(--gc); background: var(--gh);
+    }
+
     /* The bubble that appears on a clicked block number (award-event.js showRollupHint) */
     .pev-hint-pop {
         position: fixed; z-index: 450; max-width: 260px; pointer-events: none;
@@ -3222,7 +3238,7 @@
 <script src="award.js?v=2026-10-30b"></script>
 <script src="award-manage.js?v=2026-10-30b"></script>
 <script src="award-dash.js?v=2026-10-30a"></script>
-<script src="award-event.js?v=2026-10-30d"></script>
+<script src="award-event.js?v=2026-10-30e"></script>
 <script src="award-append.js?v=2026-10-27b"></script>
 <script src="award-admin.js?v=2026-10-26e"></script>
 <script src="team-performance-data.js?v=20261023e"></script>
