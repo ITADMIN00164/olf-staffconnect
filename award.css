@@ -1569,6 +1569,9 @@
 .award-page .award-line.has-other {
   grid-template-areas: "type cat qty remove" "other other other other";
 }
+.award-page .award-line.is-gift-other {
+  grid-template-areas: "type other qty remove";
+}
 .award-page .award-line-type   { grid-area: type; }
 .award-page .award-line-cat    { grid-area: cat; }
 .award-page .award-line-qty    { grid-area: qty; }

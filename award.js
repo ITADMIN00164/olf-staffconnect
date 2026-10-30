@@ -2190,13 +2190,14 @@ window.AWARD_CONFIG = {
       return t ? levelLabel(t.name, t.code) : "";
     });
     var needs = labels.map(function (label) { return levelHasCategory(label); });
+    var gift = labels.map(function (label) { return isOtherGift(label); });
 
     // A level offers its own categories. When a line changes to a level with a
     // different set, the list is rebuilt and the old choice dropped.
     lines.forEach(function (line, i) {
       var cat = line.querySelector(".award-line-cat");
-      cat.hidden = !needs[i];
-      if (!needs[i]) { cat.value = ""; cat.setAttribute("data-set", ""); return; }
+      cat.hidden = !needs[i] || gift[i];
+      if (!needs[i] || gift[i]) { cat.value = ""; cat.setAttribute("data-set", ""); return; }
       var set = categoriesFor(labels[i]);
       var key = set.join("|");
       if (cat.getAttribute("data-set") !== key) {
@@ -2215,7 +2216,7 @@ window.AWARD_CONFIG = {
     // words - so every other category is taken once.
     var used = {};              // level id -> { category: true }
     lines.forEach(function (line, i) {
-      if (!needs[i]) return;
+      if (!needs[i] || gift[i]) return;
       var cat = line.querySelector(".award-line-cat");
       var u = used[chosen[i]] || (used[chosen[i]] = {});
       if (cat.value && cat.value !== "Other" && u[cat.value]) cat.value = "";
@@ -2234,7 +2235,7 @@ window.AWARD_CONFIG = {
       var cat = line.querySelector(".award-line-cat");
       var other = line.querySelector(".award-line-other");
 
-      if (needs[i]) {
+      if (needs[i] && !gift[i]) {
         Array.prototype.forEach.call(cat.options, function (opt) {
           var heldElsewhere = lines.some(function (l2, j) {
             return j !== i && chosen[j] === chosen[i] &&
@@ -2244,10 +2245,13 @@ window.AWARD_CONFIG = {
         });
       }
 
-      other.hidden = !(needs[i] && cat.value === "Other");
+      other.hidden = gift[i] ? false : !(needs[i] && cat.value === "Other");
       if (other.hidden) other.value = "";
-      line.classList.toggle("has-category", needs[i]);
-      line.classList.toggle("has-other", !other.hidden);
+      other.placeholder = gift[i] ? "What is it?" : "What is it for?";
+      other.setAttribute("aria-label", gift[i] ? "What the other gift is" : "Other category");
+      line.classList.toggle("has-category", needs[i] && !gift[i]);
+      line.classList.toggle("is-gift-other", gift[i]);
+      line.classList.toggle("has-other", !gift[i] && !other.hidden);
 
       line.querySelector(".award-line-remove").hidden = lines.length < 2;
     });
@@ -2271,9 +2275,10 @@ window.AWARD_CONFIG = {
         var qty = line.querySelector(".award-line-qty").value.trim();
         var type = typeById(id);
         var needs = !!type && levelHasCategory(levelLabel(type.name, type.code));
+        var gift = !!type && isOtherGift(levelLabel(type.name, type.code));
         return {
-          line: line, id: id, qty: qty, type: type, needsCategory: needs,
-          category: needs ? line.querySelector(".award-line-cat").value : "",
+          line: line, id: id, qty: qty, type: type, needsCategory: needs, gift: gift,
+          category: gift ? "Other" : needs ? line.querySelector(".award-line-cat").value : "",
           other: needs ? line.querySelector(".award-line-other").value.trim() : ""
         };
       }
@@ -2401,7 +2406,7 @@ window.AWARD_CONFIG = {
       } else if (l.needsCategory && !l.category) {
         if (!lineFault) lineFault = "Choose a category for every Block, District and Jute Bag line.";
       } else if (l.needsCategory && l.category === "Other" && !l.other) {
-        if (!lineFault) lineFault = "Say what the other category is.";
+        if (!lineFault) lineFault = l.gift ? "Say what the Other gift is." : "Say what the other category is.";
       } else if (!l.qty) {
         if (!lineFault) lineFault = "Say how many for each gift.";
       } else if (!Number.isInteger(n) || n < 1) {
@@ -3146,8 +3151,12 @@ window.AWARD_CONFIG = {
   }
 
   function levelHasCategory(label) {
-    return label === "Block" || label === "District" || label === "Jute Bag";
+    return label === "Block" || label === "District" || label === "Jute Bag" || label === "Other";
   }
+
+  /* The Other gift has no category list: the words saying what it is take the
+     category's place on the line, and are kept as category_other. */
+  function isOtherGift(label) { return label === "Other"; }
 
   // What a level can be for: Block and District by what the awards are for, a jute bag by its size.
   function categoriesFor(label) {
@@ -3199,6 +3208,7 @@ window.AWARD_CONFIG = {
       var t = typeOf(id);
       var label = levelLabel(name || (t && t.name), code || (t && t.code));
       var has = levelHasCategory(label);
+      if (isOtherGift(label)) { category = "Other"; }
       // A jute bag's size is in its type; one filed before the types existed has it on the line.
       var size = label === "Jute Bag" ? (category || juteSizeOfCode(code || (t && t.code))) : "";
       var typeId = Number(id) || (label === "Jute Bag" ? (juteTypeId(size) || 0) : 0);
@@ -4073,6 +4083,7 @@ window.AWARD_CONFIG = {
     if (code === "POM_DISTRICT") return "District";
     if (code === "JUTE_SMALL") return "Small";
     if (code === "JUTE_BIG") return "Big";
+    if (code === "OTHER") return "Other";
     return code || t.name;
   }
 
