@@ -309,14 +309,16 @@ function blocksFor(district) {
 
 // ── Teachers felicitated: filled from Award Management ──
 // The two "Teachers Felicitated" columns are not typed. They count the VERIFIED
-// awards in Award Management (awarded, verified, not rejected), in the month of
-// the award date:
+// awards in Award Management (awarded, verified, not rejected), in the record's
+// own month (its POM month, e.g. a June-2026 winner counts in Jun-2026 even when
+// it is awarded, late, in October). A record whose month is not a calendar month
+// (e.g. "Pending 2025-26") counts in the month of its award date instead:
 //   Block level    = categories starting "Block Level"    (Block Level - POM)
 //   District level = categories starting "District Level" (POM and LIFESKILL)
 // A block-level award counts under the block named on the record. A record whose
 // block is not one of the district's blocks still counts in the district's
 // Block Level total, and is listed in the notes above the table.
-const AUTO_MSG = "Filled automatically from verified awards in Award Management, in the month of the award date.";
+const AUTO_MSG = "Filled automatically from verified awards in Award Management, in each award's own month.";
 
 function awardMonth(dateStr) {
   const m = /^(\d{4})-(\d{2})/.exec(str(dateStr));
@@ -328,7 +330,7 @@ function awardMonth(dateStr) {
 async function loadFelicitated() {
   aweFelicState = "loading";
   try {
-    const cols = "district_name,block_name,award_category,awarded_date,rejected";
+    const cols = "district_name,block_name,award_category,month_label,awarded_date,rejected";
     const rows = [];
     for (let offset = 0; ; offset += 1000) {
       const page = await sbGet("award_records?select=" + cols +
@@ -340,7 +342,9 @@ async function loadFelicitated() {
     const out = {};
     rows.forEach(r => {
       if (r.rejected === true) return;
-      const month = awardMonth(r.awarded_date);
+      const label = str(r.month_label);
+      const month = /^[A-Z][a-z]{2}-\d{4}$/.test(label) && MONTH_NAMES.indexOf(label.slice(0, 3)) >= 0
+        ? label : awardMonth(r.awarded_date);
       const district = str(r.district_name);
       const cat = str(r.award_category).toLowerCase();
       if (!month || !district) return;
