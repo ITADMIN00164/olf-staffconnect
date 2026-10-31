@@ -2317,3 +2317,11 @@
 @media (prefers-reduced-motion: reduce) {
   .award-page .aw-refresh-all.is-busy .aw-icon svg { animation: none; }
 }
+
+/* On a phone the stock buttons wrap onto their own line instead of widening
+   the page, and the district bar of Award Management wraps its AY badge. */
+@media (max-width: 640px) {
+  .award-page .stock-actions { flex-wrap: wrap; width: 100%; margin-left: 0; justify-content: flex-end; }
+  .award-page .awm-view .pom-filter-card, .award-page .pom-filter-card { flex-wrap: wrap; }
+  .award-page .pom-filter-card .pom-select { max-width: 100%; }
+}

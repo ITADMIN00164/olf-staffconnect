@@ -4000,6 +4000,9 @@ window.AWARD_CONFIG = {
        (its requisitions and stock figures), the Jute Bags tab only the jute
        bag stock figures. */
     var jute = stockScope === "jute";
+    var oldResult = document.getElementById("reset-result");       // from a reset just done
+    if (oldResult) oldResult.remove();
+    Array.prototype.forEach.call(document.getElementById("reset-body").children, function (n) { n.hidden = false; });
     [["reset-req", !jute], ["reset-award", !jute], ["reset-jreq", jute], ["reset-jute", jute]].forEach(function (p) {
       var box = document.getElementById(p[0]);
       box.checked = p[1];
@@ -4066,13 +4069,15 @@ window.AWARD_CONFIG = {
       if (want.p_jute_req) parts.push((r.jute_req || 0) + " jute bag requisitions");
       if (want.p_award_stock) parts.push((r.award_stock || 0) + " award stock figures");
       if (want.p_jute_stock) parts.push((r.jute_stock || 0) + " jute stock figures");
-      document.getElementById("reset-body").innerHTML =
-        '<p class="import-said">Deleted: ' + escapeHtml(parts.join(", ")) + ".</p>";
+      // The form is put away, not thrown away, so the window can be opened again for the other sheet.
+      var body = document.getElementById("reset-body");
+      Array.prototype.forEach.call(body.children, function (n) { n.hidden = true; });
+      var done = document.createElement("div");
+      done.id = "reset-result";
+      done.innerHTML = '<p class="import-said">Deleted: ' + escapeHtml(parts.join(", ")) + ".</p>" +
+        '<div class="form-actions"><button type="button" class="btn btn-primary" data-aw-close-reset>Close</button></div>';
+      body.appendChild(done);
       document.getElementById("reset-actions").hidden = true;
-      var close = document.createElement("div");
-      close.className = "form-actions";
-      close.innerHTML = '<button type="button" class="btn btn-primary" data-aw-close-reset>Close</button>';
-      document.getElementById("reset-body").appendChild(close);
       loadRequisitions();
       loadStock(function () { refreshStockControls(); renderStock(); renderReqStock(); });
     }).catch(function (err) {
