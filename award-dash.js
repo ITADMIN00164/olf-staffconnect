@@ -523,9 +523,18 @@ function sheetXml(aoa, opts) {
           '<formula1>' + xmlEsc(v.formula) + '</formula1></dataValidation>';
       }).join("") + '</dataValidations>'
     : "";
+  // Merged ranges ("A1:A2") and a frozen top-left block ({ cols, rows }).
+  const merges = (opts.merges || []).length
+    ? '<mergeCells count="' + opts.merges.length + '">' + opts.merges.map(function (m) { return '<mergeCell ref="' + m + '"/>'; }).join("") + '</mergeCells>'
+    : "";
+  const fz = opts.freeze;
+  const views = fz && (fz.cols || fz.rows)
+    ? '<sheetViews><sheetView workbookViewId="0"><pane' + (fz.cols ? ' xSplit="' + fz.cols + '"' : "") + (fz.rows ? ' ySplit="' + fz.rows + '"' : "") +
+      ' topLeftCell="' + colLetter(fz.cols || 0) + ((fz.rows || 0) + 1) + '" activePane="' + (fz.cols && fz.rows ? "bottomRight" : fz.rows ? "bottomLeft" : "topRight") + '" state="frozen"/></sheetView></sheetViews>'
+    : "";
   return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
-    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' + cols +
-    '<sheetData>' + body + '</sheetData>' + protection + checks + '</worksheet>';
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' + views + cols +
+    '<sheetData>' + body + '</sheetData>' + protection + merges + checks + '</worksheet>';
 }
 
 // A workbook of several sheets: [{ name, rows, widths, validations: [{ sqref, formula, message }] }].
@@ -553,7 +562,7 @@ function buildWorkbook(sheets, options) {
   ];
   if (options.styles) files.push(["xl/styles.xml", head + options.styles]);
   sheets.forEach(function (s, i) {
-    files.push(["xl/worksheets/sheet" + (i + 1) + ".xml", sheetXml(s.rows, { widths: s.widths, cols: s.cols, protect: s.protect, validations: s.validations })]);
+    files.push(["xl/worksheets/sheet" + (i + 1) + ".xml", sheetXml(s.rows, { widths: s.widths, cols: s.cols, protect: s.protect, validations: s.validations, merges: s.merges, freeze: s.freeze })]);
   });
   return zipStore(files);
 }

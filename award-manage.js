@@ -244,11 +244,11 @@ function showModal({ title, message, buttons }) {
 
 function confirmOverride() {
   return showModal({
-    title: "Image already exists",
-    message: "An image already exists for this record. Override it? The current image will be deleted.",
+    title: "Replace the image?",
+    message: "The current image will be deleted from Drive.",
     buttons: [
       { label: "Cancel", value: false, variant: "cancel" },
-      { label: "Override", value: true, variant: "danger" }
+      { label: "Replace", value: true, variant: "danger" }
     ]
   });
 }
@@ -1110,7 +1110,8 @@ window.awmUploadImage = async function (index, file) {
       fileName: `${safeName}_${Date.now()}${ext}`,
       mimeType: file.type || "image/jpeg",
       data: dataUrl.split(",")[1],
-      replaceId: null
+      // The picture being replaced: Drive deletes it, so the folder holds one picture per record.
+      replaceId: driveId(existingUrl) || null
     };
 
     const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
@@ -1298,8 +1299,8 @@ async function decideRecord(index, decision) {   // decision: "Yes" (verify) | "
       const held = await window.awardStockApi.balanceFor(decided.districtName || district, decided.awardCategory);
       if (held !== null && held <= 0) {
         const go = await showModal({
-          title: "No stock left for this award",
-          message: `${decided.districtName || district} has ${held} of this gift in stock. Verifying will take it ${held < 0 ? "further " : ""}below zero, and the stock sheet will show a shortfall. Verify anyway?`,
+          title: "No stock left",
+          message: `${decided.districtName || district} has ${held} in stock. Verify anyway?`,
           buttons: [
             { label: "Cancel", value: "no", variant: "cancel" },
             { label: "Verify anyway", value: "yes", variant: "primary" }

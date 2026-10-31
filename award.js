@@ -49,6 +49,11 @@ window.AWARD_CONFIG = {
     district: document.getElementById("district"),
     reqWhere: document.getElementById("req-where"),
     reqStock: document.getElementById("req-stock"),
+    reqExcel: document.getElementById("req-excel"),
+    reqCount: document.getElementById("req-count"),
+    reqClear: document.getElementById("req-clear"),
+    deliveryExcel: document.getElementById("delivery-excel"),
+    stockExcel: document.getElementById("stock-excel"),
     stockTemplate: document.getElementById("stock-template"),
     stockImport: document.getElementById("stock-import"),
     goLiveBar: document.getElementById("stock-golive"),
@@ -385,6 +390,70 @@ window.AWARD_CONFIG = {
   var hoAdmins = [];             // [{ email, name }]
   var hasAdmins = true;          // false until the fulfilment migration runs
 
+  /* Messages and questions in this tab use one pop-up of its own, in the
+     tab's colours, and never the browser's grey box. One at a time: a
+     second waits for the first to be answered. */
+  var AWP_ICONS = {
+    info:     '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="7.8" r=".6" fill="currentColor"/></svg>',
+    warning:  '<svg viewBox="0 0 24 24"><path d="M12 3.5l9 16H3z"/><path d="M12 10v4.5"/><circle cx="12" cy="17.3" r=".6" fill="currentColor"/></svg>',
+    question: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1.1.8-1.1 1.6"/><circle cx="12" cy="16.6" r=".6" fill="currentColor"/></svg>',
+    success:  '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.4l2.7 2.7L16 9.5"/></svg>',
+    lock:     '<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>'
+  };
+  var awpQueue = Promise.resolve();
+
+  function awPopup(o) {
+    awpQueue = awpQueue.then(function () {
+      return new Promise(function (resolve) {
+        var box = document.getElementById("aw-popup");
+        if (!box) return resolve(o.cancel ? false : true);
+
+        var tone = o.tone || (o.cancel ? "question" : "info");
+        var icon = document.getElementById("awp-icon");
+        icon.className = "awp-icon is-" + tone;
+        icon.innerHTML = AWP_ICONS[tone] || AWP_ICONS.info;
+        document.getElementById("awp-title").textContent = o.title || "";
+        document.getElementById("awp-text").textContent = o.message || "";
+        var ok = document.getElementById("awp-ok");
+        var cancel = document.getElementById("awp-cancel");
+        ok.textContent = o.ok || "OK";
+        ok.classList.toggle("btn-danger", tone === "danger");
+        ok.classList.toggle("btn-primary", tone !== "danger");
+        cancel.textContent = o.cancel || "Cancel";
+        cancel.hidden = !o.cancel;
+
+        var done = function (answer) {
+          box.classList.remove("is-open");
+          document.removeEventListener("keydown", onKey, true);
+          box.removeEventListener("click", onClick);
+          resolve(answer);
+        };
+        var onClick = function (e) {
+          if (e.target.closest("#awp-ok")) done(true);
+          else if (e.target.closest("#awp-cancel") || e.target.closest("[data-awp-cancel]")) done(o.cancel ? false : true);
+        };
+        var onKey = function (e) {
+          if (e.key === "Escape") { e.stopPropagation(); done(o.cancel ? false : true); }
+          else if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); done(true); }
+        };
+        box.addEventListener("click", onClick);
+        document.addEventListener("keydown", onKey, true);
+        box.classList.add("is-open");
+        ok.focus();
+      });
+    });
+    return awpQueue;
+  }
+
+  // A message with one button.
+  function awAlert(title, message, tone) {
+    return awPopup({ title: title, message: message, tone: tone || "info" });
+  }
+  // A question: resolves true on the main button, false on Cancel or Escape.
+  function awConfirm(title, message, confirmText, tone) {
+    return awPopup({ title: title, message: message, tone: tone || "question", ok: confirmText || "Continue", cancel: "Cancel" });
+  }
+
   function myEmail() {
     var u = window.__olfUser || {};
     var e = window.__olfEmployee || {};
@@ -566,6 +635,7 @@ window.AWARD_CONFIG = {
     check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
            'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
            '<path d="m4.5 12.5 5 5 10-11"/></svg>',
+    lock:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1" fill="currentColor"/></svg>',
     plus:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
            'stroke-width="2.2" stroke-linecap="round">' +
            '<path d="M12 5v14M5 12h14"/></svg>',
@@ -670,16 +740,25 @@ window.AWARD_CONFIG = {
     el.setupBanner.hidden = false;
   }
 
-  function placeholderRow(message) {
+  function placeholderRow(message, kind) {
     setRowPill(allRequisitions.length === 1 ? "1 item" : allRequisitions.length + " items");
     // Counted from the table rather than written down: the column count has
     // changed three times and a stale number leaves the message short of the
     // width, with a ragged edge where the row stops.
     var cols = document.querySelectorAll("#requisitions-table thead th").length || 1;
-    el.tbody.innerHTML =
-      '<tr class="placeholder-row"><td colspan="' + cols + '">' +
-      escapeHtml(message) + "</td></tr>";
+    var inner = escapeHtml(message);
+    if (kind === "none") {
+      inner = '<div class="req-empty">' + EMPTY_ART + '<p class="re-title">No requisitions yet</p>' +
+        '<p class="re-sub">Raise the first one to get started.</p>' +
+        '<button type="button" class="btn btn-primary btn-sm" data-aw-new>' +
+        '<i class="aw-icon" data-aw-icon="plus" aria-hidden="true"></i>New Requisition</button></div>';
+    } else if (kind === "nomatch") {
+      inner = '<div class="req-empty">' + EMPTY_ART + '<p class="re-title">No matches</p>' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-aw-clear>Clear filters</button></div>';
+    }
+    el.tbody.innerHTML = '<tr class="placeholder-row"><td colspan="' + cols + '">' + inner + "</td></tr>";
     el.tfoot.hidden = true;
+    if (kind) paintIcons();
   }
 
   // Replace a <select>'s options, keeping the current value if it survives.
@@ -712,6 +791,7 @@ window.AWARD_CONFIG = {
   var utilView = "award";
 
   function showTopView(which) {
+    if (lockedForMe("top:" + which)) { notifyLocked(); return; }
     var util = which === "util";
     var event = which === "event";
     var stock = document.getElementById("aw-view-stock");
@@ -767,7 +847,9 @@ window.AWARD_CONFIG = {
   }
 
   function showUtilView(which) {
-    utilView = which === "dash" ? "dash" : "award";
+    var asked = which === "dash" ? "dash" : "award";
+    if (lockedForMe("util:" + asked)) { notifyLocked(); return; }
+    utilView = asked;
     showTopView("util");
   }
 
@@ -779,7 +861,6 @@ window.AWARD_CONFIG = {
     dashViewStarted = false;       // and a fresh dashboard
     eventViewStarted = false;      // and fresh event counts
     utilView = "award";            // Award Utilisation opens on Award Management
-    juteView = "stock";
     stockScope = "awards";
 
     allRequisitions = [];
@@ -821,6 +902,7 @@ window.AWARD_CONFIG = {
     if (!db) db = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
     wireEvents();
+    loadLocks(enforceLocks);
     loadAdmins(function () { applyAccess(); renderRows(); });
     loadStock(function () {
       refreshStockControls(); renderStock(); renderReqStock();
@@ -830,11 +912,174 @@ window.AWARD_CONFIG = {
     loadRequisitions();
   }
 
+  // ------------------------------------------------------------- locked tabs
+
+  /* An IT admin can lock any tab of this page. Locked tabs wear a padlock for
+     everybody and open for nobody but IT admins. The list is kept in
+     award_settings as 'locked_tabs', and read when the page opens. */
+  var lockedTabs = {};              // "top:event" -> true
+
+  var LOCK_ITEMS = [
+    { k: "top:util",       t: "Award Utilisation" },
+    { k: "util:award",     t: "Award Management",     child: true },
+    { k: "util:dash",      t: "Award Data Dashboard", child: true },
+    { k: "top:event",      t: "Event Management" },
+    { k: "top:stock",      t: "Stock Management" },
+    { k: "sub:requisition", t: "Requisition",         child: true },
+    { k: "sub:delivery",   t: "Delivery",             child: true },
+    { k: "sub:stock",      t: "Stock",                child: true },
+    { k: "sub:jute",       t: "Jute Bags",            child: true }
+  ];
+
+  function lockedForMe(key) { return !!lockedTabs[key] && !isAppAdmin(); }
+
+  function notifyLocked() {
+    awAlert("This tab is locked", "An IT admin has locked it for now.", "lock");
+  }
+
+  function tabKey(btn) {
+    return btn.hasAttribute("data-aw-top") ? "top:" + btn.getAttribute("data-aw-top")
+         : btn.hasAttribute("data-aw-util") ? "util:" + btn.getAttribute("data-aw-util")
+         : "sub:" + btn.getAttribute("data-aw-subtab");
+  }
+
+  function paintLock(btn) {
+    var locked = !!lockedTabs[tabKey(btn)];
+    btn.classList.toggle("has-lock", locked);
+    btn.classList.toggle("is-locked", locked && !isAppAdmin());
+    if (locked && !isAppAdmin()) btn.setAttribute("aria-disabled", "true"); else btn.removeAttribute("aria-disabled");
+    var icon = btn.querySelector(".tab-lockico");
+    if (locked && !icon) {
+      icon = document.createElement("i");
+      icon.className = "tab-lockico";
+      icon.setAttribute("aria-hidden", "true");
+      icon.innerHTML = ICONS.lock;
+      btn.appendChild(icon);
+    } else if (!locked && icon) {
+      icon.remove();
+    }
+  }
+
+  function showLockedScreen(on) {
+    var screen = document.getElementById("aw-locked");
+    if (!screen) return;
+    screen.hidden = !on;
+    if (on) {
+      ["aw-view-stock", "aw-view-award", "aw-view-dash", "aw-view-event", "aw-util-bar", "aw-stock-actions"].forEach(function (id) {
+        var n = document.getElementById(id);
+        if (n) n.hidden = true;
+      });
+    }
+  }
+
+  /* Paints the padlocks, and moves anyone who is standing on a tab that has
+     just been locked to one that is open - or says there is none. */
+  function enforceLocks() {
+    var admin = isAppAdmin();
+    var lockBtn = document.getElementById("aw-lock-btn");
+    if (lockBtn) lockBtn.hidden = !admin;
+
+    Array.prototype.forEach.call(
+      document.querySelectorAll(".award-page .aw-toptab, .award-page .aw-utiltab, .award-page .aw-subtab"), paintLock);
+    showLockedScreen(false);
+    if (admin) return;
+
+    var topEl = document.querySelector(".award-page .aw-toptab.is-active");
+    var top = topEl && topEl.getAttribute("data-aw-top");
+    if (top && lockedForMe("top:" + top)) {
+      var alt = ["util", "event", "stock"].filter(function (k) { return !lockedForMe("top:" + k); })[0];
+      if (!alt) { showLockedScreen(true); return; }
+      showTopView(alt);
+      top = alt;
+    }
+    if (top === "util" && lockedForMe("util:" + utilView)) {
+      var other = utilView === "award" ? "dash" : "award";
+      if (lockedForMe("util:" + other)) { showLockedScreen(true); return; }
+      showUtilView(other);
+    }
+    if (top === "stock") {
+      var active = document.querySelector(".award-page .aw-subtab.is-active");
+      var name = active && active.getAttribute("data-aw-subtab");
+      if (name && lockedForMe("sub:" + name)) {
+        var openSub = ["requisition", "delivery", "stock", "jute"].filter(function (k) {
+          var b = document.querySelector('[data-aw-subtab="' + k + '"]');
+          return b && !b.hidden && !lockedForMe("sub:" + k);
+        })[0];
+        if (!openSub) { showLockedScreen(true); return; }
+        showTab(el.subtabs, "data-aw-subtab", openSub);
+      }
+    }
+  }
+
+  function loadLocks(done) {
+    db.from("award_settings").select("value").eq("key", "locked_tabs")
+      .then(function (res) {
+        lockedTabs = {};
+        try {
+          var list = JSON.parse((res.data && res.data[0] && res.data[0].value) || "[]");
+          list.forEach(function (k) { lockedTabs[k] = true; });
+        } catch (e) { /* an unreadable list means nothing is locked */ }
+        done && done();
+      })
+      .catch(function () { lockedTabs = {}; done && done(); });
+  }
+
+  function renderLocksList() {
+    var list = document.getElementById("locks-list");
+    if (!list) return;
+    list.innerHTML = LOCK_ITEMS.map(function (it) {
+      var on = !!lockedTabs[it.k];
+      return '<li class="lk-row' + (it.child ? " is-child" : "") + '">' +
+        '<span class="lk-name">' + escapeHtml(it.t) + "</span>" +
+        '<span class="lk-state' + (on ? " is-on" : "") + '">' + (on ? "Locked" : "Open") + "</span>" +
+        '<label class="lk-switch"><input type="checkbox" data-lock="' + it.k + '"' + (on ? " checked" : "") +
+        ' aria-label="Lock ' + escapeHtml(it.t) + '" /><span></span></label></li>';
+    }).join("");
+  }
+
+  function saveLocks(key, now) {
+    var before = !!lockedTabs[key];
+    lockedTabs[key] = now;
+    var keys = Object.keys(lockedTabs).filter(function (k) { return lockedTabs[k]; });
+    db.from("award_settings")
+      .upsert({ key: "locked_tabs", value: JSON.stringify(keys), updated_by: myEmail() || null,
+                updated_at: new Date().toISOString() })
+      .then(function (res) {
+        if (res.error) throw res.error;
+        enforceLocks();
+        renderLocksList();
+        var saved = document.getElementById("locks-saved");
+        if (saved) { saved.hidden = false; setTimeout(function () { saved.hidden = true; }, 1600); }
+      })
+      .catch(function (err) {
+        lockedTabs[key] = before;
+        renderLocksList();
+        reportError("save the locked tabs", err);
+        awAlert("Could not save", "The lock was not changed. Try again.", "warning");
+      });
+  }
+
+  function openLocks() {
+    if (!isAppAdmin()) return;
+    renderLocksList();
+    var m = document.getElementById("locks-modal");
+    if (!m) return;
+    m.classList.add("is-open");
+    document.addEventListener("keydown", onLocksKey);
+  }
+  function closeLocks() {
+    var m = document.getElementById("locks-modal");
+    if (m) m.classList.remove("is-open");
+    document.removeEventListener("keydown", onLocksKey);
+  }
+  function onLocksKey(event) { if (event.key === "Escape") closeLocks(); }
+
   // ------------------------------------------------------------- the tabs
 
   /* Works off each button's own attribute and the panel it names, rather
      than a list that would have to be kept in step with the markup. */
   function showTab(buttons, attr, name) {
+    if (attr === "data-aw-subtab" && lockedForMe("sub:" + name)) { notifyLocked(); return; }
     Array.prototype.forEach.call(buttons, function (tab) {
       var on = tab.getAttribute(attr) === name;
       tab.classList.toggle("is-active", on);
@@ -853,7 +1098,7 @@ window.AWARD_CONFIG = {
     if (el.rowPill) el.rowPill.hidden = name !== "requisition";
 
     // One sheet, two tabs: it goes where it is wanted, counting what that tab is about.
-    if (name === "jute") showJuteView(juteView);
+    if (name === "jute") showJuteSheet();
     else if (name === "stock") attachSheet("awards");
   }
 
@@ -973,6 +1218,51 @@ window.AWARD_CONFIG = {
      carry one. */
   var reviewing = null;          // the requisition under review
 
+  // A colour for each kind of gift, in the lines of the summary.
+  function giftToneClass(a) {
+    var n = String(a.name || "").toLowerCase();
+    if (n === "jute bag") return a.category === "Big" ? "g-big" : "g-small";
+    if (n === "block") return "g-block";
+    if (n === "district") return "g-district";
+    if (/nanhe|\bns\b/.test(n)) return "g-ns";
+    if (/shikshan|\bsu\b/.test(n)) return "g-su";
+    if (n === "other") return "g-other";
+    return "g-plain";
+  }
+
+  /* What is being decided on, for the Review and Head Office windows: who
+     asked, for where and when, why, and what - each gift a line with its
+     colour, its category and how many. */
+  function requisitionSummaryHtml(row) {
+    var p = placeOf(row);
+    var awards = awardsOf(row);
+    var total = awards.reduce(function (n, a) { return n + (Number(a.quantity) || 0); }, 0);
+    var when = formatTimestamp(row.created_at).split(", ");
+    var remark = remarkOf(row);
+
+    var gifts = awards.map(function (a, i) {
+      var what = !a.hasCategory ? "" : a.category === "Other" ? (a.categoryOther || "Other") : a.category;
+      return '<li class="' + giftToneClass(a) + '" style="--i:' + i + '"><i></i>' +
+        '<span class="rv-gname">' + escapeHtml(a.name) + "</span>" +
+        (what ? '<span class="rv-gcat">' + escapeHtml(what) + "</span>" : "") +
+        "<b>" + escapeHtml(Number(a.quantity).toLocaleString()) + "</b></li>";
+    }).join("");
+
+    return '<div class="rv">' +
+      '<div class="rv-tiles">' +
+        '<div class="rv-tile"><span class="rv-k">Requested by</span><b>' + escapeHtml(row.requester_name || "\u2014") + "</b>" +
+          (row.requester_role ? '<span class="chip-role">' + escapeHtml(row.requester_role) + "</span>" : "") + "</div>" +
+        '<div class="rv-tile"><span class="rv-k">For</span><b>' + escapeHtml(p.district || "\u2014") + "</b>" +
+          '<span class="rv-sub">' + escapeHtml([p.division, p.state].filter(Boolean).join(" \u00b7 ")) + "</span></div>" +
+        '<div class="rv-tile"><span class="rv-k">Filed</span><b>' + escapeHtml(when[0] || "\u2014") + "</b>" +
+          (when[1] ? '<span class="rv-sub">' + escapeHtml(when[1]) + "</span>" : "") + "</div>" +
+      "</div>" +
+      (remark ? '<blockquote class="rv-remark"><span>Why it is needed</span>' + escapeHtml(remark) + "</blockquote>" : "") +
+      '<div class="rv-ghead"><span>Gifts</span><span class="rv-total">Total <b>' + escapeHtml(total.toLocaleString()) + "</b></span></div>" +
+      '<ul class="rv-gifts">' + gifts + "</ul>" +
+    "</div>";
+  }
+
   function openReview(id) {
     var row = null;
     for (var i = 0; i < allRequisitions.length; i++) {
@@ -984,20 +1274,7 @@ window.AWARD_CONFIG = {
     returnFocusTo = document.activeElement;
 
     var p = placeOf(row);
-    el.reviewSummary.innerHTML =
-      "<dl>" +
-        "<div><dt>Requested by</dt><dd>" + escapeHtml(row.requester_name || "—") +
-          (row.requester_role ? ' <span class="chip-role">' +
-             escapeHtml(row.requester_role) + "</span>" : "") + "</dd></div>" +
-        "<div><dt>Gifts</dt><dd>" + awardsCellHtml(awardsOf(row), row) + "</dd></div>" +
-        "<div><dt>Total</dt><dd>" + escapeHtml(Number(row.quantity).toLocaleString()) +
-        "</dd></div>" +
-        "<div><dt>For</dt><dd>" +
-          escapeHtml([p.district, p.division, p.state].filter(Boolean).join(", ")) +
-        "</dd></div>" +
-        (remarkOf(row) ? "<div><dt>Remark</dt><dd>" + escapeHtml(remarkOf(row)) + "</dd></div>" : "") +
-        "<div><dt>Filed</dt><dd>" + escapeHtml(formatTimestamp(row.created_at)) + "</dd></div>" +
-      "</dl>";
+    el.reviewSummary.innerHTML = requisitionSummaryHtml(row);
 
     el.reviewRemark.value = "";
     setFieldError(el.reviewRemark, "review-remark-error", "");
@@ -1203,18 +1480,24 @@ window.AWARD_CONFIG = {
       receive:     "Only you can say this - you are the one it was sent to.",
       issue:       "It goes back to Head Office with what you say here."
     };
+    // Reject, hold and "never arrived" are reached from here, not from a button of their own.
+    var alts = ["hold", "reject", "issue"].filter(function (a) { return a !== action && mayDo(row, a); });
+    var altBox = document.getElementById("ho-alt");
+    if (altBox) {
+      altBox.hidden = !alts.length;
+      altBox.innerHTML = alts.map(function (a) {
+        return '<button type="button" class="ho-alt-link' + (a === "reject" || a === "issue" ? " is-danger" : "") +
+               '" data-aw-alt="' + a + '">' + escapeHtml(HO_LABELS[a]) + " instead</button>";
+      }).join("");
+      altBox.onclick = function (event) {
+        var b = event.target.closest("[data-aw-alt]");
+        if (b) startHoAction(row.id, b.getAttribute("data-aw-alt"));
+      };
+    }
     el.hoHeading.textContent = HEADINGS[action] || "Requisition";
     el.hoSub.textContent = SUBS[action] || "";
 
-    el.hoSummary.innerHTML =
-      "<dl>" +
-        "<div><dt>Requested by</dt><dd>" + escapeHtml(row.requester_name || "—") + "</dd></div>" +
-        "<div><dt>Gifts</dt><dd>" + awardsCellHtml(awardsOf(row), row) + "</dd></div>" +
-        (remarkOf(row) ? "<div><dt>Remark</dt><dd>" + escapeHtml(remarkOf(row)) + "</dd></div>" : "") +
-        "<div><dt>For</dt><dd>" +
-          escapeHtml([p.district, p.division, p.state].filter(Boolean).join(", ")) +
-        "</dd></div>" +
-      "</dl>";
+    el.hoSummary.innerHTML = requisitionSummaryHtml(row);
 
     /* Dispatching asks how many are going, filled in with what was asked
        for. Changing a figure is the whole point: a district that is sent 60
@@ -1468,14 +1751,15 @@ window.AWARD_CONFIG = {
       return;
     }
     if (!hoAdmins.length) {
-      el.adminList.innerHTML =
-        '<p class="aw-empty-line">Nobody yet. Until somebody is added, approved ' +
-        "requisitions sit waiting with no one able to act on them.</p>";
+      el.adminList.innerHTML = '<li class="admin-empty">' + EMPTY_ART + "<p>Nobody added yet.</p></li>";
       return;
     }
 
     el.adminList.innerHTML = hoAdmins.map(function (a) {
+      var initials = String(a.name || a.email || "?").replace(/@.*/, "").split(/[\s._-]+/).filter(Boolean)
+        .slice(0, 2).map(function (w) { return w.charAt(0).toUpperCase(); }).join("") || "?";
       return '<li class="admin-row">' +
+               '<span class="admin-avatar" aria-hidden="true">' + escapeHtml(initials) + "</span>" +
                '<span class="admin-who"><b>' + escapeHtml(a.name || a.email) + "</b>" +
                  (a.name ? '<span>' + escapeHtml(a.email) + "</span>" : "") +
                "</span>" +
@@ -1542,16 +1826,12 @@ window.AWARD_CONFIG = {
     // Taking the last one off leaves nobody able to fulfil anything, so it
     // says so rather than removing quietly.
     var last = hoAdmins.length === 1;
-    var ask = window.showAppConfirm ? window.showAppConfirm({
-      title: last ? "Remove the last HO admin?" : "Remove from Head Office?",
-      type: last ? "warning" : "question",
-      message: last
-        ? "Nobody will be left to acknowledge or deliver requisitions, and the "
-          + "Delivery tab will disappear until somebody is added again."
+    var ask = awConfirm(
+      last ? "Remove the last HO admin?" : "Remove from Head Office?",
+      last
+        ? "Nobody will be left to acknowledge or deliver requisitions, and the Delivery tab will disappear until somebody is added again."
         : (who.name || who.email) + " will no longer see the Delivery tab.",
-      confirmText: "Remove",
-      cancelText: "Keep"
-    }) : Promise.resolve(window.confirm("Remove " + (who.name || who.email) + "?"));
+      "Remove", "warning");
 
     Promise.resolve(ask).then(function (yes) {
       if (!yes) return;
@@ -1585,15 +1865,6 @@ window.AWARD_CONFIG = {
 
     wireTabList(el.subtabs, "data-aw-subtab");
 
-    Array.prototype.forEach.call(document.querySelectorAll("[data-jute-view]"), function (btn) {
-      btn.addEventListener("click", function () { showJuteView(btn.getAttribute("data-jute-view")); });
-    });
-
-    ["jute-district", "jute-status", "jute-size"].forEach(function (id) {
-      var sel = document.getElementById(id);
-      if (sel) sel.addEventListener("change", renderJute);
-    });
-
     Array.prototype.forEach.call(
       document.querySelectorAll(".award-page .aw-toptab"),
       function (tab) {
@@ -1614,6 +1885,20 @@ window.AWARD_CONFIG = {
 
     // The Test tab opens on its first tab, Award Utilisation.
     showTopView("util");
+
+    // The IT admin's Tab access window.
+    var lockBtn = document.getElementById("aw-lock-btn");
+    if (lockBtn) lockBtn.addEventListener("click", openLocks);
+    var locksModal = document.getElementById("locks-modal");
+    if (locksModal) {
+      locksModal.addEventListener("click", function (event) {
+        if (event.target.closest("[data-aw-close-locks]")) closeLocks();
+      });
+      locksModal.addEventListener("change", function (event) {
+        var box = event.target.closest("input[data-lock]");
+        if (box) saveLocks(box.getAttribute("data-lock"), box.checked);
+      });
+    }
 
     Array.prototype.forEach.call(
       el.hoModal.querySelectorAll("[data-aw-close-ho]"),
@@ -1696,6 +1981,7 @@ window.AWARD_CONFIG = {
 
     el.stockFetch.addEventListener("click", function () {
       stockShown = true;
+      stockFresh = true;
       renderStock();
     });
 
@@ -1719,6 +2005,9 @@ window.AWARD_CONFIG = {
 
     el.newReqBtn.addEventListener("click", openRequisitionModal);
 
+    if (el.reqExcel) el.reqExcel.addEventListener("click", function () { downloadRequisitionsExcel(false); });
+    if (el.deliveryExcel) el.deliveryExcel.addEventListener("click", function () { downloadRequisitionsExcel(true); });
+    if (el.stockExcel) el.stockExcel.addEventListener("click", downloadStockExcel);
     if (el.stockTemplate) {
       el.stockTemplate.addEventListener("click", downloadOpeningTemplate);
     }
@@ -1805,7 +2094,7 @@ window.AWARD_CONFIG = {
     );
     el.reviewApprove.addEventListener("click", function () { decide("approved"); });
     el.reviewDecline.addEventListener("click", function () { decide("declined"); });
-    if (el.filterStatus) el.filterStatus.addEventListener("change", renderTable);
+    if (el.filterStatus) el.filterStatus.addEventListener("change", renderTableFresh);
 
     // The close button, and the backdrop behind the box.
     Array.prototype.forEach.call(
@@ -1832,16 +2121,44 @@ window.AWARD_CONFIG = {
       el.filterDivision.value = "";
       el.filterDistrict.value = "";
       buildFilterOptions();
-      renderTable();
+      renderTableFresh();
     });
     el.filterDivision.addEventListener("change", function () {
       el.filterDistrict.value = "";
       buildFilterOptions();
-      renderTable();
+      renderTableFresh();
     });
-    el.filterDistrict.addEventListener("change", renderTable);
-    el.filterType.addEventListener("change", renderTable);
-    el.filterSearch.addEventListener("input", renderTable);
+    el.filterDistrict.addEventListener("change", renderTableFresh);
+    el.filterType.addEventListener("change", renderTableFresh);
+    el.filterSearch.addEventListener("input", renderTableFresh);
+    if (el.reqClear) el.reqClear.addEventListener("click", clearReqFilters);
+
+    // A row that is waiting is pressed like a button.
+    var onRow = function (event) {
+      var tr = event.target.closest && event.target.closest("tr.needs-me");
+      if (!tr) return;
+      if (event.type === "keydown") {
+        if (event.target !== tr || (event.key !== "Enter" && event.key !== " ")) return;
+        event.preventDefault();
+      } else if (event.target.closest("button, a, input, select, textarea, label")) {
+        return;                                // its own buttons (View, View log) keep their own meaning
+      }
+      pressWaitingRow(tr);
+    };
+    el.tbody.addEventListener("click", onRow);
+    el.tbody.addEventListener("keydown", onRow);
+    if (el.deliveryBody) {
+      el.deliveryBody.addEventListener("click", onRow);
+      el.deliveryBody.addEventListener("keydown", onRow);
+    }
+    var showBtn = document.getElementById("act-show");
+    if (showBtn) showBtn.addEventListener("click", showFirstWaiting);
+
+    // The buttons an empty list offers.
+    el.tbody.addEventListener("click", function (event) {
+      if (event.target.closest("[data-aw-new]")) openRequisitionModal();
+      else if (event.target.closest("[data-aw-clear]")) clearReqFilters();
+    });
   }
 
   // -------------------------------------------------------- reference data
@@ -2504,6 +2821,7 @@ window.AWARD_CONFIG = {
 
   function loadRequisitions() {
     el.refreshBtn.disabled = true;
+    reqFresh = true;
 
     db.from("requisitions")
       .select("id, requester_name, quantity, requisition_date, status, created_at," +
@@ -2583,7 +2901,6 @@ window.AWARD_CONFIG = {
         // Their own tables, and renderTable returns early when the list is
         // empty - which is exactly when they need their empty states.
         renderDelivery();
-        renderJute();
         refreshStockControls();
         renderStock();
       })
@@ -2642,7 +2959,62 @@ window.AWARD_CONFIG = {
   function renderRows() {
     renderTable();
     renderDelivery();
-    renderJute();
+    updateActionAlerts();
+  }
+
+  /* The counts on the tabs and the banner above the list: what is waiting for
+     the person looking, visible whichever tab they are on. */
+  function setCount(id, n) {
+    var node = document.getElementById(id);
+    if (!node) return;
+    node.textContent = n;
+    node.hidden = !n;
+  }
+
+  function updateActionAlerts() {
+    var mine = { review: 0, receive: 0, ho: 0 };
+    allRequisitions.forEach(function (r) { var a = actionFor(r); if (a) mine[a.kind] += 1; });
+    var reqN = mine.review + mine.receive;
+    setCount("req-tab-count", reqN);
+    setCount("delivery-tab-count", mine.ho);
+    setCount("top-tab-count", reqN + mine.ho);
+
+    var banner = document.getElementById("act-banner");
+    if (!banner) return;
+    banner.hidden = !reqN;
+    if (reqN) {
+      document.getElementById("act-text").textContent =
+        reqN === 1 ? "1 requisition is waiting for you" : reqN + " requisitions are waiting for you";
+    }
+  }
+
+  /* Pressing a row that is waiting does what its own button does: the review,
+     the confirmation, or Head Office's next step. The buttons stay for anyone
+     who would rather use them. */
+  function pressWaitingRow(tr) {
+    if (!tr) return;
+    var id = tr.getAttribute("data-aw-id"), op = tr.getAttribute("data-aw-op");
+    if (!id || !op) return;
+    if (op === "review") openReview(id); else startHoAction(id, op);
+  }
+
+  // Brings a waiting row into view and flashes it, for the banner's "Show me".
+  function spotlightRow(tr) {
+    var calm = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    tr.scrollIntoView({ behavior: calm ? "auto" : "smooth", block: "center" });
+    tr.classList.remove("flash-row");
+    void tr.offsetWidth;
+    tr.classList.add("flash-row");
+    setTimeout(function () { tr.classList.remove("flash-row"); }, 2800);
+  }
+
+  function showFirstWaiting() {
+    var first = el.tbody.querySelector("tr.needs-me");
+    if (!first && allRequisitions.some(function (r) { return actionFor(r); })) {
+      clearReqFilters();                       // it is hidden by a filter
+      first = el.tbody.querySelector("tr.needs-me");
+    }
+    if (first) spotlightRow(first);
   }
 
   /* ------------------------------------------------------------- jute bags
@@ -2650,16 +3022,6 @@ window.AWARD_CONFIG = {
      Asked for on the same requisitions as everything else, but not an award:
      they are not in the stock sheet and are never counted in it. So they have
      a tab of their own, where they are counted by size instead. */
-
-  function juteLinesOf(row) {
-    return awardsOf(row).filter(function (a) { return a.name === "Jute Bag"; });
-  }
-
-  var juteView = "stock";        // or "requests", "districts"
-
-  function juteSizeOf(row, size) {
-    return juteLinesOf(row).reduce(function (n, a) { return a.category === size ? n + a.quantity : n; }, 0);
-  }
 
   /* ------------------------------------------------------- the jute sheet
 
@@ -2687,137 +3049,10 @@ window.AWARD_CONFIG = {
     }
   }
 
-  function showJuteView(which) {
-    juteView = which;
-    var stock = which === "stock";
-
-    if (stock) attachSheet("jute");
-
-    var map = { stock: "jute-view-stock", data: "jute-view-data" };
-    document.getElementById(map.stock).hidden = !stock;
-    document.getElementById(map.data).hidden = stock;
-    var a = document.getElementById("jute-view-requests");
-    var b = document.getElementById("jute-view-districts");
-    if (a) a.hidden = which !== "requests";
-    if (b) b.hidden = which !== "districts";
-
-    Array.prototype.forEach.call(document.querySelectorAll("[data-jute-view]"), function (btn) {
-      var on = btn.getAttribute("data-jute-view") === which;
-      btn.classList.toggle("is-active", on);
-      btn.setAttribute("aria-selected", on ? "true" : "false");
-    });
-  }
-
-  function renderJute() {
-    var body = document.getElementById("jute-body");
-    if (!body) return;
-    var summary = document.getElementById("jute-summary");
-    var foot = document.getElementById("jute-foot");
-    var count = document.getElementById("jute-tab-count");
-    var selDistrict = document.getElementById("jute-district");
-    var selStatus = document.getElementById("jute-status");
-    var selSize = document.getElementById("jute-size");
-
-    var all = allRequisitions.filter(function (r) { return juteLinesOf(r).length; });
-    if (count) { count.hidden = !all.length; count.textContent = all.length; }
-
-    var districts = {}, stages = {};
-    all.forEach(function (r) {
-      var p = placeOf(r);
-      if (p.district) districts[p.district] = true;
-      stages[stageOf(r)] = true;
-    });
-    fillSelect(selDistrict, Object.keys(districts).sort(), "All districts",
-      function (n) { return n; }, function (n) { return n; });
-    fillSelect(selStatus, Object.keys(STAGES).filter(function (k) { return stages[k]; }), "All statuses",
-      function (k) { return k; }, function (k) { return STAGES[k].label; });
-
-    var sizeOf = function (row, size) {
-      return juteLinesOf(row).reduce(function (n, a) { return a.category === size ? n + a.quantity : n; }, 0);
-    };
-    var totalOf = function (row) {
-      return juteLinesOf(row).reduce(function (n, a) { return n + a.quantity; }, 0);
-    };
-
-    var rows = all.filter(function (r) {
-      var p = placeOf(r);
-      if (selDistrict.value && p.district !== selDistrict.value) return false;
-      if (selStatus.value && stageOf(r) !== selStatus.value) return false;
-      if (selSize.value && !sizeOf(r, selSize.value)) return false;
-      return true;
-    });
-
-    var small = 0, big = 0, bags = 0;
-    rows.forEach(function (r) { small += sizeOf(r, "Small"); big += sizeOf(r, "Big"); bags += totalOf(r); });
-
-    summary.innerHTML = '<div class="kpis">' +
-      kpiHtml("bag", "total", bags, bags === 1 ? "Jute bag" : "Jute bags", "") +
-      kpiHtml("doc", "move", rows.length, rows.length === 1 ? "Requisition" : "Requisitions", "") +
-      kpiHtml("layers", "wait", small, "Small", "") +
-      kpiHtml("layers", "good", big, "Big", "") +
-      "</div>";
-    paintIcons();
-    runCounters(summary);
-
-    // By district: who has asked for how many, and in what sizes, biggest first.
-    var agg = {};
-    rows.forEach(function (r) {
-      var d = placeOf(r).district || "\u2014";
-      var a = agg[d] || (agg[d] = { n: 0, s: 0, b: 0 });
-      a.n += 1; a.s += sizeOf(r, "Small"); a.b += sizeOf(r, "Big");
-    });
-    var names = Object.keys(agg).sort(function (x, y) {
-      return (agg[y].s + agg[y].b) - (agg[x].s + agg[x].b) || x.localeCompare(y);
-    });
-    var top = names.length ? Math.max(1, agg[names[0]].s + agg[names[0]].b) : 1;
-    var dBody = document.getElementById("jute-district-body");
-    if (dBody) {
-      dBody.innerHTML = names.length ? names.map(function (d) {
-        var a = agg[d];
-        return "<tr><td><b>" + escapeHtml(d) + "</b></td>" +
-          '<td class="num">' + a.n + "</td>" +
-          '<td class="num">' + (a.s ? a.s.toLocaleString() : "\u2014") + "</td>" +
-          '<td class="num">' + (a.b ? a.b.toLocaleString() : "\u2014") + "</td>" +
-          '<td class="num"><b>' + (a.s + a.b).toLocaleString() + "</b></td>" +
-          '<td class="jute-split"><span class="js-track">' +
-            '<i class="js-s" style="--w:' + (a.s / top * 100) + '%"></i>' +
-            '<i class="js-b" style="--w:' + (a.b / top * 100) + '%"></i></span></td></tr>';
-      }).join("") : '<tr class="placeholder-row"><td colspan="6">Nothing to show.</td></tr>';
-    }
-
-    if (!all.length) {
-      body.innerHTML = '<tr class="placeholder-row"><td colspan="8">No jute bags asked for yet. ' +
-        "Choose Jute Bag under Gifts when raising a requisition.</td></tr>";
-      foot.hidden = true;
-      return;
-    }
-    if (!rows.length) {
-      body.innerHTML = '<tr class="placeholder-row"><td colspan="8">No matches.</td></tr>';
-      foot.hidden = true;
-      return;
-    }
-
-    body.innerHTML = rows.map(function (r) {
-      var p = placeOf(r);
-      var s = sizeOf(r, "Small"), b = sizeOf(r, "Big");
-      var remark = remarkOf(r);
-      return "<tr>" +
-        "<td>" + escapeHtml(p.district || "—") + "</td>" +
-        "<td>" + escapeHtml(r.requester_name || "—") + "</td>" +
-        '<td class="num">' + (s ? escapeHtml(s.toLocaleString()) : "—") + "</td>" +
-        '<td class="num">' + (b ? escapeHtml(b.toLocaleString()) : "—") + "</td>" +
-        '<td class="num"><b>' + escapeHtml(totalOf(r).toLocaleString()) + "</b></td>" +
-        "<td>" + statusCellHtml(r) + "</td>" +
-        '<td class="cell-date muted">' + escapeHtml(formatTimestamp(r.created_at)) + "</td>" +
-        '<td class="cell-remark" title="' + escapeHtml(remark) + '">' + (remark ? escapeHtml(remark) : "—") + "</td>" +
-      "</tr>";
-    }).join("");
-
-    foot.innerHTML = "<tr><td colspan=\"2\">" + rows.length + (rows.length === 1 ? " requisition" : " requisitions") + "</td>" +
-      '<td class="num mono">' + small.toLocaleString() + "</td>" +
-      '<td class="num mono">' + big.toLocaleString() + "</td>" +
-      '<td class="num mono">' + bags.toLocaleString() + "</td><td colspan=\"3\"></td></tr>";
-    foot.hidden = false;
+  // The Jute Bags tab is the stock sheet, counting jute bags.
+  function showJuteSheet() {
+    attachSheet("jute");
+    document.getElementById("jute-view-stock").hidden = false;
   }
 
   /* ------------------------------------------------------------- summaries
@@ -2919,83 +3154,8 @@ window.AWARD_CONFIG = {
     runCounters(box);
   }
 
-  /* What each level holds now, and how it got there, in plain words: what the
-     districts started the year with, plus what has arrived, minus what was
-     given out. That is the whole story of the number, so it is said once per
-     level and added up in the first card. */
-  function renderStockSummary(rows, types, fy) {
-    var box = document.getElementById("stock-summary");
-    if (!box) return;
-    if (!rows || !rows.length) { box.hidden = true; box.innerHTML = ""; return; }
-
-    var start = {}, came = {}, used = {}, held = {};
-    var latest = {};
-    var nowKey = monthKeyOf(new Date());
-
-    rows.forEach(function (r) {
-      types.forEach(function (t) {
-        if (!r.monthKey) start[t.id] = (start[t.id] || 0) + (r.balance[t.id] || 0);
-        came[t.id] = (came[t.id] || 0) + (r.delivery[t.id] || 0);
-        used[t.id] = (used[t.id] || 0) + (r.utilisation[t.id] || 0);
-      });
-      // What a district holds today is its last row up to this month.
-      var cur = latest[r.district];
-      var ok = !r.monthKey || r.monthKey <= nowKey;
-      if (ok && (!cur || !cur.monthKey || (r.monthKey && r.monthKey >= cur.monthKey))) latest[r.district] = r;
-    });
-    Object.keys(latest).forEach(function (d) {
-      types.forEach(function (t) { held[t.id] = (held[t.id] || 0) + (latest[d].balance[t.id] || 0); });
-    });
-
-    // What a district was given to begin the year with is part of where it started.
-    var shown = {};
-    rows.forEach(function (r) { shown[r.district] = true; });
-    stockMovements.forEach(function (m) {
-      if (m.kind !== "opening" || !shown[m.district_name]) return;
-      var k = monthKeyOf(m.occurred_on);
-      if (k >= fy + "-04" && k < (fy + 1) + "-04") {
-        start[m.award_type_id] = (start[m.award_type_id] || 0) + (Number(m.quantity) || 0);
-      }
-    });
-
-    var sum = function (map) {
-      return types.reduce(function (n, t) { return n + (map[t.id] || 0); }, 0);
-    };
-    var total = { held: sum(held), start: sum(start), came: sum(came), used: sum(used) };
-
-    var line = function (label, value) {
-      return "<li><span>" + escapeHtml(label) + "</span><i>" + escapeHtml(value) + "</i></li>";
-    };
-    var signed = function (n) { return n === 0 ? "0" : (n < 0 ? "−" : "+") + Math.abs(n).toLocaleString(); };
-
-    var card = function (name, d, isTotal) {
-      var fix = d.held - (d.start + d.came - d.used);
-      return '<div class="snow-card' + (isTotal ? " is-total" : "") + '">' +
-        '<div class="snow-top"><span class="snow-name">' + escapeHtml(name) + "</span>" +
-          '<b class="snow-held' + (d.held < 0 ? " is-neg" : "") + '" data-count="' + d.held + '">' +
-          d.held.toLocaleString() + "</b></div>" +
-        '<ul class="snow-how">' +
-          line("Opening stock", d.start.toLocaleString()) +
-          line("Delivered", signed(d.came)) +
-          line("Utilised", signed(-d.used)) +
-          (fix ? line("Adjustments", signed(fix)) : "") +
-        "</ul></div>";
-    };
-
-    box.innerHTML =
-      '<div class="snow-head"><h4>Current stock balance</h4></div>' +
-      '<div class="snow-grid">' +
-        card(stockScope === "jute" ? "All sizes" : "All gifts", total, true) +
-        types.map(function (t) {
-          return card(shortType(t), { held: held[t.id] || 0, start: start[t.id] || 0,
-                                      came: came[t.id] || 0, used: used[t.id] || 0 }, false);
-        }).join("") +
-      "</div>";
-    box.hidden = false;
-    runCounters(box);
-  }
-
-  function renderTable() {
+  // The requisitions the filters leave, which is what the list shows.
+  function filteredRequisitions() {
     var stateFilter = el.filterState.value;
     var divisionFilter = el.filterDivision.value;
     var districtFilter = el.filterDistrict.value;
@@ -3003,7 +3163,7 @@ window.AWARD_CONFIG = {
     var statusFilter = el.filterStatus ? el.filterStatus.value : "";
     var search = el.filterSearch.value.trim().toLowerCase();
 
-    var rows = allRequisitions.filter(function (row) {
+    return allRequisitions.filter(function (row) {
       var p = placeOf(row);
       if (stateFilter && p.state !== stateFilter) return false;
       if (divisionFilter && p.division !== divisionFilter) return false;
@@ -3019,15 +3179,59 @@ window.AWARD_CONFIG = {
       if (statusFilter && stageOf(row) !== statusFilter) return false;
       return true;
     });
+  }
+
+  var reqFresh = false;            // the draw after a load or a filter animates; an action on a row does not
+
+  function renderTableFresh() { reqFresh = true; renderTable(); }
+
+  function anyReqFilter() {
+    return !!(el.filterState.value || el.filterDivision.value || el.filterDistrict.value ||
+              el.filterType.value || (el.filterStatus && el.filterStatus.value) ||
+              el.filterSearch.value.trim());
+  }
+
+  function clearReqFilters() {
+    [el.filterState, el.filterDivision, el.filterDistrict, el.filterType, el.filterStatus].forEach(function (s) {
+      if (s) s.value = "";
+    });
+    el.filterSearch.value = "";
+    buildFilterOptions();
+    renderTableFresh();
+  }
+
+  // "12 requisitions", or "Showing 3 of 12" with a way back once a filter is on.
+  function updateReqToolbar(shown) {
+    var total = allRequisitions.length;
+    var filtered = anyReqFilter();
+    if (el.reqCount) {
+      el.reqCount.textContent = !total ? "" : filtered ? "Showing " + shown + " of " + total
+        : total + (total === 1 ? " requisition" : " requisitions");
+    }
+    if (el.reqClear) el.reqClear.hidden = !filtered;
+  }
+
+  function renderTable() {
+    updateActionAlerts();
+    var rows = filteredRequisitions();
+    // What is waiting for the person looking comes first.
+    if (rows.some(function (r) { return actionFor(r); })) {
+      rows = rows.map(function (r, i) { return { r: r, i: i, m: actionFor(r) ? 0 : 1 }; })
+        .sort(function (a, b) { return a.m - b.m || a.i - b.i; })
+        .map(function (x) { return x.r; });
+    }
+    var fresh = reqFresh;
+    reqFresh = false;
 
     renderReqSummary(rows);
+    updateReqToolbar(rows.length);
 
     if (!allRequisitions.length) {
-      placeholderRow("No requisitions yet.");
+      placeholderRow("No requisitions yet.", "none");
       return;
     }
     if (!rows.length) {
-      placeholderRow("No matches.");
+      placeholderRow("No matches.", "nomatch");
       return;
     }
 
@@ -3035,7 +3239,7 @@ window.AWARD_CONFIG = {
     var gotTotal = 0;
     var html = "";
 
-    rows.forEach(function (row) {
+    rows.forEach(function (row, idx) {
       total += askedOf(row);
       gotTotal += deliveredOf(row);
       var p = placeOf(row);
@@ -3044,9 +3248,11 @@ window.AWARD_CONFIG = {
       // an em dash is more honest than guessing one.
       var awards = awardsOf(row);
 
+      var act = actionFor(row);
       html +=
-        "<tr>" +
-          '<td><span class="state-code">' + escapeHtml(stateName) + "</span></td>" +
+        '<tr class="req-row is-' + STAGES[stageOf(row)].tone + (act ? " needs-me" : "") + '" style="--i:' + idx + '"' +
+          (act ? ' tabindex="0" role="button" aria-label="' + escapeHtml(act.label) + '" data-aw-id="' + escapeHtml(row.id) + '" data-aw-op="' + escapeHtml(act.op) + '"' : "") + ">" +
+          '<td><span class="state-code">' + escapeHtml(stateName) + "</span>" + (act ? actionFlagHtml(row, act) : "") + "</td>" +
           "<td>" + escapeHtml(p.division || "—") + "</td>" +
           "<td>" + escapeHtml(p.district || "—") + "</td>" +
           "<td>" + escapeHtml(row.requester_name) + "</td>" +
@@ -3055,11 +3261,12 @@ window.AWARD_CONFIG = {
           '<td class="cell-date muted">' + escapeHtml(formatTimestamp(row.created_at)) + "</td>" +
           "<td>" + statusCellHtml(row) + "</td>" +
           '<td class="cell-log-col">' + logCellHtml(row) + "</td>" +
-          '<td class="cell-action">' + actionCellHtml(row) + "</td>" +
         "</tr>";
     });
 
     el.tbody.innerHTML = html;
+    el.tbody.classList.toggle("is-fresh", fresh);
+    if (fresh) setTimeout(function () { el.tbody.classList.remove("is-fresh"); }, 1800);
     setRowPill(rows.length === allRequisitions.length
       ? (rows.length === 1 ? "1 item" : rows.length + " items")
       : rows.length + " of " + allRequisitions.length);
@@ -3273,7 +3480,8 @@ window.AWARD_CONFIG = {
     return '<span class="qty-got' + (got ? "" : " is-none") + '">' +
              escapeHtml(got.toLocaleString()) + "</span>" +
            '<span class="qty-sep"> / </span>' +
-           '<span class="qty-asked">' + escapeHtml(asked.toLocaleString()) + "</span>";
+           '<span class="qty-asked">' + escapeHtml(asked.toLocaleString()) + "</span>" +
+           '<span class="qty-bar" aria-hidden="true"><i style="--p:' + Math.min(1, got / asked).toFixed(3) + '"></i></span>';
   }
 
   function logListHtml(row) {
@@ -3391,52 +3599,50 @@ window.AWARD_CONFIG = {
     issue:       "Never arrived"
   };
 
-  function actionCellHtml(row) {
-    if (!hasApproval) return "";
-
-    if (canDecide(myStanding(), row)) {
-      return '<button type="button" class="btn btn-ghost btn-xs" data-aw-review="' +
-               escapeHtml(row.id) + '">Review</button>';
+  /* What is waiting for whoever is signed in on a requisition: to review it,
+     to say it arrived, or - for Head Office - to move it on. null when
+     nothing is. This is what the highlights, the flag and the counts read. */
+  function actionFor(row) {
+    if (!hasApproval) return null;
+    if (canDecide(myStanding(), row)) return { kind: "review", op: "review", label: "Click to review" };
+    if (canConfirmReceipt(row)) return { kind: "receive", op: "receive", label: "Click to confirm" };
+    var acts = hoActions(row).filter(function (a) { return a !== "reject" && a !== "hold"; });
+    if (acts.length) {
+      var name = HO_LABELS[acts[0]];
+      return { kind: "ho", op: acts[0], label: "Click to " + name.charAt(0).toLowerCase() + name.slice(1) };
     }
+    return null;
+  }
 
-    if (canConfirmReceipt(row)) {
-      var mine = '<button type="button" class="btn btn-ghost btn-xs" ' +
-                   'data-aw-ho="receive" data-aw-row="' + escapeHtml(row.id) + '">' +
-                   HO_LABELS.receive + "</button>";
-      if (canReportIssue(row)) {
-        mine += ' <button type="button" class="btn btn-ghost btn-xs is-danger" ' +
-                  'data-aw-ho="issue" data-aw-row="' + escapeHtml(row.id) + '">' +
-                  HO_LABELS.issue + "</button>";
-      }
-      return mine;
-    }
-
-    return hoActions(row).map(function (act) {
-      return '<button type="button" class="btn btn-ghost btn-xs' +
-               (act === "reject" ? " is-danger" : "") +
-               '" data-aw-ho="' + escapeHtml(act) + '" data-aw-row="' +
-               escapeHtml(row.id) + '">' + HO_LABELS[act] + "</button>";
-    }).join(" ");
+  // The flag in the first column, where it can be seen without scrolling.
+  function actionFlagHtml(row, act) {
+    return '<span class="act-flag" title="Waiting for you"><i></i>' + escapeHtml(act.label) + "</span>";
   }
 
   /* HO's queue: what has been approved and not yet finished with. Settled
      requisitions drop off - this is a list of work, not a record. */
+  // Head Office's queue, in the order they have to act on it.
+  function deliveryQueue() {
+    var ORDER = { approved: 0, acknowledged: 1, on_hold: 2, dispatched: 3,
+                  received: 4, rejected: 5 };
+    return allRequisitions.filter(function (r) {
+      return ORDER[stageOf(r)] !== undefined;
+    }).sort(function (a, b) {
+      var d = ORDER[stageOf(a)] - ORDER[stageOf(b)];
+      return d !== 0 ? d : String(b.created_at).localeCompare(String(a.created_at));
+    });
+  }
+
   function renderDelivery() {
     if (!el.deliveryBody) return;
+    updateActionAlerts();
 
     /* Everything that has reached Head Office, ordered by what they have to
        do next: waiting to be picked up, ready to send, blocked, sent and
        waiting on somebody else, then finished. A dispatched requisition
        stays rather than vanishing - Head Office needs to see it turn into
        Delivered. */
-    var ORDER = { approved: 0, acknowledged: 1, on_hold: 2, dispatched: 3,
-                  received: 4, rejected: 5 };
-    var rows = allRequisitions.filter(function (r) {
-      return ORDER[stageOf(r)] !== undefined;
-    }).sort(function (a, b) {
-      var d = ORDER[stageOf(a)] - ORDER[stageOf(b)];
-      return d !== 0 ? d : String(b.created_at).localeCompare(String(a.created_at));
-    });
+    var rows = deliveryQueue();
 
     if (!rows.length) {
       el.deliveryBody.innerHTML =
@@ -3449,12 +3655,14 @@ window.AWARD_CONFIG = {
       return;
     }
 
-    el.deliveryBody.innerHTML = rows.map(function (row) {
+    el.deliveryBody.innerHTML = rows.map(function (row, idx) {
       var p = placeOf(row);
       var awards = awardsOf(row);
-      return "<tr>" +
+      var act = actionFor(row);
+      return '<tr class="req-row is-' + STAGES[stageOf(row)].tone + (act ? " needs-me" : "") + '" style="--i:' + idx + '"' +
+        (act ? ' tabindex="0" role="button" aria-label="' + escapeHtml(act.label) + '" data-aw-id="' + escapeHtml(row.id) + '" data-aw-op="' + escapeHtml(act.op) + '"' : "") + ">" +
         '<td><span class="state-code">' + escapeHtml(p.state || "—") +
-          "</span></td>" +
+          "</span>" + (act ? actionFlagHtml(row, act) : "") + "</td>" +
         "<td>" + escapeHtml(p.division || "—") + "</td>" +
         "<td>" + escapeHtml(p.district || "—") + "</td>" +
         "<td>" + escapeHtml(row.requester_name || "—") + "</td>" +
@@ -3462,9 +3670,62 @@ window.AWARD_CONFIG = {
         '<td class="num">' + quantityCellHtml(row) + "</td>" +
         "<td>" + statusCellHtml(row, true) + "</td>" +
         '<td class="cell-log-col">' + logCellHtml(row) + "</td>" +
-        '<td class="cell-action">' + actionCellHtml(row) + "</td>" +
       "</tr>";
     }).join("");
+  }
+
+  /* ----------------------------------------------------------- Excel
+
+     Each list can be taken away as a spreadsheet: the rows the screen shows,
+     with a coloured heading row. The writer is the one the dashboard uses. */
+  var EXCEL_STYLES = '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts>' +
+    '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>' +
+    '<fill><patternFill patternType="solid"><fgColor rgb="FF0F766E"/><bgColor indexed="64"/></patternFill></fill></fills>' +
+    '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>' +
+    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+    '<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+    '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs>' +
+    '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+
+  // rows[0] is the heading row.
+  function saveExcel(sheetName, rows, widths, filename) {
+    if (!window.awardXlsx || !window.awardXlsx.buildWorkbook) {
+      awAlert("Excel is not ready", "Refresh the page and try again.", "warning");
+      return;
+    }
+    var head = rows[0].map(function (text) { return { s: 1, v: text }; });
+    var bytes = window.awardXlsx.buildWorkbook(
+      [{ name: sheetName, rows: [head].concat(rows.slice(1)), widths: widths }],
+      { styles: EXCEL_STYLES });
+    window.awardXlsx.download(bytes, filename);
+  }
+
+  function downloadRequisitionsExcel(forHo) {
+    var list = forHo ? deliveryQueue() : filteredRequisitions();
+    if (!list.length) {
+      if (forHo) awAlert("Nothing in the queue", "Requisitions appear here once they are approved.");
+      else if (!allRequisitions.length) awAlert("No requisitions yet", "There is nothing to download yet.");
+      else awAlert("Nothing matches", "Change or clear the filters, then try again.");
+      return;
+    }
+
+    var rows = [["State", "Division", "District", "Requester", "Gifts", "Asked",
+                 "Delivered", "Status", "Submitted", "Received", "Remark"]];
+    list.forEach(function (row) {
+      var p = placeOf(row);
+      rows.push([
+        p.state, p.division, p.district, row.requester_name || "",
+        awardsOf(row).map(function (a) { return awardChipLabel(a) + " " + a.quantity; }).join("; "),
+        askedOf(row), deliveredOf(row), stageLabel(row, forHo),
+        formatTimestamp(row.created_at),
+        row.received_at ? formatTimestamp(row.received_at) : "",
+        remarkOf(row)
+      ]);
+    });
+    saveExcel(forHo ? "Delivery" : "Requisitions", rows,
+      [16, 18, 18, 22, 44, 9, 11, 20, 18, 18, 36],
+      (forHo ? "Delivery-queue-" : "Requisitions-") + todayLocalISO() + ".xlsx");
   }
 
   /* ==================================================================
@@ -3820,10 +4081,11 @@ window.AWARD_CONFIG = {
     return null;
   }
 
-  function goLiveText() {
-    var p = goLive.split("-");
+  function dayText(day) {
+    var p = String(day).split("-");
     return Number(p[2]) + " " + MONTH_NAMES[Number(p[1]) - 1] + " " + p[0];
   }
+  function goLiveText() { return dayText(goLive); }
 
   function renderGoLive() {
     if (!el.goLiveBar) return;
@@ -3832,8 +4094,7 @@ window.AWARD_CONFIG = {
     if (goLiveProblem) {
       html = '<span class="golive-note is-bad">' + escapeHtml(goLiveProblem) + "</span>";
     } else if (goLive) {
-      html = '<span class="golive-note">Stock is live from <b>' + escapeHtml(goLiveText()) +
-        "</b>, the month after the opening balance. Awards verified from that day come off the stock, in the month they are verified.</span>";
+      html = '<span class="golive-note"><i class="live-dot" aria-hidden="true"></i>Live from <b>' + escapeHtml(goLiveText()) + "</b></span>";
     }
     if (admin) {
       html += ' <button type="button" class="btn btn-ghost btn-xs golive-reset" data-golive="reset">Reset data\u2026</button>';
@@ -3848,8 +4109,16 @@ window.AWARD_CONFIG = {
      the page. */
   function openReset() {
     if (!canSetStock() || !el.resetModal) return;
-    ["reset-req", "reset-award", "reset-jute"].forEach(function (id) { document.getElementById(id).checked = true; });
-    document.getElementById("reset-golive").checked = false;
+    /* The two sheets are reset apart: the Stock tab empties the award side
+       (its requisitions and stock figures), the Jute Bags tab only the jute
+       bag stock figures. */
+    var jute = stockScope === "jute";
+    [["reset-req", !jute], ["reset-award", !jute], ["reset-jreq", jute], ["reset-jute", jute]].forEach(function (p) {
+      var box = document.getElementById(p[0]);
+      box.checked = p[1];
+      box.closest("label").hidden = !p[1];
+    });
+    document.getElementById("reset-heading").textContent = jute ? "Reset jute bag data" : "Reset stock data";
     document.getElementById("reset-confirm").value = "";
     document.getElementById("reset-error").hidden = true;
     document.getElementById("reset-go").disabled = false;
@@ -3878,12 +4147,15 @@ window.AWARD_CONFIG = {
   function runReset() {
     if (!canSetStock()) return;
     var want = {
-      p_requisitions: document.getElementById("reset-req").checked,
+      p_award_req: document.getElementById("reset-req").checked,
+      p_jute_req: document.getElementById("reset-jreq").checked,
       p_award_stock: document.getElementById("reset-award").checked,
       p_jute_stock: document.getElementById("reset-jute").checked,
-      p_go_live: document.getElementById("reset-golive").checked
+      p_go_live: false
     };
-    if (!want.p_requisitions && !want.p_award_stock && !want.p_jute_stock && !want.p_go_live) {
+    // The go-live date belongs to the opening balance: emptying the award stock starts it afresh.
+    want.p_go_live = want.p_award_stock;
+    if (!want.p_award_req && !want.p_jute_req && !want.p_award_stock && !want.p_jute_stock) {
       return resetFail("Tick what to delete.");
     }
     if (document.getElementById("reset-confirm").value.trim() !== "DELETE") {
@@ -3895,7 +4167,7 @@ window.AWARD_CONFIG = {
     db.rpc("award_reset_data", want).then(function (res) {
       if (res.error) {
         var m = res.error.message || "";
-        if (/switched off/i.test(m)) return resetFail("Reset is switched off in the database. It is turned off once the tab is live.");
+        if (/switched off/i.test(m)) return resetFail("Reset is switched off.");
         if (/award_reset_data|function/i.test(m)) return resetFail("Run sql/award-reset-data.sql in the Supabase SQL Editor to set this up.");
         reportError("reset the data", res.error);
         return resetFail("The data could not be deleted.");
@@ -3903,10 +4175,10 @@ window.AWARD_CONFIG = {
       var r = res.data || {};
       pendingEdits = {};
       var parts = [];
-      if (want.p_requisitions) parts.push((r.requisitions || 0) + " requisitions");
+      if (want.p_award_req) parts.push((r.award_req || 0) + " award requisitions");
+      if (want.p_jute_req) parts.push((r.jute_req || 0) + " jute bag requisitions");
       if (want.p_award_stock) parts.push((r.award_stock || 0) + " award stock figures");
       if (want.p_jute_stock) parts.push((r.jute_stock || 0) + " jute stock figures");
-      if (want.p_go_live) parts.push("the go-live date");
       document.getElementById("reset-body").innerHTML =
         '<p class="import-said">Deleted: ' + escapeHtml(parts.join(", ")) + ".</p>";
       document.getElementById("reset-actions").hidden = true;
@@ -3925,23 +4197,27 @@ window.AWARD_CONFIG = {
   function saveGoLive(value, then, confirmed) {
     if (!canSetStock()) return;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(value || "")) { showStockEditError("Choose the go-live date."); return; }
-    if (!confirmed && goLive && goLive !== value && !window.confirm(
-      "Change the go-live date from " + goLiveText() + "?\n\n" +
-      "Deliveries and verified awards are counted from this day, so every balance " +
-      "will be added up again. The opening balance you uploaded stays as it is.")) return;
-    db.from("award_settings")
-      .upsert({ key: "stock_go_live", value: value, updated_by: myEmail() || null,
-                updated_at: new Date().toISOString() })
-      .then(function (res) {
-        if (res.error) { reportError("save the go-live date", res.error); showStockEditError("The go-live date could not be saved."); return; }
-        showStockEditError("");
-        goLive = value;
-        loadVerifiedUse(function () {
-          refreshStockControls(); renderStock(); renderReqStock();
-          if (then) then();
-        });
-      })
-      .catch(function (err) { reportError("save the go-live date", err); });
+    var proceed = function () {
+      db.from("award_settings")
+        .upsert({ key: "stock_go_live", value: value, updated_by: myEmail() || null,
+                  updated_at: new Date().toISOString() })
+        .then(function (res) {
+          if (res.error) { reportError("save the go-live date", res.error); showStockEditError("The go-live date could not be saved."); return; }
+          showStockEditError("");
+          goLive = value;
+          loadVerifiedUse(function () {
+            refreshStockControls(); renderStock(); renderReqStock();
+            if (then) then();
+          });
+        })
+        .catch(function (err) { reportError("save the go-live date", err); });
+    };
+    if (!confirmed && goLive && goLive !== value) {
+      awConfirm("Change the go-live date?", "From " + goLiveText() + " to " + dayText(value) + ".", "Change", "warning")
+        .then(function (ok) { if (ok) proceed(); });
+      return;
+    }
+    proceed();
   }
 
   /* What a district holds today in the column an award comes off, for the
@@ -4091,12 +4367,34 @@ window.AWARD_CONFIG = {
      the figures come when Fetch is pressed - thirty-five districts over
      twelve months is four hundred rows. */
   var stockShown = false;
+  var stockFresh = false;          // true for the draw that follows Fetch, which is the one that animates
+
+  var PIN_SVG = '<svg class="db-pin" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z" fill="currentColor" opacity=".18"/>' +
+    '<path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>' +
+    '<circle cx="12" cy="10" r="2.6" fill="currentColor"/></svg>';
+
+  /* The line that opens each district's rows: who it is and who manages it,
+     so one district can be told from the next at a glance. */
+  function districtBandHtml(r, colCount, n) {
+    return '<tr class="district-band" style="--n:' + Math.min(n, 18) + '"><td colspan="' + colCount + '"><div class="db">' +
+      PIN_SVG + '<span class="db-name">' + escapeHtml(r.district) + "</span>" +
+      '<span class="db-state">' + escapeHtml(r.state) + "</span>" +
+      (r.pm ? '<span class="db-pm">' + escapeHtml(r.pm) + "</span>" : "") +
+      "</div></td></tr>";
+  }
+
+  /* A small drawing for the empty states: a stack of boxes. */
+  var EMPTY_ART = '<svg class="empty-art" viewBox="0 0 120 90" aria-hidden="true">' +
+    '<ellipse cx="60" cy="80" rx="38" ry="6" class="ea-shadow"/>' +
+    '<path d="M30 52l30-14 30 14v18L60 84 30 70z" class="ea-side"/>' +
+    '<path d="M30 52l30 14 30-14-30-14z" class="ea-top"/>' +
+    '<path d="M60 66v18" class="ea-line"/>' +
+    '<rect x="44" y="22" width="32" height="26" rx="4" class="ea-box"/>' +
+    '<path d="M50 32h20M50 39h12" class="ea-line"/></svg>';
 
   function renderStock() {
     var wrap = document.getElementById("stock-table-wrap");
     if (!wrap) return;
-    var summaryBox = document.getElementById("stock-summary");
-    if (summaryBox) summaryBox.hidden = true;
 
     if (stockScope === "jute" && !juteTypes.length) {
       wrap.innerHTML = '<p class="aw-empty-line">Run <code>sql/award-jute-types.sql</code> in the Supabase SQL Editor to set this up.</p>';
@@ -4105,13 +4403,8 @@ window.AWARD_CONFIG = {
 
     if (!stockShown) {
       wrap.innerHTML =
-        '<div class="stock-prompt">' +
-          "<p><b>Choose a year, and narrow it if you want to.</b></p>" +
-          "<p>Then press Fetch. Leaving the places on " +
-          "<i>All</i> shows the districts something has happened in " +
-          (canSetStock() ? "(every district, for the year the stock goes live); " : "; ") +
-          "choosing a state, a division or a district shows every district " +
-          "in it, whether or not anything has.</p>" +
+        '<div class="stock-prompt">' + EMPTY_ART +
+          "<p><b>Choose a year and press Fetch.</b></p>" +
         "</div>";
       return;
     }
@@ -4145,38 +4438,16 @@ window.AWARD_CONFIG = {
     var rows = stockRows(fy, allRequisitions,
                          stockMovements.concat(pendingMovements(fy)), places);
 
-    /* Asking for a place shows it whether or not anything has happened
-       there - that is how an empty district is given its first figures.
-       Asking for nothing in particular shows only the districts with
-       something in them, stock sitting there included. */
-    var narrowed = !!(el.stockState.value || el.stockDivision.value ||
-                      el.stockDistrict.value);
-    // The year opening balances are typed into - the go-live year, or this one before a date is set - shows an admin every district.
-    if (!narrowed && canSetStock() && fy === (goLive ? goLiveFy() : fyStartOf(new Date()))) narrowed = true;
-    if (!narrowed) {
-      var busy = {};
-      rows.forEach(function (r) {
-        if (sumOf(r.requisition) || sumOf(r.delivery) ||
-            sumOf(r.utilisation) || sumOf(r.balance)) {
-          busy[r.district] = true;
-        }
-      });
-      rows = rows.filter(function (r) { return busy[r.district]; });
-    }
+    // Every district is listed, whether or not anything has happened there.
 
     if (!rows.length) {
       wrap.innerHTML =
-        '<div class="stock-prompt">' +
-          "<p><b>Nothing has moved yet.</b></p>" +
-          "<p>A district appears here once a requisition is raised for it, " +
-          "or once it is given an opening figure. To see a district that is " +
-          "still empty - to set its opening stock, say - choose it above and " +
-          "press Fetch again.</p>" +
+        '<div class="stock-prompt">' + EMPTY_ART +
+          "<p><b>Nothing to show yet.</b></p>" +
         "</div>";
       return;
     }
 
-    renderStockSummary(rows, types, fy);
 
     var head = groupHeadHtml(types, { before:
         '<th rowspan="2" class="col-month">Month</th>' +
@@ -4185,7 +4456,18 @@ window.AWARD_CONFIG = {
       '<th rowspan="2">Remark</th>' +
       '<th rowspan="2" class="col-act"><span class="sr-only">Record</span></th>');
 
+    var colCount = 4 + GROUPS.length * (types.length + 1) + 2;
+    var lastDistrict = null;
+    var bandNo = 0;
+    var fresh = stockFresh;
+    stockFresh = false;
+
     var body = rows.map(function (r) {
+      var band = "";
+      if (r.district !== lastDistrict) {
+        lastDistrict = r.district;
+        band = districtBandHtml(r, colCount, bandNo++);
+      }
       var carry = r.monthKey === "";
       var happened = monthHasHappened(r.monthKey, fy);
       // Nothing held is nothing to give out.
@@ -4196,7 +4478,7 @@ window.AWARD_CONFIG = {
          figure - so there the balance itself is what gets typed. */
       var mayEdit = happened && canSetStock();
       var tellable = hasAnything(r);
-      return '<tr class="' + (carry ? "is-carry" : "") +
+      return band + '<tr class="' + (carry ? "is-carry" : "") +
              (tellable ? " is-tellable" : "") + '"' +
              (tellable ? ' data-aw-detail="' + escapeHtml(r.monthKey) +
                          '" data-aw-where="' + escapeHtml(r.district) + '"' : "") +
@@ -4226,10 +4508,7 @@ window.AWARD_CONFIG = {
     var waiting = countPendingEdits();
     wrap.innerHTML =
       (canSetStock()
-        ? '<p class="stock-howto">Click a cell with a line under it to type a ' +
-          "figure — <b>Requisition</b>, <b>Delivery</b> and <b>Utilisation</b> " +
-          "on any month that has happened, and the <b>Balance</b> on the first " +
-          "row (<b>Opening</b>, or <b>Carry forward</b> in other years). The rest is added up.</p>"
+        ? '<p class="stock-howto">Click an underlined cell to edit it.</p>'
         : "") +
       '<div class="stock-editbar" id="stock-editbar"' + (waiting ? "" : " hidden") + ">" +
         "<span>" + (waiting === 1 ? "One figure changed"
@@ -4242,6 +4521,10 @@ window.AWARD_CONFIG = {
       "</div>" +
       '<p class="error" id="stock-edit-error" hidden role="alert"></p>' +
       '<table id="stock-table">' + head + "<tbody>" + body + "</tbody></table>";
+
+    // The entrance plays once, after Fetch - not again each time a figure is edited.
+    wrap.classList.toggle("is-fresh", fresh);
+    if (fresh) setTimeout(function () { wrap.classList.remove("is-fresh"); }, 2200);
   }
 
   // A row with nothing in any of its own columns has nothing to break down;
@@ -4546,6 +4829,118 @@ window.AWARD_CONFIG = {
     return mo >= 4 ? y : y - 1;
   }
 
+  /* The stock sheet in Excel, drawn like the one on screen: a coloured band
+     for each group - Requisition, Delivery, Utilisation, Stock Balance - over
+     its gifts and a Total, one row to a district and month, a dash for
+     nothing, and a negative balance in red. */
+  var STOCK_XLS_STYLES = (function () {
+    var fill = function (rgb) { return '<fill><patternFill patternType="solid"><fgColor rgb="FF' + rgb + '"/><bgColor indexed="64"/></patternFill></fill>'; };
+    var font = function (rgb, bold) { return '<font>' + (bold ? '<b/>' : '') + '<sz val="11"/><color rgb="FF' + rgb + '"/><name val="Calibri"/></font>'; };
+    var xf = function (fontId, fillId, borderId, h, numFmt) {
+      return '<xf numFmtId="' + (numFmt || 0) + '" fontId="' + fontId + '" fillId="' + fillId + '" borderId="' + borderId + '" xfId="0" applyFont="1" applyFill="1" applyBorder="1"' +
+        (numFmt ? ' applyNumberFormat="1"' : '') + ' applyAlignment="1"><alignment horizontal="' + h + '" vertical="center" wrapText="1"/></xf>';
+    };
+    return '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      '<numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0;\\-#,##0;&quot;\u2013&quot;"/></numFmts>' +
+      // 0 text, 1 white bold, 2 green, 3 amber, 4 graphite bold, 5 red bold, 6 dark bold
+      '<fonts count="8">' + font("1A1D23") + font("FFFFFF", true) + font("15803D") + font("B45309") + font("1E293B", true) + font("DC2626", true) + font("1A1D23", true) + font("0F766E", true) + '</fonts>' +
+      // 0 none, 1 gray125, 2 slate, 3 requisition, 4 delivery, 5 utilisation, 6 balance, 7-10 body tints, 11 red tint, 12 opening
+      '<fills count="14"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>' +
+        fill("334155") + fill("64748B") + fill("15803D") + fill("B45309") + fill("1E293B") +
+        fill("FAFBFC") + fill("F4FBF6") + fill("FFFCF4") + fill("EEF2F6") + fill("FEF2F2") + fill("F1F5F9") + fill("E6F4F1") + '</fills>' +
+      '<borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border>' +
+        '<border><left style="thin"><color rgb="FFE3E7EE"/></left><right style="thin"><color rgb="FFE3E7EE"/></right><top style="thin"><color rgb="FFE3E7EE"/></top><bottom style="thin"><color rgb="FFE3E7EE"/></bottom><diagonal/></border>' +
+        '<border><left/><right/><top style="medium"><color rgb="FF0F766E"/></top><bottom style="thin"><color rgb="FF99D6CC"/></bottom><diagonal/></border></borders>' +
+      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+      '<cellXfs count="14">' +
+        '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+        xf(1, 2, 1, "center") +            // 1 heading of a plain column
+        xf(1, 3, 1, "center") +            // 2 Requisition band
+        xf(1, 4, 1, "center") +            // 3 Delivery band
+        xf(1, 5, 1, "center") +            // 4 Utilisation band
+        xf(1, 6, 1, "center") +            // 5 Stock Balance band
+        xf(0, 7, 1, "center", 164) +       // 6 requisition figure
+        xf(2, 8, 1, "center", 164) +       // 7 delivery figure
+        xf(3, 9, 1, "center", 164) +       // 8 utilisation figure
+        xf(4, 10, 1, "center", 164) +      // 9 balance figure
+        xf(5, 11, 1, "center", 164) +      // 10 negative balance
+        xf(0, 0, 1, "left") +              // 11 text
+        xf(6, 12, 1, "left") +             // 12 text on the Opening row
+        xf(7, 13, 2, "left") +             // 13 the band above a district
+      '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+  })();
+
+  function downloadStockExcel() {
+    if (!hasStock || !geography.length) { awAlert("Still loading", "The stock sheet is not ready yet. Try again in a moment."); return; }
+    if (!window.awardXlsx || !window.awardXlsx.buildWorkbook) {
+      awAlert("Excel is not ready", "Refresh the page and try again.", "warning");
+      return;
+    }
+
+    var fy = Number(el.stockYear.value) || fyStartOf(new Date());
+    var types = stockTypes();
+    // Every district in the places chosen, whether or not anything has happened there.
+    var rows = stockRows(fy, allRequisitions, stockMovements, visibleStockPlaces());
+    if (!rows.length) { awAlert("Nothing to download", "No districts match the places you chose."); return; }
+
+    var span = types.length + 1;                       // a group: its gifts, then Total
+    var lastCol = 4 + GROUPS.length * span;            // the Remark column, 0-based
+    var band = { req: 2, del: 3, use: 4, bal: 5 };
+    var figure = { req: 6, del: 7, use: 8, bal: 9 };
+    var col = function (n) { var s = ""; n += 1; while (n > 0) { var m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };
+
+    // Two heading rows, like the screen: the group bands, then the gifts under them.
+    var top = [], sub = [];
+    ["Month", "District", "State", "PM"].forEach(function (t) { top.push({ s: 1, v: t }); sub.push(""); });
+    var merges = ["A1:A2", "B1:B2", "C1:C2", "D1:D2"];
+    GROUPS.forEach(function (g, gi) {
+      var first = 4 + gi * span;
+      top.push({ s: band[g.kind], v: g.label });
+      for (var i = 1; i < span; i++) top.push({ s: band[g.kind], v: "" });
+      merges.push(col(first) + "1:" + col(first + span - 1) + "1");
+      types.forEach(function (t) { sub.push({ s: band[g.kind], v: shortType(t) }); });
+      sub.push({ s: band[g.kind], v: "Total" });
+    });
+    top.push({ s: 1, v: "Remark" }); sub.push("");
+    merges.push(col(lastCol) + "1:" + col(lastCol) + "2");
+
+    var out = [top, sub];
+    var lastDistrict = null;
+    rows.forEach(function (r) {
+      // A band above each district, across the whole sheet, so the districts read as blocks.
+      if (r.district !== lastDistrict) {
+        lastDistrict = r.district;
+        var text = r.district + "   ·   " + r.state + (r.pm ? "   ·   PM: " + r.pm : "");
+        var bandRow = [{ s: 13, v: text }];
+        for (var c = 1; c <= lastCol; c++) bandRow.push({ s: 13, v: "" });
+        out.push(bandRow);
+        merges.push("A" + out.length + ":" + col(lastCol) + out.length);
+      }
+      var opening = r.monthKey === "";
+      var text = opening ? 12 : 11;
+      var line = [{ s: text, v: r.month }, { s: text, v: r.district }, { s: text, v: r.state }, { s: text, v: r.pm || "" }];
+      GROUPS.forEach(function (g) {
+        var map = r[g.column] || {};
+        types.concat([null]).forEach(function (t) {
+          var n = t ? (map[t.id] || 0) : sumOf(map);
+          line.push({ s: g.kind === "bal" && n < 0 ? 10 : figure[g.kind], v: n });
+        });
+      });
+      line.push({ s: 11, v: r.remark || "" });
+      out.push(line);
+    });
+
+    var widths = [14, 20, 16, 24];
+    GROUPS.forEach(function () { for (var i = 0; i < span; i++) widths.push(11); });
+    widths.push(30);
+
+    var bytes = window.awardXlsx.buildWorkbook(
+      [{ name: "Stock", rows: out, widths: widths, merges: merges, freeze: { cols: 2, rows: 2 } }],
+      { styles: STOCK_XLS_STYLES });
+    window.awardXlsx.download(bytes,
+      "Stock-" + fyLabel(fy) + "-" + (stockScope === "jute" ? "jute-bags" : "awards") + ".xlsx");
+  }
+
   function visibleStockPlaces() {
     return stockPlaces().filter(function (p) {
       return (!el.stockState.value    || p.state === el.stockState.value) &&
@@ -4564,12 +4959,12 @@ window.AWARD_CONFIG = {
     var heads = rows[0].map(normalHeader);
     var nameAt = heads.indexOf("district name");
     if (nameAt < 0) {
-      out.problems.push({ line: 1, why: 'The first line must have a "District name" column. Download the template and fill that in.' });
+      out.problems.push({ line: 1, why: 'Missing the "District name" column. Use the template.' });
       out.blocked = true; return out;
     }
     var monthAt = heads.indexOf("balance month");
     if (monthAt < 0) {
-      out.problems.push({ line: 1, why: 'The first line must have a "Balance month" column. Download the template and fill that in.' });
+      out.problems.push({ line: 1, why: 'Missing the "Balance month" column. Use the template.' });
       out.blocked = true; return out;
     }
     var typeAt = {};
@@ -4595,11 +4990,11 @@ window.AWARD_CONFIG = {
       if (k && !monthKey) monthKey = k;
     });
     if (!monthKey) {
-      out.problems.push({ line: 2, why: "no balance month - write the month the figures are the closing balance of, like Oct 2026" });
+      out.problems.push({ line: 2, why: "no balance month (like Oct 2026)" });
       out.blocked = true; return out;
     }
     if (monthKey > nowKey) {
-      out.problems.push({ line: 2, why: monthLabelOf(monthKey) + " has not started yet - a balance can only be for a month that has begun" });
+      out.problems.push({ line: 2, why: monthLabelOf(monthKey) + " is in the future" });
       out.blocked = true; return out;
     }
     out.goLive = dayAfterMonth(monthKey);
@@ -4609,7 +5004,7 @@ window.AWARD_CONFIG = {
       var line = index + 2;
       out.rows += 1;
       if (row.length !== rows[0].length) {
-        out.problems.push({ line: line, why: "this line has " + row.length + " fields where the first line has " + rows[0].length + '. A number with a comma in it needs quotes around it, like "1,250".' });
+        out.problems.push({ line: line, why: "has " + row.length + " fields, expected " + rows[0].length + ' (put quotes around a number like "1,250")' });
         return;
       }
       var name = String(row[nameAt] || "").trim();
@@ -4623,7 +5018,7 @@ window.AWARD_CONFIG = {
       if (rowMonth !== monthKey) {
         out.problems.push({ line: line, why: place.district + ": the balance month " +
           (rowMonth ? monthLabelOf(rowMonth) : '"' + String(row[monthAt] || "").trim() + '"') +
-          " is not " + monthLabelOf(monthKey) + " - every row must be for the same month" });
+          " differs from " + monthLabelOf(monthKey) + " - use one month" });
         return;
       }
 
@@ -4631,7 +5026,7 @@ window.AWARD_CONFIG = {
       var bad = false;
       types.forEach(function (t) {
         var raw = String(row[typeAt[t.id]] || "").trim();
-        if (!raw) { out.problems.push({ line: line, why: place.district + ": " + shortType(t) + " is empty (write 0 if it holds none)" }); bad = true; return; }
+        if (!raw) { out.problems.push({ line: line, why: place.district + ": " + shortType(t) + " is empty (use 0)" }); bad = true; return; }
         var cell = parseFigureCell(raw);
         if (cell.error) { out.problems.push({ line: line, why: place.district + ": " + cell.error + ", under " + shortType(t) }); bad = true; return; }
         edits.push({ t: t, value: cell.value });
@@ -4666,14 +5061,22 @@ window.AWARD_CONFIG = {
       var already = stockMovements.some(function (m) {
         return String(m.occurred_on || "").slice(0, 7) === fyOfDay(result.goLive) + "-03";
       });
-      if (already && !window.confirm("Opening balances are already recorded.\n\n" +
-          "This file replaces them for the districts in it. Continue?")) return;
-      if (goLive && goLive !== result.goLive && !window.confirm(
-          "This file is the closing balance of " + monthLabelOf(monthBefore(result.goLive)) +
-          ", so stock goes live on " + result.goLive + " instead of " + goLive + ".\n\nContinue?")) return;
+      var apply = function () {
+        if (goLive !== result.goLive) saveGoLive(result.goLive, function () { applyOpening(result); }, true);
+        else applyOpening(result);
+      };
+      var moves = goLive && goLive !== result.goLive;
 
-      var apply = function () { applyOpening(result); };
-      if (goLive !== result.goLive) saveGoLive(result.goLive, apply, true); else apply();
+      // One question at a time, in the order they matter.
+      var ask = already
+        ? awConfirm("Replace opening balances?", "Opening balances are already recorded for these districts.", "Replace", "warning")
+        : Promise.resolve(true);
+      ask.then(function (ok) {
+        if (!ok) return;
+        if (!moves) return apply();
+        return awConfirm("Move the go-live date?", "Stock will go live on " + dayText(result.goLive) + " instead of " + dayText(goLive) + ".", "Move it", "warning")
+          .then(function (ok2) { if (ok2) apply(); });
+      });
     };
     reader.readAsText(file);
   }
@@ -4716,13 +5119,12 @@ window.AWARD_CONFIG = {
       var districts = Object.keys(result.districts).length;
 
       sub = result.blocked
-        ? "Nothing was uploaded. Put these right in the file and upload it again."
+        ? "Nothing was uploaded. Fix the file and try again."
         : count
-        ? (count === 1 ? "One figure is" : count + " figures are") +
-          " waiting in the sheet across " +
-          (districts === 1 ? "one district" : districts + " districts") +
-          ". Nothing is saved until you press Save changes."
-        : "Nothing in the file is different from what is already recorded.";
+        ? (count === 1 ? "1 figure" : count + " figures") + " in " +
+          (districts === 1 ? "1 district" : districts + " districts") +
+          ". Press Save changes to store them."
+        : "No changes.";
 
       var said = [];
       said.push(result.rows + (result.rows === 1 ? " line read" : " lines read"));
