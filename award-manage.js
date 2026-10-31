@@ -244,11 +244,11 @@ function showModal({ title, message, buttons }) {
 
 function confirmOverride() {
   return showModal({
-    title: "Image already exists",
-    message: "An image already exists for this record. Override it? The current image will be deleted.",
+    title: "Replace the image?",
+    message: "The current image will be deleted from Drive.",
     buttons: [
       { label: "Cancel", value: false, variant: "cancel" },
-      { label: "Override", value: true, variant: "danger" }
+      { label: "Replace", value: true, variant: "danger" }
     ]
   });
 }
@@ -1322,6 +1322,24 @@ async function decideRecord(index, decision) {   // decision: "Yes" (verify) | "
     // 3) Still present → record the decision on the current (authoritative) record.
     const decided = { ...match, verified: decision, verifiedBy: me };
     decided.late = isLate(decided, selectedMonth) ? "Yes" : "No";
+
+    /* Verifying takes the award off the district's stock. When there is none
+       left, say so first: the award may well have been given, and verifying
+       is a fact worth recording, but the shortfall is somebody's to fix. */
+    if (decision === "Yes" && window.awardStockApi) {
+      const held = await window.awardStockApi.balanceFor(decided.districtName || district, decided.awardCategory);
+      if (held !== null && held <= 0) {
+        const go = await showModal({
+          title: "No stock left",
+          message: `${decided.districtName || district} has ${held} in stock. Verify anyway?`,
+          buttons: [
+            { label: "Cancel", value: "no", variant: "cancel" },
+            { label: "Verify anyway", value: "yes", variant: "primary" }
+          ]
+        });
+        if (go !== "yes") { if (cell) cell.innerHTML = renderVerifyCell(index); return; }
+      }
+    }
 
     await dbDecide(decided, decision === "Yes" ? "verified" : "rejected");
 

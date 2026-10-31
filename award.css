@@ -1771,7 +1771,6 @@
 .award-page .pipe-key b { color: var(--text); font-family: var(--font-mono); }
 
 /* stock: arrived against given out, and what is held, level by level */
-.award-page .stock-summary { margin: 0 0 18px; }
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 10px;
@@ -1791,8 +1790,8 @@
 @keyframes aw-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @keyframes aw-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @keyframes aw-ring { to { stroke-dashoffset: var(--to); } }
-@keyframes aw-pop  { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
 @keyframes aw-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes aw-pop  { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
 @keyframes aw-row  { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
 
 /* dialogs come in rather than appear */
@@ -1847,22 +1846,6 @@
 .award-page .lvls-remark b { display: block; margin-bottom: 2px; font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted); }
 
 /* Stock now: one card per level, and one for all of them, each saying how the number came about. */
-.award-page .snow-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 14px; margin: 0 0 10px; }
-.award-page .snow-head h4 { margin: 0; font-size: .95rem; font-weight: 800; color: var(--text); }
-.award-page .snow-head span { font-size: .78rem; color: var(--text-muted); }
-.award-page .snow-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
-.award-page .snow-card { padding: 14px 16px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);
-                         animation: aw-rise .5s cubic-bezier(.2,.8,.3,1) both; transition: transform .2s ease, box-shadow .2s ease; }
-.award-page .snow-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(15,23,42,.09); }
-.award-page .snow-card.is-total { background: var(--accent-soft); border-color: var(--accent-soft-border); }
-.award-page .snow-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
-.award-page .snow-name { font-size: .72rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--text-soft); }
-.award-page .snow-held { font-size: 1.7rem; font-weight: 800; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
-.award-page .snow-held.is-neg { color: var(--danger); }
-.award-page .snow-how { list-style: none; margin: 0; padding: 8px 0 0; border-top: 1px solid var(--border); display: grid; gap: 3px; }
-.award-page .snow-card.is-total .snow-how { border-top-color: var(--accent-soft-border); }
-.award-page .snow-how li { display: flex; justify-content: space-between; font-size: .78rem; color: var(--text-muted); }
-.award-page .snow-how i { font-style: normal; font-family: var(--font-mono); font-weight: 700; color: var(--text-soft); }
 
 /* Jute bags tab. */
 .award-page .tab-count { margin-left: 7px; padding: 0 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink); font-size: .72rem; font-weight: 700; }
@@ -1871,20 +1854,450 @@
 .award-page #jute-body tr { animation: aw-row .32s ease both; }
 
 /* Jute bags: the view switch, and the district bars. */
-.award-page .jute-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
-.award-page .seg { display: inline-flex; padding: 3px; gap: 2px; background: var(--surface-alt); border: 1px solid var(--border); border-radius: 10px; }
-.award-page .seg-btn { padding: 6px 14px; border: 0; border-radius: 8px; background: transparent; font-family: var(--font-sans); font-size: .82rem; font-weight: 700; color: var(--text-soft); cursor: pointer; transition: background .15s, color .15s; }
-.award-page .seg-btn:hover { color: var(--text); }
-.award-page .seg-btn.is-active { background: var(--surface); color: var(--accent-ink); box-shadow: var(--shadow); }
 .award-page .jute-split { min-width: 220px; }
 .award-page .js-track { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: #EEF1F6; }
 .award-page .js-track i { display: block; flex: 0 0 var(--w); transform-origin: left; animation: aw-grow .8s .1s cubic-bezier(.2,.8,.3,1) both; }
 .award-page .js-s { background: var(--accent-2); }
 .award-page .js-b { background: #64748B; border-left: 2px solid var(--surface); }
 
-/* The jute sheet is the stock sheet counting jute bags, so the awards' file
-   template and import, which are about the four awards, are not offered on it. */
-.award-page #stock-sheet.is-jute #stock-template, .award-page #stock-sheet.is-jute #stock-import { display: none !important; }
+
+
+/* The go-live date: the day this tab becomes the stock book. */
+.award-page .stock-golive { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 10px; font-size: .88rem; }
+.award-page .stock-golive.has-note { margin-bottom: 12px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2, transparent); }
+.award-page .stock-golive:empty { display: none; }
+.award-page .stock-golive .golive-note.is-bad { color: var(--danger, #b42318); }
+.award-page .stock-golive input[type="date"] { padding: 4px 8px; border: 1px solid var(--border); border-radius: 8px; font: inherit; }
+
+.award-page .stock-golive .golive-reset { margin-left: auto; color: var(--danger, #b42318); }
+.award-page .reset-opt { display: flex; gap: 9px; align-items: flex-start; margin: 0 0 9px; font-size: .92rem; }
+.award-page .reset-opt em { color: var(--text-muted); font-style: normal; font-size: .84rem; }
+.award-page .reset-keep { margin: 12px 0; color: var(--text-muted); font-size: .84rem; }
+.award-page .reset-ask { display: block; margin: 0 0 6px; font-size: .9rem; }
+.award-page #reset-confirm { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font: inherit; }
+
+/* On a phone the three tabs are wider than the screen: let them scroll
+   sideways inside their own row instead of widening the page. */
+@media (max-width: 640px) {
+  .award-page .aw-topbar { min-width: 0; }
+  .award-page .aw-toptabs { max-width: 100%; gap: 20px; overflow-x: auto; scrollbar-width: none; }
+  .award-page .aw-toptabs::-webkit-scrollbar { display: none; }
+  .award-page .aw-top-actions { width: 100%; padding-bottom: 12px; }
+}
+
+/* A button row that sits straight in a window (not inside its padded body)
+   keeps the window's own margins instead of touching the edge. */
+.award-page .aw-box > .form-actions { margin-top: 0; padding: 14px 18px 18px; }
+
+.award-page .reset-opt[hidden] { display: none; }
+
+
+/* ======================================================================
+   Design refresh - the Test tab only. Everything is scoped to .award-page
+   and built from the tab's own tokens, so the shell's light and dark
+   themes still apply. Motion is switched off for anyone who asks for less.
+   ====================================================================== */
+
+.award-page {
+  --tone-block: #0F766E;    --tone-block-soft: rgba(15,118,110,.12);
+  --tone-district: #4F46E5; --tone-district-soft: rgba(79,70,229,.12);
+  --tone-ns: #D97706;       --tone-ns-soft: rgba(217,119,6,.14);
+  --tone-su: #E11D48;       --tone-su-soft: rgba(225,29,72,.12);
+  --tone-other: #64748B;    --tone-other-soft: rgba(100,116,139,.14);
+  --tone-small: #0EA5E9;    --tone-small-soft: rgba(14,165,233,.14);
+  --tone-big: #7C3AED;      --tone-big-soft: rgba(124,58,237,.12);
+  --lift: 0 10px 26px rgba(15,23,42,.10);
+  --ease: cubic-bezier(.2,.8,.3,1);
+}
+
+/* ---- the tabs ---- */
+.award-page .aw-toptab { border-radius: 10px 10px 0 0; padding-left: 10px; padding-right: 10px; }
+.award-page .aw-toptab:hover { background: var(--accent-soft); color: var(--accent-ink); }
+.award-page .aw-toptab.is-active {
+  background: linear-gradient(180deg, transparent, var(--accent-soft));
+  border-image: linear-gradient(90deg, var(--accent), var(--accent-line)) 1;
+}
+.award-page .aw-toptab .aw-icon { transition: transform .25s var(--ease); }
+.award-page .aw-toptab:hover .aw-icon, .award-page .aw-toptab.is-active .aw-icon { transform: translateY(-1px) scale(1.12); }
+
+.award-page .aw-subtab { border-radius: 999px; }
+.award-page .aw-subtab.is-active {
+  background: linear-gradient(135deg, var(--accent), #0E9488);
+  box-shadow: 0 4px 12px rgba(15,118,110,.28);
+}
+.award-page .aw-subtab:not(.is-active):hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(15,23,42,.08); }
+
+/* ---- buttons ---- */
+.award-page .btn { transition: transform .15s var(--ease), box-shadow .2s ease, background-color .15s ease, border-color .15s ease, filter .15s ease; }
+.award-page .btn:not(:disabled):hover { transform: translateY(-1px); }
+.award-page .btn:not(:disabled):active { transform: translateY(0) scale(.98); }
+.award-page .btn-primary { background: linear-gradient(135deg, var(--accent), #0E9488); box-shadow: 0 3px 10px rgba(15,118,110,.25); }
+.award-page .btn-primary:hover:not(:disabled) { box-shadow: 0 7px 18px rgba(15,118,110,.32); }
+.award-page .btn-ghost:hover:not(:disabled) { border-color: var(--accent-line); background: var(--accent-soft); }
+
+/* ---- cards and panels ---- */
+.award-page .card { border-radius: 16px; box-shadow: 0 1px 2px rgba(15,23,42,.05), 0 8px 24px rgba(15,23,42,.05); }
+
+/* ---- the go-live note ---- */
+.award-page .stock-golive.has-note {
+  background: linear-gradient(90deg, var(--good-soft), var(--accent-soft));
+  border-color: var(--good-soft-border);
+}
+.award-page .golive-note { color: var(--text-soft); flex: 1 1 320px; line-height: 1.5; }
+.award-page .live-dot { position: relative; display: inline-block; vertical-align: middle; margin: -2px 10px 0 2px; width: 9px; height: 9px; border-radius: 50%; background: var(--good); }
+.award-page .live-dot::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--good); opacity: 0; }
+
+/* ---- the stock cards ---- */
+
+
+
+/* ---- the stock sheet ---- */
+.award-page #stock-table { border-radius: 14px; overflow: hidden; }
+.award-page #stock-table tbody tr { transition: background-color .15s ease; }
+.award-page #stock-table tbody tr:hover { background: var(--accent-soft); }
+.award-page #stock-table td.is-neg { color: var(--danger); font-weight: 700; background: var(--danger-soft); }
+.award-page #stock-table td.is-editable { transition: box-shadow .15s ease, background-color .15s ease; }
+.award-page #stock-table td.is-editable:hover { background: var(--accent-soft); box-shadow: inset 0 -2px 0 var(--accent); }
+.award-page #stock-table tr.is-carry td { font-weight: 600; }
+
+/* ---- the requisitions ---- */
+.award-page #req-table tbody tr, .award-page #delivery-table tbody tr { transition: background-color .15s ease; }
+.award-page #req-table tbody tr:hover, .award-page #delivery-table tbody tr:hover { background: var(--accent-soft); }
+
+/* ---- empty states ---- */
+.award-page .stock-prompt { padding: 36px 20px 40px; }
+.award-page .empty-art { display: block; width: 124px; height: auto; margin: 0 auto 12px; }
+.award-page .empty-art .ea-shadow { fill: var(--border); opacity: .6; }
+.award-page .empty-art .ea-side { fill: var(--accent-soft-border); }
+.award-page .empty-art .ea-top { fill: var(--accent-line); opacity: .85; }
+.award-page .empty-art .ea-box { fill: var(--surface); stroke: var(--accent); stroke-width: 2; }
+.award-page .empty-art .ea-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; }
+
+/* ---- windows ---- */
+.award-page .aw-overlay-backdrop { backdrop-filter: blur(3px); }
+.award-page .aw-box { border-radius: 18px; box-shadow: 0 24px 60px rgba(15,23,42,.28); }
+
+/* ---- motion ---- */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes aw-rise { from { opacity: 0; transform: translateY(14px) scale(.98); } to { opacity: 1; transform: none; } }
+  @keyframes aw-grow { from { transform: scaleX(0); } to { transform: scaleX(var(--p, 0)); } }
+  @keyframes aw-ping { 0% { transform: scale(.6); opacity: .8; } 80%, 100% { transform: scale(1.6); opacity: 0; } }
+  @keyframes aw-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+  @keyframes aw-fade-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  .award-page .live-dot::after { animation: aw-ping 1.8s ease-out infinite; }
+  .award-page .empty-art { animation: aw-float 3.6s ease-in-out infinite; }
+  .award-page .stock-prompt p { animation: aw-fade-up .5s var(--ease) both; }
+  .award-page .aw-subpanel:not([hidden]), .award-page .aw-view:not([hidden]) { animation: aw-fade-up .3s var(--ease) both; }
+}
+
+/* The requisition tiles take their colour onto an edge, like the stock cards. */
+.award-page .kpi { border-left: 4px solid var(--k); border-radius: 14px; }
+.award-page .kpi:hover { box-shadow: var(--lift); }
+
+/* A row of tools above a table: Download Excel, at the right. */
+.award-page .table-tools { display: flex; justify-content: flex-end; margin: 0 0 10px; }
+
+
+/* ======================================================================
+   The stock table, polished: a band above each district, colour for each
+   gift, and an entrance that plays once after Fetch.
+   ====================================================================== */
+
+.award-page #stock-table { border-collapse: separate; border-spacing: 0; }
+.award-page #stock-table tr.district-band td {
+  padding: 0; position: relative; height: 46px;
+  background: linear-gradient(90deg, var(--accent-soft) 0%, var(--surface) 75%);
+  border-top: 4px solid var(--accent);
+  border-bottom: 1px solid var(--accent-soft-border);
+}
+.award-page #stock-table tbody tr.district-band:hover td { background: linear-gradient(90deg, var(--accent-soft) 0%, var(--surface) 75%); }
+.award-page .db {
+  position: sticky; left: 0; z-index: 1; display: inline-flex; align-items: center; flex-wrap: wrap;
+  gap: 10px 12px; padding: 9px 16px; max-width: min(100%, 980px);
+}
+.award-page .db-pin { width: 22px; height: 22px; color: var(--accent); flex: none; }
+.award-page .db-name { font-size: 1.02rem; font-weight: 800; color: var(--text); letter-spacing: -.01em; }
+.award-page .db-state, .award-page .db-pm {
+  padding: 2px 10px; border-radius: 999px; font-size: .74rem; font-weight: 600; color: var(--text-soft);
+  background: var(--surface); border: 1px solid var(--border);
+}
+.award-page .db-pm::before { content: "PM \00b7 "; color: var(--text-muted); font-weight: 500; }
+
+.award-page #stock-table tr.is-carry td { background: var(--surface-alt); }
+.award-page #stock-table tr.is-carry td.col-month::before { content: "\25B8  "; color: var(--accent); }
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes aw-slide { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: none; } }
+  .award-page #stock-table-wrap.is-fresh .db { animation: aw-slide .5s var(--ease) both; animation-delay: calc(var(--n, 0) * 45ms); }
+  .award-page #stock-table-wrap.is-fresh thead th { animation: aw-fade-up .4s var(--ease) both; }
+}
+
+
+
+/* ======================================================================
+   The requisition lists: one calm heading instead of a colour a column,
+   an edge on each row that says where it stands, a bar for what arrived,
+   and an empty list that offers a way forward.
+   ====================================================================== */
+
+/* ---- the filters ---- */
+.award-page .filters { border-radius: 14px; box-shadow: inset 0 3px 0 var(--accent-line), 0 1px 2px rgba(15,23,42,.04); background: linear-gradient(180deg, var(--surface), var(--surface-alt)); }
+.award-page .filters .field-sm select, .award-page .filters .field-sm input { transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
+.award-page .filters .field-sm select:hover, .award-page .filters .field-sm input:hover { border-color: var(--accent-line); }
+.award-page .filters .field-sm select:focus, .award-page .filters .field-sm input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft-border); outline: none; }
+
+/* ---- the toolbar under the filters ---- */
+.award-page .req-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0 0 12px; }
+.award-page .req-toolbar-left { display: flex; align-items: center; gap: 10px; }
+.award-page .req-count { font-size: .86rem; font-weight: 700; color: var(--text-soft); }
+.award-page .req-count:empty { display: none; }
+
+/* ---- the table: one heading, an edge on every row ---- */
+.award-page #requisitions-table thead th, .award-page #delivery-table thead th { background: linear-gradient(180deg, #3B4A5E, #263244); }
+.award-page #requisitions-table thead th + th, .award-page #delivery-table thead th + th { border-left: 1px solid rgba(255,255,255,.1); }
+.award-page #requisitions-table tbody td, .award-page #delivery-table tbody td { background: transparent; }
+.award-page #requisitions-table tbody td + td, .award-page #delivery-table tbody td + td { border-left: 0; }
+.award-page #requisitions-table tbody tr:nth-child(even) td, .award-page #delivery-table tbody tr:nth-child(even) td { background: var(--surface-alt); }
+.award-page #requisitions-table tbody tr:hover td, .award-page #delivery-table tbody tr:hover td { background: var(--accent-soft); }
+.award-page tr.req-row { --tone: var(--text-muted); }
+.award-page tr.req-row.is-pending  { --tone: #94A3B8; }
+.award-page tr.req-row.is-approved { --tone: var(--good); }
+.award-page tr.req-row.is-progress { --tone: var(--accent); }
+.award-page tr.req-row.is-held     { --tone: var(--warn); }
+.award-page tr.req-row.is-done     { --tone: var(--good); }
+.award-page tr.req-row.is-declined { --tone: var(--danger); }
+.award-page tr.req-row td:first-child { box-shadow: inset 4px 0 0 var(--tone); }
+
+/* ---- delivered / asked, with a bar under it ---- */
+.award-page .qty-bar { display: block; height: 4px; margin-top: 6px; border-radius: 99px; background: var(--border); overflow: hidden; }
+.award-page .qty-bar > i { display: block; height: 100%; border-radius: 99px; transform-origin: left; transform: scaleX(var(--p, 0)); background: linear-gradient(90deg, var(--good), var(--accent-line)); }
+
+/* ---- an empty list ---- */
+.award-page .req-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 30px 16px 34px; }
+.award-page .req-empty .empty-art { margin-bottom: 4px; }
+.award-page .req-empty .re-title { margin: 0; font-size: 1.02rem; font-weight: 800; color: var(--text); }
+.award-page .req-empty .re-sub { margin: 0 0 10px; color: var(--text-muted); font-size: .88rem; }
+.award-page tr.placeholder-row td { background: transparent !important; }
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes aw-bar { from { transform: scaleX(0); } to { transform: scaleX(var(--p, 0)); } }
+  .award-page tbody.is-fresh tr.req-row { animation: aw-fade-up .4s var(--ease) both; animation-delay: calc(min(var(--i, 0), 12) * 40ms); }
+  .award-page tbody.is-fresh .qty-bar > i { animation: aw-bar .8s var(--ease) both; animation-delay: calc(min(var(--i, 0), 12) * 40ms + 200ms); }
+  .award-page .req-empty { animation: aw-fade-up .45s var(--ease) both; }
+  .award-page .req-empty .empty-art { animation: aw-float 3.6s ease-in-out infinite; }
+}
+
+
+/* ======================================================================
+   The tab's pop-up: a message or a question, centred, with an icon of the
+   right tone. It sits above every other window of the tab.
+   ====================================================================== */
+.award-page #aw-popup { z-index: 840; }
+.award-page .awp-box { max-width: 400px; text-align: center; padding: 30px 28px 24px; border-radius: 20px; }
+.award-page .awp-icon {
+  width: 60px; height: 60px; margin: 0 auto 14px; border-radius: 50%; display: grid; place-items: center;
+  color: var(--tone, var(--accent)); background: var(--tone-soft, var(--accent-soft));
+  box-shadow: 0 0 0 8px color-mix(in srgb, var(--tone, var(--accent)) 9%, transparent);
+}
+.award-page .awp-icon svg { width: 30px; height: 30px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.award-page .awp-icon.is-info     { --tone: var(--accent);   --tone-soft: var(--accent-soft); }
+.award-page .awp-icon.is-warning  { --tone: var(--warn);     --tone-soft: var(--warn-soft); }
+.award-page .awp-icon.is-question { --tone: #4F46E5;         --tone-soft: rgba(79,70,229,.12); }
+.award-page .awp-icon.is-success  { --tone: var(--good);     --tone-soft: var(--good-soft); }
+.award-page .awp-icon.is-danger   { --tone: var(--danger);   --tone-soft: var(--danger-soft); }
+.award-page .awp-title { margin: 0 0 6px; font-size: 1.15rem; font-weight: 800; color: var(--text); letter-spacing: -.01em; }
+.award-page .awp-text { margin: 0 0 22px; font-size: .92rem; line-height: 1.5; color: var(--text-soft); }
+.award-page .awp-actions { display: flex; justify-content: center; gap: 10px; }
+.award-page .awp-actions .btn { min-width: 108px; justify-content: center; }
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes awp-bounce { 0% { transform: scale(.5); opacity: 0; } 60% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); } }
+  .award-page #aw-popup.is-open .awp-icon { animation: awp-bounce .5s var(--ease) both .08s; }
+  .award-page #aw-popup.is-open .awp-title, .award-page #aw-popup.is-open .awp-text, .award-page #aw-popup.is-open .awp-actions { animation: aw-fade-up .35s var(--ease) both; }
+  .award-page #aw-popup.is-open .awp-text { animation-delay: .06s; }
+  .award-page #aw-popup.is-open .awp-actions { animation-delay: .12s; }
+}
+
+
+/* ======================================================================
+   Award Utilisation and Settings, brought into line with the stock pages:
+   a status on every month, bars for how far it has got, a card for each
+   Head Office member, and the New Requisition lines as cards.
+   ====================================================================== */
+
+/* ---- the district bar of Award Management ---- */
+.award-page .pom-filter-card {
+  border-radius: 14px; box-shadow: inset 0 3px 0 var(--accent-line), 0 1px 2px rgba(15,23,42,.04);
+  background: linear-gradient(180deg, var(--surface), var(--surface-alt));
+}
+.award-page .pom-select { transition: border-color .15s ease, box-shadow .15s ease; }
+.award-page .pom-select:hover { border-color: var(--accent-line); }
+.award-page .pom-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft-border); outline: none; }
+
+/* ---- Settings: Head Office members ---- */
+.award-page .admin-row {
+  gap: 14px; margin: 0 0 8px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 12px;
+  background: var(--surface); transition: transform .2s var(--ease), box-shadow .2s ease, border-color .2s ease;
+}
+.award-page .admin-row:last-child { margin-bottom: 0; border-bottom: 1px solid var(--border); }
+.award-page .admin-row:hover { transform: translateY(-2px); box-shadow: var(--lift); border-color: var(--accent-line); }
+.award-page .admin-avatar {
+  display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; flex: none;
+  font-size: .82rem; font-weight: 800; color: #fff; background: linear-gradient(135deg, var(--accent), #0E9488);
+  box-shadow: 0 4px 10px rgba(15,118,110,.28);
+}
+.award-page .admin-empty { list-style: none; display: flex; flex-direction: column; align-items: center; padding: 20px 0 6px; color: var(--text-soft); font-weight: 600; }
+.award-page .admin-empty p { margin: 0; }
+
+/* ---- New Requisition: each gift line is a card ---- */
+.award-page .award-line {
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-alt);
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.award-page .award-line:hover { border-color: var(--accent-line); }
+.award-page .award-line:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft-border); }
+.award-page .award-line.has-error { border-color: var(--danger); background: var(--danger-soft); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .award-page .admin-row { animation: aw-fade-up .35s var(--ease) both; }
+  .award-page .award-line { animation: aw-fade-up .3s var(--ease) both; }
+}
+
+
+/* ======================================================================
+   Something is waiting for you: the row, the flag in the first column, the
+   button, the banner and the counts all say so, without any scrolling.
+   The colours stay when motion is switched off; only the pulsing goes.
+   ====================================================================== */
+.award-page .act-count {
+  display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; margin-left: 8px;
+  border-radius: 99px; background: var(--warn); color: #fff; font-size: .68rem; font-weight: 800; vertical-align: 1px;
+}
+.award-page .act-count[hidden] { display: none; }
+
+.award-page .act-banner {
+  display: flex; align-items: center; gap: 12px; margin: 0 0 14px; padding: 12px 16px; border-radius: 14px;
+  background: linear-gradient(90deg, var(--warn-soft), var(--surface)); border: 1px solid var(--warn-soft-border);
+  border-left: 5px solid var(--warn);
+}
+.award-page .act-banner[hidden] { display: none; }
+.award-page .act-bell { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--warn); color: #fff; flex: none; }
+.award-page .act-bell .aw-icon svg { width: 18px; height: 18px; }
+.award-page .act-text { font-weight: 800; color: var(--text); }
+.award-page .act-banner .btn { margin-left: auto; }
+
+.award-page #requisitions-table tbody tr.needs-me td,
+.award-page #delivery-table tbody tr.needs-me td { background: var(--warn-soft); }
+.award-page #requisitions-table tbody tr.needs-me:hover td,
+.award-page #delivery-table tbody tr.needs-me:hover td { background: #FFF1D6; }
+.award-page tr.req-row.needs-me td:first-child { box-shadow: inset 6px 0 0 var(--warn); }
+
+.award-page .act-flag {
+  display: inline-flex; align-items: center; gap: 7px; margin: 6px 0 0 0; padding: 3px 11px 3px 9px; border-radius: 99px;
+  background: var(--warn); color: #fff; font-size: .7rem; font-weight: 800; letter-spacing: .02em; cursor: pointer; white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(180,83,9,.3);
+}
+.award-page .act-flag i { position: relative; width: 7px; height: 7px; border-radius: 50%; background: #fff; flex: none; }
+.award-page .act-flag:hover, .award-page .act-flag:focus-visible { filter: brightness(1.08); outline: none; }
+.award-page .act-flag:focus-visible { box-shadow: 0 0 0 3px rgba(180,83,9,.35); }
+
+.award-page tr.needs-me { cursor: pointer; }
+.award-page tr.needs-me:focus-visible { outline: 3px solid rgba(180,83,9,.45); outline-offset: -3px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes aw-wait  { 0%, 100% { background-color: var(--warn-soft); } 50% { background-color: #FEE3B0; } }
+  @keyframes aw-ring  { 0% { box-shadow: 0 0 0 0 rgba(217,119,6,.55); } 70% { box-shadow: 0 0 0 10px rgba(217,119,6,0); } 100% { box-shadow: 0 0 0 0 rgba(217,119,6,0); } }
+  @keyframes aw-wiggle { 0%, 80%, 100% { transform: rotate(0); } 85% { transform: rotate(-14deg); } 90% { transform: rotate(12deg); } 95% { transform: rotate(-8deg); } }
+  @keyframes aw-dot   { 0% { transform: scale(.8); opacity: 1; } 100% { transform: scale(2.6); opacity: 0; } }
+  @keyframes aw-flash { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); background: var(--warn); color: #fff; } }
+
+  .award-page #requisitions-table tbody tr.needs-me td, .award-page #delivery-table tbody tr.needs-me td { animation: aw-wait 2.2s ease-in-out infinite; }
+  .award-page .act-count { animation: aw-ring 1.7s ease-out infinite; }
+  .award-page .act-bell { animation: aw-wiggle 3s ease-in-out infinite; }
+  .award-page .act-flag i::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: #fff; animation: aw-dot 1.5s ease-out infinite; }
+  @keyframes aw-rowflash { 0%, 100% { background-color: var(--warn-soft); } 50% { background-color: #FCCB7C; } }
+  .award-page tr.needs-me.flash-row td { animation: aw-rowflash .6s ease 4; }
+}
+
+/* Other things to do instead, in the Head Office window. */
+.award-page .ho-alt { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 4px 0 0; }
+.award-page .ho-alt[hidden] { display: none; }
+.award-page .ho-alt-link {
+  padding: 0; border: 0; background: none; font: inherit; font-size: .84rem; font-weight: 700; color: var(--accent-ink);
+  text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+}
+.award-page .ho-alt-link.is-danger { color: var(--danger); }
+.award-page .ho-alt-link:hover { filter: brightness(.85); }
+
+
+/* ======================================================================
+   The Review and Head Office windows: who, where and when as three tiles,
+   the reason as a quotation, each gift as a coloured line, and the decision
+   pinned at the foot so it is never scrolled out of sight.
+   ====================================================================== */
+.award-page .review-box { display: flex; flex-direction: column; width: min(640px, 96vw); max-width: 640px; max-height: min(90vh, 780px); padding: 0; border-radius: 20px; overflow: hidden; }
+.award-page .rv-head { display: flex; align-items: center; gap: 14px; padding: 18px 22px; border-bottom: 1px solid var(--border); background: linear-gradient(135deg, var(--accent-soft), var(--surface)); }
+.award-page .rv-head .aw-box-heading { flex: 1; min-width: 0; }
+.award-page .rv-badge { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; flex: none; color: #fff; background: linear-gradient(135deg, var(--accent), #0E9488); box-shadow: 0 6px 14px rgba(15,118,110,.3); }
+.award-page .rv-badge .aw-icon svg { width: 22px; height: 22px; }
+.award-page .review-body { flex: 1 1 auto; overflow-y: auto; padding: 18px 22px; }
+
+.award-page .rv-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.award-page .rv-tile { display: flex; flex-direction: column; gap: 3px; padding: 11px 13px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-alt); min-width: 0; }
+.award-page .rv-k { font-size: .64rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted); }
+.award-page .rv-tile b { font-size: .95rem; font-weight: 800; color: var(--text); overflow-wrap: anywhere; }
+.award-page .rv-sub { font-size: .76rem; color: var(--text-muted); }
+.award-page .rv-tile .chip-role { align-self: flex-start; }
+
+.award-page .rv-remark { margin: 14px 0 0; padding: 11px 14px 11px 16px; border-left: 4px solid var(--accent-line); border-radius: 0 12px 12px 0; background: var(--accent-soft); color: var(--text); font-size: .92rem; font-style: italic; }
+.award-page .rv-remark span { display: block; margin-bottom: 2px; font-size: .64rem; font-weight: 800; font-style: normal; letter-spacing: .1em; text-transform: uppercase; color: var(--accent-ink); }
+
+.award-page .rv-ghead { display: flex; align-items: baseline; justify-content: space-between; margin: 18px 0 8px; font-size: .72rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted); }
+.award-page .rv-total { letter-spacing: 0; text-transform: none; font-size: .86rem; color: var(--text-soft); }
+.award-page .rv-total b { margin-left: 4px; padding: 2px 11px; border-radius: 99px; background: var(--accent); color: #fff; font-size: .9rem; }
+.award-page .rv-gifts { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.award-page .rv-gifts li {
+  --tone: var(--accent); display: flex; align-items: center; gap: 8px; padding: 8px 12px; min-width: 0;
+  border: 1px solid var(--border); border-left: 4px solid var(--tone); border-radius: 10px; background: var(--surface);
+}
+.award-page .rv-gifts li i { width: 8px; height: 8px; border-radius: 50%; background: var(--tone); flex: none; display: none; }
+.award-page .rv-gifts .rv-gname { font-weight: 800; font-size: .88rem; color: var(--text); white-space: nowrap; }
+.award-page .rv-gifts .rv-gcat { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .8rem; color: var(--text-soft); }
+.award-page .rv-gifts li b { margin-left: auto; padding: 1px 10px; border-radius: 99px; background: var(--tone-soft, var(--accent-soft)); color: var(--text); font-family: var(--font-mono); font-size: .88rem; }
+.award-page .rv-gifts li.g-block    { --tone: var(--tone-block);    --tone-soft: var(--tone-block-soft); }
+.award-page .rv-gifts li.g-district { --tone: var(--tone-district); --tone-soft: var(--tone-district-soft); }
+.award-page .rv-gifts li.g-ns       { --tone: var(--tone-ns);       --tone-soft: var(--tone-ns-soft); }
+.award-page .rv-gifts li.g-su       { --tone: var(--tone-su);       --tone-soft: var(--tone-su-soft); }
+.award-page .rv-gifts li.g-other    { --tone: var(--tone-other);    --tone-soft: var(--tone-other-soft); }
+.award-page .rv-gifts li.g-small    { --tone: var(--tone-small);    --tone-soft: var(--tone-small-soft); }
+.award-page .rv-gifts li.g-big      { --tone: var(--tone-big);      --tone-soft: var(--tone-big-soft); }
+
+.award-page .review-decision { flex: none; padding: 14px 22px 18px; border-top: 1px solid var(--border); background: var(--surface); box-shadow: 0 -8px 18px rgba(15,23,42,.05); }
+.award-page .rv-label { display: block; margin: 0 0 6px; font-size: .78rem; font-weight: 800; color: var(--text); }
+.award-page .review-decision textarea { width: 100%; resize: vertical; min-height: 54px; }
+.award-page .review-decision .error { margin: 4px 0 0; }
+.award-page .rv-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 12px; }
+.award-page .rv-actions .btn { min-width: 132px; min-height: 44px; justify-content: center; font-weight: 800; }
+.award-page .btn-decline { background: var(--surface); color: var(--danger); border: 1.5px solid var(--danger); box-shadow: none; }
+.award-page .btn-decline:hover:not(:disabled) { background: var(--danger); color: #fff; }
+
+/* The Head Office window shows the same summary. */
+.award-page #ho-modal .review-summary { margin: 0 0 14px; }
+.award-page #ho-modal .rv-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+@media (max-width: 560px) {
+  .award-page .rv-tiles { grid-template-columns: 1fr; }
+  .award-page .rv-gifts { grid-template-columns: 1fr; }
+  .award-page .rv-actions .btn { flex: 1; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .award-page #review-modal.is-open .rv-tile, .award-page #ho-modal.is-open .rv-tile { animation: aw-fade-up .4s var(--ease) both; }
+  .award-page #review-modal.is-open .rv-tile:nth-child(2), .award-page #ho-modal.is-open .rv-tile:nth-child(2) { animation-delay: .06s; }
+  .award-page #review-modal.is-open .rv-tile:nth-child(3), .award-page #ho-modal.is-open .rv-tile:nth-child(3) { animation-delay: .12s; }
+  .award-page #review-modal.is-open .rv-gifts li, .award-page #ho-modal.is-open .rv-gifts li { animation: aw-fade-up .35s var(--ease) both; animation-delay: calc(.12s + var(--i, 0) * 35ms); }
+  .award-page #review-modal.is-open .review-box { animation: aw-pop .3s var(--ease) both; }
+}
+
 
 /* ── One "Refresh data" button for the whole page (award.js runRefreshAll) ──
    It sits at the right of the top tabs on every tab and reloads the tab on
@@ -1903,4 +2316,12 @@
 @keyframes aw-refresh-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
   .award-page .aw-refresh-all.is-busy .aw-icon svg { animation: none; }
+}
+
+/* On a phone the stock buttons wrap onto their own line instead of widening
+   the page, and the district bar of Award Management wraps its AY badge. */
+@media (max-width: 640px) {
+  .award-page .stock-actions { flex-wrap: wrap; width: 100%; margin-left: 0; justify-content: flex-end; }
+  .award-page .awm-view .pom-filter-card, .award-page .pom-filter-card { flex-wrap: wrap; }
+  .award-page .pom-filter-card .pom-select { max-width: 100%; }
 }
