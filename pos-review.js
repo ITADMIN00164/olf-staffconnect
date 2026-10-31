@@ -258,12 +258,43 @@
       unitEmpId ? fetchAll(function () { return db().from("nimble_data").select("*").eq("year", y).eq("month", m).eq("emp_id", unitEmpId); }) : NONE,
       unitEmpId ? fetchAll(function () { return db().from("visitandactivity_data").select("*").eq("year", y).eq("month", m).eq("emp_id", unitEmpId); }) : NONE,
       unitEmpId ? fetchAll(function () { return db().from("review_responses").select("*").eq("emp_id", unitEmpId).in("period_code", codes.concat(prevCodes)); }) : NONE,
-      sbGetWeekDates(y, m)
+      sbGetWeekDates(y, m),
+      sbGetRemovedWeeks(y, m),
+      sbGetRemovedWeeks(Number(pm.substring(0, 4)), Number(pm.substring(4, 6)))
     ]);
-    var weekDates = q[8];
+    var weekDates = q[8], removed = q[9], prevRemoved = q[10];
     var weeksWithData = {}; q[0].forEach(function (r) { weeksWithData[r.week] = 1; });
     var own = sectionsByCode(q[7]);
     var evMonth = MON_SHORT[m - 1] + "-" + y;   // Staff Connect "Month" column, e.g. "Sep-2026"
+
+    // Week 1 takes its actions from the last week of the previous month that has G filled.
+    // When that month's Week 5 was removed, whatever was already written in Week 5's G is
+    // not lost: it comes forward too, after Week 4's actions (same text listed once).
+    // B has 5 rows; if the two weeks hold more than 5 actions, the extras share row 5.
+    function carryFromPrevMonth(carry) {
+      var base = 0;
+      for (var pw = 5; pw >= 1; pw--) {
+        if (prevRemoved[pw]) continue;
+        var prev = own[pm + pad2(pw)];
+        if (prev && prev.G) { base = pw; break; }
+      }
+      var srcs = [];
+      if (base) srcs.push(own[pm + pad2(base)].G);
+      for (var rw = base + 1; rw <= 5; rw++) {
+        var gone = own[pm + pad2(rw)];
+        if (prevRemoved[rw] && gone && gone.G) srcs.push(gone.G);
+      }
+      if (srcs.length <= 1) { if (srcs.length) applyCarry(carry, srcs[0]); return; }
+      var list = [];
+      srcs.forEach(function (g) {
+        ["G2", "G3", "G4", "G5", "G6"].forEach(function (k) {
+          var t = String(g[k] == null ? "" : g[k]).trim();
+          if (t && list.indexOf(t) < 0) list.push(t);
+        });
+      });
+      if (list.length > 5) list = list.slice(0, 4).concat([list.slice(4).join(" | ")]);
+      ["B1", "B2", "B3", "B4", "B5"].forEach(function (b, i) { carry[b] = list[i] || ""; });
+    }
 
     var weeks = [];
     for (var wk = 0; wk <= 5; wk++) {
@@ -272,13 +303,13 @@
                  q[1], q[2], q[3], q[4], q[5], q[6]) : {};
       var carry = { B1: "", B2: "", B3: "", B4: "", B5: "" };
       if (wk === 0) applyCarry(carry, (own[pm + "00"] || {}).G);      // Monthly tab: last month's plan
-      else if (wk >= 2) applyCarry(carry, (own[month + pad2(wk - 1)] || {}).G);
-      else if (wk === 1) {
-        for (var pw = 5; pw >= 1; pw--) {
-          var prev = own[pm + pad2(pw)];
-          if (prev && prev.G) { applyCarry(carry, prev.G); break; }
-        }
+      else if (wk >= 2) {
+        // The week before, skipping weeks removed for this month (normally that is just wk - 1).
+        var pk = wk - 1; while (pk > 1 && removed[pk]) pk--;
+        if (!removed[pk]) applyCarry(carry, (own[month + pad2(pk)] || {}).G);
+        else carryFromPrevMonth(carry);
       }
+      else if (wk === 1) carryFromPrevMonth(carry);
       weeks.push({ week: wk, code: code, sections: own[code] || {}, readPoints: rp,
                    prefill: {}, carryForward: carry, verified: null });
     }
@@ -299,7 +330,33 @@
       });
       roster = { kind: unit === "PM" ? "PO" : "PM", members: members, byWeek: byWeek };
     }
-    return { header: header, unitEmpId: unitEmpId, month: month, weeks: weeks, roster: roster, weekDates: weekDates };
+    return { header: header, unitEmpId: unitEmpId, month: month, weeks: weeks, roster: roster, weekDates: weekDates, removedWeeks: removed };
+  }
+
+  /* ---------- removed weeks (itadmin) ----------
+     Table week_removed: one row per year/month/week that does not apply to that month
+     (usually Week 5). A removed week is hidden for everyone and skipped when actions
+     carry forward. Nothing in review_responses is deleted, so Restore brings it back.
+     Never fails the review: if the table is missing, every week shows as before. */
+  async function sbGetRemovedWeeks(y, m) {
+    try {
+      var res = await db().from("week_removed").select("week").eq("year", y).eq("month", m);
+      if (res.error) { console.warn("week_removed:", res.error.message || res.error); return {}; }
+      var out = {};
+      (res.data || []).forEach(function (r) { out[r.week] = true; });
+      return out;
+    } catch (e) { console.warn("week_removed:", e); return {}; }
+  }
+  async function sbSetWeekRemoved(y, m, wk, on) {
+    var res = on
+      ? await db().from("week_removed").upsert({ year: y, month: m, week: wk, removed_by: currentEmail() || "unknown",
+          removed_at: new Date().toISOString() }, { onConflict: "year,month,week" })
+      : await db().from("week_removed").delete().eq("year", y).eq("month", m).eq("week", wk);
+    if (res.error) {
+      if (/week_removed/.test(res.error.message || "") && /exist|schema cache|not find/i.test(res.error.message || ""))
+        throw new Error("The week_removed table isn't set up yet. Run sql/field-review-removed-weeks.sql in Supabase first.");
+      throw res.error;
+    }
   }
 
   /* ---------- week dates (set by itadmin, shown to everyone) ----------
@@ -631,7 +688,9 @@
     for (var i = 0; i < list.length; i++) if (list[i].week === n) return list[i];
     return { week: n, code: VIEW.month + (n < 10 ? "0" + n : "" + n), sections: {}, readPoints: {} };
   }
-  function calWeeks() { return [1, 2, 3, 4, 5].map(weekByNum); }   // always Week 1-5, with or without data
+  function isRemovedWeek(n) { return !!(VIEW && VIEW.removedWeeks && VIEW.removedWeeks[n]); }
+  function liveWeekNums() { return [1, 2, 3, 4, 5].filter(function (n) { return !isRemovedWeek(n); }); }
+  function calWeeks() { return liveWeekNums().map(weekByNum); }   // Week 1-5, with or without data, minus weeks removed for this month
   function mtdWeek() { var w0 = (VIEW.weeks || []).filter(function (w) { return w.week === 0; })[0]; return hasData(w0) ? w0 : null; }
   function repWeek() { var pw = presentWeeks(); return pw.length ? pw[0] : (mtdWeek() || (VIEW.weeks || [])[1] || { readPoints: {} }); }
 
@@ -792,7 +851,7 @@
   // Week columns shown in the table (all by default; at least one stays).
   var SELWK = { 1: true, 2: true, 3: true, 4: true, 5: true };
   function applyWeekSel() {
-    var vis = [1, 2, 3, 4, 5].filter(function (n) { return SELWK[n]; });
+    var vis = liveWeekNums().filter(function (n) { return SELWK[n]; });
     document.querySelectorAll("#prBody [data-wk]").forEach(function (el) {
       var n = Number(el.dataset.wk), on = !!SELWK[n];
       if (el.classList.contains("pr-wkcard")) {
@@ -886,13 +945,54 @@
       c.addEventListener("click", function (e) {
         var n = Number(c.dataset.wk);
         if (e.target.closest && e.target.closest("[data-wkdatebtn]")) { e.stopPropagation(); openWeekDates(n); return; }
-        if (SELWK[n] && [1, 2, 3, 4, 5].filter(function (k) { return SELWK[k]; }).length === 1) { toast("At least one week stays visible."); return; }
+        if (e.target.closest && e.target.closest("[data-wkdelbtn]")) { e.stopPropagation(); setWeekRemoved(n, true); return; }
+        if (SELWK[n] && liveWeekNums().filter(function (k) { return SELWK[k]; }).length === 1) { toast("At least one week stays visible."); return; }
         SELWK[n] = !SELWK[n]; applyWeekSel();
       });
+    });
+    document.querySelectorAll("#prBody [data-wkrestore]").forEach(function (b) {
+      b.addEventListener("click", function () { setWeekRemoved(Number(b.dataset.wkrestore), false); });
     });
     var all = $("prWkAll");
     if (all) all.addEventListener("click", function () { SELWK = { 1: true, 2: true, 3: true, 4: true, 5: true }; applyWeekSel(); });
     applyWeekSel();
+  }
+
+  /* Remove / restore a week for the whole month (itadmin only). It applies to every PO, PM
+     and DM, because weeks are the month's calendar slots, not one person's. Saved entries
+     are kept; the view reloads so the column, the cards and the carry-forward update. */
+  var WK_REMOVABLE = [5];   // only Week 5 can be missing from a month
+  async function setWeekRemoved(n, on) {
+    if (!prIsAdmin() || !VIEW || !VIEW.month) return;
+    var month = VIEW.month, y = Number(month.substring(0, 4)), m = Number(month.substring(4, 6));
+    var unsaved = Object.keys(DIRTY).some(function (c) { return Object.keys(DIRTY[c]).length; });
+    var w = weekByNum(n), filled = ["A", "B", "G", "H"].some(function (k) { return secFilled(w, k); });
+    var lines = on
+      ? ["Week " + n + " disappears for everyone in " + monthLabel(month) + " (all POs, PMs and DMs).",
+         "Next month's Week 1 shows Week " + (n - 1) + "'s “Next week” actions, plus any already written in Week " + n + "."]
+          .concat(filled ? ["Everything saved in Week " + n + " is kept in the database, just hidden. Restore brings it back."] : [])
+      : ["Week " + n + " comes back for everyone in " + monthLabel(month) + ", with anything saved in it.",
+         "Next month's Week 1 goes back to showing Week " + n + "'s actions (or Week " + (n - 1) + "'s if Week " + n + " has none)."];
+    if (unsaved) lines.push("You have unsaved changes on this page — save them first, or they will be lost.");
+    var ok = window.showAppConfirm
+      ? await window.showAppConfirm({ title: (on ? "Remove Week " : "Restore Week ") + n + "?", message: lines.join("\n"),
+          type: "warning", confirmText: on ? "Remove week" : "Restore week" })
+      : window.confirm(lines.join("\n"));
+    if (!ok) return;
+    try {
+      await sbSetWeekRemoved(y, m, n, on);
+      toast(on ? "Week " + n + " removed for " + monthLabel(month) + "." : "Week " + n + " restored.");
+      if (VIEW && VIEW.month === month) loadWeeklyView();
+    } catch (e) {
+      toast((on ? "Couldn't remove the week: " : "Couldn't restore the week: ") + (e.message || String(e)));
+    }
+  }
+  // What itadmin sees in place of a removed week: a slim card with Restore. Everyone else sees nothing.
+  function removedCardHtml(n) {
+    return '<div class="pr-card pr-wkcard pr-wkcard--removed">'
+      + '<div class="pr-card-k"><span>Week ' + n + '</span><span class="pr-wk-gone">Removed</span></div>'
+      + '<div class="pr-wkgone-txt">Not part of ' + esc(monthLabel(VIEW.month)) + '. Hidden for everyone; next month’s Week 1 shows Week ' + (n - 1) + '’s and Week ' + n + '’s actions.</div>'
+      + '<button type="button" class="pr-wkdate-btn" data-wkrestore="' + n + '">Restore week</button></div>';
   }
 
   function weekCardHtml(w) {
@@ -908,7 +1008,9 @@
     var dt = weekDateText(w.week);
     var dateLine = !(dt || prIsAdmin()) ? "" : '<div class="pr-wkcard-date"><span data-wkdate="' + w.week + '">' + esc(dt) + '</span>'
       + (prIsAdmin() ? '<button type="button" class="pr-wkdate-btn" data-wkdatebtn="' + w.week + '" title="Set the dates for Week ' + w.week + '">'
-          + (dt ? "Edit dates" : "Set dates") + '</button>' : "") + '</div>';
+          + (dt ? "Edit dates" : "Set dates") + '</button>' : "")
+      + (prIsAdmin() && WK_REMOVABLE.indexOf(w.week) >= 0 ? '<button type="button" class="pr-wkdel-btn" data-wkdelbtn="' + w.week
+          + '" title="This month has no Week ' + w.week + ' — remove it for everyone" aria-label="Remove Week ' + w.week + '"></button>' : "") + '</div>';
     return '<div class="pr-card pr-wkcard' + state + '" data-wk="' + w.week + '" role="button" tabindex="0" title="Click to show or hide Week ' + w.week + '">'
       + '<div class="pr-card-k"><span>Week ' + w.week + '</span>' + lock + '<span class="pr-wk-vis">Shown</span></div>'
       + dateLine
@@ -918,6 +1020,7 @@
   function renderCards() {
     var cards = "";
     calWeeks().forEach(function (w) { cards += weekCardHtml(w); });
+    if (prIsAdmin()) [1, 2, 3, 4, 5].filter(isRemovedWeek).forEach(function (n) { cards += removedCardHtml(n); });
     return '<div class="pr-cards-hint">Click a week to show or hide its column \u00B7 <button type="button" class="pr-linkbtn" id="prWkAll">Show all weeks</button></div>'
       + '<div class="pr-cards pr-wkcards">' + cards + '</div>';
   }
@@ -2317,8 +2420,14 @@
     var code = month + pad2(Number(week || 1));
 
     sumBody('<div class="pr-empty pr-loading">Loading…</div>');
-    sbGetSummary(units, code).then(function (d) {
-      SUM.data = d; sumRender();
+    var y = Number(month.substring(0, 4)), mo = Number(month.substring(4, 6)), wn = Number(week || 1);
+    sbGetRemovedWeeks(y, mo).then(function (rm) {
+      // Mark removed weeks in the Week dropdown for this month.
+      Array.prototype.forEach.call(($("prSumWeek") || {}).options || [], function (o) {
+        o.textContent = "Week " + o.value + (rm[o.value] ? " (removed)" : "");
+      });
+      if (rm[wn]) { SUM.data = null; sumBody('<div class="pr-empty">Week ' + wn + ' was removed for this month, so there is no review to report. Pick another week.</div>'); return; }
+      return sbGetSummary(units, code).then(function (d) { SUM.data = d; sumRender(); });
     }).catch(function (e) {
       sumBody('<div class="pr-empty pr-error">Couldn\'t load: ' + esc(e.message || String(e)) + "</div>");
     });

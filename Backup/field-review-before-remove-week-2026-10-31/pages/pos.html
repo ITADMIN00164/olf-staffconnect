@@ -1,0 +1,1871 @@
+<style>
+    /* ════════════════════════════════════════════════════════════════
+       FIELD REVIEW SYSTEM — page styles (scoped to this page only)
+       Visual layer only. Every id, class and data-attribute that pos.js
+       and pos-review.js look up is unchanged.
+       Icons are CSS masks fed by the --fr-* variables below, never inline
+       SVG elements: VS Code Live Server injects its reload script before
+       every closing SVG tag in a page fragment and then cuts the response
+       short. Keep this page free of literal SVG tags.
+       ════════════════════════════════════════════════════════════════ */
+    :root{--fr-dash:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223.5%22%20y%3D%223.5%22%20width%3D%227%22%20height%3D%227%22%20rx%3D%221.6%22%2F%3E%3Crect%20x%3D%2213.5%22%20y%3D%223.5%22%20width%3D%227%22%20height%3D%227%22%20rx%3D%221.6%22%2F%3E%3Crect%20x%3D%223.5%22%20y%3D%2213.5%22%20width%3D%227%22%20height%3D%227%22%20rx%3D%221.6%22%2F%3E%3Crect%20x%3D%2213.5%22%20y%3D%2213.5%22%20width%3D%227%22%20height%3D%227%22%20rx%3D%221.6%22%2F%3E%3C%2Fsvg%3E");
+        --fr-admin:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203l7.5%203v5.2c0%204.6-3.1%208.4-7.5%209.8-4.4-1.4-7.5-5.2-7.5-9.8V6z%22%2F%3E%3Cpath%20d%3D%22M9%2012l2.2%202.2L15.2%2010%22%2F%3E%3C%2Fsvg%3E");
+        --fr-week:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223.5%22%20y%3D%225%22%20width%3D%2217%22%20height%3D%2215.5%22%20rx%3D%222.5%22%2F%3E%3Cpath%20d%3D%22M3.5%2010h17M8%203v4M16%203v4M8%2014h2M14%2014h2M8%2017h2%22%2F%3E%3C%2Fsvg%3E");
+        --fr-sum:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%206.5l1.6%201.6L8.5%205.2M4%2012.5l1.6%201.6%202.9-2.9M4%2018.5l1.6%201.6%202.9-2.9M11.5%207h9M11.5%2013h9M11.5%2019h9%22%2F%3E%3C%2Fsvg%3E");
+        --fr-month:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3.5%2020.5h17M7%2017v-5M12%2017V6.5M17%2017v-8%22%2F%3E%3C%2Fsvg%3E");
+        --fr-pin:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2021s-6.5-5.8-6.5-11A6.5%206.5%200%200%201%2018.5%2010c0%205.2-6.5%2011-6.5%2011z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2210%22%20r%3D%222.4%22%2F%3E%3C%2Fsvg%3E");
+        --fr-users:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Ccircle%20cx%3D%229%22%20cy%3D%228%22%20r%3D%223.4%22%2F%3E%3Cpath%20d%3D%22M2.8%2020c.8-3.5%203.3-5.4%206.2-5.4s5.4%201.9%206.2%205.4M15.5%204.8a3.4%203.4%200%200%201%200%206.4M17.6%2014.9c1.8.7%203%202.3%203.5%205.1%22%2F%3E%3C%2Fsvg%3E");
+        --fr-db:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%225.8%22%20rx%3D%227.5%22%20ry%3D%222.6%22%2F%3E%3Cpath%20d%3D%22M4.5%205.8v12.4c0%201.4%203.4%202.6%207.5%202.6s7.5-1.2%207.5-2.6V5.8M4.5%2012c0%201.4%203.4%202.6%207.5%202.6s7.5-1.2%207.5-2.6%22%2F%3E%3C%2Fsvg%3E");
+        --fr-cap:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2.5%209.2L12%204.5l9.5%204.7L12%2014z%22%2F%3E%3Cpath%20d%3D%22M6.5%2011.3v4.9c2.6%202.3%208.4%202.3%2011%200v-4.9M21.5%209.2v5.6%22%2F%3E%3C%2Fsvg%3E");
+        --fr-target:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%228.5%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%224.8%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%221.2%22%2F%3E%3C%2Fsvg%3E");
+        --fr-link:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2014a4%204%200%200%200%205.7%200l3-3a4%204%200%200%200-5.7-5.7l-1.1%201.1M14%2010a4%204%200%200%200-5.7%200l-3%203a4%204%200%200%200%205.7%205.7l1.1-1.1%22%2F%3E%3C%2Fsvg%3E");
+        --fr-edit:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4.5%2019.5h3.8L19%208.8a2.7%202.7%200%200%200-3.8-3.8L4.5%2015.7z%22%2F%3E%3Cpath%20d%3D%22M13.6%206.6l3.8%203.8%22%2F%3E%3C%2Fsvg%3E");
+        --fr-trash:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4.5%207h15M9.5%207V4.5h5V7M6.5%207l.9%2013h9.2l.9-13M10%2011v5.5M14%2011v5.5%22%2F%3E%3C%2Fsvg%3E");
+        --fr-chev:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M9.5%206l6%206-6%206%22%2F%3E%3C%2Fsvg%3E");
+        --fr-eye:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2.5%2012s3.5-6.5%209.5-6.5%209.5%206.5%209.5%206.5-3.5%206.5-9.5%206.5S2.5%2012%202.5%2012z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%222.8%22%2F%3E%3C%2Fsvg%3E");
+        --fr-eyeoff:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%203l18%2018M10.6%205.6c.5-.1.9-.1%201.4-.1%206%200%209.5%206.5%209.5%206.5a17%2017%200%200%201-2.7%203.5M6.6%206.6A16%2016%200%200%200%202.5%2012s3.5%206.5%209.5%206.5c1.7%200%203.2-.5%204.5-1.2M9.9%209.9a2.8%202.8%200%200%200%204.2%204.2%22%2F%3E%3C%2Fsvg%3E");
+        --fr-check:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M5%2012.5l4.5%204.5L19%207.5%22%2F%3E%3C%2Fsvg%3E");
+        --fr-plus:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%205v14M5%2012h14%22%2F%3E%3C%2Fsvg%3E");
+        --fr-search:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Ccircle%20cx%3D%2211%22%20cy%3D%2211%22%20r%3D%226.5%22%2F%3E%3Cpath%20d%3D%22M20%2020l-4.2-4.2%22%2F%3E%3C%2Fsvg%3E");
+        --fr-inbox:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3.5%2013.5l2.6-7.6c.2-.6.8-1%201.4-1h9c.6%200%201.2.4%201.4%201l2.6%207.6v5a1.5%201.5%200%200%201-1.5%201.5h-14a1.5%201.5%200%200%201-1.5-1.5z%22%2F%3E%3Cpath%20d%3D%22M3.5%2013.5h4.8l1.2%202.2h5l1.2-2.2h4.8%22%2F%3E%3C%2Fsvg%3E");
+        --fr-alert:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%204l9%2015.5H3z%22%2F%3E%3Cpath%20d%3D%22M12%2010v4.2M12%2017v.3%22%2F%3E%3C%2Fsvg%3E");
+        --fr-pencilline:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4.5%2019.5h3.8L19%208.8a2.7%202.7%200%200%200-3.8-3.8L4.5%2015.7z%22%2F%3E%3C%2Fsvg%3E");
+        --fr-x:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M6.5%206.5l11%2011M17.5%206.5l-11%2011%22%2F%3E%3C%2Fsvg%3E");
+        --fr-refresh:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M19.5%2012a7.5%207.5%200%201%201-2.2-5.3M19.5%204.5v4h-4%22%2F%3E%3C%2Fsvg%3E");
+        --fr-dl:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203.5v11M7.5%2010l4.5%204.5%204.5-4.5M4.5%2019.5h15%22%2F%3E%3C%2Fsvg%3E");}
+
+    .fr-ico {
+        display: inline-block; flex-shrink: 0;
+        width: 16px; height: 16px;
+        background-color: currentColor;
+        -webkit-mask: var(--fr-dash) center / contain no-repeat;
+                mask: var(--fr-dash) center / contain no-repeat;
+    }
+    .fr-i-dash   { -webkit-mask-image: var(--fr-dash);   mask-image: var(--fr-dash); }
+    .fr-i-admin  { -webkit-mask-image: var(--fr-admin);  mask-image: var(--fr-admin); }
+    .fr-i-week   { -webkit-mask-image: var(--fr-week);   mask-image: var(--fr-week); }
+    .fr-i-sum    { -webkit-mask-image: var(--fr-sum);    mask-image: var(--fr-sum); }
+    .fr-i-month  { -webkit-mask-image: var(--fr-month);  mask-image: var(--fr-month); }
+    .fr-i-pin    { -webkit-mask-image: var(--fr-pin);    mask-image: var(--fr-pin); }
+    .fr-i-users  { -webkit-mask-image: var(--fr-users);  mask-image: var(--fr-users); }
+    .fr-i-db     { -webkit-mask-image: var(--fr-db);     mask-image: var(--fr-db); }
+    .fr-i-cap    { -webkit-mask-image: var(--fr-cap);    mask-image: var(--fr-cap); }
+    .fr-i-target { -webkit-mask-image: var(--fr-target); mask-image: var(--fr-target); }
+    .fr-i-link   { -webkit-mask-image: var(--fr-link);   mask-image: var(--fr-link); }
+
+    /* ── Page header: title left, Dashboard / Admin switch right ── */
+    #posPage .page-header-emp { align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+    #posPage .page-title { font-size: 24px; letter-spacing: -0.6px; }
+    #posPage .page-subtitle { margin-top: 2px; }
+
+    .pos-top-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+    .pos-top-tab {
+        display: inline-flex; align-items: center; gap: 7px;
+        background: #fff; border: 1px solid #e5e7eb; color: #374151;
+        padding: 9px 18px; border-radius: 10px; font-size: 13.5px; font-weight: 600;
+        cursor: pointer; font-family: inherit;
+        transition: background .16s ease, color .16s ease, box-shadow .16s ease, border-color .16s ease;
+    }
+    .pos-top-tab.active { background: #4f8ef7; color: #fff; border-color: #4f8ef7; }
+
+    .pos-top-tabs--header {
+        margin-bottom: 0; flex-shrink: 0; align-self: center;
+        gap: 3px; padding: 4px;
+        background: rgba(255,255,255,0.62);
+        -webkit-backdrop-filter: blur(16px) saturate(150%);
+                backdrop-filter: blur(16px) saturate(150%);
+        border: 1px solid rgba(255,255,255,0.9);
+        border-radius: 13px;
+        box-shadow: 0 1px 2px rgba(15,23,42,0.05), 0 0 0 1px rgba(15,23,42,0.05);
+    }
+    /* Only one choice for non-admins: hide the switch rather than show a lone button */
+    .pos-top-tabs--header:has(#posAdminTabBtn[hidden]) { display: none; }
+    .pos-top-tabs--header .pos-top-tab {
+        height: 36px; padding: 0 16px;
+        background: transparent; border: 0; border-radius: 10px;
+        color: #5A6577; font-size: 13px;
+    }
+    .pos-top-tabs--header .pos-top-tab:hover { color: #0F172A; background: rgba(255,255,255,0.7); }
+    .pos-top-tabs--header .pos-top-tab.active {
+        background: #fff; color: #0F172A;
+        box-shadow: 0 1px 2px rgba(15,23,42,0.08), 0 3px 10px rgba(15,23,42,0.07);
+    }
+    .pos-top-tabs--header .pos-top-tab.active .fr-ico { color: #4F8EF7; }
+
+    /* ── Admin: second-level tabs (underline style, same as Weekly / Summary / Monthly) ── */
+    .pos-subtabs {
+        display: flex; gap: 2px; margin-bottom: 18px;
+        border-bottom: 1px solid rgba(15,23,42,0.09);
+        overflow-x: auto; scrollbar-width: none;
+    }
+    .pos-subtabs::-webkit-scrollbar { display: none; }
+    .pos-subtabs .pos-top-tab {
+        position: relative; flex-shrink: 0;
+        height: 42px; padding: 0 14px;
+        background: transparent; border: 0; border-radius: 10px 10px 0 0;
+        color: #64748B; font-size: 13.5px;
+    }
+    .pos-subtabs .pos-top-tab:hover { color: #0F172A; background: rgba(255,255,255,0.55); }
+    .pos-subtabs .pos-top-tab.active { background: transparent; color: #2C63C4; }
+    .pos-subtabs .pos-top-tab.active::after {
+        content: ""; position: absolute; left: 10px; right: 10px; bottom: -1px;
+        height: 2.5px; border-radius: 3px 3px 0 0;
+        background: linear-gradient(90deg, #4F8EF7, #10B197);
+    }
+    .pos-top-tab:focus-visible { outline: 2px solid #4F8EF7; outline-offset: 2px; }
+
+    /* ── Admin: toolbar + table read as one card ── */
+    #posAdminSection .table-toolbar {
+        margin: 0; padding: 12px 14px 12px 18px;
+        background: rgba(255,255,255,0.82);
+        -webkit-backdrop-filter: blur(16px) saturate(150%);
+                backdrop-filter: blur(16px) saturate(150%);
+        border: 1px solid rgba(15,23,42,0.07); border-bottom: 0;
+        border-radius: 16px 16px 0 0;
+    }
+    #posAdminSection .table-meta { font-size: 12.5px; color: #64748B; font-weight: 500; }
+    #posAdminSection .toolbar-right { gap: 8px; flex-wrap: wrap; }
+
+    .pos-scroll-wrap {
+        max-height: 480px;
+        overflow: auto;
+        background: #fff;
+        border: 1px solid rgba(15,23,42,0.07);
+        border-radius: 16px;
+        box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 8px 24px rgba(15,23,42,0.06);
+        scrollbar-width: thin;
+        scrollbar-color: rgba(15,23,42,0.18) transparent;
+    }
+    #posAdminSection .table-toolbar + .pos-scroll-wrap { border-radius: 0 0 16px 16px; }
+    .pos-scroll-wrap table { width: 100%; border-collapse: separate; border-spacing: 0; }
+    .pos-scroll-wrap thead th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: #F8FAFC;
+        color: #64748B;
+        font-size: 11px; letter-spacing: 0.06em;
+        padding: 11px 16px;
+        border-bottom: 1px solid #E5E9F0;
+    }
+    .pos-scroll-wrap td {
+        padding: 11px 16px;
+        font-size: 13px; color: #334155;
+        border-bottom: 1px solid #F0F3F7;
+        vertical-align: middle;
+    }
+    .pos-scroll-wrap tbody tr { transition: background .12s ease; }
+    .pos-scroll-wrap tbody tr:hover { background: #F6F9FF; }
+    .pos-scroll-wrap tbody tr:last-child td { border-bottom: 0; }
+    .pos-scroll-wrap .empty-state { padding: 52px 20px; color: #94A3B8; }
+    .pos-scroll-wrap .empty-icon { font-size: 34px; opacity: .85; }
+
+    /* Primary "+ Add …" buttons on this page */
+    #posAdminSection .btn-add {
+        height: 38px; padding: 0 16px; border-radius: 10px;
+        background: linear-gradient(180deg, #5B97F8, #3F7FEB);
+        box-shadow: 0 1px 2px rgba(37,99,235,0.22), 0 4px 12px rgba(79,142,247,0.22), inset 0 1px 0 rgba(255,255,255,0.18);
+        font-size: 13px;
+        transition: transform .14s ease, box-shadow .14s ease, background .14s ease;
+    }
+    #posAdminSection .btn-add:hover { background: linear-gradient(180deg, #4F8EF7, #3172E0); box-shadow: 0 2px 4px rgba(37,99,235,0.25), 0 6px 16px rgba(79,142,247,0.28); }
+    #posAdminSection .btn-add:active { transform: translateY(1px); }
+
+    /* Status badge in Assignments (resigned keeps its own inline red) */
+    #posAdminSection .badge-dept {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 3px 10px 3px 8px; border-radius: 999px;
+        background: #E6F6EE; color: #0B7A55;
+        font-size: 12px; font-weight: 600;
+    }
+    #posAdminSection .badge-dept::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+    /* Row actions: icon buttons (pencil / bin) instead of emoji */
+    .pos-icon-btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 30px; height: 30px; padding: 0;
+        border: 1px solid transparent; border-radius: 8px;
+        background: none; cursor: pointer;
+        font-size: 0; line-height: 1;
+        vertical-align: middle;
+        transition: background .14s ease, border-color .14s ease, color .14s ease, transform .14s ease;
+    }
+    .pos-icon-btn::before {
+        content: ""; width: 15px; height: 15px; background: currentColor;
+        -webkit-mask: var(--fr-edit) center / contain no-repeat;
+                mask: var(--fr-edit) center / contain no-repeat;
+    }
+    .pos-icon-btn:active { transform: scale(.94); }
+    .pos-icon-btn.edit { color: #2C63C4; background: #EEF4FF; margin-right: 6px; }
+    .pos-icon-btn.edit:hover { background: #DFEAFE; border-color: #C5DAFC; }
+    .pos-icon-btn.delete { color: #D92D20; background: #FEF1F0; }
+    .pos-icon-btn.delete::before { -webkit-mask-image: var(--fr-trash); mask-image: var(--fr-trash); }
+    .pos-icon-btn.delete:hover { background: #FDE2DF; border-color: #F8C4BE; }
+    .pos-icon-btn:focus-visible { outline: 2px solid #4F8EF7; outline-offset: 1px; }
+    th.pos-col-actions, td.pos-col-actions { width: 92px; min-width: 92px; text-align: left; white-space: nowrap; }
+
+    /* ── Checklists in the Assignment modal ── */
+    .pos-checklist {
+        max-height: 210px;
+        overflow-y: auto;
+        border: 1px solid #E2E8F0;
+        border-radius: 10px;
+        background: #fff;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(0,0,0,0.14) transparent;
+    }
+    .pos-checklist::-webkit-scrollbar { width: 6px; }
+    .pos-checklist::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 3px; }
+    .pos-checklist-row {
+        display: flex;
+        align-items: center;
+        padding: 0;
+        margin: 0;
+        cursor: pointer;
+        user-select: none;
+        border-bottom: 1px solid #F1F4F8;
+        transition: background .12s ease;
+    }
+    .pos-checklist-row:last-child { border-bottom: none; }
+    .pos-checklist-row:hover { background: #F5F8FF; }
+    .pos-checklist-row.checked { background: #EEF4FF; }
+    .pos-checklist-row.checked .pos-checklist-label { color: #1E3A8A; font-weight: 500; }
+    .pos-checklist-cb {
+        width: 17px; height: 17px;
+        margin: 0 12px 0 14px;
+        cursor: pointer;
+        accent-color: #4f8ef7;
+        flex-shrink: 0;
+    }
+    .pos-checklist-label {
+        flex: 1;
+        font-size: 13px;
+        color: #374151;
+        padding: 9px 12px 9px 0;
+        cursor: pointer;
+        line-height: 1.3;
+    }
+    .pos-checklist-empty {
+        padding: 18px 14px;
+        font-size: 12.5px;
+        color: #94A3B8;
+        text-align: center;
+    }
+    .pos-checklist-search {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: rgba(255,255,255,0.96);
+        padding: 8px 10px;
+        border-bottom: 1px solid #E8ECF2;
+    }
+    .pos-checklist-search input {
+        width: 100%;
+        height: 34px;
+        padding: 0 10px 0 32px;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        font-size: 12.5px;
+        font-family: inherit;
+        outline: none;
+        background: #F8FAFC url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='M20 20l-4.2-4.2'/%3E%3C/svg%3E") no-repeat 10px center;
+        transition: border-color .15s, box-shadow .15s, background-color .15s;
+    }
+    .pos-checklist-search input:focus {
+        border-color: #4f8ef7;
+        background-color: #fff;
+        box-shadow: 0 0 0 3px rgba(79,142,247,0.14);
+    }
+    /* The app-wide .form-group label / input rules (block label, full-width input)
+       were beating the checklist styles, stacking each tick box above its name. */
+    .modal-overlay[id^="pos"] .pos-checklist .pos-checklist-row {
+        display: flex; align-items: center; margin: 0;
+        font-size: 13px; font-weight: 400; color: #374151;
+    }
+    .modal-overlay[id^="pos"] .pos-checklist .pos-checklist-cb {
+        width: 17px; height: 17px; padding: 0; margin: 0 12px 0 14px;
+        border: 0; border-radius: 4px; box-shadow: none;
+    }
+    .pos-checklist-count {
+        font-size: 11.5px;
+        color: #94A3B8;
+        margin-top: 5px;
+    }
+
+    /* ── Alias mapping modal ── */
+    .pos-al-bar {
+        display: flex; align-items: center; gap: 10px;
+        padding: 8px 0 12px; border-bottom: 1px solid #EEF1F6; margin-bottom: 4px;
+    }
+    .pos-al-tally { flex: 1; font-size: 12.5px; font-weight: 600; color: #475569; }
+    .pos-al-row {
+        display: flex; align-items: center; gap: 12px;
+        padding: 10px 8px; border-bottom: 1px solid #F1F4F8;
+        border-radius: 8px;
+    }
+    .pos-al-row.has-sug { background: #F3F8FF; }
+    .pos-al-name { flex: 1; font-size: 13.5px; font-weight: 500; color: #0F172A; min-width: 0; }
+    .pos-al-n {
+        margin-left: 7px; font-size: 11px; font-weight: 700;
+        color: #2C63C4; background: #EEF4FF; border-radius: 999px; padding: 1px 8px;
+    }
+    .pos-al-sug { display: block; font-size: 11px; color: #0369a1; margin-top: 3px; }
+    .pos-al-sel {
+        flex: 1; height: 36px; padding: 0 10px; border: 1px solid #E2E8F0;
+        border-radius: 9px; font-size: 13px; font-family: inherit; background: #fff;
+    }
+    .pos-al-sel:focus { outline: none; border-color: #4F8EF7; box-shadow: 0 0 0 3px rgba(79,142,247,0.14); }
+
+    /* ── Assignment modal: employee typeahead (reads the Employees directory) ──
+         A menu, not a list: hidden until you type, never scrollable, and it
+         floats over the fields below instead of pushing them down. ── */
+    .pos-emp-ac { position: relative; }
+    .pos-emp-ac > input {
+        width: 100%;
+        height: 40px;
+        padding: 0 12px 0 36px;
+        border: 1px solid #E2E8F0;
+        border-radius: 10px;
+        font-size: 13.5px;
+        font-family: inherit;
+        outline: none;
+        background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='M20 20l-4.2-4.2'/%3E%3C/svg%3E") no-repeat 12px center;
+        transition: border-color .15s, box-shadow .15s;
+    }
+    .pos-emp-ac > input:focus {
+        border-color: #4f8ef7;
+        box-shadow: 0 0 0 3px rgba(79,142,247,0.14);
+    }
+    .pos-emp-menu {
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0; right: 0;
+        z-index: 20;
+        background: #fff;
+        border: 1px solid #E2E8F0;
+        border-radius: 12px;
+        box-shadow: 0 14px 34px rgba(15,23,42,0.16);
+        overflow: hidden;
+        padding: 4px;
+    }
+    .pos-emp-menu[hidden] { display: none; }
+    .pos-emp-row {
+        display: flex;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 4px 8px;
+        padding: 8px 12px;
+        cursor: pointer;
+        user-select: none;
+        border-radius: 8px;
+        line-height: 1.35;
+    }
+    .pos-emp-row:hover { background: #F3F6FC; }
+    .pos-emp-row.is-active { background: #EAF1FF; box-shadow: inset 3px 0 0 #4f8ef7; }
+    .pos-emp-row.is-taken { opacity: 0.62; }
+    .pos-emp-name { font-size: 13px; font-weight: 600; color: #0F172A; }
+    .pos-emp-meta { font-size: 11.5px; color: #94A3B8; }
+    .pos-emp-taken {
+        font-size: 10.5px; font-weight: 600;
+        color: #b45309; background: #fef3c7;
+        border-radius: 999px; padding: 1px 8px;
+    }
+    /* Fields filled from the directory — visibly not yours to type in */
+    .pos-ro {
+        background: #F8FAFC !important;
+        color: #475569 !important;
+        cursor: default;
+    }
+
+    /* ── Source cards (Data / Academic Plan / Targets / Aliases) ── */
+    .pos-src-card {
+        background: rgba(255,255,255,0.84);
+        -webkit-backdrop-filter: blur(18px) saturate(150%);
+                backdrop-filter: blur(18px) saturate(150%);
+        border: 1px solid rgba(255,255,255,0.9);
+        border-radius: 16px;
+        box-shadow: 0 1px 3px rgba(15,23,42,0.06), 0 0 0 1px rgba(15,23,42,0.05);
+        padding: 18px 20px;
+        margin-bottom: 14px;
+        transition: box-shadow .18s ease;
+    }
+    .pos-src-card:hover { box-shadow: 0 2px 4px rgba(15,23,42,0.05), 0 10px 26px rgba(15,23,42,0.08), 0 0 0 1px rgba(15,23,42,0.05); }
+    .pos-src-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .pos-src-tile {
+        width: 40px; height: 40px; border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 19px; flex-shrink: 0;
+        box-shadow: inset 0 0 0 1px rgba(15,23,42,0.05);
+    }
+    .pos-src-titles { flex: 1; min-width: 0; }
+    .pos-src-title { font-size: 15px; font-weight: 700; color: #0F172A; letter-spacing: -0.2px; }
+    .pos-src-sub { font-size: 12.5px; color: #64748B; margin-top: 2px; line-height: 1.45; }
+
+    /* Data tab: the six upload cards sit two-up on wide screens */
+    #posTabData {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 540px), 1fr));
+        gap: 14px;
+        align-items: start;
+    }
+    #posTabData .pos-src-card { margin-bottom: 0; }
+
+    .pos-src-controls { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+    .pos-field { display: flex; flex-direction: column; gap: 6px; }
+    .pos-field--grow { flex: 1; min-width: 180px; }
+    .pos-field > label:not(.pos-file) { font-size: 11px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.06em; }
+
+    .pos-sel {
+        height: 40px; padding: 0 32px 0 12px;
+        border: 1px solid #E2E8F0; border-radius: 10px;
+        font-size: 13.5px; font-family: inherit; color: #0F172A;
+        background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2364748B' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center;
+        -webkit-appearance: none; appearance: none;
+        cursor: pointer; transition: border-color .15s, box-shadow .15s;
+        box-shadow: 0 1px 1px rgba(15,23,42,0.03);
+    }
+    .pos-sel:hover { border-color: #CBD5E1; }
+    .pos-sel:focus { outline: none; border-color: #4f8ef7; box-shadow: 0 0 0 3px rgba(79,142,247,0.14); }
+
+    /* File picker: the native input is hidden, the label is the control */
+    .pos-file {
+        position: relative;
+        height: 40px; display: flex; align-items: center; gap: 9px;
+        padding: 0 12px;
+        border: 1.5px dashed #CBD5E1; border-radius: 10px;
+        background: #FAFBFD; color: #64748B;
+        font-size: 13px; cursor: pointer; overflow: hidden;
+        transition: border-color .15s, background .15s, color .15s;
+    }
+    .pos-file:hover { border-color: #4f8ef7; background: #F3F7FF; color: #2C63C4; }
+    .pos-file input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+    .pos-file-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pos-file.has-file { border-style: solid; border-color: #86efac; background: #F0FDF4; color: #15803d; font-weight: 500; }
+
+    /* Buttons */
+    .pos-btn {
+        height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+        padding: 0 16px; border-radius: 10px;
+        font-size: 13px; font-weight: 600; font-family: inherit;
+        cursor: pointer; white-space: nowrap;
+        background: #fff; color: #334155; border: 1px solid #E2E8F0;
+        transition: background .15s, border-color .15s, color .15s, box-shadow .15s, transform .12s;
+    }
+    .pos-btn:hover { border-color: #CBD5E1; background: #F8FAFC; }
+    .pos-btn:active { transform: translateY(1px); }
+    .pos-btn-primary {
+        background: linear-gradient(180deg, #5B97F8, #3F7FEB); color: #fff; border: 1px solid #3F7FEB; min-width: 100px;
+        box-shadow: 0 1px 2px rgba(37,99,235,0.22), 0 4px 12px rgba(79,142,247,0.22), inset 0 1px 0 rgba(255,255,255,0.18);
+    }
+    .pos-btn-primary:hover { background: linear-gradient(180deg, #4F8EF7, #3172E0); border-color: #3172E0; color: #fff; box-shadow: 0 2px 4px rgba(37,99,235,0.25), 0 6px 16px rgba(79,142,247,0.28); }
+    .pos-btn-primary:disabled { background: #A9C5F8; border-color: #A9C5F8; cursor: progress; box-shadow: none; }
+    .pos-btn-primary:disabled::before {
+        content: ""; width: 12px; height: 12px; border-radius: 50%;
+        border: 2px solid rgba(255,255,255,0.5); border-top-color: #fff;
+        animation: pos-spin .7s linear infinite;
+    }
+    @keyframes pos-spin { to { transform: rotate(360deg); } }
+    .pos-btn-ghost { height: 34px; background: #fff; color: #334155; border: 1px solid #E2E8F0; padding: 0 12px; border-radius: 9px; }
+    .pos-btn-ghost:hover { border-color: #A9C7FB; color: #2C63C4; background: #F3F7FF; }
+
+    /* Last-upload strip */
+    .pos-last {
+        display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        margin-top: 16px; padding: 9px 10px 9px 14px;
+        background: #F8FAFC; border: 1px solid #EEF1F6; border-radius: 10px;
+        font-size: 12.5px; color: #64748B;
+    }
+    .pos-last--empty { justify-content: center; color: #94A3B8; }
+    .pos-last-label { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.06em; font-size: 10.5px; }
+    .pos-last-label::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #10B197; box-shadow: 0 0 0 3px rgba(16,177,151,0.15); }
+    .pos-last-period { font-weight: 600; color: #0F172A; font-size: 13px; }
+    .pos-last-dot { width: 3px; height: 3px; border-radius: 50%; background: #CBD5E1; }
+    .pos-last-more { margin-left: auto; color: #94A3B8; }
+    .pos-last .pos-icon-btn { margin-left: 4px; }
+    .pos-last-more + .pos-icon-btn { margin-left: 4px; }
+    .pos-last:not(:has(.pos-last-more)) .pos-icon-btn { margin-left: auto; }
+
+    .pos-acad-warn { display:inline-block; font-size:11px; font-weight:600; color:#b45309; background:#fef3c7; border:1px solid #fde68a; border-radius:20px; padding:1px 8px; white-space:nowrap; }
+    .pos-acad-search {
+        height: 38px; min-width: 240px; padding: 0 12px 0 34px;
+        border: 1px solid #E2E8F0; border-radius: 10px; font-size: 13px; font-family: inherit;
+        background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='M20 20l-4.2-4.2'/%3E%3C/svg%3E") no-repeat 11px center;
+        transition: border-color .15s, box-shadow .15s;
+    }
+    .pos-acad-search:focus { outline:none; border-color:#4f8ef7; box-shadow:0 0 0 3px rgba(79,142,247,0.14); }
+    #posAdminSection .toolbar-right .pos-sel { height: 38px; }
+    .pos-acad-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+    #posAliasMeta { margin-top: -4px; }
+    .pos-tgt-wrap table { font-size: 12.5px; }
+    .pos-tgt-wrap th { white-space: nowrap; }
+    .pos-tgt-wrap th, .pos-tgt-wrap td { padding-left: 12px; padding-right: 12px; }
+    .pos-tgt-wrap td.pos-num, .pos-tgt-wrap th.pos-num { text-align: right; font-variant-numeric: tabular-nums; }
+    .pos-tgt-wrap td.pos-zero { color: #c0c4cc; }
+    .pos-tgt-check { min-width: 150px; }
+    .pos-tgt-flag { display:inline-block; font-size:10.5px; font-weight:600; border-radius:999px; padding:1px 8px; margin:1px 0; line-height:1.4; }
+    .pos-tgt-flag.warn { color:#b45309; background:#fef3c7; border:1px solid #fde68a; }
+    .pos-tgt-flag.skip { color:#475467; background:#eef1f5; border:1px solid #dde1e7; }
+    .pos-tgt-ok { display:inline-flex; align-items:center; gap:5px; font-size:10.5px; font-weight:700; color:#0B7A55; background:#E6F6EE; border-radius:999px; padding:1px 8px; }
+    .pos-tgt-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:0 14px; }
+    .pos-tgt-grid label { font-size:11.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .pos-tgt-grid input.is-bad { border-color:#ef4444; background:#fef2f2; }
+    #posTabAcademic .pos-src-head .pos-btn-ghost + .pos-btn-ghost { margin-left: -4px; }
+
+    .pos-ico, .pos-file-icon {
+        display: inline-block; flex-shrink: 0; background-color: currentColor;
+        -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+        -webkit-mask-position: center; mask-position: center;
+        -webkit-mask-size: contain; mask-size: contain;
+    }
+    .pos-ico-dl { width: 14px; height: 14px; -webkit-mask-image: var(--fr-dl); mask-image: var(--fr-dl); }
+    .pos-file-icon { width: 16px; height: 16px; -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M9.5%201.5H4a1.5%201.5%200%200%200-1.5%201.5v10A1.5%201.5%200%200%200%204%2014.5h8a1.5%201.5%200%200%200%201.5-1.5V5.5z%22%2F%3E%3Cpath%20d%3D%22M9.5%201.5v4h4%22%2F%3E%3C%2Fsvg%3E"); mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M9.5%201.5H4a1.5%201.5%200%200%200-1.5%201.5v10A1.5%201.5%200%200%200%204%2014.5h8a1.5%201.5%200%200%200%201.5-1.5V5.5z%22%2F%3E%3Cpath%20d%3D%22M9.5%201.5v4h4%22%2F%3E%3C%2Fsvg%3E"); }
+
+    /* ── This page's modals (they sit outside #posPage, so scope by id) ── */
+    .modal-overlay[id^="pos"] {
+        background: rgba(15,23,42,0.46);
+        -webkit-backdrop-filter: blur(5px);
+                backdrop-filter: blur(5px);
+    }
+    .modal-overlay[id^="pos"].open .modal-box { animation: pos-pop .22s cubic-bezier(.2,.8,.2,1); }
+    @keyframes pos-pop { from { opacity: 0; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: none; } }
+    .modal-overlay[id^="pos"] .modal-box {
+        border-radius: 18px;
+        box-shadow: 0 24px 64px rgba(15,23,42,0.28), 0 0 0 1px rgba(15,23,42,0.06);
+    }
+    .modal-overlay[id^="pos"] .modal-header { padding: 18px 22px; border-bottom: 1px solid #EEF1F6; }
+    .modal-overlay[id^="pos"] .modal-header h2 { font-size: 16.5px; letter-spacing: -0.2px; color: #0F172A; }
+    .modal-overlay[id^="pos"] .modal-close {
+        width: 32px; height: 32px; padding: 0; border-radius: 9px;
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 14px; color: #94A3B8;
+    }
+    .modal-overlay[id^="pos"] .modal-close:hover { background: #F1F5F9; color: #334155; }
+    .modal-overlay[id^="pos"] .modal-body { padding: 20px 22px; gap: 16px; }
+    .modal-overlay[id^="pos"] .form-group label { font-size: 12px; color: #334155; margin-bottom: 6px; }
+    .modal-overlay[id^="pos"] .form-group input:not([type="checkbox"]),
+    .modal-overlay[id^="pos"] .form-group select {
+        width: 100%; height: 40px; padding: 0 12px;
+        border: 1px solid #E2E8F0; border-radius: 10px;
+        font-size: 13.5px; font-family: inherit; color: #0F172A; background-color: #fff;
+        outline: none; transition: border-color .15s, box-shadow .15s;
+    }
+    .modal-overlay[id^="pos"] .form-group select {
+        padding-right: 32px; cursor: pointer;
+        -webkit-appearance: none; appearance: none;
+        background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2364748B' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center;
+    }
+    .modal-overlay[id^="pos"] .form-group .pos-emp-ac > input { padding-left: 36px; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='M20 20l-4.2-4.2'/%3E%3C/svg%3E") no-repeat 12px center; }
+    .modal-overlay[id^="pos"] .form-group .pos-checklist-search input { height: 34px; padding-left: 32px; background: #F8FAFC url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='M20 20l-4.2-4.2'/%3E%3C/svg%3E") no-repeat 10px center; }
+    .modal-overlay[id^="pos"] .form-group input:not([type="checkbox"]):hover,
+    .modal-overlay[id^="pos"] .form-group select:hover { border-color: #CBD5E1; }
+    .modal-overlay[id^="pos"] .form-group input:not([type="checkbox"]):focus,
+    .modal-overlay[id^="pos"] .form-group select:focus { border-color: #4F8EF7; box-shadow: 0 0 0 3px rgba(79,142,247,0.14); }
+    .modal-overlay[id^="pos"] .modal-footer { padding: 14px 22px; background: #F8FAFC; border-top: 1px solid #EEF1F6; }
+    .modal-overlay[id^="pos"] .btn-cancel {
+        height: 38px; padding: 0 18px; border-radius: 10px; border-color: #E2E8F0; font-weight: 600; color: #334155;
+        transition: background .15s, border-color .15s;
+    }
+    .modal-overlay[id^="pos"] .btn-cancel:hover { background: #F1F5F9; border-color: #CBD5E1; }
+    .modal-overlay[id^="pos"] .btn-save {
+        height: 38px; padding: 0 20px; border-radius: 10px;
+        background: linear-gradient(180deg, #5B97F8, #3F7FEB);
+        box-shadow: 0 1px 2px rgba(37,99,235,0.22), 0 4px 12px rgba(79,142,247,0.22), inset 0 1px 0 rgba(255,255,255,0.18);
+    }
+    .modal-overlay[id^="pos"] .btn-save:hover { background: linear-gradient(180deg, #4F8EF7, #3172E0); }
+
+    @media (max-width: 720px) {
+        #posPage .page-header-emp { align-items: flex-start; }
+        .pos-top-tabs--header { width: 100%; }
+        .pos-top-tabs--header .pos-top-tab { flex: 1; justify-content: center; }
+        #posAdminSection .table-toolbar { align-items: stretch; }
+        .pos-acad-search { min-width: 0; width: 100%; }
+        .pos-tgt-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .modal-overlay[id^="pos"].open .modal-box { animation: none; }
+    }
+</style>
+
+<div class="employees-page" id="posPage">
+    <div class="page-header-emp">
+        <div>
+            <div class="page-title">Field <span>Review System</span></div>
+            <div class="page-subtitle">Weekly and monthly reviews for POs, PMs and DMs</div>
+        </div>
+        <div class="pos-top-tabs pos-top-tabs--header">
+            <button class="pos-top-tab" data-postoptab="dashboard" onclick="window.POSAdmin.showTopTab('dashboard')"><span class="fr-ico fr-i-dash" aria-hidden="true"></span>Dashboard</button>
+            <button class="pos-top-tab" data-postoptab="admin" id="posAdminTabBtn" onclick="window.POSAdmin.showTopTab('admin')" hidden><span class="fr-ico fr-i-admin" aria-hidden="true"></span>Admin</button>
+        </div>
+    </div>
+
+    <!-- ───────── DASHBOARD (everyone) — Field Team Review, logic in pos-review.js ───────── -->
+    <div id="posDashboard">
+      <div id="ftrRoot" class="pr">
+        <div class="pr-head">
+          <div>
+            <h1 class="pr-title">Reviews</h1>
+            <p class="pr-sub">Weekly review across POs, PMs and DMs.</p>
+          </div>
+          <nav class="pr-nav" id="prNav">
+            <button class="pr-navbtn is-active" data-view="weekly"><span class="fr-ico fr-i-week" aria-hidden="true"></span>Weekly</button>
+            <button class="pr-navbtn" data-view="summary"><span class="fr-ico fr-i-sum" aria-hidden="true"></span>Summary</button>
+            <button class="pr-navbtn" data-view="monthly"><span class="fr-ico fr-i-month" aria-hidden="true"></span>Monthly</button>
+          </nav>
+        </div>
+
+        <section class="pr-view" id="prWeekly">
+          <div class="pr-panel pr-filters">
+            <label class="pr-field"><span>Review unit</span>
+              <select id="prUnit">
+                <option value="PO">PO</option>
+                <option value="PM">PM</option>
+                <option value="DM">DM</option>
+                <option value="District">District</option>
+              </select></label>
+            <label class="pr-field"><span id="prValueLabel">PO</span>
+              <select id="prValue" disabled><option value="">—</option></select></label>
+            <label class="pr-field"><span>Month</span>
+              <select id="prMonth" disabled><option value="">—</option></select></label>
+            <button class="pr-btn pr-btn-primary" id="prLoad" disabled>Open review</button>
+          </div>
+          <div id="prBody">
+            <div class="pr-empty">Choose a review unit, a value and a month, then open the review.</div>
+          </div>
+        </section>
+
+        <!-- SUMMARY — did the weekly review happen, across people.
+             Filters cascade: review unit first, then members of those units.
+             Nothing ticked means all, which is why both panels say so. -->
+        <section class="pr-view" id="prSummary" hidden>
+          <div class="pr-panel pr-filters">
+            <div class="pr-field pr-ms">
+              <span>Review unit</span>
+              <button type="button" class="pr-ms-btn" id="prSumUnitBtn">All review units</button>
+              <div class="pr-ms-panel" id="prSumUnitPanel" hidden></div>
+            </div>
+            <div class="pr-field pr-ms">
+              <span>Member</span>
+              <button type="button" class="pr-ms-btn is-muted" id="prSumMemberBtn" disabled>Select a review unit first</button>
+              <div class="pr-ms-panel" id="prSumMemberPanel" hidden></div>
+            </div>
+            <label class="pr-field"><span>Month</span>
+              <select id="prSumMonth" disabled><option value="">—</option></select></label>
+            <label class="pr-field"><span>Week</span>
+              <select id="prSumWeek">
+                <option value="1">Week 1</option>
+                <option value="2">Week 2</option>
+                <option value="3">Week 3</option>
+                <option value="4">Week 4</option>
+                <option value="5">Week 5</option>
+              </select></label>
+            <label class="pr-field pr-sum-search-field"><span>Search</span>
+              <input type="search" id="prSumSearch" class="pr-sum-search" placeholder="Search a name or employee ID…"></label>
+            <button class="pr-btn pr-btn-primary" id="prSumLoad">Show</button>
+          </div>
+          <div id="prSumBody">
+            <div class="pr-empty">Pick a review unit and a month, then Show.</div>
+          </div>
+        </section>
+        <section class="pr-view" id="prMonthly" hidden>
+          <div class="pr-panel pr-filters">
+            <label class="pr-field"><span>Review unit</span>
+              <select id="prMoUnit">
+                <option value="PO">PO</option>
+                <option value="PM">PM</option>
+                <option value="DM">DM</option>
+                <option value="District">District</option>
+              </select></label>
+            <label class="pr-field"><span id="prMoValueLabel">PO</span>
+              <select id="prMoValue" disabled><option value="">—</option></select></label>
+            <label class="pr-field"><span>Month</span>
+              <select id="prMoMonth" disabled><option value="">—</option></select></label>
+            <button class="pr-btn pr-btn-primary" id="prMoLoad" disabled>Open review</button>
+          </div>
+          <div id="prMoBody">
+            <div class="pr-empty">Choose a review unit, a value and a month, then open the monthly review.</div>
+          </div>
+        </section>
+
+        <div id="poToast" class="pr-toast" hidden></div>
+        <div id="prListModal" class="pr-modal" hidden>
+          <div class="pr-modal-box pr-list-box">
+            <div class="pr-modal-title" id="prListTitle">Exams planned</div>
+            <div id="prListBody" class="pr-list-body"></div>
+            <div class="pr-modal-foot"><span id="prListNote" class="pr-modal-msg"></span><span class="pr-modal-spacer"></span><button class="pr-btn" id="prListClose">Close</button></div>
+          </div>
+        </div>
+
+        <!-- Summary drill-down: the people behind a clicked count -->
+        <div id="prSumModal" class="pr-modal" hidden>
+          <div class="pr-modal-box pr-list-box">
+            <div class="pr-modal-title" id="prSumModalTitle">Review status</div>
+            <div id="prSumModalBody" class="pr-list-body pr-sum-modal-body"></div>
+            <div class="pr-modal-foot">
+              <span id="prSumModalNote" class="pr-modal-msg"></span>
+              <span class="pr-modal-spacer"></span>
+              <button class="pr-btn pr-btn-primary" id="prSumModalDl">Download Excel</button>
+              <button class="pr-btn" id="prSumModalClose">Close</button>
+            </div>
+          </div>
+        </div>
+  <div id="prModal" class="pr-modal" hidden>
+    <div class="pr-modal-box">
+      <div class="pr-modal-title" id="prModalTitle">Edit</div>
+      <textarea id="prModalText" class="pr-modal-ta" maxlength="80"></textarea>
+      <div class="pr-modal-foot">
+        <span id="prModalMsg" class="pr-modal-msg"></span>
+        <span class="pr-modal-spacer"></span>
+        <button class="pr-btn" id="prModalClose">Close</button>
+        <button class="pr-btn pr-btn-primary" id="prModalSave">Save</button>
+      </div>
+    </div>
+  </div>
+  <!-- Week dates editor: itadmin only (pos-review.js opens it from the week cards) -->
+  <div id="prWdModal" class="pr-modal" hidden>
+    <div class="pr-modal-box pr-wd-box">
+      <div class="pr-modal-title" id="prWdTitle">Week dates</div>
+      <div class="pr-wd-row">
+        <label class="pr-field pr-wd-field"><span>From</span><input type="date" id="prWdFrom"></label>
+        <label class="pr-field pr-wd-field"><span>To</span><input type="date" id="prWdTo"></label>
+      </div>
+      <div class="pr-modal-foot">
+        <span id="prWdMsg" class="pr-modal-msg"></span>
+        <span class="pr-modal-spacer"></span>
+        <button class="pr-btn" id="prWdClear" hidden>Remove dates</button>
+        <button class="pr-btn" id="prWdClose">Cancel</button>
+        <button class="pr-btn pr-btn-primary" id="prWdSave">Save</button>
+      </div>
+    </div>
+  </div>
+      </div>
+      <style>
+        /* ════════════════════════════════════════════════════════════
+           FIELD REVIEW — DASHBOARD (Weekly · Summary · Monthly)
+           Markup comes from pos-review.js; class names are its contract.
+           ════════════════════════════════════════════════════════════ */
+        .pr{--l:#E5E9F0;--l2:#EEF1F6;--ink:#0F172A;--ink2:#334155;--mut:#64748B;--faint:#94A3B8;--bg:#F7F9FC;
+            --acc:#4F8EF7;--acc2:#3172E0;--acc-ink:#2C63C4;--acc-soft:#EEF4FF;--acc-line:#CFE0FD;--teal:#10B197;
+            --hl:#fff7e6;--good:#0E9F6E;--good-ink:#0B7A55;--good-soft:#E6F6EE;--good-line:#BDE8D3;
+            --warn:#B7791F;--warn-ink:#92400E;--warn-soft:#FEF4DC;--warn-line:#F3D38C;
+            --bad:#D92D20;--bad-ink:#B42318;--bad-soft:#FEF1F0;--bad-line:#F6C9C4;
+            --glass:rgba(255,255,255,.82);--r:16px;
+            --sh-sm:0 1px 2px rgba(15,23,42,.04),0 1px 3px rgba(15,23,42,.06);
+            --sh-md:0 2px 4px rgba(15,23,42,.04),0 10px 28px rgba(15,23,42,.08);
+            --ring:0 0 0 1px rgba(15,23,42,.05);
+            --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2364748B' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            color:var(--ink);max-width:var(--page-max, 1680px);margin:0 auto;padding:0 0 96px;font-size:13.5px;}
+        .pr *,.pr *::before,.pr *::after{box-sizing:border-box;}
+
+        /* ── Section tabs (Weekly / Summary / Monthly) ──
+           The page header above already names the page, so the old inner
+           "Reviews" heading is kept for screen readers only. */
+        .pr-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;
+                 margin:0 0 16px;border-bottom:1px solid rgba(15,23,42,.09);}
+        .pr-head>div:first-child{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
+        .pr-title{font-size:22px;font-weight:650;margin:0;}
+        .pr-sub{color:var(--mut);margin:3px 0 0;}
+        .pr-nav{display:flex;gap:2px;}
+        .pr-navbtn{position:relative;display:inline-flex;align-items:center;gap:8px;height:42px;border:0;background:transparent;
+                   padding:0 14px;border-radius:10px 10px 0 0;font:inherit;font-size:13.5px;font-weight:600;color:var(--mut);cursor:pointer;
+                   transition:color .15s ease,background .15s ease;}
+        .pr-navbtn:hover{color:var(--ink);background:rgba(255,255,255,.55);}
+        .pr-navbtn.is-active{color:var(--acc-ink);}
+        .pr-navbtn.is-active::after{content:"";position:absolute;left:10px;right:10px;bottom:-1px;height:2.5px;border-radius:3px 3px 0 0;
+                                    background:linear-gradient(90deg,var(--acc),var(--teal));}
+        .pr-navbtn:focus-visible{outline:2px solid var(--acc);outline-offset:-2px;}
+
+        /* ── Panels ── */
+        .pr-panel{background:var(--glass);-webkit-backdrop-filter:blur(18px) saturate(150%);backdrop-filter:blur(18px) saturate(150%);
+                  border:1px solid rgba(255,255,255,.9);border-radius:var(--r);padding:16px 18px;margin-bottom:14px;
+                  box-shadow:var(--sh-sm),var(--ring);}
+        .pr-h2{font-size:15px;font-weight:650;margin:0 0 2px;}
+
+        /* ── Filters ── */
+        .pr-filters{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:14px 16px;}
+        /* the blur on panels makes each one its own layer: keep the filter row (and its dropdowns) above what follows */
+        .pr-panel.pr-filters{position:relative;z-index:20;}
+        .pr-field{display:flex;flex-direction:column;gap:6px;min-width:200px;}
+        .pr-field>span{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;font-weight:600;}
+        .pr-field select,.pr-ms-btn{height:40px;padding:0 34px 0 12px;border:1px solid var(--l);border-radius:10px;font:inherit;font-size:13.5px;
+                  color:var(--ink);background:#fff var(--chev) no-repeat right 13px center;-webkit-appearance:none;appearance:none;cursor:pointer;
+                  box-shadow:0 1px 1px rgba(15,23,42,.03);transition:border-color .15s,box-shadow .15s,background-color .15s;}
+        .pr-field select:hover:not(:disabled),.pr-ms-btn:hover:not(:disabled){border-color:#CBD5E1;}
+        .pr-field select:focus,.pr-ms-btn:focus-visible{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px rgba(79,142,247,.16);}
+        .pr-field select:disabled{background-color:#F4F6F9;color:var(--faint);cursor:not-allowed;}
+
+        /* ── Buttons ── */
+        .pr-btn{height:40px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 16px;border:1px solid var(--l);
+                border-radius:10px;background:#fff;color:var(--ink2);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer;white-space:nowrap;
+                box-shadow:0 1px 2px rgba(15,23,42,.05);transition:background .15s,border-color .15s,color .15s,box-shadow .15s,transform .12s;}
+        .pr-btn:hover:not(:disabled){border-color:#C7D2E0;background:#F8FAFC;color:var(--ink);}
+        .pr-btn:active:not(:disabled){transform:translateY(1px);}
+        .pr-btn:focus-visible{outline:2px solid var(--acc);outline-offset:2px;}
+        .pr-btn:disabled{opacity:.55;cursor:not-allowed;box-shadow:none;}
+        .pr-btn-primary{background:linear-gradient(180deg,#5B97F8,#3F7FEB);border-color:#3F7FEB;color:#fff;
+                        box-shadow:0 1px 2px rgba(37,99,235,.22),0 4px 12px rgba(79,142,247,.24),inset 0 1px 0 rgba(255,255,255,.18);}
+        .pr-btn-primary:hover:not(:disabled){background:linear-gradient(180deg,#4F8EF7,#3172E0);border-color:#3172E0;color:#fff;
+                        box-shadow:0 2px 4px rgba(37,99,235,.25),0 6px 16px rgba(79,142,247,.3);}
+        .pr-btn-primary:disabled{background:#A9C5F8;border-color:#A9C5F8;color:#fff;opacity:1;}
+
+        /* ── Empty / loading / error states ── */
+        .pr-empty,.pr-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;
+                  color:var(--mut);padding:46px 20px;line-height:1.55;font-size:13.5px;
+                  background:rgba(255,255,255,.5);border:1.5px dashed rgba(100,116,139,.25);border-radius:var(--r);}
+        .pr-empty::before{content:"";width:34px;height:34px;flex-shrink:0;background:#A9B7CB;
+                  -webkit-mask:var(--fr-inbox) center/contain no-repeat;mask:var(--fr-inbox) center/contain no-repeat;}
+        .pr-empty.pr-loading::before{-webkit-mask:none;mask:none;width:26px;height:26px;border-radius:50%;background:none;
+                  border:2.5px solid var(--acc-line);border-top-color:var(--acc);animation:pr-rot .8s linear infinite;}
+        .pr-empty.pr-error{color:var(--bad-ink);background:rgba(254,241,240,.75);border-color:var(--bad-line);}
+        .pr-empty.pr-error::before{background:var(--bad);-webkit-mask-image:var(--fr-alert);mask-image:var(--fr-alert);}
+        .pr-panel .pr-empty,.pr-modal .pr-empty{border:0;background:transparent;padding:30px 12px;}
+        .pr-hint,.pr-base-count{color:var(--mut);font-size:12px;}
+
+        /* ── Who is under review ── */
+        .pr-po{display:flex;flex-direction:row;align-items:center;gap:16px;padding:16px 18px;}
+        .pr-avatar{width:50px;height:50px;border-radius:15px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+                   font-size:17px;font-weight:700;letter-spacing:.02em;color:#fff;
+                   background:linear-gradient(135deg,var(--acc) 0%,#3F7FEB 45%,var(--teal) 120%);
+                   box-shadow:0 6px 16px rgba(79,142,247,.32),inset 0 1px 0 rgba(255,255,255,.25);}
+        .pr-po-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;}
+        .pr-po-name{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;font-size:19px;font-weight:700;letter-spacing:-.35px;line-height:1.2;}
+        .pr-po-name small{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:999px;background:#F1F5F9;
+                   color:var(--mut);font-size:12px;font-weight:600;letter-spacing:0;font-variant-numeric:tabular-nums;}
+        .pr-po-line{display:flex;align-items:center;flex-wrap:wrap;gap:4px 0;color:var(--mut);font-size:13px;}
+        .pr-po-line b{color:var(--ink);font-weight:600;}
+        .pr-po-line .sep{display:inline-block;width:4px;height:4px;margin:0 10px;border-radius:50%;background:#CBD5E1;font-size:0;color:transparent;}
+        .pr-po-line>.pr-mut:last-child{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 9px;border-radius:999px;
+                   background:#F1F5F9;color:var(--mut);font-size:11.5px;font-weight:600;}
+        .pr-po-line>.pr-mut:last-child::before{content:"";width:13px;height:13px;background:currentColor;
+                   -webkit-mask:var(--fr-eye) center/contain no-repeat;mask:var(--fr-eye) center/contain no-repeat;}
+        .pr-role{flex-shrink:0;align-self:flex-start;display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;
+                 font-size:10.5px;font-weight:750;letter-spacing:.08em;text-transform:uppercase;
+                 color:var(--acc-ink);background:var(--acc-soft);border:1px solid var(--acc-line);}
+        .pr-role-pm{color:#9A5B05;background:#FEF3DC;border-color:#F3D38C;}
+        .pr-role-dm{color:#6D28D9;background:#F3EEFF;border-color:#DCCEFC;}
+        .pr-role-district{color:var(--good-ink);background:var(--good-soft);border-color:var(--good-line);}
+
+        /* Blocks / team chips join the identity card as its footer */
+        .pr-po:has(+ .pr-blocks){margin-bottom:0;border-bottom-left-radius:0;border-bottom-right-radius:0;}
+        .pr-po + .pr-blocks{border-top-left-radius:0;border-top-right-radius:0;border-top:1px solid var(--l2);padding-top:13px;}
+        .pr-blocks-h{display:flex;align-items:center;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);font-weight:700;margin-bottom:10px;}
+        .pr-blocks-h b{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:20px;padding:0 7px;margin-left:8px;
+                       border-radius:999px;background:var(--acc-soft);color:var(--acc-ink);font-size:11.5px;letter-spacing:0;}
+        .pr-chips{display:flex;gap:6px;flex-wrap:wrap;}
+        .pr-chip{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 11px;border:1px solid var(--l);border-radius:9px;
+                 font-size:12.5px;font-weight:500;color:var(--ink2);background:#fff;box-shadow:0 1px 1px rgba(15,23,42,.03);}
+        .pr-chip code{order:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:10.5px;font-weight:600;color:var(--mut);
+                      background:#F1F5F9;border-radius:5px;padding:2px 5px;margin:0;}
+
+        /* ── Cards (week progress, monthly scores) ── */
+        .pr-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:16px;}
+        .pr-card{position:relative;overflow:hidden;background:var(--glass);-webkit-backdrop-filter:blur(18px) saturate(150%);backdrop-filter:blur(18px) saturate(150%);
+                 border:1px solid rgba(255,255,255,.9);border-radius:14px;padding:14px 16px;box-shadow:var(--sh-sm),var(--ring);}
+        .pr-card-k{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);font-weight:700;line-height:1.35;}
+        .pr-card-v{font-size:28px;font-weight:750;letter-spacing:-.8px;margin-top:6px;font-variant-numeric:tabular-nums;line-height:1.15;color:var(--ink);}
+        .pr-card-v small{font-size:13px;font-weight:600;color:var(--faint);margin-left:5px;letter-spacing:0;}
+        .pr-cards-hint{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:12px;color:var(--mut);margin:2px 2px 9px;}
+        .pr-linkbtn{border:0;background:none;color:var(--acc-ink);font:inherit;font-weight:600;cursor:pointer;padding:0;}
+        .pr-linkbtn:hover{text-decoration:underline;text-underline-offset:3px;}
+
+        /* week cards: one segment per review section, labelled A · B · G · H */
+        .pr-wkcard .pr-card-k>span:first-child{font-size:13px;text-transform:none;letter-spacing:-.1px;color:var(--ink);font-weight:700;}
+        .pr-wkcard-date{font-size:12px;color:var(--mut);margin-top:3px;}
+        .pr-bars{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:13px;padding-bottom:15px;}
+        .pr-bar{position:relative;height:6px;border-radius:4px;background:#E6EBF2;}
+        .pr-bar.on{background:linear-gradient(90deg,#1DBA85,var(--good));}
+        .pr-bar.off{background:#E6EBF2;}
+        .pr-bar.part{background:#F5B544;}
+        .pr-bar[data-k]::after{content:attr(data-k);position:absolute;left:0;top:10px;font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--faint);}
+        .pr-bar.on[data-k]::after{color:var(--good-ink);}
+        .pr-wkcard-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;color:var(--mut);margin-top:9px;}
+        .pr-wkcard .pr-wkcard-foot>span:first-child{display:inline-flex;align-items:center;gap:7px;font-weight:500;}
+        .pr-wkcard .pr-wkcard-foot>span:first-child::before{content:"";width:7px;height:7px;border-radius:50%;background:#CBD5E1;}
+        .pr-lock{font-size:11px;margin-left:6px;}
+        .pr-wkcard.locked{background:#fafbfc;}
+        .pr-wkcard.complete{background:linear-gradient(180deg,rgba(230,246,238,.95),rgba(255,255,255,.86) 75%);}
+        .pr-wkcard.complete .pr-wkcard-foot>span:first-child{color:var(--good-ink);}
+        .pr-wkcard.complete .pr-wkcard-foot>span:first-child::before{background:var(--good);box-shadow:0 0 0 3px rgba(14,159,110,.16);}
+        .pr-wkcard.partial{background:linear-gradient(180deg,rgba(254,244,220,.95),rgba(255,255,255,.86) 75%);}
+        .pr-wkcard.partial .pr-wkcard-foot>span:first-child{color:var(--warn-ink);}
+        .pr-wkcard.partial .pr-wkcard-foot>span:first-child::before{background:#F59E0B;box-shadow:0 0 0 3px rgba(245,158,11,.16);}
+        .pr-wkcard.overdue{background:#fdf3f3;}
+        .pr-wkcard.overdue .pr-card-k>span:first-child{color:var(--bad);}
+        th.pr-col-locked{background:#eceff3;color:#8a94a3;}
+        .pr-wkcards .pr-wkcard{cursor:pointer;transition:box-shadow .18s ease,opacity .18s ease,transform .18s ease,filter .18s ease;}
+        .pr-wkcards .pr-wkcard:hover{transform:translateY(-2px);box-shadow:var(--sh-md),var(--ring);}
+        .pr-wkcards .pr-wkcard:focus-visible{outline:2px solid var(--acc);outline-offset:2px;}
+        .pr-wk-vis{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 8px 0 6px;border-radius:999px;
+                   font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--acc-ink);background:var(--acc-soft);}
+        .pr-wk-vis::before{content:"";width:12px;height:12px;background:currentColor;-webkit-mask:var(--fr-eye) center/contain no-repeat;mask:var(--fr-eye) center/contain no-repeat;}
+        .pr-wkcard.is-off{opacity:.58;filter:saturate(.35);box-shadow:none;border-style:dashed;border-color:#CBD5E1;}
+        .pr-wkcard.is-off .pr-wk-vis{color:var(--mut);background:#EEF1F5;}
+        .pr-wkcard.is-off .pr-wk-vis::before{-webkit-mask-image:var(--fr-eyeoff);mask-image:var(--fr-eyeoff);}
+        .pr-wkhide{display:none !important;}
+
+        /* monthly score cards */
+        .pr-mo-cards{grid-template-columns:repeat(auto-fit,minmax(170px,1fr));}
+        .pr-mo-cards .pr-card{padding-left:18px;}
+        .pr-mo-cards .pr-card[data-goal^="G"]::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:3px;border-radius:0 3px 3px 0;background:var(--gc,var(--acc));}
+        .pr-mo-cards .pr-card[data-goal="G1"]{--gc:#4F8EF7;}
+        .pr-mo-cards .pr-card[data-goal="G2"]{--gc:#10B197;}
+        .pr-mo-cards .pr-card[data-goal="G3"]{--gc:#8B5CF6;}
+        .pr-mo-cards .pr-card[data-goal="G4"]{--gc:#F59E0B;}
+        .pr-mo-cards .pr-card[data-goal="G5"]{--gc:#EC4899;}
+        .pr-mo-cards .pr-card[data-goal="TOTAL"]{border-color:transparent;color:#fff;
+                 background:linear-gradient(135deg,#3B78E7 0%,#4F8EF7 50%,#10B197 140%);
+                 box-shadow:0 10px 26px rgba(63,127,235,.32),inset 0 1px 0 rgba(255,255,255,.2);}
+        .pr-mo-cards .pr-card[data-goal="TOTAL"]::after{content:"";position:absolute;right:-34px;top:-34px;width:120px;height:120px;border-radius:50%;
+                 background:radial-gradient(circle,rgba(255,255,255,.22),rgba(255,255,255,0) 70%);pointer-events:none;}
+        .pr-mo-cards .pr-card[data-goal="TOTAL"] .pr-card-k,
+        .pr-mo-cards .pr-card[data-goal="TOTAL"] .pr-wkcard-foot{color:rgba(255,255,255,.85);}
+        .pr-mo-cards .pr-card[data-goal="TOTAL"] .pr-card-v{color:#fff;font-size:30px;}
+        .pr-mo-cards .pr-card[data-goal="TOTAL"] .pr-card-v small{color:rgba(255,255,255,.75);}
+
+        /* ── The review table ── */
+        .pr-tablewrap{max-height:70vh;overflow:auto;background:#fff;border:1px solid rgba(15,23,42,.07);border-radius:var(--r);
+                      box-shadow:var(--sh-md);scrollbar-width:thin;scrollbar-color:rgba(15,23,42,.2) transparent;}
+        .pr-tablewrap::-webkit-scrollbar{width:9px;height:9px;}
+        .pr-tablewrap::-webkit-scrollbar-thumb{background:rgba(15,23,42,.16);border-radius:6px;border:2px solid #fff;}
+        table.pr-tbl{border-collapse:separate;border-spacing:0;width:100%;font-size:13px;}
+        .pr-tbl th,.pr-tbl td{border-bottom:1px solid var(--l2);border-right:0;padding:9px 12px;text-align:left;vertical-align:middle;color:var(--ink2);font-size:13px;}
+        .pr-tbl th{background:#F8FAFC;font-weight:600;color:var(--mut);position:sticky;top:0;z-index:3;white-space:nowrap;font-size:11px;
+                   text-transform:uppercase;letter-spacing:.06em;padding-top:11px;padding-bottom:11px;border-bottom:1px solid var(--l);}
+        .pr-tbl th.pr-num,.pr-tbl td.pr-num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+        .pr-tbl td.pr-item{min-width:250px;font-weight:500;color:var(--ink);}
+        .pr-tbl td.pr-who,.pr-tbl th.pr-who{text-align:center;}
+        .pr-tbl td.pr-item{position:sticky;left:0;z-index:1;background:#fff;box-shadow:inset -1px 0 0 var(--l2);}
+        .pr-tbl th.pr-item{position:sticky;left:0;z-index:4;box-shadow:inset -1px 0 0 var(--l);}
+        .pr-tbl tbody tr.pr-row{transition:background .1s ease;}
+        .pr-tbl tbody tr.pr-row:hover td{background:#F5F8FF;}
+        .pr-tbl tbody tr.pr-row:hover td.pr-item{background:#F1F6FF;}
+        .pr-tbl tbody tr:last-child td{border-bottom:0;}
+
+        /* week columns: centred, softly separated, alternate tint */
+        .pr-tbl th.pr-wkh,.pr-tbl td.pr-wkc{border-left:1px solid var(--l2);text-align:center;}
+        .pr-tbl td.pr-wkalt{background:#FAFBFE;}
+        .pr-tbl th.pr-wkalt{background:#F2F5FA;}
+        .pr-wkh-date{display:block;font-size:10.5px;font-weight:500;color:var(--mut);text-transform:none;letter-spacing:0;margin-top:2px;}
+        .pr-wkh-date:empty{display:none;}
+        /* week dates (set by itadmin) */
+        .pr-wkcard-date{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:18px;font-variant-numeric:tabular-nums;}
+        .pr-wkcard-date>span:empty{display:none;}
+        .pr-wkdate-btn{margin-left:auto;border:1px solid var(--acc-line);background:var(--acc-soft);color:var(--acc-ink);border-radius:999px;
+            height:22px;padding:0 9px;font:inherit;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;}
+        .pr-wkdate-btn:hover{background:#E1ECFF;}
+        .pr-wd-box{width:min(440px,94vw);}
+        .pr-wd-row{display:flex;gap:12px;flex-wrap:wrap;}
+        .pr-wd-field{flex:1;min-width:150px;}
+        .pr-wd-field input{height:40px;padding:0 12px;border:1px solid var(--l);border-radius:10px;font:inherit;font-size:13.5px;color:var(--ink);background:#fff;}
+        .pr-wd-field input:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px rgba(79,142,247,.16);}
+        .pr-mtd{background:#fbfcfe;font-weight:600;}
+        th.pr-mtd{background:#eef3f9;}
+
+        /* section header rows (click to open) */
+        .pr-grp td{background:linear-gradient(90deg,#F1F6FE,#F8FAFD 55%,#FBFCFE);font-weight:650;color:var(--ink);cursor:pointer;user-select:none;
+                   letter-spacing:-.05px;font-size:13.5px;padding:10px 12px;border-top:1px solid var(--l2);border-bottom:1px solid var(--l2);
+                   box-shadow:inset 3px 0 0 var(--acc);transition:background .15s ease;}
+        .pr-grp:hover td{background:linear-gradient(90deg,#E7F0FE,#F3F7FD 55%,#F8FAFD);}
+        .pr-grp.is-open td{background:linear-gradient(90deg,#E9F1FE,#F4F8FE 55%,#FAFBFE);border-bottom-color:var(--acc-line);}
+        tr.pr-grp:first-child td{border-top:0;}
+        .pr-caret{display:inline-block;width:16px;height:16px;margin-right:6px;vertical-align:middle;position:relative;top:-1px;font-size:0;line-height:0;color:var(--mut);background:currentColor;
+                  -webkit-mask:var(--fr-chev) center/14px no-repeat;mask:var(--fr-chev) center/14px no-repeat;transition:transform .18s ease,color .15s ease;}
+        .pr-grp.is-open .pr-caret{transform:rotate(90deg);color:var(--acc-ink);}
+        .pr-grp-k{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:22px;padding:0 6px;margin-right:9px;
+                  border-radius:7px;background:#fff;border:1px solid var(--acc-line);color:var(--acc-ink);font-size:11.5px;font-weight:750;
+                  letter-spacing:0;box-shadow:0 1px 1px rgba(15,23,42,.04);vertical-align:1px;}
+        .pr-grp .pr-grpcount{display:inline-flex;align-items:center;height:20px;font-size:11px;font-weight:600;color:var(--mut);background:#fff;
+                  border:1px solid var(--l);border-radius:999px;padding:0 8px;margin-left:8px;vertical-align:1px;}
+        .pr-who-tag{display:inline-flex;align-items:center;height:20px;margin-left:8px;font-size:9.5px;font-weight:750;letter-spacing:.07em;
+                    border-radius:999px;padding:0 8px;text-transform:uppercase;vertical-align:1px;}
+        .pr-who-po{color:#1D5BC4;background:#E8F0FE;border:1px solid #CFE0FD;}
+        .pr-who-pm{color:#9A5B05;background:#FEF3DC;border:1px solid #F3D38C;}
+        .pr-who-auto{color:#475569;background:#F1F5F9;border:1px solid #E2E8F0;}
+        tr.pr-hidden{display:none;}
+        .pr-mut{color:var(--faint);}
+
+        /* status words */
+        .pr-rev-yes{color:var(--good-ink);font-weight:600;}
+        .pr-rev-part{color:var(--warn-ink);font-weight:600;}
+        .pr-rev-no{color:var(--mut);}
+        span.pr-rev-yes,span.pr-rev-part,span.pr-rev-no,span.pr-sum-no{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px 0 8px;
+                  border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap;}
+        span.pr-rev-yes{background:var(--good-soft);}
+        span.pr-rev-part{background:var(--warn-soft);}
+        span.pr-rev-no,span.pr-sum-no{background:#F1F5F9;color:var(--mut);}
+        span.pr-rev-yes::before,span.pr-rev-part::before,span.pr-rev-no::before,span.pr-sum-no::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;}
+        span.pr-sum-no::before,span.pr-rev-no::before{background:#B6C2D2;}
+        .pr-teamrow td.pr-item{font-weight:500;}
+        .pr-revbtn{height:28px;padding:0 10px;font-size:12px;}
+        .pr-revbtn-on{background:var(--good);border-color:var(--good);color:#fff;}
+
+        /* editable cells */
+        .pr-seg{display:inline-flex;gap:4px;flex-wrap:wrap;justify-content:center;}
+        .pr-segbtn{height:27px;display:inline-flex;align-items:center;gap:4px;border:1px solid var(--l);background:#fff;border-radius:999px;padding:0 10px;
+                   font:inherit;font-size:12px;font-weight:600;color:var(--ink2);cursor:pointer;white-space:nowrap;line-height:1;
+                   transition:background .14s,border-color .14s,color .14s,box-shadow .14s;}
+        .pr-segbtn:hover{border-color:#B9C6D8;background:#F8FAFC;color:var(--ink);}
+        .pr-segbtn:focus-visible{outline:2px solid var(--acc);outline-offset:1px;}
+        .pr-segbtn.is-on{background:#E3EDFF;border-color:#A9C7FB;color:#1D5BC4;box-shadow:0 1px 2px rgba(37,99,235,.12);}
+        .pr-segbtn.is-on[data-v="G"],.pr-segbtn.is-on[data-v="Done"],.pr-seg[data-fid^="H"] .pr-segbtn.is-on[data-v="Y"]{background:#DDF5EA;border-color:#9FDDC2;color:var(--good-ink);}
+        .pr-seg[data-fid^="A"] .pr-segbtn.is-on[data-v="Y"],.pr-segbtn.is-on[data-v="Partial"]{background:#FEF0C7;border-color:#F3CF7A;color:var(--warn-ink);}
+        .pr-segbtn.is-on[data-v="R"],.pr-segbtn.is-on[data-v="Not"],.pr-segbtn.is-on[data-v="N"]{background:#FDE4E1;border-color:#F4B2AA;color:var(--bad-ink);}
+        .pr-ta{width:100%;min-width:150px;border:1px solid var(--l);border-radius:8px;padding:6px 8px;font:inherit;font-size:12.5px;resize:vertical;min-height:30px;}
+        .pr-sel{height:32px;border:1px solid var(--l);border-radius:8px;padding:0 30px 0 10px;font:inherit;font-size:12.5px;color:var(--ink);
+                background:#fff var(--chev) no-repeat right 10px center;-webkit-appearance:none;appearance:none;cursor:pointer;transition:border-color .15s,box-shadow .15s;}
+        .pr-sel:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px rgba(79,142,247,.14);}
+        .pr-carry{font-size:11.5px;color:var(--mut);margin-bottom:4px;max-width:190px;}
+        .pr-ro{color:var(--ink);}
+        .pr-iconbtn{position:relative;width:34px;height:30px;display:inline-flex;align-items:center;justify-content:center;padding:0;
+                    border:1px solid var(--l);background:#fff;border-radius:9px;font-size:0;line-height:1;cursor:pointer;color:var(--mut);
+                    transition:background .14s,border-color .14s,color .14s,transform .12s;}
+        .pr-iconbtn::before{content:"";width:15px;height:15px;background:currentColor;-webkit-mask:var(--fr-eye) center/contain no-repeat;mask:var(--fr-eye) center/contain no-repeat;}
+        .pr-iconbtn.editable::before{-webkit-mask-image:var(--fr-edit);mask-image:var(--fr-edit);}
+        .pr-iconbtn:hover{border-color:var(--acc-line);background:var(--acc-soft);color:var(--acc-ink);}
+        .pr-iconbtn:active{transform:scale(.95);}
+        .pr-iconbtn:focus-visible{outline:2px solid var(--acc);outline-offset:1px;}
+        .pr-iconbtn.editable{color:var(--acc-ink);}
+        .pr-iconbtn.has-val{color:var(--good-ink);border-color:var(--good-line);background:#EFFAF5;}
+        .pr-iconbtn.has-val::after{content:"";position:absolute;top:-3px;right:-3px;width:9px;height:9px;border-radius:50%;background:var(--good);border:2px solid #fff;}
+        .pr-bcell{display:flex;flex-direction:column;align-items:center;gap:6px;}
+        .pr-viewbtn{display:inline-flex;align-items:center;gap:5px;height:26px;border:1px solid var(--acc-line);background:var(--acc-soft);color:var(--acc-ink);
+                    border-radius:999px;padding:0 10px;font:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .14s,color .14s,border-color .14s;}
+        .pr-viewbtn::before{content:"";width:13px;height:13px;background:currentColor;-webkit-mask:var(--fr-eye) center/contain no-repeat;mask:var(--fr-eye) center/contain no-repeat;}
+        .pr-viewbtn:hover{background:var(--acc);border-color:var(--acc);color:#fff;}
+        .pr-carry-none{font-size:11.5px;color:var(--faint);white-space:nowrap;}
+        .pr-bstat{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:#F1F5F9;font-size:12px;font-weight:600;color:var(--ink2);}
+
+        /* ── Save bar: stays in reach while you scroll the review ── */
+        .pr-savebar{position:sticky;bottom:14px;z-index:30;display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-top:16px;
+                    padding:10px 10px 10px 16px;background:rgba(255,255,255,.88);-webkit-backdrop-filter:blur(18px) saturate(160%);backdrop-filter:blur(18px) saturate(160%);
+                    border:1px solid rgba(255,255,255,.9);border-radius:14px;box-shadow:0 10px 30px rgba(15,23,42,.14),var(--ring);}
+        .pr-savehint{display:inline-flex;align-items:center;gap:8px;margin-right:auto;color:var(--mut);font-size:12.5px;}
+        .pr-savehint::before{content:"";width:16px;height:16px;flex-shrink:0;background:var(--acc);-webkit-mask:var(--fr-edit) center/contain no-repeat;mask:var(--fr-edit) center/contain no-repeat;}
+        .pr-savehint.is-fail{color:var(--bad);font-weight:600;}
+        .pr-savehint.is-fail::before{background:var(--bad);-webkit-mask-image:var(--fr-alert);mask-image:var(--fr-alert);}
+        .pr-verified{font-size:12px;font-weight:600;color:#1a7a3e;background:#eef8f0;border:1px solid #bfe3c9;border-radius:20px;padding:3px 10px;margin-right:auto;}
+
+        /* legacy helpers (kept for markup that may still use them) */
+        .pr-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px;}
+        .pr-divider{border:0;border-top:1px solid var(--l);margin:22px 0 18px;}
+        .pr-run-status{margin-top:16px;border:1px solid var(--l);border-radius:10px;padding:12px 14px;background:var(--bg);font-size:13px;white-space:pre-wrap;line-height:1.5;}
+        .pr-run-status.is-error{border-color:var(--bad-line);background:var(--bad-soft);color:var(--bad-ink);}
+        .pr-base-filter{padding:8px 10px;border:1px solid var(--l);border-radius:8px;font:inherit;min-width:220px;}
+        .pr-base-note{margin-top:12px;border:1px solid #e5cfa3;background:#fdf7e8;border-radius:10px;padding:10px 12px;font-size:13px;color:#7a5b12;}
+        .pr-base-wrap{margin-top:12px;overflow:auto;max-height:60vh;}
+        table.pr-base-tbl{border-collapse:collapse;font-size:12.5px;white-space:nowrap;}
+        .pr-base-tbl th,.pr-base-tbl td{border:1px solid var(--l);padding:2px 0;}
+        .pr-base-tbl thead th{background:var(--bg);position:sticky;top:0;padding:7px 10px;text-align:left;font-weight:600;z-index:1;}
+        .pr-base-tbl td.pr-cell{padding:0;}
+        .pr-base-tbl td.pr-cell [contenteditable]{padding:5px 8px;min-width:90px;outline:none;min-height:18px;}
+        .pr-base-tbl td.pr-cell [contenteditable]:focus{background:#eef5ff;box-shadow:inset 0 0 0 2px var(--acc);}
+        .pr-base-del{border:0;background:transparent;color:#b34141;cursor:pointer;font-size:15px;padding:4px 6px;}
+        tr.pr-row-hidden{display:none;}
+
+        /* ── Toast ── */
+        .pr-toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;max-width:min(560px,92vw);
+                  background:rgba(15,23,42,.92);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);color:#fff;padding:11px 18px 11px 14px;
+                  border-radius:12px;box-shadow:0 12px 32px rgba(15,23,42,.3);font-size:13px;font-weight:500;z-index:700;animation:pr-toast .24s cubic-bezier(.2,.8,.2,1);}
+        .pr-toast::before{content:"";width:18px;height:18px;flex-shrink:0;background:#34D399;-webkit-mask:var(--fr-check) center/contain no-repeat;mask:var(--fr-check) center/contain no-repeat;}
+        .pr-toast[hidden]{display:none;}
+        .pr-spin{display:inline-block;width:14px;height:14px;border:2px solid #ffffff70;border-top-color:#fff;border-radius:50%;animation:pr-rot .7s linear infinite;vertical-align:-2px;margin-right:2px;}
+        @keyframes pr-rot{to{transform:rotate(360deg)}}
+        @keyframes pr-toast{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+        @keyframes pr-fade{from{opacity:0}to{opacity:1}}
+        @keyframes pr-pop{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
+        @keyframes pr-drop{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+
+        /* ── Modals ── */
+        .pr-modal{position:fixed;inset:0;padding:20px;background:rgba(15,23,42,.46);-webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px);
+                  align-items:center;justify-content:center;z-index:600;}
+        .pr-modal:not([hidden]){display:flex;animation:pr-fade .16s ease;}
+        .pr-modal-box{background:#fff;border-radius:18px;padding:22px 22px 18px;width:min(540px,94vw);
+                      box-shadow:0 24px 64px rgba(15,23,42,.28),0 0 0 1px rgba(15,23,42,.06);animation:pr-pop .22s cubic-bezier(.2,.8,.2,1);}
+        .pr-modal-title{font-weight:700;font-size:16px;letter-spacing:-.25px;color:var(--ink);margin-bottom:14px;line-height:1.35;}
+        .pr-modal-ta{width:100%;min-height:130px;border:1px solid var(--l);border-radius:12px;padding:12px 14px;font:inherit;font-size:14px;line-height:1.55;
+                     resize:vertical;background:#FBFCFE;transition:border-color .15s,box-shadow .15s,background .15s;}
+        .pr-modal-ta:focus{outline:none;border-color:var(--acc);background:#fff;box-shadow:0 0 0 3px rgba(79,142,247,.14);}
+        .pr-modal-ta[readonly]{background:var(--bg);color:var(--ink);}
+        .pr-modal-foot{display:flex;align-items:center;gap:10px;margin-top:16px;}
+        .pr-modal-foot .pr-btn{height:38px;}
+        .pr-modal-spacer{flex:1;}
+        .pr-modal-msg{font-size:12px;color:var(--mut);font-variant-numeric:tabular-nums;}
+        .pr-modal-msg.is-over{color:var(--bad);font-weight:600;}
+        .pr-list-box{width:min(840px,94vw);}
+        .pr-list-body{max-height:60vh;overflow:auto;border:1px solid var(--l);border-radius:12px;}
+        .pr-list-body .pr-tbl th{position:sticky;top:0;}
+        .pr-list-body .pr-tgt-total td{font-weight:700;background:#F8FAFC;color:var(--ink);border-top:1px solid var(--l);}
+        .pr-list-warn{color:var(--warn);font-size:11.5px;}
+        .pr-acad-po{font-size:12px;line-height:1.55;white-space:normal;}
+        .pr-acad-po b{font-weight:600;color:var(--ink);}
+        #prSumModalDl::before,.pr-sum-dl::before{content:"";width:15px;height:15px;background:currentColor;-webkit-mask:var(--fr-dl) center/contain no-repeat;mask:var(--fr-dl) center/contain no-repeat;}
+        .pr-addbox{width:min(640px,94vw);}
+        .pr-addform{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-height:60vh;overflow:auto;padding:2px;}
+        .pr-addform .pr-fld{display:flex;flex-direction:column;gap:4px;}
+        .pr-addform .pr-fld.wide{grid-column:1 / -1;}
+        .pr-addform label{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;font-weight:600;}
+        .pr-addform input,.pr-addform select,.pr-addform textarea{padding:8px 10px;border:1px solid var(--l);border-radius:8px;font:inherit;background:#fff;}
+        .pr-addform select[multiple]{min-height:120px;}
+        .pr-addform textarea{min-height:70px;resize:vertical;}
+        .pr-chkwrap{border:1px solid var(--l);border-radius:8px;padding:8px;max-height:150px;overflow:auto;display:flex;flex-direction:column;gap:5px;}
+        .pr-chkwrap label{text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink);font-weight:500;display:flex;gap:7px;align-items:center;}
+        .pr-chkwrap .taken{color:var(--mut);}
+
+        /* ── Summary: multi-select filters ── */
+        .pr-ms{position:relative;}
+        .pr-ms-btn{width:100%;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+        .pr-ms-btn:disabled,.pr-ms-btn.is-muted{color:var(--faint);background-color:#F4F6F9;cursor:not-allowed;}
+        .pr-ms-panel{position:absolute;top:calc(100% + 6px);left:0;min-width:270px;z-index:40;background:#fff;border:1px solid var(--l);border-radius:12px;
+                     box-shadow:0 16px 36px rgba(15,23,42,.16);overflow:hidden;animation:pr-drop .16s ease;}
+        .pr-ms-panel[hidden]{display:none;}
+        .pr-ms-list{max-height:240px;overflow-y:auto;padding:4px;}
+        .pr-ms-row{display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;font-size:13.5px;border-radius:8px;}
+        .pr-ms-row:hover{background:#F3F6FC;}
+        .pr-ms-row input{width:16px;height:16px;accent-color:var(--acc);cursor:pointer;flex-shrink:0;}
+        .pr-ms-all{border-bottom:1px solid var(--l2);padding:11px 16px;border-radius:0;}
+        .pr-ms-hint{margin-left:auto;font-size:10.5px;font-weight:600;color:var(--mut);background:#F1F5F9;border-radius:999px;padding:1px 7px;}
+        .pr-ms-empty{padding:16px 14px;font-size:12.5px;color:var(--mut);text-align:center;}
+        .pr-ms-foot{display:flex;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid var(--l2);background:#F8FAFC;}
+        .pr-ms-note{flex:1;font-size:11px;color:var(--mut);}
+        .pr-ms-foot .pr-btn{height:32px;padding:0 13px;font-size:12.5px;}
+
+        /* ── Summary: table ── */
+        .pr-sum-search-field{flex:1;min-width:220px;}
+        .pr-sum-search{height:40px;padding:0 12px 0 36px;border:1px solid var(--l);border-radius:10px;font:inherit;width:100%;color:var(--ink);
+                       background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='M20 20l-4.2-4.2'/%3E%3C/svg%3E") no-repeat 12px center;
+                       transition:border-color .15s,box-shadow .15s;}
+        .pr-sum-search:hover{border-color:#CBD5E1;}
+        .pr-sum-search:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px rgba(79,142,247,.16);}
+        .pr-sum-head{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+        .pr-sum-head .pr-blocks-h{flex:1;margin:0;font-size:12px;color:var(--ink);letter-spacing:.04em;}
+        .pr-sum-period{display:inline-flex;align-items:center;height:22px;padding:0 9px;margin-left:10px;border-radius:999px;background:var(--acc-soft);
+                       color:var(--acc-ink);font-weight:600;font-size:11.5px;text-transform:none;letter-spacing:0;}
+        .pr-sum-dl{height:34px;padding:0 13px;font-size:12.5px;white-space:nowrap;}
+        .pr-sum-tbl td.pr-num,.pr-sum-tbl th.pr-num{text-align:center;width:160px;}
+        .pr-sum-sub{display:block;font-size:11.5px;color:var(--mut);font-weight:400;margin-top:2px;}
+        .pr-sum-total td{background:#F8FAFC;font-weight:700;color:var(--ink);border-top:1px solid var(--l);}
+        .pr-sum-tbl tbody tr.pr-sum-total:hover td{background:#F3F6FB;}
+        .pr-sum-drill{display:inline-flex;align-items:center;justify-content:center;min-width:46px;height:28px;padding:0 12px;border-radius:999px;
+                      border:1px solid var(--acc-line);background:var(--acc-soft);color:var(--acc-ink);font:inherit;font-weight:700;font-size:13px;
+                      font-variant-numeric:tabular-nums;cursor:pointer;transition:transform .12s,box-shadow .15s,background .15s;}
+        .pr-sum-drill:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(15,23,42,.1);}
+        .pr-sum-drill.pr-rev-yes{color:var(--good-ink);background:var(--good-soft);border-color:var(--good-line);}
+        .pr-sum-drill.pr-rev-part{color:var(--warn-ink);background:var(--warn-soft);border-color:var(--warn-line);}
+        .pr-sum-drill.pr-rev-no{color:var(--ink2);background:#F1F5F9;border-color:#E2E8F0;}
+        .pr-sum-zero{color:#C3CBD6;font-weight:600;}
+        .pr-sum-hint{display:flex;align-items:center;gap:7px;margin:12px 2px 0;font-size:12px;color:var(--mut);}
+        .pr-sum-hint::before{content:"";width:14px;height:14px;flex-shrink:0;background:var(--faint);-webkit-mask:var(--fr-search) center/contain no-repeat;mask:var(--fr-search) center/contain no-repeat;}
+        .pr-sum-modal-body{max-height:56vh;overflow:auto;}
+        .pr-sum-modal-body td,.pr-sum-modal-body th{text-align:left;}
+        .pr-sum-ix{color:var(--faint);width:44px;font-variant-numeric:tabular-nums;}
+
+        /* ── Monthly scorecard table ── */
+        .pr-mo-tbl td.pr-item{min-width:340px;}
+        .pr-mo-tbl tr.pr-mo-l0 td{background:#FCFDFF;}
+        .pr-mo-tbl tr.pr-mo-l0 td.pr-item{font-weight:650;color:var(--ink);}
+        .pr-mo-tbl tr.pr-mo-l0 td:nth-child(6){font-weight:700;color:var(--ink);}
+        .pr-mo-tbl tr.pr-mo-l1 td.pr-item{padding-left:36px;font-weight:500;color:var(--ink2);}
+        .pr-mo-tbl tr.pr-mo-l2 td.pr-item{padding-left:58px;font-weight:400;color:var(--ink2);font-size:12.5px;}
+        .pr-mo-tbl tr.pr-mo-l1 td.pr-item::before,.pr-mo-tbl tr.pr-mo-l2 td.pr-item::before{content:"";position:absolute;top:50%;width:9px;height:1.5px;border-radius:2px;background:#CBD5E1;}
+        .pr-mo-tbl tr.pr-mo-l1 td.pr-item::before{left:20px;}
+        .pr-mo-tbl tr.pr-mo-l2 td.pr-item::before{left:42px;width:7px;background:#DCE3EC;}
+        .pr-mo-tbl tr.pr-mo-l1[data-g4] td.pr-item::before{display:none;}
+        .pr-mo-tbl tr.pr-mo-head td{background:#F8FAFC;}
+        .pr-mo-tbl tr.pr-mo-head td.pr-item{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--mut);font-weight:700;}
+        .pr-mo-tbl td:not(.pr-item){white-space:nowrap;}
+        .pr-mo-sub{font-size:11.5px;color:var(--mut);font-weight:400;margin-top:3px;white-space:normal;line-height:1.45;max-width:560px;}
+        .pr-mo-pill{display:inline-flex;align-items:center;height:22px;font-size:11px;font-weight:600;border-radius:999px;padding:0 9px;white-space:nowrap;}
+        .pr-mo-na{color:#64748B;background:#F1F5F9;border:1px solid #E2E8F0;}
+        .pr-mo-entry{color:var(--warn-ink);background:var(--warn-soft);border:1px solid var(--warn-line);}
+        .pr-mo-note{background:#fff8e6;border-color:#ecd9a8;color:#7a5b12;font-size:13px;}
+        .pr-mo-link{display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:26px;border:1px solid var(--acc-line);background:var(--acc-soft);
+                    color:var(--acc-ink);font:inherit;font-weight:700;border-radius:999px;padding:0 10px;cursor:pointer;transition:background .14s,color .14s,border-color .14s;}
+        .pr-mo-link:hover{background:var(--acc);border-color:var(--acc);color:#fff;}
+        .pr-mo-num,.pr-mo-ent,.pr-mo-g4n{height:32px;text-align:right;border:1px solid var(--l);border-radius:8px;padding:0 9px;font:inherit;font-size:13px;
+                    background:#fff;font-variant-numeric:tabular-nums;transition:border-color .15s,box-shadow .15s;}
+        .pr-mo-num,.pr-mo-ent{width:88px;}
+        .pr-mo-g4n{width:80px;}
+        .pr-mo-num:hover,.pr-mo-ent:hover,.pr-mo-g4n:hover,.pr-mo-txt:hover,.pr-mo-yn:hover{border-color:#CBD5E1;}
+        .pr-mo-num:focus,.pr-mo-ent:focus,.pr-mo-g4n:focus,.pr-mo-txt:focus,.pr-mo-yn:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px rgba(79,142,247,.14);}
+        .pr-mo-num.is-bad,.pr-mo-ent.is-bad,.pr-mo-g4n.is-bad{border-color:var(--bad);background:var(--bad-soft);}
+        .pr-mo-over{font-size:11px;font-weight:600;color:var(--warn);margin-top:4px;}
+        .pr-mo-tlink{border:1px solid transparent;background:transparent;color:var(--acc-ink);font:inherit;font-weight:650;border-radius:7px;padding:2px 7px;cursor:pointer;
+                     font-variant-numeric:tabular-nums;text-decoration:underline dotted;text-decoration-color:#9DBCF5;text-underline-offset:4px;transition:background .14s,border-color .14s;}
+        .pr-mo-tlink:hover{background:var(--acc-soft);border-color:var(--acc-line);text-decoration:none;}
+        .pr-mo-why{display:inline-flex;align-items:center;gap:5px;height:24px;border:1px solid transparent;font:inherit;font-size:12px;font-weight:650;cursor:pointer;
+                   padding:0 10px;border-radius:999px;transition:box-shadow .14s,transform .12s;}
+        .pr-mo-why.pr-rev-yes{background:var(--good-soft);border-color:var(--good-line);}
+        .pr-mo-why.pr-rev-part{background:var(--warn-soft);border-color:var(--warn-line);}
+        .pr-mo-why:hover{box-shadow:0 3px 8px rgba(15,23,42,.1);transform:translateY(-1px);}
+        .pr-mo-yn{height:32px;border:1px solid var(--l);border-radius:8px;padding:0 28px 0 10px;font:inherit;font-size:12.5px;min-width:84px;cursor:pointer;
+                  background:#fff var(--chev) no-repeat right 10px center;-webkit-appearance:none;appearance:none;transition:border-color .15s,box-shadow .15s;}
+        .pr-mo-hint{cursor:help;}
+        .pr-mo-g4off{display:none !important;}
+        .pr-mo-g4name{display:flex;align-items:center;gap:6px;}
+        .pr-mo-txt{flex:1;min-width:180px;height:32px;border:1px solid var(--l);border-radius:8px;padding:0 10px;font:inherit;font-size:13px;background:#fff;transition:border-color .15s,box-shadow .15s;}
+        .pr-mo-x{border:1px solid var(--l);background:#fff;color:var(--faint);border-radius:8px;width:32px;height:32px;cursor:pointer;flex-shrink:0;font-size:12px;transition:color .14s,border-color .14s,background .14s;}
+        .pr-mo-x:hover{color:var(--bad);border-color:var(--bad-line);background:var(--bad-soft);}
+        .pr-mo-add{height:32px;padding:0 12px;font-size:12.5px;color:var(--acc-ink);border-style:dashed;border-color:#A9C7FB;background:#F7FAFF;}
+        .pr-mo-add:hover:not(:disabled){background:var(--acc-soft);color:var(--acc-ink);border-color:var(--acc);}
+        .pr-mo-wsum{display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:999px;font-weight:700;background:#F1F5F9;color:var(--ink2);}
+        .pr-mo-wsum.ok{color:var(--good-ink);background:var(--good-soft);}
+        .pr-mo-wsum.bad{color:var(--bad-ink);background:var(--bad-soft);}
+
+        @media (max-width:900px){
+          .pr-avatar{width:44px;height:44px;border-radius:13px;font-size:15px;}
+        }
+        @media (max-width:640px){
+          .pr-field{min-width:100%;}
+          .pr-filters .pr-btn{width:100%;}
+          .pr-nav{width:100%;overflow-x:auto;}
+          .pr-navbtn{flex:1;justify-content:center;padding:0 8px;}
+          .pr-tbl td.pr-item{min-width:170px;}
+          .pr-mo-tbl td.pr-item{min-width:220px;}
+          .pr-savebar{flex-wrap:wrap;}
+        }
+        @media (prefers-reduced-motion:reduce){
+          .pr *{animation:none !important;transition:none !important;}
+          .pr-toast,.pr-modal,.pr-modal-box{animation:none !important;}
+        }
+      </style>
+    </div>
+
+    <!-- ───────── ADMIN (org admin only) ───────── -->
+    <div id="posAdminSection" style="display:none;">
+
+        <div class="pos-subtabs" role="tablist">
+            <button class="pos-top-tab active" data-postab="locations" onclick="window.POSAdmin.showTab('locations')"><span class="fr-ico fr-i-pin" aria-hidden="true"></span>Locations</button>
+            <button class="pos-top-tab" data-postab="assignments" onclick="window.POSAdmin.showTab('assignments')"><span class="fr-ico fr-i-users" aria-hidden="true"></span>Assignments</button>
+            <button class="pos-top-tab" data-postab="data" onclick="window.POSAdmin.showTab('data')"><span class="fr-ico fr-i-db" aria-hidden="true"></span>Data</button>
+            <button class="pos-top-tab" data-postab="academic" onclick="window.POSAdmin.showTab('academic')"><span class="fr-ico fr-i-cap" aria-hidden="true"></span>Academic Plan</button>
+            <button class="pos-top-tab" data-postab="targets" onclick="window.POSAdmin.showTab('targets')"><span class="fr-ico fr-i-target" aria-hidden="true"></span>G2 · G3 · G5 Targets</button>
+            <button class="pos-top-tab" data-postab="aliases" onclick="window.POSAdmin.showTab('aliases')"><span class="fr-ico fr-i-link" aria-hidden="true"></span>Name Aliases</button>
+        </div>
+
+        <!-- LOCATIONS TAB -->
+        <div id="posTabLocations" class="pos-tab">
+            <div class="table-toolbar">
+                <div class="table-meta" id="posLocMeta">Loading…</div>
+                <div class="toolbar-right">
+                    <button class="btn-add" onclick="window.POSAdmin.openStateModal()">+ Add State</button>
+                    <button class="btn-add" onclick="window.POSAdmin.openDistrictModal()">+ Add District</button>
+                    <button class="btn-add" onclick="window.POSAdmin.openBlockModal()">+ Add Block</button>
+                </div>
+            </div>
+            <div class="pos-scroll-wrap">
+                <table>
+                    <thead>
+                        <tr><th>State</th><th>District</th><th>Block</th><th class="pos-col-actions">Actions</th></tr>
+                    </thead>
+                    <tbody id="posBlocksTbody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ASSIGNMENTS TAB -->
+        <div id="posTabAssignments" class="pos-tab" style="display:none;">
+            <div class="table-toolbar">
+                <div class="table-meta" id="posAssignMeta">Loading…</div>
+                <div class="toolbar-right">
+                    <button type="button" class="pos-btn pos-btn-ghost" onclick="window.POSAdmin.downloadAssignments()"><span class="pos-ico pos-ico-dl" aria-hidden="true"></span><span>Download Excel</span></button>
+                    <button class="btn-add" onclick="window.POSAdmin.openAssignmentModal()">+ Add Assignment</button>
+                </div>
+            </div>
+            <div class="pos-scroll-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th><th>Emp ID</th><th>Role</th><th>Status</th>
+                            <th class="pos-col-actions">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="posAssignTbody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ACADEMIC PLAN TAB -->
+        <div id="posTabAcademic" class="pos-tab" style="display:none;">
+            <div class="pos-src-card">
+                <div class="pos-src-head">
+                    <div class="pos-src-tile" style="background:#eef3fe;">🎓</div>
+                    <div class="pos-src-titles">
+                        <div class="pos-src-title">Academic Plan</div>
+                        <div class="pos-src-sub">Exams per PO and district, with test cycle and date. Feeds Monthly → G1 Academic Programs.</div>
+                    </div>
+                    <button type="button" class="pos-btn pos-btn-ghost" onclick="window.POSAdmin.downloadAcadCurrent()"><span class="pos-ico pos-ico-dl" aria-hidden="true"></span><span>Download current</span></button>
+                    <button type="button" class="pos-btn pos-btn-ghost" onclick="window.POSAdmin.downloadAcadSample()"><span class="pos-ico pos-ico-dl" aria-hidden="true"></span><span>Sample</span></button>
+                </div>
+                <div class="pos-src-controls">
+                    <div class="pos-field pos-field--grow">
+                        <label>Upload updated Excel — replaces the whole plan</label>
+                        <label class="pos-file">
+                            <input type="file" id="posAcadFile" accept=".xlsx,.xls,.csv" onchange="window.POSAdmin.onFilePicked(this)">
+                            <span class="pos-file-icon" aria-hidden="true"></span>
+                            <span class="pos-file-text">Choose an Excel file</span>
+                        </label>
+                    </div>
+                    <button type="button" class="pos-btn pos-btn-primary" id="posAcadUploadBtn" onclick="window.POSAdmin.uploadAcademic()">Upload</button>
+                </div>
+            </div>
+            <div class="table-toolbar">
+                <div class="table-meta" id="posAcadMeta">Loading…</div>
+                <div class="toolbar-right" style="gap:8px;">
+                    <input type="search" id="posAcadSearch" class="pos-acad-search" placeholder="Search PO, district, program…" oninput="window.POSAdmin.renderAcademicTable()">
+                    <select id="posAcadFilter" class="pos-sel" onchange="window.POSAdmin.renderAcademicTable()"><option value="">All rows</option></select>
+                    <button class="btn-add" onclick="window.POSAdmin.openAcadModal()">+ Add exam</button>
+                </div>
+            </div>
+            <div class="pos-scroll-wrap" style="max-height:560px;">
+                <table>
+                    <thead><tr><th>PO ID</th><th>PO Name</th><th>District</th><th>Program</th><th>Test Cycle</th><th>Preferred Month</th><th>Fixed Date</th><th>Counts in</th><th class="pos-col-actions">Actions</th></tr></thead>
+                    <tbody id="posAcadTbody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- G2 · G3 · G5 TARGETS TAB -->
+        <div id="posTabTargets" class="pos-tab" style="display:none;">
+            <div class="pos-src-card">
+                <div class="pos-src-head">
+                    <div class="pos-src-tile" style="background:#ecfdf3;">🎯</div>
+                    <div class="pos-src-titles">
+                        <div class="pos-src-title">G2 · G3 · G5 Targets</div>
+                        <div class="pos-src-sub">Monthly targets per PO. PM, DM and District targets are added up from their districts' PO rows, skipping blocks counted twice.</div>
+                    </div>
+                    <button type="button" class="pos-btn pos-btn-ghost" onclick="window.POSAdmin.downloadTgtCurrent()"><span class="pos-ico pos-ico-dl" aria-hidden="true"></span><span>Download month</span></button>
+                    <button type="button" class="pos-btn pos-btn-ghost" onclick="window.POSAdmin.downloadTgtSample()"><span class="pos-ico pos-ico-dl" aria-hidden="true"></span><span>Sample</span></button>
+                </div>
+                <div class="pos-src-controls">
+                    <div class="pos-field"><label>Year</label><select id="posTgtYear" class="pos-sel"></select></div>
+                    <div class="pos-field"><label>Month</label><select id="posTgtMonth" class="pos-sel"><option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option><option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option><option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option><option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option></select></div>
+                    <div class="pos-field pos-field--grow">
+                        <label>Targets Excel for this month</label>
+                        <label class="pos-file">
+                            <input type="file" id="posTgtFile" accept=".xlsx,.xls,.csv" onchange="window.POSAdmin.onFilePicked(this)">
+                            <span class="pos-file-icon" aria-hidden="true"></span>
+                            <span class="pos-file-text">Choose an Excel file</span>
+                        </label>
+                    </div>
+                    <button type="button" class="pos-btn pos-btn-primary" id="posTgtUploadBtn" onclick="window.POSAdmin.uploadTargets()">Upload</button>
+                </div>
+                <div class="pos-last pos-last--empty" style="justify-content:flex-start;">Rules: PM rows are skipped · "Posts per month / per teacher" must be 1 for every PO · a target of 0 means "not set".</div>
+            </div>
+            <div class="table-toolbar">
+                <div class="table-meta" id="posTgtMeta">Loading…</div>
+                <div class="toolbar-right" style="gap:8px;">
+                    <select id="posTgtView" class="pos-sel" onchange="window.POSAdmin.loadTargetRows()"><option value="">No months yet</option></select>
+                    <input type="search" id="posTgtSearch" class="pos-acad-search" placeholder="Search PO, district…" oninput="window.POSAdmin.renderTargetsTable()">
+                    <button class="btn-add" onclick="window.POSAdmin.openTgtModal()">+ Add PO</button>
+                </div>
+            </div>
+            <div class="pos-scroll-wrap pos-tgt-wrap" style="max-height:560px;">
+                <table><thead id="posTgtThead"></thead><tbody id="posTgtTbody"></tbody></table>
+            </div>
+        </div>
+
+        <!-- ───────── NAME ALIASES TAB ─────────
+             Nimble and V&A files carry no employee ID, only a typed name, so
+             every upload leans on this table. It used to be invisible: a wrong
+             mapping was silent and permanent. This is where you see and fix it. -->
+        <div id="posTabAliases" class="pos-tab" style="display:none;">
+            <div class="pos-src-card">
+                <div class="pos-src-head">
+                    <div class="pos-src-tile" style="background:#f5f3ff;">🔗</div>
+                    <div class="pos-src-titles">
+                        <div class="pos-src-title">Name Aliases</div>
+                        <div class="pos-src-sub">How names in Nimble and Visit &amp; Activity files resolve to an employee. Rows highlighted amber share one employee with another name — usually a wrong mapping.</div>
+                    </div>
+                    <button type="button" class="pos-btn pos-btn-ghost" onclick="window.POSAdmin.loadAliasRows()">Refresh</button>
+                </div>
+                <div class="table-meta" id="posAliasMeta">Loading…</div>
+                <div class="pos-acad-toolbar">
+                    <select id="posAliasSource" class="pos-sel" onchange="window.POSAdmin.renderAliasTable()">
+                        <option value="">All sources</option>
+                        <option value="nimble">nimble</option>
+                        <option value="visitandactivity">visitandactivity</option>
+                    </select>
+                    <input type="search" id="posAliasSearch" class="pos-acad-search" placeholder="Search a name or employee ID…" oninput="window.POSAdmin.renderAliasTable()">
+                </div>
+                <div class="pos-scroll-wrap" style="max-height:520px;">
+                    <table>
+                        <thead><tr><th>Source</th><th>Name in file</th><th>Maps to</th><th>Warning</th><th class="pos-col-actions">Actions</th></tr></thead>
+                        <tbody id="posAliasTbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- DATA TAB -->
+        <div id="posTabData" class="pos-tab" style="display:none;">
+            <div class="pos-src-card">
+                <div class="pos-src-head">
+                    <div class="pos-src-tile" style="background:#eef3fe;">📊</div>
+                    <div class="pos-src-titles">
+                        <div class="pos-src-title">Vinoba</div>
+                        <div class="pos-src-sub">Block-level posts, lifeskills, coupons, streaks, POM winners</div>
+                    </div>
+                    <button type="button" class="pos-btn pos-btn-ghost" onclick="window.POSAdmin.downloadVinobaTempl()"><span class="pos-ico pos-ico-dl" aria-hidden="true"></span><span>Sample</span></button>
+                </div>
+                <div class="pos-src-controls">
+                    <div class="pos-field">
+                        <label>Year</label>
+                        <select id="posVinobaYear" class="pos-sel"></select>
+                    </div>
+                    <div class="pos-field">
+                        <label>Month</label>
+                        <select id="posVinobaMonth" class="pos-sel"><option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option><option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option><option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option><option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option></select>
+                    </div>
+                    <div class="pos-field">
+                        <label>Week</label>
+                        <select id="posVinobaWeek" class="pos-sel"><option value="1">Week 1</option><option value="2">Week 2</option><option value="3">Week 3</option><option value="4">Week 4</option><option value="5">Week 5</option><option value="0">All Month</option></select>
+                    </div>
+                    <div class="pos-field pos-field--grow">
+                        <label>File</label>
+                        <label class="pos-file">
+                            <input type="file" id="posVinobaFile" accept=".xlsx,.xls,.csv" onchange="window.POSAdmin.onFilePicked(this)">
+                            <span class="pos-file-icon" aria-hidden="true"></span>
+                            <span class="pos-file-text">Choose an Excel file</span>
+                        </label>
+                    </div>
+                    <button type="button" class="pos-btn pos-btn-primary" id="posVinobaUploadBtn" onclick="window.POSAdmin.uploadVinoba()">Upload</button>
+                </div>
+                <div id="posVinobaLogTbody"><div class="pos-last pos-last--empty">Loading…</div></div>
+            </div>
+            <div class="pos-src-card">
+                <div class="pos-src-head">
+                    <div class="pos-src-tile" style="background:#fef6e7;">🧾</div>
+                    <div class="pos-src-titles">
+                        <div class="pos-src-title">Expense Report (ER)</div>
+                        <div class="pos-src-sub">Employee-level ER submission status and amount</div>
+                    </div>
+                    <button type="button" class="pos-btn pos-btn-ghost" onclick="window.POSAdmin.downloadErTempl()"><span class="pos-ico pos-ico-dl" aria-hidden="true"></span><span>Sample</span></button>
+                </div>
+                <div class="pos-src-controls">
+                    <div class="pos-field">
+                        <label>Year</label>
+                        <select id="posErYear" class="pos-sel"></select>
+                    </div>
+                    <div class="pos-field">
+                        <label>Month</label>
+                        <select id="posErMonth" class="pos-sel"><option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option><option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option><option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option><option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option></select>
+                    </div>
+                    <div class="pos-field">
+                        <label>Week</label>
+                        <select id="posErWeek" class="pos-sel"><option value="1">Week 1</option><option value="2">Week 2</option><option value="3">Week 3</option><option value="4">Week 4</option><option value="5">Week 5</option><option value="0">All Month</option></select>
+                    </div>
+                    <div class="pos-field pos-field--grow">
+                        <label>File</label>
+                        <label class="pos-file">
+                            <input type="file" id="posErFile" accept=".xlsx,.xls,.csv" onchange="window.POSAdmin.onFilePicked(this)">
+                            <span class="pos-file-icon" aria-hidden="true"></span>
+                            <span class="pos-file-text">Choose an Excel file</span>
+                        </label>
+                    </div>
+                    <button type="button" class="pos-btn pos-btn-primary" id="posErUploadBtn" onclick="window.POSAdmin.uploadEr()">Upload</button>
+                </div>
+                <div id="posErLogTbody"><div class="pos-last pos-last--empty">Loading…</div></div>
+            </div>
+            <div class="pos-src-card">
+                <div class="pos-src-head">
+                    <div class="pos-src-tile" style="background:#ecfdf3;">⏰</div>
+                    <div class="pos-src-titles">
+                        <div class="pos-src-title">Keka</div>
+                        <div class="pos-src-sub">Employee-level attendance, leaves, late arrivals, missing swipes</div>
+                    </div>
+                    <button type="button" class="pos-btn pos-btn-ghost" onclick="window.POSAdmin.downloadKekaTempl()"><span class="pos-ico pos-ico-dl" aria-hidden="true"></span><span>Sample</span></button>
+                </div>
+                <div class="pos-src-controls">
+                    <div class="pos-field">
+                        <label>Year</label>
+                        <select id="posKekaYear" class="pos-sel"></select>
+                    </div>
+                    <div class="pos-field">
+                        <label>Month</label>
+                        <select id="posKekaMonth" class="pos-sel"><option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option><option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option><option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option><option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option></select>
+                    </div>
+                    <div class="pos-field">
+                        <label>Week</label>
+                        <select id="posKekaWeek" class="pos-sel"><option value="1">Week 1</option><option value="2">Week 2</option><option value="3">Week 3</option><option value="4">Week 4</option><option value="5">Week 5</option><option value="0">All Month</option></select>
+                    </div>
+                    <div class="pos-field pos-field--grow">
+                        <label>File</label>
+                        <label class="pos-file">
+                            <input type="file" id="posKekaFile" accept=".xlsx,.xls,.csv" onchange="window.POSAdmin.onFilePicked(this)">
+                            <span class="pos-file-icon" aria-hidden="true"></span>
+                            <span class="pos-file-text">Choose an Excel file</span>
+                        </label>
+                    </div>
+                    <button type="button" class="pos-btn pos-btn-primary" id="posKekaUploadBtn" onclick="window.POSAdmin.uploadKeka()">Upload</button>
+                </div>
+                <div id="posKekaLogTbody"><div class="pos-last pos-last--empty">Loading…</div></div>
+            </div>
+            <div class="pos-src-card">
+                <div class="pos-src-head">
+                    <div class="pos-src-tile" style="background:#f5f0ff;">🎪</div>
+                    <div class="pos-src-titles">
+                        <div class="pos-src-title">Staff Connect (Events)</div>
+                        <div class="pos-src-sub">Block-level event counts and teacher felicitations</div>
+                    </div>
+                    <button type="button" class="pos-btn pos-btn-ghost" onclick="window.POSAdmin.downloadScTempl()"><span class="pos-ico pos-ico-dl" aria-hidden="true"></span><span>Sample</span></button>
+                </div>
+                <div class="pos-src-controls">
+                    <div class="pos-field">
+                        <label>Year</label>
+                        <select id="posScYear" class="pos-sel"></select>
+                    </div>
+                    <div class="pos-field">
+                        <label>Month</label>
+                        <select id="posScMonth" class="pos-sel"><option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option><option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option><option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option><option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option></select>
+                    </div>
+                    <div class="pos-field">
+                        <label>Week</label>
+                        <select id="posScWeek" class="pos-sel"><option value="1">Week 1</option><option value="2">Week 2</option><option value="3">Week 3</option><option value="4">Week 4</option><option value="5">Week 5</option><option value="0">All Month</option></select>
+                    </div>
+                    <div class="pos-field pos-field--grow">
+                        <label>File</label>
+                        <label class="pos-file">
+                            <input type="file" id="posScFile" accept=".xlsx,.xls,.csv" onchange="window.POSAdmin.onFilePicked(this)">
+                            <span class="pos-file-icon" aria-hidden="true"></span>
+                            <span class="pos-file-text">Choose an Excel file</span>
+                        </label>
+                    </div>
+                    <button type="button" class="pos-btn pos-btn-primary" id="posScUploadBtn" onclick="window.POSAdmin.uploadSc()">Upload</button>
+                </div>
+                <div id="posScLogTbody"><div class="pos-last pos-last--empty">Loading…</div></div>
+            </div>
+            <div class="pos-src-card">
+                <div class="pos-src-head">
+                    <div class="pos-src-tile" style="background:#fdf0f3;">🎫</div>
+                    <div class="pos-src-titles">
+                        <div class="pos-src-title">Nimble (Tickets)</div>
+                        <div class="pos-src-sub">Ticket data, matched to employees by name alias</div>
+                    </div>
+                    <button type="button" class="pos-btn pos-btn-ghost" onclick="window.POSAdmin.downloadNimbleTempl()"><span class="pos-ico pos-ico-dl" aria-hidden="true"></span><span>Sample</span></button>
+                </div>
+                <div class="pos-src-controls">
+                    <div class="pos-field">
+                        <label>Year</label>
+                        <select id="posNimbleYear" class="pos-sel"></select>
+                    </div>
+                    <div class="pos-field">
+                        <label>Month</label>
+                        <select id="posNimbleMonth" class="pos-sel"><option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option><option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option><option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option><option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option></select>
+                    </div>
+                    <div class="pos-field">
+                        <label>Week</label>
+                        <select id="posNimbleWeek" class="pos-sel"><option value="1">Week 1</option><option value="2">Week 2</option><option value="3">Week 3</option><option value="4">Week 4</option><option value="5">Week 5</option><option value="0">All Month</option></select>
+                    </div>
+                    <div class="pos-field pos-field--grow">
+                        <label>File</label>
+                        <label class="pos-file">
+                            <input type="file" id="posNimbleFile" accept=".xlsx,.xls,.csv" onchange="window.POSAdmin.onFilePicked(this)">
+                            <span class="pos-file-icon" aria-hidden="true"></span>
+                            <span class="pos-file-text">Choose an Excel file</span>
+                        </label>
+                    </div>
+                    <button type="button" class="pos-btn pos-btn-primary" id="posNimbleUploadBtn" onclick="window.POSAdmin.uploadNimble()">Upload</button>
+                </div>
+                <div id="posNimbleLogTbody"><div class="pos-last pos-last--empty">Loading…</div></div>
+            </div>
+            <div class="pos-src-card">
+                <div class="pos-src-head">
+                    <div class="pos-src-tile" style="background:#eefaf8;">🏫</div>
+                    <div class="pos-src-titles">
+                        <div class="pos-src-title">Visit & Activity</div>
+                        <div class="pos-src-sub">PO-level visit and activity counts, matched by name alias</div>
+                    </div>
+                    <button type="button" class="pos-btn pos-btn-ghost" onclick="window.POSAdmin.downloadVaTempl()"><span class="pos-ico pos-ico-dl" aria-hidden="true"></span><span>Sample</span></button>
+                </div>
+                <div class="pos-src-controls">
+                    <div class="pos-field">
+                        <label>Year</label>
+                        <select id="posVaYear" class="pos-sel"></select>
+                    </div>
+                    <div class="pos-field">
+                        <label>Month</label>
+                        <select id="posVaMonth" class="pos-sel"><option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option><option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option><option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option><option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option></select>
+                    </div>
+                    <div class="pos-field">
+                        <label>Week</label>
+                        <select id="posVaWeek" class="pos-sel"><option value="1">Week 1</option><option value="2">Week 2</option><option value="3">Week 3</option><option value="4">Week 4</option><option value="5">Week 5</option><option value="0">All Month</option></select>
+                    </div>
+                    <div class="pos-field pos-field--grow">
+                        <label>File</label>
+                        <label class="pos-file">
+                            <input type="file" id="posVaFile" accept=".xlsx,.xls,.csv" onchange="window.POSAdmin.onFilePicked(this)">
+                            <span class="pos-file-icon" aria-hidden="true"></span>
+                            <span class="pos-file-text">Choose an Excel file</span>
+                        </label>
+                    </div>
+                    <button type="button" class="pos-btn pos-btn-primary" id="posVaUploadBtn" onclick="window.POSAdmin.uploadVa()">Upload</button>
+                </div>
+                <div id="posVaLogTbody"><div class="pos-last pos-last--empty">Loading…</div></div>
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+<!-- ───────── MODAL: ADD STATE ───────── -->
+<div id="posStateModal" class="modal-overlay">
+    <div class="modal-box" style="width:420px;">
+        <div class="modal-header">
+            <h2>Add State</h2>
+            <button class="modal-close" onclick="window.POSAdmin.closeStateModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>State Name <span class="req">*</span></label>
+                <input type="text" id="posStateName" placeholder="e.g. Maharashtra">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" onclick="window.POSAdmin.closeStateModal()">Cancel</button>
+            <button class="btn-save" onclick="window.POSAdmin.saveState()">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- ───────── MODAL: ADD DISTRICT ───────── -->
+<div id="posDistrictModal" class="modal-overlay">
+    <div class="modal-box" style="width:420px;">
+        <div class="modal-header">
+            <h2>Add District</h2>
+            <button class="modal-close" onclick="window.POSAdmin.closeDistrictModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>State <span class="req">*</span></label>
+                <select id="posDistrictState"></select>
+            </div>
+            <div class="form-group">
+                <label>District Name <span class="req">*</span></label>
+                <input type="text" id="posDistrictName" placeholder="e.g. Ahilyanagar">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" onclick="window.POSAdmin.closeDistrictModal()">Cancel</button>
+            <button class="btn-save" onclick="window.POSAdmin.saveDistrict()">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- ───────── MODAL: ADD / EDIT BLOCK ───────── -->
+<div id="posBlockModal" class="modal-overlay">
+    <div class="modal-box" style="width:420px;">
+        <div class="modal-header">
+            <h2 id="posBlockModalTitle">Add Block</h2>
+            <button class="modal-close" onclick="window.POSAdmin.closeBlockModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>State <span class="req">*</span></label>
+                <select id="posBlockState"
+                    onchange="window.POSAdmin.refreshBlockDistrictOptions()"></select>
+            </div>
+            <div class="form-group">
+                <label>District <span class="req">*</span></label>
+                <select id="posBlockDistrict"></select>
+            </div>
+            <div class="form-group">
+                <label>Block Name <span class="req">*</span></label>
+                <input type="text" id="posBlockName" placeholder="e.g. AKOLE">
+            </div>
+            <p style="font-size:11.5px;color:#9ca3af;">
+                A block name must be unique within its district — you'll get a clear error if it already exists there.
+            </p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" onclick="window.POSAdmin.closeBlockModal()">Cancel</button>
+            <button class="btn-save" onclick="window.POSAdmin.saveBlock()">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- ───────── MODAL: ADD / EDIT ASSIGNMENT ───────── -->
+<div id="posAssignModal" class="modal-overlay">
+    <div class="modal-box" style="width:640px;">
+        <div class="modal-header">
+            <h2 id="posAssignModalTitle">Add Assignment</h2>
+            <button class="modal-close" onclick="window.POSAdmin.closeAssignmentModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <!-- The person is picked from the Staff Connect Employees directory, never
+                 typed. The email stored here has to be the exact Google account they
+                 sign in with, and Employees is already the source of truth for that —
+                 typing it by hand is how an assignment ends up on the wrong person. -->
+            <div class="form-group" id="posAssignPickWrap">
+                <label>Employee <span class="req">*</span></label>
+                <div class="pos-emp-ac">
+                    <input type="text" id="posAssignEmpSearch" autocomplete="off"
+                           placeholder="Type a few letters of the name, ID or email…"
+                           oninput="window.POSAdmin.onEmpSearch(this.value)"
+                           onkeydown="window.POSAdmin.onEmpKey(event)"
+                           onblur="window.POSAdmin.onEmpBlur()">
+                    <div class="pos-emp-menu" id="posAssignEmpList" hidden></div>
+                </div>
+                <div class="pos-checklist-count" id="posAssignEmpCount"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Employee ID <span class="req">*</span></label>
+                    <input type="text" id="posAssignEmpId" class="pos-ro" readonly placeholder="Pick an employee above">
+                </div>
+                <div class="form-group">
+                    <label>Designation <span class="req">*</span></label>
+                    <select id="posAssignDesignation" onchange="window.POSAdmin.refreshAssignModalUI()">
+                        <option value="PO">PO</option>
+                        <option value="PM">PM</option>
+                        <option value="DM">DM</option>
+                        <option value="COO">COO</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Name <span class="req">*</span></label>
+                    <input type="text" id="posAssignName" class="pos-ro" readonly placeholder="From Employees">
+                </div>
+                <div class="form-group">
+                    <label>Email <span class="req">*</span></label>
+                    <input type="email" id="posAssignEmail" class="pos-ro" readonly placeholder="From Employees">
+                </div>
+            </div>
+            <p style="font-size:11.5px;color:#9ca3af;margin-top:-8px;">
+                ID, name and email come from the Employees page — if any of them is wrong, fix it there. Designation here is the review role, which is separate from their job title.
+            </p>
+            <div class="form-group">
+                <label>Assigned Districts</label>
+                <div id="posAssignDistrictsBox" class="pos-checklist"></div>
+                <div class="pos-checklist-count" id="posDistrictCount"></div>
+            </div>
+            <div class="form-group" id="posAssignBlocksWrap">
+                <label>Assigned Blocks</label>
+                <div id="posAssignBlocksBox" class="pos-checklist"></div>
+                <div class="pos-checklist-count" id="posBlockCount"></div>
+            </div>
+            <p id="posAssignBlocksAutoNote" style="font-size:11.5px;color:#9ca3af;display:none;">
+                PM / DM / COO roles cover every block in each checked district automatically — nothing to pick here.
+            </p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" onclick="window.POSAdmin.closeAssignmentModal()">Cancel</button>
+            <button class="btn-save" onclick="window.POSAdmin.saveAssignment()">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- ───────── MODAL: ACADEMIC PLAN ROW ───────── -->
+<div id="posAcadModal" class="modal-overlay">
+    <div class="modal-box" style="width:600px;">
+        <div class="modal-header">
+            <h2 id="posAcadModalTitle">Edit exam</h2>
+            <button class="modal-close" onclick="window.POSAdmin.closeAcadModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>PO ID <span class="req">*</span></label>
+                    <input type="text" id="posAcadPoId" list="posAcadPoList" placeholder="e.g. OLF-25-139" onchange="window.POSAdmin.onAcadPoIdChange()">
+                    <datalist id="posAcadPoList"></datalist>
+                </div>
+                <div class="form-group"><label>PO Name</label><input type="text" id="posAcadPoName"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>District <span class="req">*</span></label><select id="posAcadDistrict"></select></div>
+                <div class="form-group"><label>Program Name <span class="req">*</span></label><input type="text" id="posAcadProgram" placeholder="e.g. JNV"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Test Cycle</label><input type="text" id="posAcadTest" placeholder="e.g. Test 1"></div>
+                <div class="form-group"><label>Preferred Month</label><select id="posAcadPrefMonth"></select></div>
+            </div>
+            <div class="form-group"><label>Fixed Date</label><input type="date" id="posAcadDate"></div>
+            <p style="font-size:11.5px;color:#9ca3af;">The exam counts in the month of its Fixed Date. Without a Fixed Date, the Preferred Month is used.</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" onclick="window.POSAdmin.closeAcadModal()">Cancel</button>
+            <button class="btn-save" onclick="window.POSAdmin.saveAcadRow()">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- ───────── MODAL: TARGETS ROW ───────── -->
+<div id="posTgtModal" class="modal-overlay">
+    <div class="modal-box" style="width:820px;">
+        <div class="modal-header">
+            <h2 id="posTgtModalTitle">Edit targets</h2>
+            <button class="modal-close" onclick="window.POSAdmin.closeTgtModal()">✕</button>
+        </div>
+        <div class="modal-body" style="max-height:62vh;">
+            <div class="form-row">
+                <div class="form-group"><label>PO ID <span class="req">*</span></label>
+                    <input type="text" id="posTgtPoId" list="posTgtPoList" onchange="window.POSAdmin.onTgtPoIdChange()"><datalist id="posTgtPoList"></datalist></div>
+                <div class="form-group"><label>PO Name</label><input type="text" id="posTgtPoName"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>District <span class="req">*</span></label><select id="posTgtDistrict"></select></div>
+                <div class="form-group"><label>PM (as in the file)</label><input type="text" id="posTgtPm"></div>
+            </div>
+            <div id="posTgtFields" class="pos-tgt-grid"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" onclick="window.POSAdmin.closeTgtModal()">Cancel</button>
+            <button class="btn-save" onclick="window.POSAdmin.saveTgtRow()">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- ───────── MODAL: NAME ALIAS MAPPING ───────── -->
+<div id="posAliasModal" class="modal-overlay">
+    <div class="modal-box" style="width:720px;">
+        <div class="modal-header">
+            <h2 id="posAliasModalTitle">Map Unmatched Names</h2>
+            <button class="modal-close" onclick="window.POSAdmin.cancelAliasModal()">✕</button>
+        </div>
+        <div class="modal-body" style="max-height:58vh;">
+            <p style="font-size:13px;color:#6b7280;margin-bottom:10px;" id="posAliasModalDesc">
+                Every name found in the file is listed below, busiest first. Map the ones who are
+                <b>field staff</b>; leave everyone else on <b>Skip</b> — HO and service accounts must not
+                attach to a PO's review. Saved mappings are reused on every future upload and can be
+                corrected later under <b>Admin → Name Aliases</b>.
+            </p>
+            <div class="pos-al-bar">
+                <span class="pos-al-tally" id="posAliasTally"></span>
+                <button type="button" class="pos-btn" onclick="window.POSAdmin.aliasSkipAll()">Skip all</button>
+            </div>
+            <div id="posAliasRows"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" onclick="window.POSAdmin.cancelAliasModal()">Cancel Upload</button>
+            <button class="btn-save" onclick="window.POSAdmin.saveAliases()">Save Mappings & Continue Upload</button>
+        </div>
+    </div>
+</div>
+
+<!-- ───────── MODAL: RE-MAP ONE SAVED ALIAS ───────── -->
+<div id="posAliasEditModal" class="modal-overlay">
+    <div class="modal-box" style="width:520px;">
+        <div class="modal-header">
+            <h2>Re-map name</h2>
+            <button class="modal-close" onclick="window.POSAdmin.closeAliasEdit()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Name in file</label>
+                <div id="posAliasEditName" style="font-size:13.5px;font-weight:600;color:#1a1d23;"></div>
+            </div>
+            <div class="form-group">
+                <label>Maps to</label>
+                <select id="posAliasEditSel"></select>
+            </div>
+            <p style="font-size:11.5px;color:#9ca3af;">
+                This changes future uploads. Rows already in the database keep the employee ID they were given — re-upload that week to correct them.
+            </p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" onclick="window.POSAdmin.closeAliasEdit()">Cancel</button>
+            <button class="btn-save" onclick="window.POSAdmin.saveAliasEdit()">Save</button>
+        </div>
+    </div>
+</div>

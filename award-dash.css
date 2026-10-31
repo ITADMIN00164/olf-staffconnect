@@ -77,6 +77,8 @@
 @media (max-width: 900px) {
   .awd-view .dash-content-row { flex-direction: column; }
   .awd-view .dash-chart-wrap { width: 100%; }
+  .awd-view .dash-content-row { align-items: stretch; }
+  .awd-view .dash-table-wrap { flex: none; width: 100%; max-width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) {
   .awd-view .dash-refresh-btn.spinning .dash-refresh-ico, .awd-view .dash-mini-spinner { animation-duration: 2.4s; }

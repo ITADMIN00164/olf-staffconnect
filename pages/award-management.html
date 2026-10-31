@@ -26,7 +26,7 @@
       <nav class="aw-toptabs" role="tablist" aria-label="Award Management">
         <button type="button" role="tab" class="aw-toptab" data-aw-top="util" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="trophy" aria-hidden="true"></i>Award Utilisation</button>
         <button type="button" role="tab" class="aw-toptab" data-aw-top="event" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="calendar" aria-hidden="true"></i>Event Management</button>
-        <button type="button" role="tab" class="aw-toptab is-active" data-aw-top="stock" aria-selected="true"><i class="aw-icon" data-aw-icon="stock" aria-hidden="true"></i>Stock Management</button>
+        <button type="button" role="tab" class="aw-toptab is-active" data-aw-top="stock" aria-selected="true"><i class="aw-icon" data-aw-icon="stock" aria-hidden="true"></i>Stock Management<span class="act-count" id="top-tab-count" hidden></span></button>
       </nav>
       <div class="aw-top-right">
         <div class="aw-top-actions" id="aw-stock-actions">
@@ -56,12 +56,12 @@
         <button type="button" role="tab" id="aw-subtab-requisition" class="aw-subtab is-active"
                 data-aw-subtab="requisition" aria-controls="aw-subpanel-requisition"
                 aria-selected="true">
-          <i class="aw-icon" data-aw-icon="doc" aria-hidden="true"></i>Requisition
+          <i class="aw-icon" data-aw-icon="doc" aria-hidden="true"></i>Requisition<span class="act-count" id="req-tab-count" hidden></span>
         </button>
         <button type="button" role="tab" id="aw-subtab-delivery" class="aw-subtab"
                 data-aw-subtab="delivery" aria-controls="aw-subpanel-delivery"
                 aria-selected="false" tabindex="-1" hidden>
-          <i class="aw-icon" data-aw-icon="truck" aria-hidden="true"></i>Delivery
+          <i class="aw-icon" data-aw-icon="truck" aria-hidden="true"></i>Delivery<span class="act-count" id="delivery-tab-count" hidden></span>
         </button>
         <button type="button" role="tab" id="aw-subtab-stock" class="aw-subtab"
                 data-aw-subtab="stock" aria-controls="aw-subpanel-stock"
@@ -72,7 +72,6 @@
                 data-aw-subtab="jute" aria-controls="aw-subpanel-jute"
                 aria-selected="false" tabindex="-1">
           <i class="aw-icon" data-aw-icon="bag" aria-hidden="true"></i>Jute Bags
-          <span class="tab-count" id="jute-tab-count" hidden></span>
         </button>
         <button type="button" role="tab" id="aw-subtab-settings" class="aw-subtab"
                 data-aw-subtab="settings" aria-controls="aw-subpanel-settings"
@@ -95,6 +94,12 @@
       <!-- Figures above the list: how many requisitions are where, and how much
            of what was asked for has arrived. Drawn by award.js. -->
       <div class="req-summary" id="req-summary" hidden></div>
+      <!-- Something is waiting for whoever is looking at this. -->
+      <div class="act-banner" id="act-banner" role="status" hidden>
+        <span class="act-bell" aria-hidden="true"><i class="aw-icon" data-aw-icon="clock"></i></span>
+        <span class="act-text" id="act-text"></span>
+        <button type="button" class="btn btn-primary btn-sm" id="act-show">Show me</button>
+      </div>
       <div class="filters">
         <div class="field field-sm">
           <label for="filter-state">Filter by state</label>
@@ -131,6 +136,19 @@
           <input type="search" id="filter-search" placeholder="Name contains…" />
         </div>
       </div>
+      <div class="req-toolbar">
+        <div class="req-toolbar-left">
+          <span class="req-count" id="req-count"></span>
+          <button type="button" id="req-clear" class="btn btn-ghost btn-xs" hidden>
+            <i class="aw-icon" data-aw-icon="close" aria-hidden="true"></i>
+            Clear filters
+          </button>
+        </div>
+        <button type="button" id="req-excel" class="btn btn-ghost btn-sm">
+          <i class="aw-icon" data-aw-icon="download" aria-hidden="true"></i>
+          Download Excel
+        </button>
+      </div>
       <div class="table-scroll">
         <table id="requisitions-table">
           <thead>
@@ -144,12 +162,11 @@
               <th scope="col">Submitted</th>
               <th scope="col">Status</th>
               <th scope="col">Log</th>
-              <th scope="col"><span class="sr-only">Review</span></th>
             </tr>
           </thead>
           <tbody id="requisitions-body">
             <tr class="placeholder-row">
-              <td colspan="10">Loading requisitions…</td>
+              <td colspan="9">Loading requisitions…</td>
             </tr>
           </tbody>
           <tfoot id="requisitions-foot" hidden>
@@ -166,7 +183,13 @@
       <div id="aw-subpanel-delivery" class="aw-subpanel" role="tabpanel"
            aria-labelledby="aw-subtab-delivery" hidden>
         <section class="card">
-          <div class="table-scroll">
+        <div class="table-tools">
+          <button type="button" id="delivery-excel" class="btn btn-ghost btn-sm">
+            <i class="aw-icon" data-aw-icon="download" aria-hidden="true"></i>
+            Download Excel
+          </button>
+        </div>
+            <div class="table-scroll">
             <table id="delivery-table">
               <thead>
                 <tr>
@@ -178,11 +201,10 @@
                   <th scope="col" class="num">Quantity</th>
                   <th scope="col">Status</th>
                   <th scope="col">Log</th>
-                  <th scope="col"><span class="sr-only">Action</span></th>
                 </tr>
               </thead>
               <tbody id="delivery-body">
-                <tr class="placeholder-row"><td colspan="9">Loading…</td></tr>
+                <tr class="placeholder-row"><td colspan="8">Loading…</td></tr>
               </tbody>
             </table>
           </div>
@@ -193,6 +215,8 @@
            aria-labelledby="aw-subtab-stock" hidden>
         <section class="card" id="stock-host">
           <div id="stock-sheet">
+          <!-- The day this tab becomes the stock book. -->
+          <div class="stock-golive" id="stock-golive"></div>
           <div class="stock-controls">
             <div class="field field-sm">
               <label for="stock-year">Year</label>
@@ -223,15 +247,16 @@
                 Import
               </button>
               <input type="file" id="stock-file" accept=".csv,text/csv" hidden />
+              <button type="button" id="stock-excel" class="btn btn-ghost btn-sm">
+                <i class="aw-icon" data-aw-icon="download" aria-hidden="true"></i>
+                Download Excel
+              </button>
               <button type="button" id="stock-fetch" class="btn btn-primary btn-sm">
                 <i class="aw-icon" data-aw-icon="search" aria-hidden="true"></i>
                 Fetch
               </button>
             </div>
           </div>
-
-          <!-- What was asked for, what arrived, what was given out and what is held. -->
-          <div class="stock-summary" id="stock-summary" hidden></div>
 
           <div class="table-scroll" id="stock-table-wrap"></div>
           </div>
@@ -241,80 +266,8 @@
       <div id="aw-subpanel-jute" class="aw-subpanel" role="tabpanel"
            aria-labelledby="aw-subtab-jute" hidden>
         <section class="card">
-          <div class="jute-bar">
-            <div class="seg" role="tablist" aria-label="Jute bags view">
-              <button type="button" role="tab" class="seg-btn is-active" data-jute-view="stock" aria-selected="true">Stock</button>
-              <button type="button" role="tab" class="seg-btn" data-jute-view="requests" aria-selected="false">By requisition</button>
-              <button type="button" role="tab" class="seg-btn" data-jute-view="districts" aria-selected="false">By district</button>
-            </div>
-          </div>
-
           <!-- The stock sheet is moved in here, counting jute bags. -->
           <div id="jute-view-stock"></div>
-
-          <div id="jute-view-data" hidden>
-            <div id="jute-summary"></div>
-
-          <div class="filters">
-            <div class="field field-sm">
-              <label for="jute-district">Filter by district</label>
-              <select id="jute-district"><option value="">All districts</option></select>
-            </div>
-            <div class="field field-sm">
-              <label for="jute-status">Filter by status</label>
-              <select id="jute-status"><option value="">All statuses</option></select>
-            </div>
-            <div class="field field-sm">
-              <label for="jute-size">Filter by size</label>
-              <select id="jute-size">
-                <option value="">Small and Big</option>
-                <option value="Small">Small</option>
-                <option value="Big">Big</option>
-              </select>
-            </div>
-          </div>
-
-          <div id="jute-view-requests">
-          <div class="table-scroll">
-            <table id="jute-table">
-              <thead>
-                <tr>
-                  <th scope="col">District</th>
-                  <th scope="col">Requester</th>
-                  <th scope="col" class="num">Small</th>
-                  <th scope="col" class="num">Big</th>
-                  <th scope="col" class="num">Total</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Submitted</th>
-                  <th scope="col">Remark</th>
-                </tr>
-              </thead>
-              <tbody id="jute-body">
-                <tr class="placeholder-row"><td colspan="8">Loading…</td></tr>
-              </tbody>
-              <tfoot id="jute-foot" hidden></tfoot>
-            </table>
-          </div>
-          </div>
-
-          <div id="jute-view-districts" hidden>
-            <div class="table-scroll">
-              <table id="jute-district-table">
-                <thead>
-                  <tr>
-                    <th scope="col">District</th>
-                    <th scope="col" class="num">Requisitions</th>
-                    <th scope="col" class="num">Small</th>
-                    <th scope="col" class="num">Big</th>
-                    <th scope="col" class="num">Total</th>
-                    <th scope="col">Small and Big</th>
-                  </tr>
-                </thead>
-                <tbody id="jute-district-body"></tbody>
-              </table>
-            </div>
-          </div>
-          </div>
         </section>
       </div>
 
@@ -672,6 +625,60 @@
       </div>
     </div>
 
+    <!-- The tab's own pop-up: a message or a question, in the tab's colours. -->
+    <div class="aw-overlay" id="aw-popup">
+      <div class="aw-overlay-backdrop" data-awp-cancel></div>
+      <div class="aw-box aw-box-sm awp-box" role="alertdialog" aria-modal="true"
+           aria-labelledby="awp-title" aria-describedby="awp-text">
+        <div class="awp-icon" id="awp-icon" aria-hidden="true"></div>
+        <h2 id="awp-title" class="awp-title"></h2>
+        <p id="awp-text" class="awp-text"></p>
+        <div class="awp-actions">
+          <button type="button" class="btn btn-ghost" id="awp-cancel">Cancel</button>
+          <button type="button" class="btn btn-primary" id="awp-ok">OK</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reset the data: Staff Connect admins only, typed to confirm. -->
+    <div class="aw-overlay" id="reset-modal">
+      <div class="aw-overlay-backdrop" data-aw-close-reset></div>
+
+      <div class="aw-box aw-box-sm" role="dialog" aria-modal="true"
+           aria-labelledby="reset-heading">
+        <div class="aw-box-head">
+          <span class="rule rule-accent" aria-hidden="true"></span>
+          <div class="aw-box-heading">
+            <h2 id="reset-heading">Reset data</h2>
+            <p class="aw-box-sub">This cannot be undone.</p>
+          </div>
+          <button type="button" class="aw-box-close" data-aw-close-reset aria-label="Close">
+            <i class="aw-icon" data-aw-icon="close" aria-hidden="true"></i>
+          </button>
+        </div>
+
+        <div class="aw-box-body" id="reset-body">
+          <label class="reset-opt"><input type="checkbox" id="reset-req" checked />
+            <span>Award requisitions</span></label>
+          <label class="reset-opt"><input type="checkbox" id="reset-award" checked />
+            <span>Award stock figures</span></label>
+          <label class="reset-opt"><input type="checkbox" id="reset-jreq" checked />
+            <span>Jute bag requisitions</span></label>
+          <label class="reset-opt"><input type="checkbox" id="reset-jute" checked />
+            <span>Jute bag stock figures</span></label>
+          <p class="reset-keep">Records and lists are kept.</p>
+          <label for="reset-confirm" class="reset-ask">Type <b>DELETE</b> to confirm</label>
+          <input type="text" id="reset-confirm" autocomplete="off" />
+          <p class="error" id="reset-error" hidden role="alert"></p>
+        </div>
+
+        <div class="form-actions" id="reset-actions">
+          <button type="button" class="btn btn-ghost" data-aw-close-reset>Cancel</button>
+          <button type="button" class="btn btn-danger" id="reset-go">Delete</button>
+        </div>
+      </div>
+    </div>
+
     <!-- What a file changed, and what it could not. Shown before anything is
          written: the figures land in the sheet as unsaved edits, and Save is
          still the thing that writes them. -->
@@ -706,35 +713,35 @@
     <div class="aw-overlay" id="review-modal">
       <div class="aw-overlay-backdrop" data-aw-close-review></div>
 
-      <div class="aw-box aw-box-sm" role="dialog" aria-modal="true"
+      <div class="aw-box aw-box-sm review-box" role="dialog" aria-modal="true"
            aria-labelledby="review-heading">
-        <div class="aw-box-head">
+        <div class="aw-box-head rv-head">
+          <span class="rv-badge" aria-hidden="true"><i class="aw-icon" data-aw-icon="doc"></i></span>
           <div class="aw-box-heading">
             <h2 id="review-heading">Review Requisition</h2>
-            <p class="aw-box-sub">Recorded against your name, and not undone</p>
+            <p class="aw-box-sub">Your decision is recorded against your name.</p>
           </div>
           <button type="button" class="aw-box-close" data-aw-close-review aria-label="Close">
             <i class="aw-icon" data-aw-icon="close" aria-hidden="true"></i>
           </button>
         </div>
 
-        <div class="aw-box-body">
+        <!-- What is being decided on: it scrolls if it is long, and the decision below does not. -->
+        <div class="aw-box-body review-body">
           <div id="review-banner" class="banner" role="status" aria-live="polite" hidden>
             <span id="review-banner-text"></span>
           </div>
-
           <div class="review-summary" id="review-summary"></div>
+        </div>
 
-          <div class="field">
-            <label for="review-remark">Remark
-              <span class="hint">required when declining</span></label>
-            <textarea id="review-remark" rows="3"
-                      placeholder="Why this is being approved or declined"></textarea>
-            <p class="error" id="review-remark-error" role="alert"></p>
-          </div>
-
-          <div class="form-actions">
-            <button type="button" id="review-decline" class="btn btn-danger">Decline</button>
+        <div class="review-decision">
+          <label for="review-remark" class="rv-label">Remark
+            <span class="hint">required when declining</span></label>
+          <textarea id="review-remark" rows="2"
+                    placeholder="Why this is being approved or declined"></textarea>
+          <p class="error" id="review-remark-error" role="alert"></p>
+          <div class="rv-actions">
+            <button type="button" id="review-decline" class="btn btn-decline">Decline</button>
             <button type="button" id="review-approve" class="btn btn-primary">
               <i class="aw-icon" data-aw-icon="check" aria-hidden="true"></i>
               Approve
@@ -775,6 +782,8 @@
             <textarea id="ho-remark" rows="3"></textarea>
             <p class="error" id="ho-remark-error" role="alert"></p>
           </div>
+          <!-- Other things that can be done with this requisition instead. -->
+          <p class="ho-alt" id="ho-alt" hidden></p>
           <div class="form-actions">
             <button type="button" class="btn btn-ghost" data-aw-close-ho>Cancel</button>
             <button type="button" id="ho-confirm" class="btn btn-primary">Acknowledge</button>
