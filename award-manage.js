@@ -1069,9 +1069,11 @@ window.awmUploadImage = async function (index, file) {
   // Check Awarded Data BEFORE uploading anything, so a stale page can't push a new
   // image to Drive for a locked record (which could never be saved anyway).
   cell.innerHTML = '<span class="img-status">⏳ Checking…</span>';
+  let savedImg = "";                                  // the image the database holds for this record now
   try {
     const fresh = await getFreshRecords();
     const match = fresh.find(f => recKey(f) === recKey(rec));
+    savedImg = (match && match.folderLink) || "";
     if (match && match.verified === "Yes") {          // verified elsewhere → locked
       adoptFreshInto(rec, match);
       if (selectedMonth) { monthCache[selectedMonth] = currentRecords; updateMonthRow(selectedMonth); }
@@ -1091,7 +1093,7 @@ window.awmUploadImage = async function (index, file) {
     return;
   }
 
-  const existingUrl = rec.folderLink;
+  const existingUrl = rec.folderLink || savedImg;
   if (existingUrl) {
     const ok = await confirmOverride();
     if (!ok) { cell.innerHTML = renderImageCell(index); return; } // Cancel → keep old image
@@ -1110,25 +1112,54 @@ window.awmUploadImage = async function (index, file) {
       fileName: `${safeName}_${Date.now()}${ext}`,
       mimeType: file.type || "image/jpeg",
       data: dataUrl.split(",")[1],
-      // The picture being replaced: Drive deletes it, so the folder holds one picture per record.
-      replaceId: driveId(existingUrl) || null
+      replaceId: driveId(existingUrl) || null   // the Apps Script deletes this file once the new one is stored
     };
 
     const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
     const out = await res.json();
     if (!out.success) throw new Error(out.error || "Upload failed");
 
+    const wasDirty = !!currentRecords[index]._dirty;
     currentRecords[index].folderLink = out.url;
     currentRecords[index].uploadedBy = currentUser();
     currentRecords[index]._dirty = true;      // image is on Drive but NOT yet written to the record — user must Save
+
+    // The old image is gone from Drive now. If the saved record pointed at it, write
+    // the new link to the record straight away so it never points at a deleted file.
+    // Only the image fields change; other unsaved edits still wait for Save.
+    let linkSaved = false;
+    if (savedImg) {
+      try {
+        const done = await sbSend("PATCH", `award_records?id=eq.${rec.id}&verified=eq.false`, {
+          image_url: out.url,
+          drive_file_id: driveId(out.url) || null,
+          uploaded_by: currentUser() || null,
+          updated_at: new Date().toISOString()
+        });
+        if (done.length) {
+          linkSaved = true;
+          dbLog(rec.id, "image replaced");
+          // Nothing else pending → row stays "Saved". A rejected row keeps its Save
+          // button, because saving is how it is sent back for verification.
+          currentRecords[index]._dirty = wasDirty || currentRecords[index].verified === "Rejected";
+        }
+      } catch (e) {
+        console.error("Could not write the new image link:", e);
+      }
+    }
+    recomputeDirty();
     cell.innerHTML = renderImageCell(index, true, false);
-    refreshRowControls(index);                // row now shows its Save button (not "Saved")
+    refreshRowControls(index);                // row shows Save (or "Saved" when nothing else is pending)
     updateSaveAllBar();
 
     if (payload.replaceId && out.deletedOld === false) {
       console.warn("Old image not deleted. replaceId:", payload.replaceId, "error:", out.deleteError);
       const reason = (out.deleteError || "unknown reason").replace(/^Exception:\s*/, "").slice(0, 150);
       showToast("Old image not deleted — " + reason, "error");
+    } else if (savedImg && !linkSaved) {
+      showToast("New image uploaded but not saved to the record yet — click Save.", "error");
+    } else if (payload.replaceId) {
+      showToast("Image replaced. The old image was deleted.");
     } else {
       showToast("Image uploaded.");
     }
@@ -1698,6 +1729,27 @@ window.awmApi = {
   showModal: showModal,
   showLoader: showLoader,
   hideLoader: hideLoader
+};
+
+// The page-wide "Refresh data" button (award.js) while Award Management is showing.
+// An open month reloads like "Refresh Records" (unsaved edits are asked about first);
+// the month list reloads the district list and the chosen district's months.
+// Answers false when the user cancels.
+window.awmRefreshAll = async function () {
+  if (selectedMonth) {
+    const wasDirty = dirty;
+    await refreshRecords();
+    return !(wasDirty && dirty);
+  }
+  const keep = (document.getElementById("awmDistrict") || {}).value || "";
+  await loadFilters();
+  const dd = document.getElementById("awmDistrict");
+  if (keep && dd) {
+    if (Array.from(dd.options).some(o => o.value === keep)) dd.value = keep;
+    await loadDistrictSummary();
+  }
+  showToast("Data refreshed.");
+  return true;
 };
 
 window.initAwardManageUI = function () {

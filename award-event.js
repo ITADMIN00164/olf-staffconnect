@@ -137,23 +137,44 @@ let aweDistricts     = [];      // district list backing the dropdown
 let aweDistrictsState = "loading";   // "loading" | "ready" | "failed"
 let aweBlocks        = {};      // district -> its blocks, in order
 let aweStates        = {};      // district -> its state
+let aweFelic         = null;    // teachers felicitated, from Award Management (null = not loaded)
+let aweFelicState    = "loading";   // "loading" | "ready" | "failed"
 
 // ── Columns ──
 // scope "block"    -> editable in block view, computed + read-only in district view
 // scope "district" -> district view only
 const OTHER_MSG = "Events other than POM, NS and SU.";
 
+// The table shows the columns in this order, grouped (block, then district, then the
+// rest) under a coloured heading per group, so each kind is easy to tell apart.
+// The Excel report keeps its own column order (EXPORT_HEADERS below).
 const COLUMNS = [
-  { key: "blockEvents",      head: "Total<br>Block Events",                    scope: "block"    },
-  { key: "districtEvents",   head: "Total<br>District Events",                 scope: "district" },
-  { key: "blockTeachers",    head: "Teachers Felicitated<br>(Block Level)",    scope: "block"    },
-  { key: "districtTeachers", head: "Teachers Felicitated<br>(District Level)", scope: "district" },
-  { key: "suNsEvents",       head: "SU/NS<br>Events",                          scope: "district" },
-  { key: "suNsTeachers",     head: "Teachers Felicitated<br>(SU/NS Events)",   scope: "district" },
-  { key: "otherEvents",      head: "Other<br>Events",                          scope: "district", tip: OTHER_MSG },
-  { key: "otherTeachers",    head: "Teachers Felicitated<br>(Other Events)",   scope: "district", tip: OTHER_MSG },
-  { key: "clusterHeads",     head: "Total Cluster<br>Heads Recognised",        scope: "district" }
+  { key: "blockEvents",      head: "Total<br>Block Events",                    scope: "block",    group: "block"    },
+  { key: "blockTeachers",    head: "Teachers Felicitated<br>(Block Level)",    scope: "block",    group: "block",    auto: true },
+  { key: "districtEvents",   head: "Total<br>District Events",                 scope: "district", group: "district" },
+  { key: "districtTeachers", head: "Teachers Felicitated<br>(District Level)", scope: "district", group: "district", auto: true },
+  { key: "suNsEvents",       head: "SU/NS<br>Events",                          scope: "district", group: "suns"     },
+  { key: "suNsTeachers",     head: "Teachers Felicitated<br>(SU/NS Events)",   scope: "district", group: "suns"     },
+  { key: "otherEvents",      head: "Other<br>Events",                          scope: "district", group: "other", tip: OTHER_MSG },
+  { key: "otherTeachers",    head: "Teachers Felicitated<br>(Other Events)",   scope: "district", group: "other", tip: OTHER_MSG },
+  { key: "clusterHeads",     head: "Total Cluster<br>Heads Recognised",        scope: "district", group: "cluster"  }
 ];
+
+const COLUMN_GROUPS = {
+  block:    "Block level",
+  district: "District level",
+  suns:     "SU / NS events",
+  other:    "Other events",
+  cluster:  "Cluster heads"
+};
+
+// The class a cell of column `ci` (in `cols`) carries: its group's colour, and a
+// divider where a new group starts.
+function groupClass(cols, ci) {
+  const c = cols[ci];
+  const starts = ci === 0 || cols[ci - 1].group !== c.group;
+  return "pev-g-" + c.group + (starts ? " pev-gs" : "");
+}
 
 const ROLLUP_MSG = "Select any block and fill these numbers — they are reconciled here automatically.";
 
@@ -165,7 +186,8 @@ function visibleColumns() {
 
 // The columns the person can type into, and so the only ones this view may send.
 function editableColumns() {
-  return isBlockView() ? COLUMNS.filter(c => c.scope === "block") : COLUMNS.filter(c => c.scope === "district");
+  const scope = isBlockView() ? "block" : "district";
+  return COLUMNS.filter(c => c.scope === scope && !c.auto);
 }
 
 // ── Academic years ──
@@ -285,6 +307,97 @@ function blocksFor(district) {
   return Array.isArray(list) ? list : [];
 }
 
+// ── Teachers felicitated: filled from Award Management ──
+// The two "Teachers Felicitated" columns are not typed. They count the VERIFIED
+// awards in Award Management (awarded, verified, not rejected), in the month of
+// the award date:
+//   Block level    = categories starting "Block Level"    (Block Level - POM)
+//   District level = categories starting "District Level" (POM and LIFESKILL)
+// A block-level award counts under the block named on the record. A record whose
+// block is not one of the district's blocks still counts in the district's
+// Block Level total, and is listed in the notes above the table.
+const AUTO_MSG = "Filled automatically from verified awards in Award Management, in the month of the award date.";
+
+function awardMonth(dateStr) {
+  const m = /^(\d{4})-(\d{2})/.exec(str(dateStr));
+  if (!m) return "";
+  const mi = Number(m[2]) - 1;
+  return mi >= 0 && mi < 12 ? MONTH_NAMES[mi] + "-" + m[1] : "";
+}
+
+async function loadFelicitated() {
+  aweFelicState = "loading";
+  try {
+    const cols = "district_name,block_name,award_category,awarded_date,rejected";
+    const rows = [];
+    for (let offset = 0; ; offset += 1000) {
+      const page = await sbGet("award_records?select=" + cols +
+        "&awarded=is.true&verified=is.true&order=id.asc&limit=1000&offset=" + offset);
+      rows.push.apply(rows, page);
+      if (page.length < 1000) break;
+    }
+    // district -> month -> { district, block, blocks: { BLOCK NAME -> { n, raw } } }
+    const out = {};
+    rows.forEach(r => {
+      if (r.rejected === true) return;
+      const month = awardMonth(r.awarded_date);
+      const district = str(r.district_name);
+      const cat = str(r.award_category).toLowerCase();
+      if (!month || !district) return;
+      const isBlock = cat.indexOf("block level") === 0;
+      const isDistrict = cat.indexOf("district level") === 0;
+      if (!isBlock && !isDistrict) return;
+      const d = (out[district] = out[district] || {});
+      const m = (d[month] = d[month] || { district: 0, block: 0, blocks: {} });
+      if (isDistrict) { m.district++; return; }
+      m.block++;
+      const key = blockName(r.block_name) || "(NO BLOCK)";
+      const b = (m.blocks[key] = m.blocks[key] || { n: 0, raw: str(r.block_name) });
+      b.n++;
+    });
+    aweFelic = out;
+    aweFelicState = "ready";
+  } catch (e) {
+    console.error("Teachers felicitated could not be counted:", e);
+    aweFelicState = "failed";
+  }
+  if (aweDistrict) { render(); renderNotes(); }
+}
+
+function felicMonth(district, month) {
+  const d = aweFelic ? lookup(aweFelic, district) : null;
+  return (d && d[month]) || null;
+}
+
+// The value an auto column shows: a number, or "" when it can't be known yet.
+function autoValue(month, key) {
+  if (aweFelicState !== "ready") return "";
+  const now = new Date();
+  if (monthOrder(month) > now.getFullYear() * 12 + now.getMonth()) return "";   // a month still to come
+  const m = felicMonth(aweDistrict, month);
+  if (key === "districtTeachers") return m ? m.district : 0;
+  if (!isBlockView()) return m ? m.block : 0;
+  const b = m && m.blocks[blockName(aweBlock)];
+  return b ? b.n : 0;
+}
+
+// Block-level awards whose block is not one of the district's blocks.
+function unplacedBlockAwards(district, months) {
+  const known = new Set(blocksFor(district).map(blockName));
+  const names = new Set();
+  let count = 0;
+  months.forEach(month => {
+    const m = felicMonth(district, month);
+    if (!m) return;
+    Object.keys(m.blocks).forEach(k => {
+      if (known.has(k)) return;
+      count += m.blocks[k].n;
+      names.add(m.blocks[k].raw || "no block");
+    });
+  });
+  return { count: count, names: Array.from(names) };
+}
+
 // ── Values ──
 function str(v) { return v === undefined || v === null ? "" : String(v).trim(); }
 
@@ -388,7 +501,7 @@ function renderNotes() {
   if (!isBlockView()) {
     const legacy = aweEvents
       .filter(r => str(r.districtName) === aweDistrict && str(r.block) === "" &&
-        (str(r.blockEvents) !== "" || str(r.blockTeachers) !== ""))
+        str(r.blockEvents) !== "")                     // block teachers are counted, not typed, now
       .map(r => str(r.month))
       .filter(m => shown.has(m));
     if (legacy.length) {
@@ -396,6 +509,19 @@ function renderNotes() {
         "figures recorded against the district itself, from before blocks were introduced. They " +
         "remain saved and are not counted in the block totals above — re-enter them under the " +
         "relevant block when convenient.");
+    }
+  }
+
+  // Teachers felicitated: where the numbers come from, and anything that can't be placed.
+  if (aweFelicState === "failed") {
+    notes.push("The Teachers Felicitated numbers could not be loaded from Award Management. Use Refresh data to try again.");
+  } else if (aweFelicState === "ready" && Object.keys(aweBlocks).length) {
+    const lost = unplacedBlockAwards(aweDistrict, currentMonths());
+    if (lost.count) {
+      notes.push(lost.count + " verified block-level award" + (lost.count === 1 ? " has" : "s have") +
+        " a block that is not one of " + aweDistrict + "'s blocks (" + lost.names.join(", ") + "). " +
+        (lost.count === 1 ? "It counts" : "They count") + " in the district's Teachers Felicitated (Block Level) total, " +
+        "but not under any block. Correct the block on the record in Award Management to place it.");
     }
   }
 
@@ -426,12 +552,22 @@ function renderHead() {
   const thead = el("aweThead");
   if (!thead) return;
   const cols = visibleColumns();
-  const cells = cols.map(c => {
-    const rollup = !isBlockView() && c.scope === "block";
-    const tip = rollup ? ROLLUP_MSG : (c.tip || "");
-    const cls = [rollup ? "pev-rollup-th" : "", c.tip ? "pev-tip-th" : ""].filter(Boolean).join(" ");
+  const cells = cols.map((c, ci) => {
+    const rollup = !c.auto && !isBlockView() && c.scope === "block";
+    const tip = c.auto ? AUTO_MSG : rollup ? ROLLUP_MSG : (c.tip || "");
+    const cls = [rollup ? "pev-rollup-th" : "", c.auto ? "pev-auto-th" : "", c.tip ? "pev-tip-th" : "", groupClass(cols, ci)].filter(Boolean).join(" ");
     return "<th" + (cls ? ' class="' + cls + '"' : "") + (tip ? ' title="' + esc(tip) + '"' : "") + ">" + c.head + "</th>";
   }).join("");
+
+  // The group headings above: one per run of columns of the same group.
+  let groups = "";
+  for (let ci = 0; ci < cols.length; ) {
+    let span = 1;
+    while (ci + span < cols.length && cols[ci + span].group === cols[ci].group) span++;
+    groups += '<th colspan="' + span + '" scope="colgroup" class="pev-grp ' + groupClass(cols, ci) + '">' +
+      esc(COLUMN_GROUPS[cols[ci].group] || "") + "</th>";
+    ci += span;
+  }
 
   // Widths: month, one per count, save, last updated. They add up to 100% so the
   // table always fits its card; the headings wrap to the width they are given.
@@ -440,7 +576,10 @@ function renderHead() {
   const group = '<col style="width:' + MONTH_W + '%">' + cols.map(() => '<col style="width:' + each + '%">').join("") +
     '<col style="width:' + SAVE_W + '%"><col style="width:' + UPDATED_W + '%">';
 
-  thead.innerHTML = '<tr><th>Month</th>' + cells + '<th class="col-center">Save</th><th>Last Updated</th></tr>';
+  thead.innerHTML =
+    '<tr class="pev-grp-row"><th rowspan="2">Month</th>' + groups +
+    '<th rowspan="2" class="col-center">Save</th><th rowspan="2">Last Updated</th></tr>' +
+    '<tr class="pev-col-row">' + cells + '</tr>';
   const cg = el("aweColgroup");
   if (cg) cg.innerHTML = group;
 }
@@ -468,6 +607,11 @@ function refreshRowControls(i) {
 // One column's total: a roll-up in the district view's block columns, otherwise what is typed.
 function columnTotal(c) {
   let sum = 0, any = false;
+  if (c.auto) {
+    if (aweFelicState !== "ready") return "—";
+    aweRows.forEach(r => { sum += Number(autoValue(r.month, c.key)) || 0; });
+    return sum;
+  }
   if (!isBlockView() && c.scope === "block") {
     aweRows.forEach(r => {
       const roll = blockRollup(r.month, aweDistrict, c.key);
@@ -494,16 +638,27 @@ function render() {
   const blockView = isBlockView();
 
   tbody.innerHTML = aweRows.map((r, i) => {
-    const cells = cols.map(c => {
+    const cells = cols.map((c, ci) => {
+      const g = groupClass(cols, ci);
+      // Teachers felicitated: counted from verified awards, never typed.
+      if (c.auto) {
+        const v = autoValue(r.month, c.key);
+        const text = aweFelicState === "ready" ? (v === "" ? "—" : String(v)) : (aweFelicState === "failed" ? "!" : "…");
+        return '<td class="pev-auto ' + g + '" title="' + esc(AUTO_MSG) + '" role="button" tabindex="0" ' +
+          'onclick="aweAutoHint(this)" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();aweAutoHint(this)}">' +
+          '<span class="pev-auto-val' + (v ? " has" : "") + '">' + text + "</span></td>";
+      }
       // District view: the block-level columns are a read-only roll-up.
       if (!blockView && c.scope === "block") {
         const roll = blockRollup(r.month, aweDistrict, c.key);
         const text = roll.contributors ? roll.sum : "—";
-        return '<td class="pev-rollup" title="' + esc(ROLLUP_MSG) + '"><span class="pev-rollup-val">' + text + "</span></td>";
+        return '<td class="pev-rollup ' + g + '" title="' + esc(ROLLUP_MSG) + '" role="button" tabindex="0" ' +
+          'onclick="aweRollupHint(this)" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();aweRollupHint(this)}">' +
+          '<span class="pev-rollup-val">' + text + "</span></td>";
       }
       const val = str(r[c.key]);
       const bad = !valid(val);
-      return "<td" + (c.tip ? ' title="' + esc(c.tip) + '"' : "") + '><input type="number" min="0" step="1" inputmode="numeric" ' +
+      return '<td class="' + g + '"' + (c.tip ? ' title="' + esc(c.tip) + '"' : "") + '><input type="number" min="0" step="1" inputmode="numeric" ' +
         'class="pev-input' + (bad ? " bad" : "") + '" data-row="' + i + '" data-key="' + c.key + '" ' +
         'value="' + esc(val) + '" placeholder="—" oninput="aweUpdateField(' + i + ",'" + c.key + "',this.value)\"></td>";
     }).join("");
@@ -516,7 +671,7 @@ function render() {
   }).join("");
 
   tbody.innerHTML += '<tr class="pev-totals"><td>Total</td>' +
-    cols.map(c => "<td>" + columnTotal(c) + "</td>").join("") + "<td></td><td></td></tr>";
+    cols.map((c, ci) => '<td class="' + groupClass(cols, ci) + '">' + columnTotal(c) + "</td>").join("") + "<td></td><td></td></tr>";
 
   updateSaveBar();
 }
@@ -527,6 +682,66 @@ function updateSaveBar() {
   const bar = el("aweSaveBar");
   if (bar) bar.style.display = hasUnsaved() ? "block" : "none";
 }
+
+// District view: the block-level numbers are filled per block, so a click on one
+// says so in a small bubble on that cell, and points at the Block dropdown.
+let aweHintTimer = null;
+function hideRollupHint() {
+  const old = document.getElementById("aweHintPop");
+  if (old) old.remove();
+  clearTimeout(aweHintTimer);
+  window.removeEventListener("scroll", hideRollupHint, true);
+  window.removeEventListener("resize", hideRollupHint);
+}
+
+function showRollupHint(cell, text) {
+  hideRollupHint();
+  const pop = document.createElement("div");
+  pop.id = "aweHintPop";
+  pop.className = "pev-hint-pop";
+  pop.setAttribute("role", "status");
+  pop.textContent = text || "Select a block first to fill these numbers";
+  document.body.appendChild(pop);
+
+  // Above the cell, centred on it; below it when there is no room above.
+  // The app zooms the whole page (html { zoom } in index.html), so measured
+  // positions and CSS pixels can differ: work in measured units, then divide
+  // by the scale the bubble itself shows.
+  pop.style.left = "0px"; pop.style.top = "0px";
+  const pr = pop.getBoundingClientRect();
+  const scale = pop.offsetWidth ? (pr.width / pop.offsetWidth) || 1 : 1;
+  const r = (cell.querySelector(".pev-rollup-val, .pev-auto-val") || cell).getBoundingClientRect();   // the number box itself
+  const w = pr.width, h = pr.height, gap = 9 * scale;
+  const vw = document.documentElement.clientWidth * scale;
+  const below = r.top - h - gap < 70 * scale;
+  const left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), vw - w - 8);
+  const top = below ? r.bottom + gap : r.top - h - gap;
+  pop.style.left = (left / scale) + "px";
+  pop.style.top = (top / scale) + "px";
+  pop.style.setProperty("--arrow-x", ((r.left + r.width / 2 - left) / scale) + "px");
+  pop.classList.add(below ? "is-below" : "is-above");
+
+  aweHintTimer = setTimeout(hideRollupHint, 2600);
+  window.addEventListener("scroll", hideRollupHint, true);
+  window.addEventListener("resize", hideRollupHint);
+}
+
+// Teachers felicitated cells: say where the number comes from.
+window.aweAutoHint = function (cell) {
+  if (cell && cell.getBoundingClientRect) showRollupHint(cell, "Filled automatically from verified awards");
+};
+
+window.aweRollupHint = function (cell) {
+  if (cell && cell.getBoundingClientRect) showRollupHint(cell);
+  else showToast("Select a block first to fill these numbers.", "info");
+  const sel = el("aweBlock");
+  if (!sel || sel.disabled) return;
+  sel.focus({ preventScroll: true });   // scrolling would close the bubble
+  sel.classList.remove("pev-attn");
+  void sel.offsetWidth;                 // restart the highlight if it is already showing
+  sel.classList.add("pev-attn");
+  setTimeout(() => sel.classList.remove("pev-attn"), 2400);
+};
 
 window.aweUpdateField = function (index, key, value) {
   const r = aweRows[index];
@@ -856,6 +1071,15 @@ async function saveAll() {
   }
 }
 
+// The page-wide "Refresh data" button (award.js) while Event Management is showing.
+// Answers false when nothing was reloaded (a save in flight, or the user cancelled).
+window.aweRefresh = async function () {
+  if (aweSaving) return false;
+  const hadUnsaved = hasUnsaved();
+  await refresh();
+  return !(hadUnsaved && hasUnsaved());
+};
+
 // ── Refresh ──
 async function refresh() {
   if (aweSaving) return;
@@ -878,6 +1102,7 @@ async function refresh() {
     const ok = await loadEvents();
     await loadDistricts();
     await loadBlocks();
+    await loadFelicitated();
     // A district that is no longer listed cannot stay selected.
     if (aweDistrict && aweDistricts.indexOf(aweDistrict) < 0) {
       aweDistrict = ""; aweBlock = ""; aweRows = [];
@@ -926,16 +1151,38 @@ function num(v) {
 
 function buildExportRows() {
   const byDistrict = {};
+  const bucketFor = (d, m) => {
+    byDistrict[d] = byDistrict[d] || {};
+    return (byDistrict[d][m] = byDistrict[d][m] || { district: null, blocks: {}, felic: null, felicBlocks: {} });
+  };
   aweEvents.forEach(r => {
     const d = str(r.districtName);
     const m = str(r.month);
     if (!d || !m) return;
-    byDistrict[d] = byDistrict[d] || {};
-    byDistrict[d][m] = byDistrict[d][m] || { district: null, blocks: {} };
-    const bucket = byDistrict[d][m];
+    const bucket = bucketFor(d, m);
     const b = str(r.block);
     if (b === "") bucket.district = r; else bucket.blocks[b] = r;
   });
+
+  // Teachers felicitated come from Award Management, so a month or block with
+  // felicitations gets a row even when no counts were typed for it. A record's
+  // block is matched to the district's block list; one that isn't on it keeps
+  // the name written on the record.
+  if (aweFelicState === "ready" && aweFelic) {
+    Object.keys(aweFelic).forEach(d => {
+      const known = blocksFor(d);
+      Object.keys(aweFelic[d]).forEach(m => {
+        const f = aweFelic[d][m];
+        const bucket = bucketFor(d, m);
+        bucket.felic = f;
+        Object.keys(f.blocks).forEach(k => {
+          const name = known.find(b => blockName(b) === k) || f.blocks[k].raw || "";
+          bucket.felicBlocks[name] = (bucket.felicBlocks[name] || 0) + f.blocks[k].n;
+          if (name && !Object.prototype.hasOwnProperty.call(bucket.blocks, name)) bucket.blocks[name] = null;
+        });
+      });
+    });
+  }
 
   const out = [];
   Object.keys(byDistrict).sort((a, b) => a.localeCompare(b)).forEach(district => {
@@ -947,11 +1194,13 @@ function buildExportRows() {
     Object.keys(months).sort((a, b) => monthOrder(a) - monthOrder(b)).forEach(month => {
       const bucket = months[month];
       const dRow = bucket.district;
+      const felicDistrict = bucket.felic ? bucket.felic.district : 0;
+      const hasDistrict = !!dRow || felicDistrict > 0;
 
       // The blocks that need a row this month: any with figures of their own, and
       // the default block when there are district figures to put somewhere.
       const names = Object.keys(bucket.blocks);
-      if (dRow && fallback && names.indexOf(fallback) < 0) names.push(fallback);
+      if (hasDistrict && fallback && names.indexOf(fallback) < 0) names.push(fallback);
 
       // In the mapping's order, with anything unmapped after it, so a block that
       // was renamed is still exported and not dropped.
@@ -964,22 +1213,24 @@ function buildExportRows() {
       });
 
       // District figures with no block mapped at all still get one row, Block blank.
-      if (!names.length && dRow) names.push("");
+      if (!names.length && hasDistrict) names.push("");
+      if (bucket.felicBlocks[""] && names.indexOf("") < 0) names.push("");   // awards with no block at all
 
       names.forEach(block => {
         const bRow = bucket.blocks[block] || null;
-        const carriesDistrict = dRow && (block === fallback || (!fallback && block === ""));
+        const carriesDistrict = hasDistrict && (block === fallback || (!fallback && block === ""));
+        const blockFelic = bucket.felicBlocks[block] || 0;
         out.push([
           state, district, block, month,
           bRow ? num(bRow.blockEvents) : "",
-          carriesDistrict ? num(dRow.districtEvents) : "",
-          bRow ? num(bRow.blockTeachers) : "",
-          carriesDistrict ? num(dRow.districtTeachers) : "",
-          carriesDistrict ? num(dRow.suNsEvents) : "",
-          carriesDistrict ? num(dRow.suNsTeachers) : "",
-          carriesDistrict ? num(dRow.otherEvents) : "",
-          carriesDistrict ? num(dRow.otherTeachers) : "",
-          carriesDistrict ? num(dRow.clusterHeads) : ""
+          carriesDistrict && dRow ? num(dRow.districtEvents) : "",
+          blockFelic || "",
+          carriesDistrict && felicDistrict ? felicDistrict : "",
+          carriesDistrict && dRow ? num(dRow.suNsEvents) : "",
+          carriesDistrict && dRow ? num(dRow.suNsTeachers) : "",
+          carriesDistrict && dRow ? num(dRow.otherEvents) : "",
+          carriesDistrict && dRow ? num(dRow.otherTeachers) : "",
+          carriesDistrict && dRow ? num(dRow.clusterHeads) : ""
         ]);
       });
     });
@@ -988,7 +1239,7 @@ function buildExportRows() {
 }
 
 function downloadExcel() {
-  if (!aweEventsLoaded) { showToast("Event data is still loading. Try again in a moment.", "info"); return; }
+  if (!aweEventsLoaded || aweFelicState === "loading") { showToast("Event data is still loading. Try again in a moment.", "info"); return; }
   const rows = buildExportRows();
   if (!rows.length) { showToast("There is no saved event data to export yet.", "info"); return; }
   if (!window.awardXlsx) { showToast("Could not generate the Excel file.", "error"); return; }
@@ -1009,6 +1260,7 @@ window.initAwardEventUI = function () {
   aweEvents = []; aweEventsLoaded = false; aweEventsLoading = false;
   aweDistrict = ""; aweBlock = ""; aweRows = []; aweSaving = false;
   aweDistricts = []; aweDistrictsState = "loading"; aweBlocks = {}; aweStates = {};
+  aweFelic = null; aweFelicState = "loading";
 
   const on = function (id, event, handler) {
     const node = el(id);
@@ -1028,6 +1280,7 @@ window.initAwardEventUI = function () {
   loadDistricts();
   loadBlocks();
   loadEvents();
+  loadFelicitated();
 
   // Never let a closing tab take unsaved counts with it.
   if (!window.__aweBeforeUnload) {

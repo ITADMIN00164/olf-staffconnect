@@ -1860,8 +1860,6 @@
 .award-page .js-s { background: var(--accent-2); }
 .award-page .js-b { background: #64748B; border-left: 2px solid var(--surface); }
 
-/* The jute sheet is the stock sheet counting jute bags, so the awards' file
-   template and import, which are about the four awards, are not offered on it. */
 
 
 /* The go-live date: the day this tab becomes the stock book. */
@@ -2301,48 +2299,21 @@
 }
 
 
-/* ======================================================================
-   Locked tabs: a padlock on the tab, the tab dimmed for anyone who cannot
-   open it, the IT admin's Tab access switches, and what a locked section
-   shows in place of its content.
-   ====================================================================== */
-.award-page .tab-lockico { display: inline-flex; margin-left: 8px; color: var(--warn); vertical-align: -2px; }
-.award-page .tab-lockico svg { width: 15px; height: 15px; }
-.award-page .is-locked { opacity: .55; cursor: not-allowed; }
-.award-page .is-locked:hover { background: none; }
-.award-page .aw-subtab.is-active .tab-lockico { color: #FDE68A; }
-
-.award-page .aw-lock-btn {
-  align-self: center; margin: 0 0 0 14px; padding: 6px 14px; border: 1px dashed var(--accent-line); border-radius: 999px;
-  background: var(--accent-soft); color: var(--accent-ink); font: inherit; font-size: .8rem; font-weight: 800; cursor: pointer;
-  transition: transform .15s var(--ease), box-shadow .2s ease, background-color .15s ease;
+/* ── One "Refresh data" button for the whole page (award.js runRefreshAll) ──
+   It sits at the right of the top tabs on every tab and reloads the tab on
+   screen. The separate Refresh buttons the views carried do the same job, so
+   they are hidden (kept in the markup, the code still uses them). */
+.award-page .aw-top-right { display: flex; align-items: center; gap: 10px; margin-left: auto; padding-bottom: 9px; }
+.award-page .aw-top-right > .aw-top-actions { padding-bottom: 0; }
+.award-page #refresh-btn,
+.award-page #awmRefreshBtn,
+.award-page #aweRefreshBtn,
+.award-page #awdRefreshBtn { display: none !important; }
+.award-page .aw-refresh-all { min-width: 132px; justify-content: center; }
+.award-page .aw-refresh-all .aw-icon svg { transform-origin: 50% 50%; }
+.award-page .aw-refresh-all.is-busy .aw-icon svg { animation: aw-refresh-spin .8s linear infinite; }
+.award-page .aw-refresh-all.is-done { color: var(--accent-ink); }
+@keyframes aw-refresh-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .award-page .aw-refresh-all.is-busy .aw-icon svg { animation: none; }
 }
-.award-page .aw-lock-btn[hidden] { display: none; }
-.award-page .aw-lock-btn:hover { transform: translateY(-1px); background: var(--accent-soft-border); box-shadow: 0 3px 10px rgba(15,23,42,.08); }
-.award-page .aw-lock-btn .aw-icon svg { width: 14px; height: 14px; }
-
-.award-page .aw-locked { text-align: center; padding: 56px 20px 64px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; }
-.award-page .aw-locked[hidden] { display: none; }
-.award-page .aw-locked-badge { display: grid; place-items: center; width: 74px; height: 74px; margin: 0 auto 14px; border-radius: 50%; color: var(--warn); background: var(--warn-soft); box-shadow: 0 0 0 10px rgba(217,119,6,.08); }
-.award-page .aw-locked-badge .aw-icon svg { width: 34px; height: 34px; }
-.award-page .aw-locked h2 { margin: 0 0 4px; font-size: 1.2rem; font-weight: 800; color: var(--text); }
-.award-page .aw-locked p { margin: 0; color: var(--text-muted); }
-
-.award-page .awp-icon.is-lock { --tone: var(--warn); --tone-soft: var(--warn-soft); }
-
-.award-page .lk-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.award-page .lk-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
-.award-page .lk-row.is-child { margin-left: 22px; background: var(--surface-alt); }
-.award-page .lk-name { flex: 1; font-weight: 700; color: var(--text); }
-.award-page .lk-row:not(.is-child) .lk-name { font-weight: 800; }
-.award-page .lk-state { font-size: .72rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--good); }
-.award-page .lk-state.is-on { color: var(--warn); }
-.award-page .lk-switch { position: relative; width: 44px; height: 24px; flex: none; }
-.award-page .lk-switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; z-index: 1; }
-.award-page .lk-switch span { position: absolute; inset: 0; border-radius: 99px; background: var(--border-strong); transition: background-color .2s ease; }
-.award-page .lk-switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .2s var(--ease); }
-.award-page .lk-switch input:checked + span { background: var(--warn); }
-.award-page .lk-switch input:checked + span::after { transform: translateX(20px); }
-.award-page .lk-switch input:focus-visible + span { box-shadow: 0 0 0 3px var(--accent-soft-border); }
-.award-page .lk-saved { margin: 10px 0 0; text-align: center; font-size: .82rem; font-weight: 800; color: var(--good); }
-.award-page .lk-saved[hidden] { display: none; }

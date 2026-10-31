@@ -632,6 +632,15 @@ window.awardDashShown = function () {
   if (loaded && !loading && Date.now() - loadedAt > 30000) refresh();
 };
 
+// The page-wide "Refresh data" button (award.js) while the dashboard is showing.
+// Resolves once the new data is in.
+window.awardDashRefresh = function () {
+  refresh();
+  return new Promise(function (resolve) {
+    (function wait() { if (!loading) return resolve(true); setTimeout(wait, 150); })();
+  });
+};
+
 window.initAwardDashUI = function () {
   rows = []; loaded = false; loading = false;
   const bar = el("awdFilterBar");

@@ -397,8 +397,7 @@ window.AWARD_CONFIG = {
     info:     '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="7.8" r=".6" fill="currentColor"/></svg>',
     warning:  '<svg viewBox="0 0 24 24"><path d="M12 3.5l9 16H3z"/><path d="M12 10v4.5"/><circle cx="12" cy="17.3" r=".6" fill="currentColor"/></svg>',
     question: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1.1.8-1.1 1.6"/><circle cx="12" cy="16.6" r=".6" fill="currentColor"/></svg>',
-    success:  '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.4l2.7 2.7L16 9.5"/></svg>',
-    lock:     '<svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>'
+    success:  '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.4l2.7 2.7L16 9.5"/></svg>'
   };
   var awpQueue = Promise.resolve();
 
@@ -635,7 +634,6 @@ window.AWARD_CONFIG = {
     check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
            'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
            '<path d="m4.5 12.5 5 5 10-11"/></svg>',
-    lock:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1" fill="currentColor"/></svg>',
     plus:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
            'stroke-width="2.2" stroke-linecap="round">' +
            '<path d="M12 5v14M5 12h14"/></svg>',
@@ -789,9 +787,10 @@ window.AWARD_CONFIG = {
      Award Utilisation holds two views of its own, Award Management and the Award
      Data Dashboard, chosen with the small tabs under it. */
   var utilView = "award";
+  var currentTop = "util";       // the top tab on screen, for the page-wide Refresh data button
 
   function showTopView(which) {
-    if (lockedForMe("top:" + which)) { notifyLocked(); return; }
+    currentTop = which;
     var util = which === "util";
     var event = which === "event";
     var stock = document.getElementById("aw-view-stock");
@@ -846,10 +845,73 @@ window.AWARD_CONFIG = {
     }
   }
 
+  /* The page-wide Refresh data button. It reloads what the tab on screen
+     shows, through the same code each view's own Refresh used, so unsaved
+     edits are still asked about first. A view answers false when the user
+     cancels. */
+  function waitUntil(test, ms) {
+    return new Promise(function (resolve) {
+      var end = Date.now() + (ms || 20000);
+      (function poll() {
+        if (test() || Date.now() > end) return resolve();
+        setTimeout(poll, 150);
+      })();
+    });
+  }
+
+  function refreshStockData() {
+    var stockDone = new Promise(function (resolve) {
+      loadStock(function () {
+        refreshStockControls(); renderStock(); renderReqStock();
+        resolve();
+      });
+    });
+    loadAwardTypes();
+    loadRequisitions();          // disables the Stock Refresh button until it has an answer
+    return Promise.all([stockDone, waitUntil(function () { return !el.refreshBtn.disabled; })]);
+  }
+
+  function refreshCurrentView() {
+    if (currentTop === "event") {
+      return typeof window.aweRefresh === "function" ? window.aweRefresh() : Promise.resolve(false);
+    }
+    if (currentTop === "util") {
+      var fn = utilView === "dash" ? window.awardDashRefresh : window.awmRefreshAll;
+      return typeof fn === "function" ? fn() : Promise.resolve(false);
+    }
+    return refreshStockData();
+  }
+
+  var refreshing = false;
+  function runRefreshAll() {
+    var btn = document.getElementById("aw-refresh-all");
+    if (refreshing || !btn) return;
+    var label = btn.querySelector(".aw-refresh-label");
+    refreshing = true;
+    btn.disabled = true;
+    btn.classList.remove("is-done");
+    btn.classList.add("is-busy");
+    if (label) label.textContent = "Refreshing…";
+    Promise.resolve()
+      .then(refreshCurrentView)
+      .catch(function (err) { console.error("Refresh failed:", err); return false; })
+      .then(function (result) {
+        refreshing = false;
+        btn.disabled = false;
+        btn.classList.remove("is-busy");
+        if (result === false) { if (label) label.textContent = "Refresh data"; return; }
+        btn.classList.add("is-done");
+        if (label) label.textContent = "Updated";
+        setTimeout(function () {
+          if (refreshing) return;
+          btn.classList.remove("is-done");
+          if (label) label.textContent = "Refresh data";
+        }, 1600);
+      });
+  }
+
   function showUtilView(which) {
-    var asked = which === "dash" ? "dash" : "award";
-    if (lockedForMe("util:" + asked)) { notifyLocked(); return; }
-    utilView = asked;
+    utilView = which === "dash" ? "dash" : "award";
     showTopView("util");
   }
 
@@ -902,7 +964,6 @@ window.AWARD_CONFIG = {
     if (!db) db = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
     wireEvents();
-    loadLocks(enforceLocks);
     loadAdmins(function () { applyAccess(); renderRows(); });
     loadStock(function () {
       refreshStockControls(); renderStock(); renderReqStock();
@@ -912,174 +973,11 @@ window.AWARD_CONFIG = {
     loadRequisitions();
   }
 
-  // ------------------------------------------------------------- locked tabs
-
-  /* An IT admin can lock any tab of this page. Locked tabs wear a padlock for
-     everybody and open for nobody but IT admins. The list is kept in
-     award_settings as 'locked_tabs', and read when the page opens. */
-  var lockedTabs = {};              // "top:event" -> true
-
-  var LOCK_ITEMS = [
-    { k: "top:util",       t: "Award Utilisation" },
-    { k: "util:award",     t: "Award Management",     child: true },
-    { k: "util:dash",      t: "Award Data Dashboard", child: true },
-    { k: "top:event",      t: "Event Management" },
-    { k: "top:stock",      t: "Stock Management" },
-    { k: "sub:requisition", t: "Requisition",         child: true },
-    { k: "sub:delivery",   t: "Delivery",             child: true },
-    { k: "sub:stock",      t: "Stock",                child: true },
-    { k: "sub:jute",       t: "Jute Bags",            child: true }
-  ];
-
-  function lockedForMe(key) { return !!lockedTabs[key] && !isAppAdmin(); }
-
-  function notifyLocked() {
-    awAlert("This tab is locked", "An IT admin has locked it for now.", "lock");
-  }
-
-  function tabKey(btn) {
-    return btn.hasAttribute("data-aw-top") ? "top:" + btn.getAttribute("data-aw-top")
-         : btn.hasAttribute("data-aw-util") ? "util:" + btn.getAttribute("data-aw-util")
-         : "sub:" + btn.getAttribute("data-aw-subtab");
-  }
-
-  function paintLock(btn) {
-    var locked = !!lockedTabs[tabKey(btn)];
-    btn.classList.toggle("has-lock", locked);
-    btn.classList.toggle("is-locked", locked && !isAppAdmin());
-    if (locked && !isAppAdmin()) btn.setAttribute("aria-disabled", "true"); else btn.removeAttribute("aria-disabled");
-    var icon = btn.querySelector(".tab-lockico");
-    if (locked && !icon) {
-      icon = document.createElement("i");
-      icon.className = "tab-lockico";
-      icon.setAttribute("aria-hidden", "true");
-      icon.innerHTML = ICONS.lock;
-      btn.appendChild(icon);
-    } else if (!locked && icon) {
-      icon.remove();
-    }
-  }
-
-  function showLockedScreen(on) {
-    var screen = document.getElementById("aw-locked");
-    if (!screen) return;
-    screen.hidden = !on;
-    if (on) {
-      ["aw-view-stock", "aw-view-award", "aw-view-dash", "aw-view-event", "aw-util-bar", "aw-stock-actions"].forEach(function (id) {
-        var n = document.getElementById(id);
-        if (n) n.hidden = true;
-      });
-    }
-  }
-
-  /* Paints the padlocks, and moves anyone who is standing on a tab that has
-     just been locked to one that is open - or says there is none. */
-  function enforceLocks() {
-    var admin = isAppAdmin();
-    var lockBtn = document.getElementById("aw-lock-btn");
-    if (lockBtn) lockBtn.hidden = !admin;
-
-    Array.prototype.forEach.call(
-      document.querySelectorAll(".award-page .aw-toptab, .award-page .aw-utiltab, .award-page .aw-subtab"), paintLock);
-    showLockedScreen(false);
-    if (admin) return;
-
-    var topEl = document.querySelector(".award-page .aw-toptab.is-active");
-    var top = topEl && topEl.getAttribute("data-aw-top");
-    if (top && lockedForMe("top:" + top)) {
-      var alt = ["util", "event", "stock"].filter(function (k) { return !lockedForMe("top:" + k); })[0];
-      if (!alt) { showLockedScreen(true); return; }
-      showTopView(alt);
-      top = alt;
-    }
-    if (top === "util" && lockedForMe("util:" + utilView)) {
-      var other = utilView === "award" ? "dash" : "award";
-      if (lockedForMe("util:" + other)) { showLockedScreen(true); return; }
-      showUtilView(other);
-    }
-    if (top === "stock") {
-      var active = document.querySelector(".award-page .aw-subtab.is-active");
-      var name = active && active.getAttribute("data-aw-subtab");
-      if (name && lockedForMe("sub:" + name)) {
-        var openSub = ["requisition", "delivery", "stock", "jute"].filter(function (k) {
-          var b = document.querySelector('[data-aw-subtab="' + k + '"]');
-          return b && !b.hidden && !lockedForMe("sub:" + k);
-        })[0];
-        if (!openSub) { showLockedScreen(true); return; }
-        showTab(el.subtabs, "data-aw-subtab", openSub);
-      }
-    }
-  }
-
-  function loadLocks(done) {
-    db.from("award_settings").select("value").eq("key", "locked_tabs")
-      .then(function (res) {
-        lockedTabs = {};
-        try {
-          var list = JSON.parse((res.data && res.data[0] && res.data[0].value) || "[]");
-          list.forEach(function (k) { lockedTabs[k] = true; });
-        } catch (e) { /* an unreadable list means nothing is locked */ }
-        done && done();
-      })
-      .catch(function () { lockedTabs = {}; done && done(); });
-  }
-
-  function renderLocksList() {
-    var list = document.getElementById("locks-list");
-    if (!list) return;
-    list.innerHTML = LOCK_ITEMS.map(function (it) {
-      var on = !!lockedTabs[it.k];
-      return '<li class="lk-row' + (it.child ? " is-child" : "") + '">' +
-        '<span class="lk-name">' + escapeHtml(it.t) + "</span>" +
-        '<span class="lk-state' + (on ? " is-on" : "") + '">' + (on ? "Locked" : "Open") + "</span>" +
-        '<label class="lk-switch"><input type="checkbox" data-lock="' + it.k + '"' + (on ? " checked" : "") +
-        ' aria-label="Lock ' + escapeHtml(it.t) + '" /><span></span></label></li>';
-    }).join("");
-  }
-
-  function saveLocks(key, now) {
-    var before = !!lockedTabs[key];
-    lockedTabs[key] = now;
-    var keys = Object.keys(lockedTabs).filter(function (k) { return lockedTabs[k]; });
-    db.from("award_settings")
-      .upsert({ key: "locked_tabs", value: JSON.stringify(keys), updated_by: myEmail() || null,
-                updated_at: new Date().toISOString() })
-      .then(function (res) {
-        if (res.error) throw res.error;
-        enforceLocks();
-        renderLocksList();
-        var saved = document.getElementById("locks-saved");
-        if (saved) { saved.hidden = false; setTimeout(function () { saved.hidden = true; }, 1600); }
-      })
-      .catch(function (err) {
-        lockedTabs[key] = before;
-        renderLocksList();
-        reportError("save the locked tabs", err);
-        awAlert("Could not save", "The lock was not changed. Try again.", "warning");
-      });
-  }
-
-  function openLocks() {
-    if (!isAppAdmin()) return;
-    renderLocksList();
-    var m = document.getElementById("locks-modal");
-    if (!m) return;
-    m.classList.add("is-open");
-    document.addEventListener("keydown", onLocksKey);
-  }
-  function closeLocks() {
-    var m = document.getElementById("locks-modal");
-    if (m) m.classList.remove("is-open");
-    document.removeEventListener("keydown", onLocksKey);
-  }
-  function onLocksKey(event) { if (event.key === "Escape") closeLocks(); }
-
   // ------------------------------------------------------------- the tabs
 
   /* Works off each button's own attribute and the panel it names, rather
      than a list that would have to be kept in step with the markup. */
   function showTab(buttons, attr, name) {
-    if (attr === "data-aw-subtab" && lockedForMe("sub:" + name)) { notifyLocked(); return; }
     Array.prototype.forEach.call(buttons, function (tab) {
       var on = tab.getAttribute(attr) === name;
       tab.classList.toggle("is-active", on);
@@ -1886,19 +1784,8 @@ window.AWARD_CONFIG = {
     // The Test tab opens on its first tab, Award Utilisation.
     showTopView("util");
 
-    // The IT admin's Tab access window.
-    var lockBtn = document.getElementById("aw-lock-btn");
-    if (lockBtn) lockBtn.addEventListener("click", openLocks);
-    var locksModal = document.getElementById("locks-modal");
-    if (locksModal) {
-      locksModal.addEventListener("click", function (event) {
-        if (event.target.closest("[data-aw-close-locks]")) closeLocks();
-      });
-      locksModal.addEventListener("change", function (event) {
-        var box = event.target.closest("input[data-lock]");
-        if (box) saveLocks(box.getAttribute("data-lock"), box.checked);
-      });
-    }
+    var refreshAll = document.getElementById("aw-refresh-all");
+    if (refreshAll) refreshAll.addEventListener("click", runRefreshAll);
 
     Array.prototype.forEach.call(
       el.hoModal.querySelectorAll("[data-aw-close-ho]"),

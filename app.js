@@ -1551,6 +1551,7 @@ function watchPageAccess() {
         pageAccessLoaded = true;
         markPageAccessReady();
         applyPageAccessNav();
+        applyAwardTabLocks();
         if (currentPage && !isPageEnabled(currentPage) && !isItAdmin()) {
             notify(`${pageLabel(currentPage)} has been switched off by IT Admin.`, "info");
             navigate("home");
@@ -1562,6 +1563,7 @@ function watchPageAccess() {
         pageAccessLoaded = true;
         markPageAccessReady();
         applyPageAccessNav();
+        applyAwardTabLocks();
     });
 }
 
@@ -1678,6 +1680,139 @@ async function setPageEnabled(page, on) {
 }
 
 /* ====================================
+   TEST PAGE TAB LOCKS (IT Admin)
+   The Award Management page's three top tabs - Award Utilisation, Event Management
+   and Stock Management - can each be locked by IT Admin.
+     - Users: a locked tab is not shown at all. If every tab is locked
+       they see a short notice instead.
+     - IT Admin: every tab stays visible, each with a small Lock/Unlock
+       button beside it.
+   Stored in the same appSettings/pageAccess doc, watched live:
+       { awardTabLocks: { util: false, event: true, stock: false } }
+   true = locked; a tab missing from the map is open. Like the page
+   switches, this is a UI gate.
+==================================== */
+
+const AWARD_TABS = { util: "Award Utilisation", event: "Event Management", stock: "Stock Management" };
+const LOCK_ICON   = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+const UNLOCK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.6-1.8"/></svg>';
+
+function isAwardTabLocked(key) {
+    const locks = (pageAccessData || {}).awardTabLocks || {};
+    return locks[key] === true;
+}
+
+function applyAwardTabLocks() {
+    const nav = document.querySelector(".award-page .aw-toptabs");
+    if (!nav) return;                                  // the Award Management page isn't on screen
+    const admin = isItAdmin();
+    const tabs = Array.from(nav.querySelectorAll(".aw-toptab[data-aw-top]"));
+
+    tabs.forEach(tab => {
+        const key = tab.getAttribute("data-aw-top");
+        const name = AWARD_TABS[key] || tab.textContent.trim();
+        const locked = isAwardTabLocked(key);
+
+        // Each tab sits in a small wrapper so its lock button can sit beside it
+        // (a button can't hold another control).
+        let wrap = tab.parentElement.classList.contains("aw-tabwrap") ? tab.parentElement : null;
+        if (!wrap) {
+            wrap = document.createElement("span");
+            wrap.className = "aw-tabwrap";
+            wrap.setAttribute("role", "presentation");
+            nav.insertBefore(wrap, tab);
+            wrap.appendChild(tab);
+        }
+        wrap.hidden = locked && !admin;
+        tab.classList.toggle("aw-toptab--locked", locked && admin);
+
+        let btn = wrap.querySelector(".aw-tablock");
+        if (!admin) { if (btn) btn.remove(); return; }
+        if (!btn) {
+            btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "aw-tablock";
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                setAwardTabLocked(key, !isAwardTabLocked(key));
+            });
+            wrap.appendChild(btn);
+        }
+        btn.classList.toggle("is-locked", locked);
+        btn.setAttribute("aria-pressed", locked ? "true" : "false");
+        btn.innerHTML = (locked ? LOCK_ICON : UNLOCK_ICON) + `<span>${locked ? "Locked" : "Unlocked"}</span>`;
+        btn.setAttribute("aria-label", `${name}: ${locked ? "locked, hidden from users" : "unlocked, visible to users"}`);
+        btn.title = locked ? `${name} is hidden from users - click to unlock it`
+                           : `${name} is visible to users - click to lock it`;
+    });
+
+    // Users: never leave them on a tab they can no longer see.
+    const page = nav.closest(".award-page");
+    const visible = tabs.filter(t => !t.parentElement.hidden);
+    const views = ["aw-view-stock", "aw-view-award", "aw-view-dash", "aw-view-event", "aw-util-bar", "aw-stock-actions"]
+        .map(id => document.getElementById(id)).filter(Boolean);
+    let notice = page ? page.querySelector(".aw-alllocked") : null;
+
+    if (!visible.length) {
+        views.forEach(v => { v.hidden = true; });
+        if (!notice && page) {
+            notice = document.createElement("div");
+            notice.className = "aw-alllocked";
+            notice.setAttribute("role", "status");
+            notice.innerHTML = LOCK_ICON + "<div><strong>This section is locked</strong>" +
+                "<span>IT Admin has locked it for now. Please check back later.</span></div>";
+            const bar = page.querySelector(".aw-topbar");
+            if (bar) bar.after(notice); else page.prepend(notice);
+        }
+        nav.dataset.allLocked = "1";
+        return;
+    }
+    const wasAllLocked = nav.dataset.allLocked === "1";
+    if (notice) notice.remove();
+    delete nav.dataset.allLocked;
+    const active = tabs.find(t => t.classList.contains("is-active"));
+    if (wasAllLocked || !active || active.parentElement.hidden) visible[0].click();
+}
+
+async function setAwardTabLocked(key, locked) {
+    if (!isItAdmin() || !AWARD_TABS[key]) return;
+    const name = AWARD_TABS[key];
+    if (locked) {
+        const ok = await showAppConfirm({
+            title: `Lock ${name}?`,
+            message: `Users won't see the ${name} tab on the Award Management page until you unlock it. Anyone on it now is moved to another tab. You will still see it.`,
+            type: "warning",
+            confirmText: "Lock tab"
+        });
+        if (!ok) return;
+    }
+    const btn = document.querySelector(`.award-page .aw-toptab[data-aw-top="${key}"]`)
+        ?.parentElement?.querySelector(".aw-tablock");
+    if (btn) btn.disabled = true;
+    try {
+        await setDoc(PAGE_ACCESS_DOC, {
+            awardTabLocks: { [key]: locked },
+            updatedBy: auth.currentUser?.email || "",
+            updatedAt: serverTimestamp()
+        }, { merge: true });
+        logAudit(locked ? "award-tab-locked" : "award-tab-unlocked", { tab: key });
+        notify(locked ? `${name} is now locked for users.` : `${name} is now visible to users.`, "success");
+        // The live listener repaints the tabs.
+    } catch (err) {
+        console.error(err);
+        await showAppAlert({
+            title: `Could not change ${name}`,
+            message: "Firestore did not accept the change (" + (err.code || err.message) + "). " +
+                     "Check that the Firestore rules allow IT Admin to write to appSettings.",
+            type: "error"
+        });
+    } finally {
+        if (btn) btn.disabled = false;
+        applyAwardTabLocks();
+    }
+}
+
+/* ====================================
    ROUTER
    Nav IDs use data-page attribute to
    avoid issues with hyphens in IDs.
@@ -1773,6 +1908,7 @@ window.navigate = async function (page) {
         if (window.AwardManagement && typeof window.AwardManagement.mount === "function") {
             window.AwardManagement.mount();
         }
+        applyAwardTabLocks();       // IT Admin's tab locks (hide locked tabs from users)
     }
 
     else if (page === "team-performance") {

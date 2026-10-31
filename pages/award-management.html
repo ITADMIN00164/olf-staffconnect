@@ -20,32 +20,27 @@
       </span>
     </div>
 
-    <!-- The Test tab: Stock Management and Award Management, with the stock
+    <!-- The Award Management page: Stock Management and Award Management, with the stock
          actions on the right while Stock Management is showing. -->
     <div class="aw-topbar">
-      <nav class="aw-toptabs" role="tablist" aria-label="Test">
+      <nav class="aw-toptabs" role="tablist" aria-label="Award Management">
         <button type="button" role="tab" class="aw-toptab" data-aw-top="util" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="trophy" aria-hidden="true"></i>Award Utilisation</button>
         <button type="button" role="tab" class="aw-toptab" data-aw-top="event" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="calendar" aria-hidden="true"></i>Event Management</button>
         <button type="button" role="tab" class="aw-toptab is-active" data-aw-top="stock" aria-selected="true"><i class="aw-icon" data-aw-icon="stock" aria-hidden="true"></i>Stock Management<span class="act-count" id="top-tab-count" hidden></span></button>
       </nav>
-      <!-- IT admins only: which tabs are locked for everyone else. -->
-      <button type="button" id="aw-lock-btn" class="aw-lock-btn" hidden>
-        <i class="aw-icon" data-aw-icon="lock" aria-hidden="true"></i>Tab access
-      </button>
-      <div class="aw-top-actions" id="aw-stock-actions">
-        <button type="button" id="refresh-btn" class="btn btn-ghost btn-sm"><i class="aw-icon" data-aw-icon="refresh" aria-hidden="true"></i>Refresh</button>
-        <button type="button" id="new-req-btn" class="btn btn-primary btn-sm">
-          <i class="aw-icon" data-aw-icon="plus" aria-hidden="true"></i>
-          New Requisition
-        </button>
+      <div class="aw-top-right">
+        <div class="aw-top-actions" id="aw-stock-actions">
+          <button type="button" id="refresh-btn" class="btn btn-ghost btn-sm"><i class="aw-icon" data-aw-icon="refresh" aria-hidden="true"></i>Refresh</button>
+          <button type="button" id="new-req-btn" class="btn btn-primary btn-sm">
+            <i class="aw-icon" data-aw-icon="plus" aria-hidden="true"></i>
+            New Requisition
+          </button>
+        </div>
+        <!-- One Refresh for the whole page: reloads the data of the tab on screen
+             (award.js refreshCurrentView). It replaces the separate Refresh buttons
+             each view used to carry, which are hidden in award.css. -->
+        <button type="button" id="aw-refresh-all" class="btn btn-ghost btn-sm aw-refresh-all" title="Reload the latest data for the tab you are on"><i class="aw-icon" data-aw-icon="refresh" aria-hidden="true"></i><span class="aw-refresh-label" aria-live="polite">Refresh data</span></button>
       </div>
-    </div>
-
-    <!-- What a locked tab shows to anyone who is not an IT admin. -->
-    <div class="aw-locked" id="aw-locked" hidden>
-      <div class="aw-locked-badge" aria-hidden="true"><i class="aw-icon" data-aw-icon="lock"></i></div>
-      <h2>This section is locked</h2>
-      <p>An IT admin has locked it for now.</p>
     </div>
 
     <!-- Award Utilisation: its two views, Award Management and Award Data Dashboard. -->
@@ -627,27 +622,6 @@
         </button>
       </div>
     </form>        </div>
-      </div>
-    </div>
-
-    <!-- Tab access: a switch for each tab, saved as it is flipped. IT admins only. -->
-    <div class="aw-overlay" id="locks-modal">
-      <div class="aw-overlay-backdrop" data-aw-close-locks></div>
-      <div class="aw-box aw-box-sm" role="dialog" aria-modal="true" aria-labelledby="locks-heading">
-        <div class="aw-box-head">
-          <span class="rule rule-accent" aria-hidden="true"></span>
-          <div class="aw-box-heading">
-            <h2 id="locks-heading">Tab access</h2>
-            <p class="aw-box-sub">Locked tabs stay open for IT admins.</p>
-          </div>
-          <button type="button" class="aw-box-close" data-aw-close-locks aria-label="Close">
-            <i class="aw-icon" data-aw-icon="close" aria-hidden="true"></i>
-          </button>
-        </div>
-        <div class="aw-box-body">
-          <ul class="lk-list" id="locks-list"></ul>
-          <p class="lk-saved" id="locks-saved" hidden>Saved</p>
-        </div>
       </div>
     </div>
 
