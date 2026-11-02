@@ -2505,3 +2505,27 @@
   .award-page .pg-hero { padding: 14px 16px; }
   .award-page .aw-toptab { padding: 8px 12px; }
 }
+
+
+/* ======================================================================
+   No banner on this page: the menu already says where you are. One tidy
+   row instead: the three tabs on the left, Refresh and the page action on
+   the right, all the same height; the views of a tab sit right below.
+   ====================================================================== */
+.award-page .aw-topbar { margin: 0 0 14px; gap: 12px; }
+.award-page .aw-top-right { padding-bottom: 0; gap: 10px; align-items: center; }
+.award-page .aw-top-right .btn { min-height: 40px; padding: 0 16px; border-radius: 12px; font-size: 13.5px; font-weight: 700; }
+.award-page .aw-top-right .aw-refresh-all {
+  background: var(--surface); border: 1px solid var(--border); color: var(--accent-ink); min-width: 140px;
+  box-shadow: 0 1px 6px rgba(15,23,42,.05);
+}
+.award-page .aw-top-right .aw-refresh-all:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
+.award-page .aw-top-right .aw-refresh-all.is-done { color: var(--good); border-color: var(--good-soft-border); background: var(--good-soft); }
+.award-page .aw-top-right .btn-primary { background: linear-gradient(135deg, var(--accent), #10B197); box-shadow: 0 6px 14px rgba(47,111,228,.28); }
+.award-page .aw-toptabs { padding: 4px; }
+.award-page .aw-toptab { padding: 9px 18px; }
+.award-page .aw-subtabs { margin: 0 0 14px; padding: 0; }
+@media (max-width: 720px) {
+  .award-page .aw-top-right { width: 100%; }
+  .award-page .aw-top-right .btn { flex: 1 1 auto; justify-content: center; }
+}
