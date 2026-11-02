@@ -773,7 +773,7 @@
         var t = evtTime(e);
         return '<div class="event-list-item" style="--c:' + getProgramColor(programOf(e)) + '" data-pcal-view-event="' + esc(e.id) + '" title="Click to view details">' +
             '<div class="event-info">' +
-              '<div class="evt-title">' + esc(e.eventName || programOf(e)) + '</div>' +
+              '<div class="evt-title" title="' + esc(e.eventName || programOf(e)) + '">' + esc(e.eventName || programOf(e)) + '</div>' +
               '<div class="evt-meta"><span>' + pi('pin') + esc(e.district || '—') + '</span>' +
                 (t ? '<span>' + pi('clock') + esc(t) + '</span>' : '') + '</div>' +
               '<span class="evt-prog">' + esc(programOf(e)) + '</span>' +

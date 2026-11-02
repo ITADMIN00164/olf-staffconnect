@@ -9,10 +9,17 @@
         <span class="pg-blob pg-blob--a" aria-hidden="true"></span>
         <span class="pg-blob pg-blob--b" aria-hidden="true"></span>
         <span class="pg-blob pg-blob--c" aria-hidden="true"></span>
+        <!-- The sky follows the time of day (app.js sets data-tod on the banner) -->
+        <span class="hm-sky" aria-hidden="true">
+            <svg class="hm-sun" viewBox="0 0 120 120"><g class="hm-sun-rays" stroke="#FDE68A" stroke-width="5" stroke-linecap="round"><path d="M60 6v14M60 100v14M6 60h14M100 60h14M21.8 21.8l9.9 9.9M88.3 88.3l9.9 9.9M21.8 98.2l9.9-9.9M88.3 31.7l9.9-9.9"/></g><circle cx="60" cy="60" r="26" fill="#FCD34D"/><circle cx="60" cy="60" r="26" fill="url(#hmSunGlow)"/><defs><radialGradient id="hmSunGlow" cx=".38" cy=".35" r=".7"><stop offset="0" stop-color="#FFF7D6"/><stop offset="1" stop-color="#F59E0B" stop-opacity=".9"/></radialGradient></defs></svg>
+            <svg class="hm-moon" viewBox="0 0 120 120"><path d="M78 20a42 42 0 1 0 24 70A36 36 0 1 1 78 20z" fill="#FEF3C7"/><circle cx="58" cy="58" r="4" fill="#FDE68A" opacity=".7"/><circle cx="70" cy="78" r="6" fill="#FDE68A" opacity=".6"/></svg>
+            <svg class="hm-stars" viewBox="0 0 240 120"><g fill="#fff"><circle class="s1" cx="20" cy="22" r="2"/><circle class="s2" cx="70" cy="58" r="1.6"/><circle class="s3" cx="118" cy="16" r="2.2"/><circle class="s1" cx="168" cy="44" r="1.5"/><circle class="s2" cx="214" cy="20" r="2"/><circle class="s3" cx="40" cy="92" r="1.4"/><circle class="s1" cx="150" cy="96" r="1.8"/><circle class="s2" cx="226" cy="84" r="1.5"/></g></svg>
+        </span>
         <div class="pg-hero-main">
             <div class="pg-eyebrow"><span class="pg-live" aria-hidden="true"></span><span id="homeDate">&nbsp;</span></div>
-            <h1 class="pg-hero-title hm-title"><span class="hm-title-text"><span id="homeGreeting">Welcome back</span>, <span class="hm-name" id="homeUserName">—</span></span><span class="hm-hand" aria-hidden="true">👋</span></h1>
+            <h1 class="pg-hero-title hm-title"><span class="hm-title-text" id="homeGreetText">Welcome back</span><button type="button" class="hm-hand" id="homeHand" title="Say hi!" aria-label="Wave hello and get a new greeting"><span class="hm-hand-ico" aria-hidden="true">👋</span></button></h1>
             <p class="pg-hero-sub">One Stop Solution for OLF's Data Management</p>
+            <p class="hm-line" id="homeLine" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 7H6a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h3v1a3 3 0 0 1-3 3M20 7h-4a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h3v1a3 3 0 0 1-3 3"/></svg><span id="homeLineText"></span></p>
         </div>
         <div class="hm-clock pg-glass" aria-hidden="true">
             <div class="hm-clock-time" id="homeClock">--:--</div>
@@ -29,6 +36,7 @@
             <div class="pg-stat-info">
                 <div class="pg-stat-value" id="statTotal">—</div>
                 <div class="pg-stat-label">Total Employees</div>
+                <div class="pg-stat-note">On the staff list</div>
             </div>
         </div>
         <div class="pg-stat" style="--tint:#10B197">
@@ -38,6 +46,7 @@
             <div class="pg-stat-info">
                 <div class="pg-stat-value" id="statDepts">—</div>
                 <div class="pg-stat-label">Departments</div>
+                <div class="pg-stat-note">Teams across OLF</div>
             </div>
         </div>
         <div class="pg-stat" style="--tint:#F43F5E">
@@ -47,6 +56,7 @@
             <div class="pg-stat-info">
                 <div class="pg-stat-value" id="statLocations">—</div>
                 <div class="pg-stat-label">Locations</div>
+                <div class="pg-stat-note">Offices and districts</div>
             </div>
         </div>
     </div>
@@ -88,7 +98,22 @@
 /* The shared banner and stat cards live in index.html (pg-*). Only what is Home's own stays here. */
 .hm-title { display: flex; align-items: center; flex-wrap: wrap; gap: 0 12px; }
 .hm-name { color: #FEF3C7; }
-.hm-hand { display: inline-block; flex: 0 0 auto; font-size: 1em; line-height: 1; position: relative; top: -4px; margin-left: -4px; transform-origin: 70% 70%; }
+.hm-greet-letters { display: inline; }
+.hm-w { display: inline-block; white-space: nowrap; }
+.hm-ch { display: inline-block; }
+.hm-hand { position: relative; display: inline-grid; place-items: center; flex: 0 0 auto; top: -4px; margin-left: -4px; padding: 0; border: 0; background: none; font: inherit; font-size: 1em; line-height: 1; cursor: pointer; border-radius: 50%; }
+.hm-hand-ico { display: inline-block; transform-origin: 70% 70%; transition: transform .25s cubic-bezier(.34,1.56,.64,1); }
+.hm-hand:hover .hm-hand-ico { transform: scale(1.18) rotate(-8deg); }
+.hm-hand:focus-visible { outline: 3px solid rgba(255,255,255,.7); outline-offset: 4px; }
+/* tap the hand: confetti bits fly out from it */
+.hm-confetti {
+    position: absolute; left: 50%; top: 50%; width: 7px; height: 11px; margin: -5px 0 0 -3px; border-radius: 2px; pointer-events: none;
+    animation: hm-confetti .85s cubic-bezier(.15,.7,.3,1) forwards;
+}
+@keyframes hm-confetti {
+    0% { transform: translate(0, 0) rotate(0) scale(.6); opacity: 1; }
+    100% { transform: translate(var(--dx), calc(var(--dy) + 26px)) rotate(var(--rot)) scale(1); opacity: 0; }
+}
 
 .hm-clock {
     flex: 0 0 auto; text-align: center; padding: 14px 24px; border-radius: 18px;
@@ -229,15 +254,106 @@ html[data-theme="dark"] .hm .upcoming-card { border-color: var(--hairline); box-
 @media (prefers-reduced-motion: no-preference) {
     .hm-section { animation: hm-in .6s cubic-bezier(.22,1,.36,1) backwards; }
     #upcomingSection { animation-delay: .3s; } .news-section.hm-section { animation-delay: .36s; }
-    .hm-hand { animation: hm-wave 2.6s ease-in-out 1s infinite; }
+    .hm-hand-ico { animation: hm-wave 2.6s ease-in-out 1s infinite; }
+    .hm-hand.is-waving .hm-hand-ico { animation: hm-wave-big .9s ease-in-out; }
+    /* the greeting arrives letter by letter and floats away before the next */
+    .hm-ch { animation: hm-ch-in .55s cubic-bezier(.22,1,.36,1) backwards; animation-delay: var(--d, 0ms); }
+    .hm-greet-out .hm-ch { animation: hm-ch-out .38s cubic-bezier(.55,0,.75,.2) forwards; animation-delay: calc(var(--d, 0ms) * .2); }
+    @keyframes hm-ch-in { from { opacity: 0; transform: translateY(16px) rotate(8deg) scale(.9); filter: blur(5px); } }
+    @keyframes hm-ch-out { to { opacity: 0; transform: translateY(-14px) scale(.95); filter: blur(4px); } }
+    /* the name glows softly, like a light coming on and off */
+    .hm-name { animation: hm-name-glow 3.2s ease-in-out 1.2s infinite alternate; }
+    @keyframes hm-name-glow { from { text-shadow: 0 0 0 rgba(253,230,138,0); } to { text-shadow: 0 0 16px rgba(253,230,138,.85), 0 0 2px rgba(255,255,255,.6); } }
+    @keyframes hm-greet { from { opacity: 0; transform: translateY(10px); filter: blur(4px); } }
+    @keyframes hm-wave-big { 0%, 100% { transform: rotate(0) scale(1); } 15% { transform: rotate(24deg) scale(1.3); } 30% { transform: rotate(-16deg) scale(1.3); } 45% { transform: rotate(22deg) scale(1.25); } 60% { transform: rotate(-12deg) scale(1.15); } 80% { transform: rotate(8deg) scale(1.05); } }
     .hm .hm-empty-ico { animation: hm-bob 3.2s ease-in-out infinite; }
     @keyframes hm-in { from { opacity: 0; transform: translateY(14px); } }
     @keyframes hm-wave { 0%, 60%, 100% { transform: rotate(0); } 10%, 30% { transform: rotate(16deg); } 20%, 40% { transform: rotate(-10deg); } 50% { transform: rotate(8deg); } }
     @keyframes hm-bob { 50% { transform: translateY(-4px); } }
 }
 
+/* ── Finishing touches ─────────────────────────────────────────
+   A faint dot grid on the right of the banner, crisp corner rings on the
+   figures instead of a blurred glow, and Announcements as one panel with
+   its heading inside. */
+.hm-hero::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background-image: radial-gradient(rgba(255,255,255,.28) 1px, transparent 1.4px); background-size: 18px 18px;
+    -webkit-mask-image: linear-gradient(100deg, transparent 38%, #000 88%); mask-image: linear-gradient(100deg, transparent 38%, #000 88%);
+}
+.hm-hero > .pg-hero-main, .hm-hero > .hm-clock { position: relative; z-index: 1; }
+
+.hm .pg-stat::after {
+    right: -34px; top: -34px; width: 104px; height: 104px; background: none;
+    border: 16px solid color-mix(in srgb, var(--tint, #4F8EF7) 9%, transparent);
+    transition: transform .4s cubic-bezier(.22,1,.36,1);
+}
+.hm .pg-stat::before {
+    content: ""; position: absolute; left: 22px; right: 22px; top: 0; height: 3px; border-radius: 0 0 3px 3px;
+    background: linear-gradient(90deg, var(--tint, #4F8EF7), color-mix(in srgb, var(--tint, #4F8EF7) 30%, transparent));
+    opacity: .85;
+}
+.hm .pg-stat:hover::after { transform: scale(1.12); }
+.hm .pg-stat-note { margin-top: 3px; font-size: 12px; font-weight: 500; color: var(--text-faint); }
+.hm .pg-stat-label { color: var(--text); font-weight: 700; }
+
+.hm .news-section {
+    padding: 16px 18px 18px; border-radius: 20px;
+    background: var(--glass-strong); border: 1px solid var(--hairline); box-shadow: var(--shadow-sm);
+}
+.hm .news-section .hm-head { padding-bottom: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--hairline); }
+.hm .news-section .news-empty-state { background: transparent; border: 0; box-shadow: none; padding: 26px 20px 20px; }
+
+/* ── The banner follows the day ────────────────────────────────
+   morning: sunrise blue into warm amber, the sun up on the right
+   afternoon: the usual brand blue-to-teal, the sun high
+   evening: violet into rose, the sun low and orange
+   night: deep navy, a crescent moon and twinkling stars */
+.hm-hero { transition: background .8s ease; }
+.hm-hero[data-tod="morning"]   { background: linear-gradient(120deg, #2457C5 0%, #3B82F6 45%, #F59E0B 115%); }
+.hm-hero[data-tod="afternoon"] { background: linear-gradient(120deg, #2457C5 0%, #2F6FE4 40%, #0B8F7A 100%); }
+.hm-hero[data-tod="evening"]   { background: linear-gradient(120deg, #3730A3 0%, #6D28D9 48%, #BE185D 100%); }
+.hm-hero[data-tod="night"]     { background: linear-gradient(120deg, #0B1530 0%, #1E3A8A 58%, #0B4F6C 100%); }
+
+.hm-sky { position: absolute; z-index: 0; right: 210px; top: 0; bottom: 0; width: 220px; pointer-events: none; }
+.hm-sky svg { position: absolute; display: none; }
+.hm-sun  { width: 96px; height: 96px; right: 40px; top: 10px; filter: drop-shadow(0 0 22px rgba(253,224,71,.55)); }
+.hm-moon { width: 74px; height: 74px; right: 50px; top: 14px; filter: drop-shadow(0 0 18px rgba(254,243,199,.5)); }
+.hm-stars { width: 220px; height: 110px; right: 0; top: 6px; }
+.hm-hero[data-tod="morning"] .hm-sun   { display: block; top: 34px; }
+.hm-hero[data-tod="afternoon"] .hm-sun { display: block; top: 4px; }
+.hm-hero[data-tod="evening"] .hm-sun   { display: block; top: 48px; filter: drop-shadow(0 0 24px rgba(251,146,60,.65)) saturate(1.2) hue-rotate(-18deg); }
+.hm-hero[data-tod="night"] .hm-moon, .hm-hero[data-tod="night"] .hm-stars { display: block; }
+
+/* line of the day */
+.hm-line {
+    display: flex; align-items: flex-start; gap: 9px; width: fit-content; max-width: 68ch; margin: 14px 0 0; padding: 9px 15px 9px 11px;
+    border-radius: 13px; font-size: 13.5px; font-weight: 600; font-style: italic; line-height: 1.5; color: #fff;
+    background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.3); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+.hm-line[hidden] { display: none; }
+.hm-line svg { width: 17px; height: 17px; flex: none; margin-top: 1px; fill: none; stroke: #FDE68A; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+@media (prefers-reduced-motion: no-preference) {
+    .hm-sun-rays { transform-origin: 60px 60px; animation: hm-rays 40s linear infinite; }
+    .hm-sun { animation: hm-sun-glow 4s ease-in-out infinite alternate; }
+    .hm-moon { animation: hm-float 6s ease-in-out infinite; }
+    .hm-stars circle { animation: hm-twinkle 3s ease-in-out infinite; }
+    .hm-stars .s2 { animation-delay: 1s; } .hm-stars .s3 { animation-delay: 2s; }
+    .hm-line:not([hidden]) { animation: hm-in .7s .3s cubic-bezier(.22,1,.36,1) backwards; }
+    @keyframes hm-rays { to { transform: rotate(360deg); } }
+    @keyframes hm-sun-glow { from { transform: scale(1); } to { transform: scale(1.06); } }
+    @keyframes hm-float { 50% { transform: translateY(-5px) rotate(-4deg); } }
+    @keyframes hm-twinkle { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+}
+
 @media (max-width: 900px) {
     .hm-clock { display: none; }
+    .hm-sky { right: 0; opacity: .55; }
+}
+@media (max-width: 640px) {
+    .hm-sky { width: 140px; transform: scale(.75); transform-origin: top right; }
+    .hm-line { font-size: 12.5px; }
 }
 @media (max-width: 768px) {
     .news-cards-grid { grid-template-columns: 1fr; }

@@ -1,0 +1,138 @@
+# Greetings on Home - the big "Hello, Om" line.
+#
+# Home shows one, then a new one every few seconds while it is open; tapping
+# the waving hand picks another straight away. Each comes from the section
+# for the time of day, and now and then from today's weekday section.
+#
+# How to edit:
+#   - One greeting per line, under its [section].
+#   - Write {name} where the person's first name goes.
+#   - Lines starting with # (like these) and empty lines are skipped.
+#   - Keep them short: they are the page's big heading (about 6 words reads best).
+#
+# Sections: [morning] 5am-12pm, [afternoon] 12-5pm, [evening] 5-8pm,
+# [night] 8pm-5am, and the weekday specials [monday] ... [sunday].
+
+[morning]
+Good morning, {name}
+Rise and shine, {name}
+Morning, {name}! Coffee first, then the world
+Top of the morning, {name}
+Hello sunshine, {name}
+Fresh day, fresh start, {name}
+Up and running, {name}?
+Let's make today count, {name}
+The day is yours, {name}
+New day, new wins, {name}
+Morning, {name}! Big things today
+Good vibes only, {name}
+Rise up and make it happen, {name}
+Hey {name}, the sun beat you to it
+Morning, {name}! Ready to change a classroom?
+Chai or coffee, {name}?
+Early bird mode: on, {name}
+Hello {name}, let's write a good story today
+Today's plan: be awesome, {name}
+Good morning, {name}! You've got this
+Small steps, big day, {name}
+Morning, {name}! The kids are counting on us
+Let's go, {name}! Eyes on the goal
+Sunshine and spreadsheets, {name}?
+
+[afternoon]
+Good afternoon, {name}
+Lunch done, {name}? Let's roll
+Afternoon, {name}! Halfway there
+Hey {name}, how's the day treating you?
+Keep going, {name}, you're doing great
+Post-lunch power mode, {name}?
+Hello again, {name}
+Second half, strong finish, {name}
+Fighting the after-lunch nap, {name}?
+Stay sharp, {name}, the day's not done
+Afternoon, {name}! Keep the momentum
+Halfway through and still shining, {name}
+A little progress every hour, {name}
+Hey {name}, time for a quick stretch?
+You're on a roll, {name}
+Afternoon, {name}! What did we tick off today?
+Keep calm and carry on, {name}
+Water break, {name}? Hydrate and dominate
+One task at a time, {name}
+Good afternoon, {name}! Make it count
+
+[evening]
+Good evening, {name}
+Evening, {name}! Almost there
+Wrapping up, {name}?
+One last push, {name}
+Hey {name}, what a day it's been
+Golden hour, {name}
+Proud of today, {name}?
+Evening, {name}! Time to wind down soon
+Finish strong, {name}
+Another good day in the books, {name}
+Sunset mode, {name}
+Wrap it up, {name}, you earned it
+Evening, {name}! Thanks for all you did today
+Almost home time, {name}
+Hey {name}, tomorrow will thank you for today
+Last lap, {name}!
+
+[night]
+Burning the midnight oil, {name}?
+Still here, {name}? You're a star
+Hello, night owl {name}
+The moon says hi, {name}
+Quiet hours, big ideas, {name}?
+Don't forget to rest, {name}
+Working late, {name}? Respect
+Even superheroes sleep, {name}
+Night shift hero, {name}
+Hey {name}, the stars are on duty too
+Late night, bright mind, {name}
+Wrap up soon, {name}, rest is productive too
+Shh, {name}, the spreadsheets are sleeping
+Good night soon, {name}?
+Night mode activated, {name}
+
+[monday]
+Happy Monday, {name}! Fresh week, fresh start
+Monday again, {name}? Let's own it
+New week, new goals, {name}
+Monday motivation loading, {name}
+Let's make this week legendary, {name}
+
+[tuesday]
+Happy Tuesday, {name}! Keep it rolling
+Tuesday's here, {name}, momentum on
+Terrific Tuesday, {name}
+
+[wednesday]
+Happy Wednesday, {name}! Halfway through the week
+Midweek magic, {name}
+Hump day, {name}! Over the top we go
+
+[thursday]
+Happy Thursday, {name}! Almost there
+Thursday power, {name}
+One more push to Friday, {name}
+
+[friday]
+It's Friday, {name}! Finish strong
+Friday feels, {name}
+Weekend's in sight, {name}
+Happy Friday, {name}! You made it
+Friday mode on, {name}
+
+[saturday]
+Working on a weekend, {name}? Absolute legend
+Saturday hustle, {name}?
+Weekend warrior, {name}
+A Saturday visit, {name}? We see you
+
+[sunday]
+Sunday and still here, {name}? Respect
+A Sunday visit, {name}? Don't forget to rest
+Sunday planner, {name}? Next week's in good hands
+Easy Sunday, {name}

@@ -145,7 +145,8 @@
 .awm-view .awm-ay { padding: 5px 12px; border-radius: 999px; background: #FFFBEB; border: 1px solid #FBE2B0; color: #B45309; font-size: 12px; font-weight: 700; white-space: nowrap; }
 .awm-view .pom-select { min-width: 240px; padding: 10px 14px; border: 1px solid #E3E7EE; border-radius: 8px; box-shadow: none; font-size: 14px; }
 .awm-view .pom-card { border: 1px solid #E3E7EE; border-radius: 10px; box-shadow: none; }
-.awm-view .pom-table th { background: #F7F8FA; color: #8B909E; font-size: 11px; letter-spacing: .09em; padding: 12px 14px; border-bottom: 1px solid #E3E7EE; }
+.awm-view .pom-card { overflow-x: auto; }   /* wide tables slide sideways on a phone instead of being cut off */
+.awm-view .pom-table th { background: #F7F8FA; color: #5F6878; font-size: 11px; letter-spacing: .09em; padding: 12px 14px; border-bottom: 1px solid #E3E7EE; }
 .awm-view .pom-table td { padding: 13px 14px; font-size: 13.5px; border-bottom: 1px solid #EEF0F4; }
 .awm-view .pom-table.fixed td { padding: 11px 10px; font-size: 12.5px; }
 .awm-view .pom-table.fixed th { padding: 11px 10px; }

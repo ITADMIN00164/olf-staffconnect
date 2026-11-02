@@ -11,7 +11,7 @@
   --border2:   #B0C4D4;
   --text:      #1A2533;
   --text2:     #5A6B7A;
-  --text3:     #8A9AAA;
+  --text3:     #66778A;
   --brand:        #2F6FE4;
   --brand-dark:   #2457C5;
   --brand-lt:     #EEF4FF;
@@ -993,15 +993,154 @@
   #sg-app .app-nav { height: auto; flex-wrap: wrap; padding: 10px 14px; }
   #sg-app .nav-tabs { order: 3; width: 100%; overflow-x: auto; }
 }
+/* side-by-side blocks stack on a phone, and nothing inside a grid can push
+   it wider than the screen (wide tables scroll in their own box instead) */
+#sg-app [style*="display:grid"] > * { min-width: 0; }
+@media (max-width: 760px) {
+  #sg-app [style*="grid-template-columns:1.5fr 1fr"], #sg-app [style*="grid-template-columns:2fr 1fr"],
+  #sg-app [style*="grid-template-columns:1.3fr 1fr"], #sg-app [style*="grid-template-columns:1fr 1fr"] { grid-template-columns: 1fr !important; }
+}
+
+/* ======================================================================
+   The shared banner, as on Awards & Gifts: the page name on the left,
+   Refresh and who you are on the right, and along its foot the page switch
+   (Dashboard, SMART Goals, Monthly Plan, Reviews, Settings) followed, on
+   the Dashboard, by its views. The chosen page is solid white; the chosen
+   view is a frosted pill with a small white bar, so the two levels differ.
+   (#sgHero in each rule: it has to outweigh the older bar rules above.)
+   ====================================================================== */
+#sg-app #sgHero.app-nav {
+  position: relative; overflow: hidden; isolation: isolate; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 20px;
+  height: auto; width: calc(100% - 48px); max-width: calc(var(--page-max, 1680px) - 48px); margin: 16px auto 0; padding: 16px 22px 14px;
+  border: 0; border-radius: 20px; color: #fff;
+  background: linear-gradient(120deg, #2457C5 0%, #2F6FE4 40%, #0B8F7A 100%);
+  box-shadow: 0 18px 40px rgba(36,87,197,.28), inset 0 1px 0 rgba(255,255,255,.35);
+}
+#sg-app #sgHero::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; opacity: .5;
+  background-image: radial-gradient(rgba(255,255,255,.28) 1.2px, transparent 1.4px); background-size: 22px 22px;
+  -webkit-mask-image: linear-gradient(100deg, #000 0%, transparent 70%); mask-image: linear-gradient(100deg, #000 0%, transparent 70%);
+}
+#sg-app #sgHero .sg-hero-lead { display: flex; align-items: center; gap: 14px; min-width: 0; flex: 1 1 260px; }
+#sg-app #sgHero .sg-hero-ico {
+  width: 46px; height: 46px; flex: 0 0 auto; border-radius: 15px; display: grid; place-items: center;
+  background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.36); box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 8px 18px rgba(15,23,42,.14);
+}
+#sg-app #sgHero .sg-hero-ico svg { width: 30px; height: 30px; filter: drop-shadow(0 2px 2px rgba(15,23,42,.2)); }
+#sg-app #sgHero .sg-hero-main { min-width: 0; }
+#sg-app #sgHero .sg-hero-title { margin: 0 0 2px; font-size: 22px; font-weight: 800; letter-spacing: -.6px; line-height: 1.15; color: #fff; }
+#sg-app #sgHero .sg-hero-sub { margin: 0; font-size: 13px; font-weight: 500; color: rgba(255,255,255,.9); }
+
+#sg-app #sgHero .nav-right { flex: 0 0 auto; gap: 10px !important; }
+#sg-app #sgHero .nav-right .btn-secondary { min-height: 38px; padding: 0 15px; font-weight: 700; }
+#sg-app #sgHero #user-badge > span:first-child { color: rgba(255,255,255,.92) !important; font-weight: 600; }
+#sg-app #sgHero #user-badge > span:nth-child(2) { background: rgba(255,255,255,.92) !important; color: #2457C5 !important; border-color: transparent !important; }
+#sg-app #sgHero #user-badge button { color: rgba(255,255,255,.9) !important; border-color: rgba(255,255,255,.4) !important; }
+
+/* the foot of the banner: page switch | the Dashboard's views */
+#sg-app #sgHero .sg-hero-nav {
+  order: 3; flex: 1 1 100%; display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; min-width: 0;
+  padding-top: 12px; border-top: 1px solid rgba(255,255,255,.22);
+}
+#sg-app #sgHero .nav-tabs { flex: 0 0 auto; overflow-x: auto; scrollbar-width: none; }
+#sg-app #sgHero .nav-tab { height: 36px; }
+#sg-app #sgHero .dash-subtabs {
+  display: flex; align-items: center; gap: 4px; flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none;
+  margin: 0; padding: 0 0 0 14px; border-left: 1px solid rgba(255,255,255,.3);
+}
+#sg-app:not(:has(#page-dashboard.active)) #sgHero .dash-subtabs { display: none; }
+#sg-app #sgHero .dash-subtab-btn {
+  position: relative; flex: 0 0 auto; height: 36px; padding: 0 14px; border: 0; border-radius: 10px; cursor: pointer;
+  background: transparent; box-shadow: none; transform: none;
+  font: inherit; font-size: 13px; font-weight: 600; color: rgba(255,255,255,.86); white-space: nowrap;
+  transition: background-color .18s ease, color .15s ease;
+}
+#sg-app #sgHero .dash-subtab-btn:hover:not(.active) { background: rgba(255,255,255,.14); color: #fff; }
+#sg-app #sgHero .dash-subtab-btn.active { background: rgba(255,255,255,.22); color: #fff; font-weight: 700; box-shadow: inset 0 0 0 1px rgba(255,255,255,.38); }
+#sg-app #sgHero .dash-subtab-btn.active::after {
+  content: ""; position: absolute; left: 14px; right: 14px; bottom: 3px; height: 2px; border-radius: 2px; background: #fff; opacity: .9;
+}
+#sg-app #sgHero .nav-tab:focus-visible, #sg-app #sgHero .dash-subtab-btn:focus-visible { outline: 2px solid rgba(255,255,255,.8); outline-offset: 1px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  #sg-app #sgHero { animation: pg-in .6s cubic-bezier(.22,1,.36,1) backwards; }
+}
+@media (max-width: 1100px) {
+  #sg-app #sgHero .nav-tabs { flex: 1 1 100%; order: 0; width: auto; }
+  #sg-app #sgHero .nav-tab { flex: 1 1 auto; justify-content: center; }
+  #sg-app #sgHero .dash-subtabs { flex: 1 1 100%; padding-left: 0; border-left: 0; }
+}
+@media (max-width: 640px) {
+  #sg-app #sgHero.app-nav { width: calc(100% - 24px); margin-top: 12px; padding: 14px; }
+  #sg-app #sgHero .sg-hero-title { font-size: 19px; }
+  #sg-app #sgHero .nav-right { flex: 1 1 100%; flex-wrap: wrap; }
+}
+/* ======================================================================
+   Clear sections. Every block on these pages is a card with a visible
+   edge on a solid surface, and the blocks sit at one even distance from
+   each other: the page's own header (title, line, its buttons), the
+   filters, then the content. Empty lists are a dashed panel, not text
+   floating on the background.
+   ====================================================================== */
+#sg-app {
+  --sg-glass: var(--surface); --sg-glass-strong: var(--surface);
+  --sg-edge: rgba(15,23,42,.10); --sg-hair: rgba(15,23,42,.08);
+  --sg-gap: 16px;
+}
+#sg-app .page { padding-top: 18px; }
+#sg-app .page > .page-header,
+#sg-app #page-dashboard > div:first-child,
+#sg-app #page-settings > h1 {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px;
+  margin: 0 0 var(--sg-gap) !important; padding: 16px 20px;
+  background: var(--surface); border: 1px solid var(--sg-edge); border-radius: 16px;
+  box-shadow: 0 2px 10px rgba(15,23,42,.05);
+}
+#sg-app .page > .page-header h1, #sg-app #page-dashboard > div:first-child h1 { font-size: 19px !important; letter-spacing: -.4px !important; }
+#sg-app #page-settings > h1 { font-size: 19px !important; display: block; }
+#sg-app #page-dashboard > div:first-child { display: block; }
+#sg-app .page > .page-header + .col-legend { margin: calc(var(--sg-gap) * -1 + 6px) 0 var(--sg-gap); padding: 0 6px; }
+#sg-app .filter-bar {
+  margin: 0 0 var(--sg-gap); padding: 12px 14px; border-radius: 16px;
+  background: var(--surface); border: 1px solid var(--sg-edge); box-shadow: 0 2px 10px rgba(15,23,42,.05);
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+#sg-app .card { background: var(--surface); border: 1px solid var(--sg-edge); border-radius: 16px; -webkit-backdrop-filter: none; backdrop-filter: none; }
+#sg-app .card + .card, #sg-app .card { margin-bottom: var(--sg-gap); }
+#sg-app .card-header { padding: 14px 20px; border-bottom: 1px solid var(--sg-hair); background: linear-gradient(180deg, rgba(47,111,228,.05), transparent); }
+#sg-app .card-title { font-size: 14px; font-weight: 700; color: var(--text); }
+#sg-app .card-body { padding: 18px 20px; }
+#sg-app .metric-card { border: 1px solid var(--sg-edge); }
+#sg-app .plan-tbl-wrap { border: 1px solid var(--sg-edge); border-radius: 16px; box-shadow: 0 2px 10px rgba(15,23,42,.05); }
+#sg-app .goal-group { border-color: var(--sg-edge); border-radius: 14px; background: var(--surface); box-shadow: 0 1px 4px rgba(15,23,42,.04); }
+#sg-app .goal-tree { gap: 12px; }
+#sg-app #smart-goals-list > .empty, #sg-app #review-list > .empty, #sg-app .page > .empty,
+#sg-app #smart-goals-list .empty:only-child, #sg-app #review-list .empty:only-child {
+  margin: 0; padding: 44px 24px; border: 1.5px dashed rgba(15,23,42,.14); border-radius: 16px; background: var(--surface);
+}
+@media (max-width: 640px) {
+  #sg-app { --sg-gap: 12px; }
+  #sg-app .page { padding: 12px; }
+  #sg-app .page > .page-header, #sg-app #page-dashboard > div:first-child, #sg-app #page-settings > h1 { padding: 14px; }
+}
+
+@media (max-width: 768px) {
+  /* phones: the banner scrolls away with the page instead of holding a quarter of the screen */
+  .content-area:has(> #sg-app) { overflow-y: auto; }
+  #sg-app { height: auto; overflow: visible; }
+  #sg-app .app-body, #sg-app .page-content { overflow: visible; }
+}
 </style>
-<nav class="app-nav">
-  <div class="nav-brand">OLF <span>Tracker</span></div>
-  <div class="nav-tabs">
-    <button class="nav-tab active" onclick="showPage('dashboard')">Dashboard</button>
-    <button class="nav-tab" onclick="showPage('smart-goals')">SMART Goals</button>
-    <button class="nav-tab" onclick="showPage('monthly-plan')">Monthly Plan</button>
-    <button class="nav-tab" id="nav-tab-reviews" onclick="showPage('reviews')">Reviews</button>
-    <button class="nav-tab" id="nav-tab-settings" onclick="showPage('settings')">Settings</button>
+<nav class="app-nav" id="sgHero">
+  <span class="pg-blob pg-blob--a" aria-hidden="true"></span>
+  <span class="pg-blob pg-blob--b" aria-hidden="true"></span>
+  <div class="sg-hero-lead">
+    <span class="sg-hero-ico" aria-hidden="true"><svg class="hero-color-ico" viewBox="0 0 32 32" aria-hidden="true"><circle cx="15" cy="17" r="12" fill="#EF4444"/><circle cx="15" cy="17" r="8.500" fill="#fff"/><circle cx="15" cy="17" r="5.200" fill="#EF4444"/><circle cx="15" cy="17" r="2" fill="#fff"/><path d="M15 17 26 6" stroke="#92400E" stroke-width="2" stroke-linecap="round"/><path d="m22.500 9.500.8-5.500 4.600 1.200 1.200 4.600-5.500.8z" fill="#3B82F6"/></svg></span>
+    <div class="sg-hero-main">
+      <h1 class="sg-hero-title">HO Plan &amp; Review</h1>
+      <p class="sg-hero-sub">SMART goals, monthly plans and reviews for Head Office teams</p>
+    </div>
   </div>
   <div class="nav-right" style="display:flex;align-items:center;gap:8px">
     <button class="btn btn-secondary btn-sm" id="sg-refresh-btn" onclick="sgRefresh()" title="Reload the latest data from the server (no page reload needed)">
@@ -1009,6 +1148,21 @@
     </button>
     <span style="font-size:11px;color:var(--text3)" id="nav-dept-label"></span>
     <div id="user-badge" style="display:flex;align-items:center"></div>
+  </div>
+  <!-- The page switch, then (on the Dashboard) its views, along the foot of the banner -->
+  <div class="sg-hero-nav">
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="showPage('dashboard')">Dashboard</button>
+      <button class="nav-tab" onclick="showPage('smart-goals')">SMART Goals</button>
+      <button class="nav-tab" onclick="showPage('monthly-plan')">Monthly Plan</button>
+      <button class="nav-tab" id="nav-tab-reviews" onclick="showPage('reviews')">Reviews</button>
+      <button class="nav-tab" id="nav-tab-settings" onclick="showPage('settings')">Settings</button>
+    </div>
+    <div class="dash-subtabs">
+      <button class="dash-subtab-btn" data-subtab="flow" id="dash-subtab-btn-flow" onclick="switchDashSubtab('flow')" style="display:none">Ticket Flow</button>
+      <button class="dash-subtab-btn active" data-subtab="plan" onclick="switchDashSubtab('plan')">Monthly Plan Progress</button>
+      <button class="dash-subtab-btn" data-subtab="review" onclick="switchDashSubtab('review')">Monthly Review</button>
+    </div>
   </div>
 </nav>
 
@@ -1029,12 +1183,6 @@
     <select id="dash-month-filter" onchange="renderDashboard()"><option value="">All Months</option></select>
     <select id="dash-week-filter" onchange="renderDashboard()"><option value="">All Weeks</option></select>
     <select id="dash-dept-filter" onchange="renderDashboard()"><option value="">All Departments</option></select>
-  </div>
-
-  <div class="dash-subtabs">
-    <button class="dash-subtab-btn" data-subtab="flow" id="dash-subtab-btn-flow" onclick="switchDashSubtab('flow')" style="display:none">Ticket Flow</button>
-    <button class="dash-subtab-btn active" data-subtab="plan" onclick="switchDashSubtab('plan')">Monthly Plan Progress</button>
-    <button class="dash-subtab-btn" data-subtab="review" onclick="switchDashSubtab('review')">Monthly Review</button>
   </div>
 
   <div id="dash-subtab-plan">
