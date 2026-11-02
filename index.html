@@ -2770,6 +2770,49 @@
     .theme-switch button:focus-visible { outline: 2px solid var(--chrome-accent); outline-offset: 1px; }
     @media (max-width: 520px) { .theme-switch button { width: 26px; } }
 
+    /* ── Header, polished: a flowing accent line, a sliding theme pill, a livelier profile chip ── */
+    html[data-theme] .topbar::after {
+        content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; pointer-events: none; opacity: .75;
+        background: linear-gradient(90deg, transparent 0%, var(--brand) 25%, var(--teal) 50%, var(--brand) 75%, transparent 100%);
+        background-size: 200% 100%;
+    }
+    html[data-theme] .topbar { padding-top: 2px; }
+
+    /* theme switch: one raised pill slides to the chosen option */
+    .theme-switch { --ts-w: 30px; position: relative; isolation: isolate; }
+    .theme-switch::before {
+        content: ""; position: absolute; z-index: -1; left: 3px; top: 3px; bottom: 3px; width: var(--ts-w); border-radius: 999px;
+        background: var(--chrome-bg); box-shadow: -2px -2px 5px var(--chrome-hi), 2px 2px 5px var(--chrome-lo);
+        transform: translateX(calc(var(--ts-i, 0) * (var(--ts-w) + 2px)));
+        transition: transform .38s cubic-bezier(.34,1.45,.64,1);
+    }
+    .theme-switch:has(button:nth-child(2)[aria-checked="true"]) { --ts-i: 1; }
+    .theme-switch:has(button:nth-child(3)[aria-checked="true"]) { --ts-i: 2; }
+    .theme-switch button[aria-checked="true"] { background: transparent; box-shadow: none; }
+    .theme-switch button svg { transition: transform .45s cubic-bezier(.34,1.56,.64,1); }
+    .theme-switch button:hover svg { transform: rotate(25deg) scale(1.15); }
+    .theme-switch button[aria-checked="true"] svg { transform: scale(1.1); }
+    @media (max-width: 520px) { .theme-switch { --ts-w: 26px; } }
+
+    /* profile chip */
+    .tp-avatar { position: relative; width: 32px; height: 32px; font-size: 12px; box-shadow: 0 0 0 2px var(--chrome-bg, #fff), 0 0 0 3.5px rgba(79,142,247,.55), 0 4px 10px rgba(79,142,247,.35); }
+    .tp-avatar::after {
+        content: ""; position: absolute; right: -2px; bottom: -2px; width: 10px; height: 10px; border-radius: 50%;
+        background: #22C55E; box-shadow: 0 0 0 2px var(--chrome-bg, #fff);
+    }
+    .topbar-profile { gap: 10px; padding: 4px 12px 4px 5px; }
+    .tp-name { font-size: 13px; font-weight: 700; letter-spacing: -.1px; }
+    .tp-caret { width: 13px; height: 13px; transition: transform .25s cubic-bezier(.34,1.56,.64,1); }
+    .topbar-profile[aria-expanded="true"] .tp-caret { transform: rotate(180deg); }
+    .topbar-profile:hover .tp-caret { transform: translateY(1px); }
+    .topbar-profile[aria-expanded="true"]:hover .tp-caret { transform: rotate(180deg); }
+    @media (prefers-reduced-motion: no-preference) {
+        html[data-theme] .topbar::after { animation: tb-flow 9s linear infinite; }
+        @keyframes tb-flow { to { background-position: 200% 0; } }
+        .tp-avatar::after { animation: tb-online 2.6s ease-out infinite; }
+        @keyframes tb-online { 0% { box-shadow: 0 0 0 2px var(--chrome-bg, #fff), 0 0 0 2px rgba(34,197,94,.7); } 100% { box-shadow: 0 0 0 2px var(--chrome-bg, #fff), 0 0 0 8px rgba(34,197,94,0); } }
+    }
+
     /* ── Sidebar: the soft-UI skin, re-pointed at the shared tokens ── */
     html[data-theme] #appSidebar {
         --sb-bg: var(--chrome-bg);
@@ -3052,7 +3095,7 @@
                     <span class="tp-name" id="topbarName">—</span>
                     <span class="tp-dept" id="topbarDept">—</span>
                 </span>
-                <span class="tp-caret" aria-hidden="true">▾</span>
+                <svg class="tp-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
                 <span id="topbarRole" hidden>—</span>
             </button>
         </div>
