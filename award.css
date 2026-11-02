@@ -2325,3 +2325,57 @@
   .award-page .awm-view .pom-filter-card, .award-page .pom-filter-card { flex-wrap: wrap; }
   .award-page .pom-filter-card .pom-select { max-width: 100%; }
 }
+
+
+/* ======================================================================
+   Award Management, finished off: the records show where each stands, the
+   admin windows share the look of the other pop-ups, the file chooser is
+   friendly, and loading rows shimmer. The month table is left as it was.
+   ====================================================================== */
+
+/* ---- the records table ---- */
+.award-page .awm-view .pom-table tbody tr.rec-verified td:first-child { box-shadow: inset 4px 0 0 var(--good); }
+.award-page .awm-view .pom-table tbody tr.rec-rejected td:first-child { box-shadow: inset 4px 0 0 var(--danger); }
+.award-page .awm-view .pom-table tbody tr.rec-saved    td:first-child { box-shadow: inset 4px 0 0 #3B82F6; }
+.award-page .awm-view .pom-table tbody tr.rec-unsaved  td:first-child { box-shadow: inset 4px 0 0 var(--warn); }
+.award-page .awm-view .pom-table.fixed tbody tr { transition: background-color .15s ease; }
+.award-page .awm-view .pom-table.fixed tbody tr:hover > td { background: var(--accent-soft); }
+
+.award-page .awm-view .awm-filters { gap: 8px; flex-wrap: wrap; }
+.award-page .awm-view .awm-filters b { font-size: .95rem; }
+.award-page .awm-chip {
+  display: inline-flex; align-items: center; padding: 3px 11px; border-radius: 999px;
+  font-size: .74rem; font-weight: 700; border: 1px solid transparent;
+}
+.award-page .awm-chip.is-verified { background: var(--good-soft);   color: var(--good);   border-color: var(--good-soft-border); }
+.award-page .awm-chip.is-saved    { background: #EFF6FF;            color: #1D4ED8;       border-color: #BFDBFE; }
+.award-page .awm-chip.is-pending  { background: var(--surface-alt); color: var(--text-soft); border-color: var(--border); }
+.award-page .awm-chip.is-rejected { background: var(--danger-soft); color: var(--danger); border-color: var(--danger-soft-border); }
+
+/* ---- the admin windows: All uploads, Deleted records, confirmations ---- */
+.award-page .awm-view .pom-modal-overlay, .award-page .awm-view .pom-prompt-overlay { backdrop-filter: blur(3px); }
+.award-page .awm-view .pom-modal-box, .award-page .awm-view .pom-prompt-box { border-radius: 20px; box-shadow: 0 24px 60px rgba(15,23,42,.28); padding: 26px 26px 22px; }
+.award-page .awm-view .pom-modal-title, .award-page .awm-view .pom-prompt-title { font-size: 1.1rem; font-weight: 800; letter-spacing: -.01em; }
+.award-page .awm-view .pmbtn { min-height: 40px; padding: 9px 20px; border-radius: 10px; font-weight: 800; transition: transform .15s var(--ease), box-shadow .2s ease, background-color .15s ease; }
+.award-page .awm-view .pmbtn:hover { transform: translateY(-1px); }
+.award-page .awm-view .pmbtn:active { transform: scale(.98); }
+.award-page .awm-view .pmbtn.primary { background: linear-gradient(135deg, var(--accent), #0E9488); box-shadow: 0 3px 10px rgba(15,118,110,.25); }
+.award-page .awm-view .pmbtn.primary:hover { background: linear-gradient(135deg, var(--accent-hover), var(--accent)); box-shadow: 0 7px 18px rgba(15,118,110,.32); }
+
+/* ---- Add records: a friendlier file chooser ---- */
+.award-page .awm-view .awa-file { transition: border-color .15s ease, background-color .15s ease; cursor: pointer; }
+.award-page .awm-view .awa-file:hover { border-color: var(--accent); background: var(--accent-soft); }
+.award-page .awm-view .awa-file::file-selector-button {
+  margin-right: 12px; padding: 8px 18px; border: 0; border-radius: 999px; cursor: pointer;
+  background: linear-gradient(135deg, var(--accent), #0E9488); color: #fff; font: inherit; font-weight: 800;
+  transition: filter .15s ease;
+}
+.award-page .awm-view .awa-file:hover::file-selector-button { filter: brightness(1.08); }
+
+/* ---- loading rows ---- */
+.award-page tr.is-loading td { color: var(--text-muted); text-align: center; background: linear-gradient(90deg, var(--surface-alt) 25%, var(--border) 37%, var(--surface-alt) 63%); background-size: 400% 100%; }
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes aw-shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+  .award-page tr.is-loading td { animation: aw-shimmer 1.4s ease-in-out infinite; }
+  .award-page .awm-view .pom-modal-box, .award-page .awm-view .pom-prompt-box { animation: aw-pop .3s var(--ease) both; }
+}
