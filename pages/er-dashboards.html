@@ -134,22 +134,7 @@
    colour and respond to the pointer. Only the look changes here; every
    link, label and address is as it was. Icons stay CSS masks (no inline svg).
    ====================================================================== */
-.erd-page .erd-head {
-    position: relative; overflow: hidden; isolation: isolate; align-items: center; padding: 26px 30px; border-radius: 22px; color: #fff;
-    background: linear-gradient(120deg, #2F6FE4 0%, #4F8EF7 40%, #10B197 100%);
-    box-shadow: 0 16px 36px rgba(47,111,228,.26), inset 0 1px 0 rgba(255,255,255,.35);
-}
-.erd-page .erd-head::before {
-    content: ""; position: absolute; inset: 0; z-index: -1; opacity: .5;
-    background-image: radial-gradient(rgba(255,255,255,.28) 1.2px, transparent 1.4px); background-size: 22px 22px;
-    -webkit-mask-image: linear-gradient(100deg, #000, transparent 70%); mask-image: linear-gradient(100deg, #000, transparent 70%);
-}
-.erd-blob { position: absolute; z-index: -1; border-radius: 50%; filter: blur(34px); pointer-events: none; }
-.erd-blob--a { width: 240px; height: 240px; right: -50px; top: -90px; background: rgba(255,255,255,.26); }
-.erd-blob--b { width: 200px; height: 200px; right: 28%; bottom: -120px; background: rgba(253,230,138,.3); }
-.erd-page .erd-title { font-size: 30px; font-weight: 800; letter-spacing: -.9px; color: #fff; margin: 0 0 6px; }
-.erd-page .erd-title span { background: none; -webkit-text-fill-color: #FEF3C7; color: #FEF3C7; }
-.erd-page .erd-sub { color: rgba(255,255,255,.92); font-size: 13.5px; font-weight: 500; max-width: 62ch; }
+.erd-page .pg-hero { margin-bottom: 0; }
 .erd-page .erd-user {
     background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.34); box-shadow: inset 0 1px 0 rgba(255,255,255,.3);
     -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
@@ -199,29 +184,24 @@
 .erd-c-lock  { --m: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='11' width='14' height='10' rx='2'/%3E%3Cpath d='M8 11V7a4 4 0 0 1 8 0v4'/%3E%3C/svg%3E"); }
 
 @media (prefers-reduced-motion: no-preference) {
-    .erd-page .erd-head, .erd-page .erd-tile { animation: erd-in .6s cubic-bezier(.22,1,.36,1) backwards; }
+    .erd-page .erd-tile { animation: erd-in .6s cubic-bezier(.22,1,.36,1) backwards; }
     .erd-page .erd-tile:nth-child(1) { animation-delay: .08s; } .erd-page .erd-tile:nth-child(2) { animation-delay: .14s; }
     .erd-page .erd-tile:nth-child(3) { animation-delay: .2s; }  .erd-page .erd-tile:nth-child(4) { animation-delay: .26s; }
     .erd-page .erd-tile:nth-child(5) { animation-delay: .32s; } .erd-page .erd-tile:nth-child(6) { animation-delay: .38s; }
     .erd-page .erd-tile:nth-child(7) { animation-delay: .44s; }
-    .erd-blob--a { animation: erd-drift 14s ease-in-out infinite alternate; }
-    .erd-blob--b { animation: erd-drift 18s ease-in-out -6s infinite alternate-reverse; }
     @keyframes erd-in { from { opacity: 0; transform: translateY(14px); } }
-    @keyframes erd-drift { to { transform: translate(30px, 20px) scale(1.12); } }
 }
 @media (max-width: 640px) {
-    .erd-page .erd-head { padding: 20px; }
-    .erd-page .erd-title { font-size: 24px; }
 }
 </style>
 <div class="erd-page">
 
-    <header class="erd-head">
-        <span class="erd-blob erd-blob--a" aria-hidden="true"></span>
-        <span class="erd-blob erd-blob--b" aria-hidden="true"></span>
-        <div class="erd-head-text">
-            <h1 class="erd-title">ER &amp; <span>Dashboards</span></h1>
-            <p class="erd-sub">OLF apps and program dashboards. Each opens in a new tab &middot; sign in with your OLF Google account.</p>
+    <header class="pg-hero">
+        <span class="pg-blob pg-blob--a" aria-hidden="true"></span>
+        <span class="pg-blob pg-blob--b" aria-hidden="true"></span>
+        <div class="pg-hero-main">
+            <h1 class="pg-hero-title">ER &amp; <span class="pg-accent">Dashboards</span></h1>
+            <p class="pg-hero-sub">OLF apps and program dashboards. Each opens in a new tab &middot; sign in with your OLF Google account.</p>
         </div>
         <div class="erd-user" title="Use this Google account when an app asks you to sign in">
             <span class="erd-avatar" id="erdAvatar" aria-hidden="true">?</span>

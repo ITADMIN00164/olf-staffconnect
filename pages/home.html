@@ -5,14 +5,14 @@
     <div id="newsBannerSection" style="display:none;"></div>
 
     <!-- ── Hero: greeting, date and time ── -->
-    <section class="hm-hero" aria-label="Welcome">
-        <span class="hm-blob hm-blob--a" aria-hidden="true"></span>
-        <span class="hm-blob hm-blob--b" aria-hidden="true"></span>
-        <span class="hm-blob hm-blob--c" aria-hidden="true"></span>
-        <div class="hm-hero-main">
-            <div class="hm-eyebrow"><span class="hm-live" aria-hidden="true"></span><span id="homeDate">&nbsp;</span></div>
-            <h1 class="hm-title"><span class="hm-title-text"><span id="homeGreeting">Welcome back</span>, <span class="hm-name" id="homeUserName">—</span></span><span class="hm-hand" aria-hidden="true">👋</span></h1>
-            <p class="hm-sub">One Stop Solution for OLF's Data Management</p>
+    <section class="pg-hero hm-hero" aria-label="Welcome">
+        <span class="pg-blob pg-blob--a" aria-hidden="true"></span>
+        <span class="pg-blob pg-blob--b" aria-hidden="true"></span>
+        <span class="pg-blob pg-blob--c" aria-hidden="true"></span>
+        <div class="pg-hero-main">
+            <div class="pg-eyebrow"><span class="pg-live" aria-hidden="true"></span><span id="homeDate">&nbsp;</span></div>
+            <h1 class="pg-hero-title hm-title"><span class="hm-title-text"><span id="homeGreeting">Welcome back</span>, <span class="hm-name" id="homeUserName">—</span></span><span class="hm-hand" aria-hidden="true">👋</span></h1>
+            <p class="pg-hero-sub">One Stop Solution for OLF's Data Management</p>
         </div>
         <div class="hm-clock" aria-hidden="true">
             <div class="hm-clock-time" id="homeClock">--:--</div>
@@ -21,32 +21,32 @@
     </section>
 
     <!-- ── Stats ── -->
-    <div class="hm-stats stats-row" id="statsRow">
-        <div class="hm-stat" style="--tint:#4F8EF7">
-            <div class="hm-stat-icon">
+    <div class="pg-stats stats-row" id="statsRow">
+        <div class="pg-stat" style="--tint:#4F8EF7">
+            <div class="pg-stat-icon">
                 <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="21.500" cy="10.500" r="4.300" fill="#FCD9A8"/><path d="M13.500 27c0-5.200 3.400-8.500 8-8.500s8 3.300 8 8.500z" fill="#3B82F6"/><circle cx="11" cy="12" r="4.800" fill="#FFD3A1"/><path d="M2.500 28.500c0-5.800 3.700-9.500 8.500-9.500s8.500 3.700 8.500 9.500z" fill="#8B5CF6"/></svg>
             </div>
-            <div class="hm-stat-info">
-                <div class="hm-stat-value" id="statTotal">—</div>
-                <div class="hm-stat-label">Total Employees</div>
+            <div class="pg-stat-info">
+                <div class="pg-stat-value" id="statTotal">—</div>
+                <div class="pg-stat-label">Total Employees</div>
             </div>
         </div>
-        <div class="hm-stat" style="--tint:#10B197">
-            <div class="hm-stat-icon">
+        <div class="pg-stat" style="--tint:#10B197">
+            <div class="pg-stat-icon">
                 <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="6" y="4" width="14" height="24" rx="2" fill="#14B8A6"/><rect x="18" y="12" width="9" height="16" rx="2" fill="#0F766E"/><g fill="#CCFBF1"><rect x="9" y="8" width="3" height="3" rx=".6"/><rect x="14" y="8" width="3" height="3" rx=".6"/><rect x="9" y="14" width="3" height="3" rx=".6"/><rect x="14" y="14" width="3" height="3" rx=".6"/><rect x="9" y="20" width="3" height="3" rx=".6"/><rect x="14" y="20" width="3" height="3" rx=".6"/><rect x="21" y="16" width="3" height="3" rx=".6"/><rect x="21" y="22" width="3" height="3" rx=".6"/></g></svg>
             </div>
-            <div class="hm-stat-info">
-                <div class="hm-stat-value" id="statDepts">—</div>
-                <div class="hm-stat-label">Departments</div>
+            <div class="pg-stat-info">
+                <div class="pg-stat-value" id="statDepts">—</div>
+                <div class="pg-stat-label">Departments</div>
             </div>
         </div>
-        <div class="hm-stat" style="--tint:#F43F5E">
-            <div class="hm-stat-icon">
+        <div class="pg-stat" style="--tint:#F43F5E">
+            <div class="pg-stat-icon">
                 <svg viewBox="0 0 32 32" aria-hidden="true"><ellipse cx="16" cy="29" rx="6.500" ry="1.800" fill="#0F172A" opacity=".15"/><path d="M16 28.500s-9.500-9-9.500-16a9.500 9.500 0 0 1 19 0c0 7-9.500 16-9.500 16z" fill="#F43F5E"/><circle cx="16" cy="12.500" r="4" fill="#fff"/></svg>
             </div>
-            <div class="hm-stat-info">
-                <div class="hm-stat-value" id="statLocations">—</div>
-                <div class="hm-stat-label">Locations</div>
+            <div class="pg-stat-info">
+                <div class="pg-stat-value" id="statLocations">—</div>
+                <div class="pg-stat-label">Locations</div>
             </div>
         </div>
     </div>
@@ -85,38 +85,10 @@
 <style>
 .home-page { max-width: var(--page-max, 1680px); margin-left: auto; margin-right: auto; }
 
-/* ── Hero ───────────────────────────────────────────────────── */
-.hm-hero {
-    position: relative; overflow: hidden; isolation: isolate;
-    display: flex; align-items: center; justify-content: space-between; gap: 24px;
-    padding: 30px 34px; margin-bottom: 22px; border-radius: 22px; color: #fff;
-    background: linear-gradient(120deg, #2F6FE4 0%, #4F8EF7 38%, #10B197 100%);
-    box-shadow: 0 18px 40px rgba(47,111,228,.28), inset 0 1px 0 rgba(255,255,255,.35);
-}
-.hm-hero::before {            /* faint dot grid */
-    content: ""; position: absolute; inset: 0; z-index: -1; opacity: .5;
-    background-image: radial-gradient(rgba(255,255,255,.28) 1.2px, transparent 1.4px);
-    background-size: 22px 22px;
-    -webkit-mask-image: linear-gradient(100deg, #000 0%, transparent 70%);
-            mask-image: linear-gradient(100deg, #000 0%, transparent 70%);
-}
-.hm-blob { position: absolute; z-index: -1; border-radius: 50%; filter: blur(34px); pointer-events: none; }
-.hm-blob--a { width: 260px; height: 260px; right: -60px; top: -90px; background: rgba(255,255,255,.28); }
-.hm-blob--b { width: 220px; height: 220px; right: 22%; bottom: -120px; background: rgba(253,230,138,.34); }
-.hm-blob--c { width: 200px; height: 200px; left: -70px; bottom: -110px; background: rgba(6,95,70,.30); }
-
-.hm-hero-main { min-width: 0; }
-.hm-eyebrow {
-    display: inline-flex; align-items: center; gap: 8px; margin-bottom: 12px;
-    padding: 5px 13px 5px 11px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: .02em;
-    background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.3);
-    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
-}
-.hm-live { width: 8px; height: 8px; border-radius: 50%; background: #86EFAC; box-shadow: 0 0 0 0 rgba(134,239,172,.7); }
-.hm-title { display: flex; align-items: center; flex-wrap: wrap; gap: 0 12px; font-size: 34px; font-weight: 800; letter-spacing: -1px; line-height: 1.12; margin: 0 0 8px; color: #fff; }
+/* The shared banner and stat cards live in index.html (pg-*). Only what is Home's own stays here. */
+.hm-title { display: flex; align-items: center; flex-wrap: wrap; gap: 0 12px; }
 .hm-name { color: #FEF3C7; }
 .hm-hand { display: inline-block; flex: 0 0 auto; font-size: 1em; line-height: 1; position: relative; top: -4px; margin-left: -4px; transform-origin: 70% 70%; }
-.hm-sub { margin: 0; font-size: 14.5px; font-weight: 500; opacity: .92; }
 
 .hm-clock {
     flex: 0 0 auto; text-align: center; padding: 14px 24px; border-radius: 18px;
@@ -126,30 +98,6 @@
 }
 .hm-clock-time { font-size: 34px; font-weight: 800; letter-spacing: -1px; line-height: 1; font-variant-numeric: tabular-nums; }
 .hm-clock-day { margin-top: 6px; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; opacity: .85; }
-
-/* ── Stats ──────────────────────────────────────────────────── */
-.hm-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 26px; }
-.hm-stat {
-    position: relative; overflow: hidden; display: flex; align-items: center; gap: 16px;
-    padding: 20px 22px; border-radius: 18px;
-    background: var(--glass-strong, rgba(255,255,255,.88)); border: 1px solid var(--hairline, rgba(15,23,42,.08));
-    box-shadow: var(--shadow-sm); transition: transform .22s var(--ease, ease), box-shadow .22s ease;
-}
-.hm-stat::after {            /* soft tinted glow in the corner */
-    content: ""; position: absolute; right: -40px; top: -40px; width: 130px; height: 130px; border-radius: 50%;
-    background: radial-gradient(circle, color-mix(in srgb, var(--tint) 24%, transparent), transparent 70%); pointer-events: none;
-}
-.hm-stat:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
-.hm-stat-icon {
-    width: 58px; height: 58px; border-radius: 17px; display: grid; place-items: center; flex: 0 0 auto;
-    background: color-mix(in srgb, var(--tint) 13%, transparent);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tint) 22%, transparent);
-    transition: transform .3s cubic-bezier(.34,1.56,.64,1);
-}
-.hm-stat-icon svg { width: 36px; height: 36px; filter: drop-shadow(0 2px 2px rgba(15,23,42,.18)); }
-.hm-stat:hover .hm-stat-icon { transform: scale(1.1) rotate(-5deg); }
-.hm-stat-value { font-size: 34px; font-weight: 800; letter-spacing: -1px; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
-.hm-stat-label { margin-top: 6px; font-size: 13px; font-weight: 600; color: var(--text-soft); }
 
 /* ── Section heads ──────────────────────────────────────────── */
 .hm-section { margin: 0 0 26px; }
@@ -282,30 +230,19 @@ html[data-theme="dark"] .hm .upcoming-card { border-color: var(--hairline); box-
 
 /* ── Motion: everything settles in, the hero keeps a slow drift ─ */
 @media (prefers-reduced-motion: no-preference) {
-    .hm-hero, .hm-stat, .hm-section { animation: hm-in .6s cubic-bezier(.22,1,.36,1) backwards; }
-    .hm-hero { animation-delay: .02s; }
-    .hm-stat:nth-child(1) { animation-delay: .12s; } .hm-stat:nth-child(2) { animation-delay: .18s; } .hm-stat:nth-child(3) { animation-delay: .24s; }
+    .hm-section { animation: hm-in .6s cubic-bezier(.22,1,.36,1) backwards; }
     #upcomingSection { animation-delay: .3s; } .news-section.hm-section { animation-delay: .36s; }
-    .hm-blob--a { animation: hm-drift 14s ease-in-out infinite alternate; }
-    .hm-blob--b { animation: hm-drift 18s ease-in-out -6s infinite alternate-reverse; }
-    .hm-blob--c { animation: hm-drift 16s ease-in-out -3s infinite alternate; }
-    .hm-live { animation: hm-ping 2.2s ease-out infinite; }
     .hm-hand { animation: hm-wave 2.6s ease-in-out 1s infinite; }
     .hm .hm-empty-ico { animation: hm-bob 3.2s ease-in-out infinite; }
     @keyframes hm-in { from { opacity: 0; transform: translateY(14px); } }
-    @keyframes hm-drift { to { transform: translate(34px, 22px) scale(1.12); } }
-    @keyframes hm-ping { 0% { box-shadow: 0 0 0 0 rgba(134,239,172,.7); } 100% { box-shadow: 0 0 0 9px rgba(134,239,172,0); } }
     @keyframes hm-wave { 0%, 60%, 100% { transform: rotate(0); } 10%, 30% { transform: rotate(16deg); } 20%, 40% { transform: rotate(-10deg); } 50% { transform: rotate(8deg); } }
     @keyframes hm-bob { 50% { transform: translateY(-4px); } }
 }
 
 @media (max-width: 900px) {
-    .hm-hero { padding: 24px 22px; }
-    .hm-title { font-size: 27px; }
     .hm-clock { display: none; }
 }
 @media (max-width: 768px) {
-    .hm-stats, .stats-row { grid-template-columns: 1fr; }
     .news-cards-grid { grid-template-columns: 1fr; }
     .upcoming-grid { grid-template-columns: 1fr; }
 }

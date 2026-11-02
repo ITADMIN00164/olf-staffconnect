@@ -2503,6 +2503,18 @@ function renderEmployees() {
             : `${filtered.length} record${filtered.length !== 1 ? "s" : ""}`;
     }
 
+    // The figures at the top describe the whole directory, whatever the search shows.
+    const empFigures = {
+        empStatTotal:    employees.length,
+        empStatActive:   employees.filter(isActiveEmployee).length,
+        empStatInactive: employees.filter(e => !isActiveEmployee(e)).length,
+        empStatDepts:    new Set(employees.map(e => e.Dept).filter(Boolean)).size
+    };
+    Object.keys(empFigures).forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.dataset.v !== String(empFigures[id])) { el.dataset.v = String(empFigures[id]); animateCount(el, empFigures[id]); }
+    });
+
     const tableCols = getTableColumns();
     const colCount  = tableCols.length + 1 + (currentRole === "Admin" ? 1 : 0);
 
