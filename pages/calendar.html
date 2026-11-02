@@ -460,11 +460,6 @@
     box-shadow: 0 4px 12px rgba(240,124,43,.28); font-weight: 700;
   }
   #pcal-app .sidebar-add-btn:hover { background: linear-gradient(180deg, #f07c2b, #c95b13); box-shadow: 0 6px 16px rgba(240,124,43,.35); }
-  #pcal-app #pcal-past-btn {
-    background: var(--surface) !important; color: var(--text-dark); border: 1px solid var(--border);
-    box-shadow: none; font-weight: 600; margin-top: 8px !important;
-  }
-  #pcal-app #pcal-past-btn:hover { background: var(--off) !important; border-color: #cfd8e3; }
   #pcal-app .sidebar-legend { padding: 16px 14px 10px; margin-top: 14px; border-top: 1px solid var(--line); }
   #pcal-app .pcal-filter-item { padding: 6px 6px; margin: 0 -6px 1px; border-radius: 8px; font-size: 0.82rem; color: var(--text-dark); }
   #pcal-app .pcal-filter-count {
@@ -697,27 +692,113 @@
   #pcal-app .pcal-key-off { border-color: #f2c4c4; background: repeating-linear-gradient(135deg, #fdf0f0 0 4px, #f6d6d6 4px 5px); }
   #pcal-app .pcal-key { color: #b4534e; }
   #pcal-app .cal-cell.today .day-num { color: #fff; }
+
+  /* ======================================================================
+     Program Calendar, brought into the same look as the other pages: the
+     shared banner, one row of views, soft cards, blue-to-teal accents.
+     Only the look changes; every id and behaviour is as it was.
+     ====================================================================== */
+  #pcal-app {
+    --primary: #2457C5; --primary-light: #2F6FE4; --primary-pale: #EEF4FF; --accent: #2F6FE4;
+    --text-dark: var(--text, #1c2b3a); --text-mid: var(--text-soft, #4a5a6a); --text-light: var(--text-faint, #8a9aaa);
+    --border: var(--hairline, #d0dae4); --bg: transparent;
+    --radius-lg: 18px;
+  }
+  #pcal-app .pcal-i { width: 17px; height: 17px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  #pcal-app .pcal-hero { margin-bottom: 16px; }
+
+  /* the views, as one row of pills in a soft card */
+  #pcal-app .pcal-navcard {
+    display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 5px; margin: 0 0 18px; border-radius: 18px;
+    background: var(--glass-strong, #fff); border: 1px solid var(--hairline, #d0dae4); box-shadow: var(--shadow-sm);
+  }
+  #pcal-app .pcal-nav-item {
+    width: auto; padding: 9px 18px; border: 0; border-radius: 13px; gap: 8px; font-size: .88rem; font-weight: 700; color: var(--text-mid);
+    transition: color .18s ease, background-color .18s ease, box-shadow .22s ease, transform .15s ease;
+  }
+  #pcal-app .pcal-nav-item:hover:not(.active) { background: var(--primary-pale); color: var(--primary); }
+  #pcal-app .pcal-nav-item.active {
+    color: #fff; background: linear-gradient(135deg, #4F8EF7, #10B197); border-left-color: transparent;
+    box-shadow: 0 6px 14px rgba(47,111,228,.32), inset 0 1px 0 rgba(255,255,255,.35);
+  }
+  #pcal-app .pcal-nav-item:active { transform: scale(.97); }
+
+  /* sidebar and cards */
+  #pcal-app .pcal-side { border-radius: 18px; background: var(--glass-strong, #fff); border: 1px solid var(--hairline, #d0dae4); top: 12px; }
+  #pcal-app .pcal-side-section { border-bottom: 0; }
+  #pcal-app select { border-radius: 10px; background-color: var(--surface-alt, #f4f6fa); }
+  #pcal-app select:hover { border-color: var(--primary-light); }
+  #pcal-app .calendar-card { border-radius: 20px; background: var(--glass-strong, #fff); box-shadow: var(--shadow-sm); }
+  #pcal-app .pcal-toolbar { padding: 14px 20px; border-bottom: 1px solid var(--hairline, #d0dae4); }
+  #pcal-app .pcal-tb-title { font-weight: 800; letter-spacing: -.4px; }
+  #pcal-app .pcal-tb-nav, #pcal-app .pcal-tb-today { border-radius: 10px; transition: background-color .15s ease, border-color .15s ease, transform .15s ease; }
+  #pcal-app .pcal-tb-nav:hover, #pcal-app .pcal-tb-today:hover { transform: translateY(-1px); }
+  #pcal-app .cal-day-header { background: var(--primary-pale); color: var(--text-mid); }
+  #pcal-app .cal-cell.today .day-num { background: linear-gradient(135deg, #4F8EF7, #10B197); box-shadow: 0 3px 8px rgba(47,111,228,.35); }
+  #pcal-app .cal-cell:not(.other-month):hover { background: var(--primary-pale); }
+  #pcal-app .section-heading { color: var(--text-dark); font-size: .8rem; }
+  #pcal-app .event-list-item { border-radius: 14px; background: var(--glass-strong, #fff); transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+  #pcal-app .event-list-item:hover { transform: translateY(-2px); }
+
+  /* buttons */
+  #pcal-app .btn-primary { background: linear-gradient(135deg, #4F8EF7, #2F6FE4); border-radius: 11px; box-shadow: 0 6px 14px rgba(47,111,228,.28); transition: transform .15s ease, box-shadow .2s ease; }
+  #pcal-app .btn-primary:hover { background: linear-gradient(135deg, #4F8EF7, #2F6FE4); box-shadow: 0 10px 20px rgba(47,111,228,.36); transform: translateY(-1px); }
+  #pcal-app .btn-primary:active { transform: scale(.97); }
+  #pcal-app .btn-secondary { border-radius: 11px; }
+  #pcal-app .pcal-filter-badge { background: var(--primary-light); }
+
+  /* the add / edit windows */
+  #pcal-app .modal { border-radius: 20px; overflow: hidden auto; }
+  #pcal-app .modal-header { background: linear-gradient(120deg, #2457C5 0%, #2F6FE4 45%, #0B8F7A 100%); border-bottom: 0; }
+  #pcal-app .modal-header h2 { color: #fff; }
+  #pcal-app .modal-close { color: rgba(255,255,255,.85); }
+  #pcal-app .modal-close:hover { color: #fff; }
+
+  /* Settings, Past Events and Bulk Import have no sidebar controls: the side card goes and the content takes the width */
+  #pcal-app .pcal-shell:has(#pcal-sidebar-cal-controls[style*="none"]) .pcal-side { display: none; }
+  #pcal-app .pcal-shell:has(#pcal-sidebar-cal-controls[style*="none"]) .content { padding-left: 0; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    #pcal-app .pcal-navcard, #pcal-app .calendar-card, #pcal-app .pcal-side { animation: pcal-in .55s cubic-bezier(.22,1,.36,1) backwards; }
+    #pcal-app .pcal-navcard { animation-delay: .1s; } #pcal-app .pcal-side, #pcal-app .calendar-card { animation-delay: .18s; }
+    @keyframes pcal-in { from { opacity: 0; transform: translateY(12px); } }
+  }
+  @media (max-width: 860px) {
+    #pcal-app .content { padding-left: 0; width: 100%; }
+    #pcal-app .pcal-navcard { display: flex; width: 100%; }
+    #pcal-app .pcal-nav-item { flex: 1 1 auto; justify-content: center; padding: 9px 12px; }
+  }
 </style>
+
+  <!-- Same banner as the other pages (styles: index.html, pg-*) -->
+  <section class="pg-hero pcal-hero">
+    <span class="pg-blob pg-blob--a" aria-hidden="true"></span>
+    <span class="pg-blob pg-blob--b" aria-hidden="true"></span>
+    <div class="pg-hero-lead">
+      <span class="pg-hero-ico" aria-hidden="true"><svg viewBox="0 0 32 32"><rect x="4" y="6" width="24" height="22" rx="4" fill="#fff"/><path d="M4 10a4 4 0 0 1 4-4h16a4 4 0 0 1 4 4v4H4z" fill="#F472B6"/><rect x="9" y="3" width="3" height="6" rx="1.5" fill="#CBD5E1"/><rect x="20" y="3" width="3" height="6" rx="1.5" fill="#CBD5E1"/><g fill="#3B82F6"><circle cx="10.500" cy="19" r="1.800"/><circle cx="16" cy="19" r="1.800"/><circle cx="10.500" cy="24" r="1.800"/></g><circle cx="21.500" cy="19" r="1.800" fill="#F59E0B"/><circle cx="16" cy="24" r="1.800" fill="#10B981"/></svg></span>
+      <div class="pg-hero-main">
+        <h1 class="pg-hero-title">Program Calendar</h1>
+        <p class="pg-hero-sub">Programmes and events across districts, with weekly offs marked.</p>
+      </div>
+    </div>
+    <div class="pg-hero-actions">
+      <button class="pg-btn" id="pcal-past-btn"><svg class="pcal-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18v13H3zM3 7l2-3h14l2 3M9 12h6"/></svg>Past events</button>
+      <button class="pg-btn pg-btn--solid" id="pcal-add-btn"><svg class="pcal-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add Event</button>
+    </div>
+  </section>
+
+  <!-- The views of the calendar -->
+  <nav class="pcal-navcard" aria-label="Calendar views">
+    <button class="pcal-nav-item active" data-pcal-tab="calendar"><svg class="pcal-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M8.5 3v4M15.5 3v4"/></svg>Calendar</button>
+    <button class="pcal-nav-item pcal-admin-only" data-pcal-tab="settings"><svg class="pcal-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.600 5.600l2.100 2.100M16.300 16.300l2.100 2.100M18.400 5.600l-2.100 2.100M7.700 16.300l-2.100 2.100"/></svg>Settings</button>
+    <button class="pcal-nav-item pcal-admin-only" data-pcal-tab="past"><svg class="pcal-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18v13H3zM3 7l2-3h14l2 3M9 12h6"/></svg>Past Events</button>
+    <button class="pcal-nav-item pcal-admin-only" data-pcal-tab="bulk"><svg class="pcal-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10m0 0 4-4m-4 4-4-4M5 19h14"/></svg>Bulk Import</button>
+  </nav>
 
   <div class="pcal-shell">
 
     <!-- ══════════ SIDEBAR ══════════ -->
     <aside class="pcal-side">
-      <nav class="pcal-side-nav">
-        <button class="pcal-nav-item active" data-pcal-tab="calendar">
-          <span class="nav-icon">📅</span> Calendar
-        </button>
-        <button class="pcal-nav-item pcal-admin-only" data-pcal-tab="settings">
-          <span class="nav-icon">⚙️</span> Settings
-        </button>
-        <button class="pcal-nav-item pcal-admin-only" data-pcal-tab="past">
-          <span class="nav-icon">🗂</span> Past Events
-        </button>
-        <button class="pcal-nav-item pcal-admin-only" data-pcal-tab="bulk">
-          <span class="nav-icon">📥</span> Bulk Import
-        </button>
-      </nav>
-
       <div id="pcal-sidebar-cal-controls">
         <div class="pcal-side-section">
           <div class="sidebar-section-title">Jump to</div>
@@ -734,16 +815,6 @@
           </div>
           <div class="pcal-pf-wrap" id="pcal-sidebar-legend"></div>
         </div>
-
-        <button class="sidebar-add-btn pcal-admin-only" id="pcal-add-btn">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M7 1v12M1 7h12" stroke="white" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-          Add Event
-        </button>
-        <button class="sidebar-add-btn pcal-admin-only" id="pcal-past-btn"
-          style="background:#475569;margin-top:8px">🗂 View Past Events</button>
-
       </div>
     </aside>
 
@@ -1048,3 +1119,6 @@
   </template>
 
 </div>
+
+<!-- Local Live Server adds its reload script at the closing body tag; this gives it a safe place. -->
+</body>
