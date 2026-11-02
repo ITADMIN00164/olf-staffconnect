@@ -2618,3 +2618,7 @@
   .award-page .stock-controls > #stock-fetch { flex: 1 1 100%; justify-content: center; }
   .award-page .awe-view .pev-hint { margin-left: 0; flex: 1 1 100%; }
 }
+
+/* Small grey labels (filter names, card captions, hints) were a shade too pale to read comfortably. */
+.award-page { --text-muted: #6B7280; }
+.award-page .field label, .award-page .pev-hint, .award-page .kpi small, .award-page .kpi em { color: var(--text-soft); }

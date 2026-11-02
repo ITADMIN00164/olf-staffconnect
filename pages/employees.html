@@ -1104,7 +1104,7 @@ html[data-theme="dark"] .employees-page { --row-hover: #283042; --row-line: rgba
 
 /* table */
 .employees-page table { width: 100%; }
-.employees-page .table-wrap { border-radius: 16px; border: 1px solid var(--row-line); }
+.employees-page .table-wrap { max-height: max(340px, calc(100vh - 480px)); border-radius: 16px; border: 1px solid var(--row-line); }
 .employees-page th {
     padding: 13px 16px; font-size: 11px; font-weight: 800; letter-spacing: .07em; color: var(--text-soft);
     background: var(--th-bg); border-bottom: 1px solid var(--row-line);

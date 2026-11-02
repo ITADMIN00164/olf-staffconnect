@@ -136,10 +136,7 @@
    ====================================================================== */
 .erd-page .pg-hero { margin-bottom: 0; }
 .erd-page .erd-user {
-    background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.34); box-shadow: inset 0 1px 0 rgba(255,255,255,.3);
-    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
 }
-.erd-page .erd-avatar { background: rgba(255,255,255,.9); color: #2F6FE4; }
 .erd-page .erd-user-text small { color: rgba(255,255,255,.8); }
 .erd-page .erd-user-text b { color: #fff; font-weight: 700; }
 
@@ -165,7 +162,10 @@
 .erd-page .erd-tag { display: inline-block; align-self: flex-start; padding: 3px 10px; border-radius: 999px; background: color-mix(in srgb, var(--c) 12%, transparent); letter-spacing: .05em; }
 .erd-page .erd-name { color: var(--text, #0f172a); font-size: 15.5px; letter-spacing: -.2px; }
 .erd-page .erd-desc { color: var(--text-soft, #5a6577); }
-.erd-page .erd-host { color: var(--text-faint, #8a94a6); font-weight: 500; }
+.erd-page .erd-host { color: var(--text-soft, #5a6577); font-weight: 500; }
+.erd-page .erd-tag { color: color-mix(in srgb, var(--c) 76%, #000); }
+html[data-theme="dark"] .erd-page .erd-tag { color: color-mix(in srgb, var(--c) 52%, #fff); }
+html[data-theme="dark"] .erd-page .erd-go { color: color-mix(in srgb, var(--c) 52%, #fff); }
 .erd-page .erd-go { background: color-mix(in srgb, var(--c) 11%, transparent); padding: 6px 13px; }
 .erd-page .erd-tile:hover .erd-go { background: var(--c); color: #fff; }
 .erd-page .erd-tile--feature .erd-go { background: var(--c); color: #fff; padding: 7px 16px; box-shadow: 0 6px 14px -6px var(--c); }
@@ -203,8 +203,8 @@
             <h1 class="pg-hero-title">ER &amp; <span class="pg-accent">Dashboards</span></h1>
             <p class="pg-hero-sub">OLF apps and program dashboards. Each opens in a new tab &middot; sign in with your OLF Google account.</p>
         </div>
-        <div class="erd-user" title="Use this Google account when an app asks you to sign in">
-            <span class="erd-avatar" id="erdAvatar" aria-hidden="true">?</span>
+        <div class="erd-user pg-glass" title="Use this Google account when an app asks you to sign in">
+            <span class="erd-avatar pg-glass-avatar" id="erdAvatar" aria-hidden="true">?</span>
             <span class="erd-user-text"><small>Signed in as</small><b id="erdUserEmail">—</b></span>
         </div>
     </header>
