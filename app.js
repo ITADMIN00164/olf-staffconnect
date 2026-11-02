@@ -1122,7 +1122,7 @@ async function renderUpcomingEvents() {
             </div>
             <div class="upcoming-body">
                 <div class="upcoming-title" title="${escHtml(e.eventName || e.type || "Event")}">${escHtml(e.eventName || e.type || "Event")}</div>
-                <div class="upcoming-meta">\u{1F4CD} ${escHtml(e.district || "\u2014")} &nbsp;\u00B7&nbsp; \u{1F551} ${escHtml(time)}</div>
+                <div class="upcoming-meta"><span class="hm-mi">${hmIcon("pin")}${escHtml(e.district || "\u2014")}</span><span class="hm-mi">${hmIcon("clock")}${escHtml(time)}</span></div>
                 <span class="upcoming-chip upcoming-chip--${tone}">${escHtml(when)}</span>
             </div>
         </div>`;
@@ -1996,6 +1996,29 @@ async function deriveSchema() {
 ==================================== */
 
 /* Home: greeting, live clock and count-up numbers. */
+const HM_ICON_PATHS = {
+    pin:       '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/>',
+    clock:     '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    calendar:  '<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M8.5 3v4M15.5 3v4"/>',
+    megaphone: '<path d="M4 10v4a1 1 0 0 0 1 1h2l5 4V5L7 9H5a1 1 0 0 0-1 1z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/>',
+    trash:     '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+    inbox:     '<path d="M4 13l2.5-7.5A2 2 0 0 1 8.4 4h7.2a2 2 0 0 1 1.9 1.5L20 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M4 13h4.5A1.5 1.5 0 0 1 10 14.5a2 2 0 0 0 4 0 1.5 1.5 0 0 1 1.5-1.5H20"/>'
+};
+function hmIcon(name) {
+    return '<svg class="hm-i" viewBox="0 0 24 24" aria-hidden="true">' + HM_ICON_PATHS[name] + "</svg>";
+}
+
+// The small picture beside the greeting follows the time of day.
+function homeGreetIconFor(date) {
+    const h = date.getHours();
+    if (h >= 5 && h < 17) {
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><g class="hm-rays"><path d="M12 2.5V5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M18.7 5.3l-1.8 1.8M7.1 16.9l-1.8 1.8"/></g><circle cx="12" cy="12" r="4.2"/></svg>';
+    }
+    if (h >= 17 && h < 20) {
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><g class="hm-rays"><path d="M12 5V3M5.6 8.6 4.2 7.2M18.4 8.6l1.4-1.4M3 15H5M19 15h2"/></g><path d="M7.5 15a4.5 4.5 0 0 1 9 0M3 19h18"/></svg>';
+    }
+    return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/><path class="hm-twinkle" d="M17 3v3M15.5 4.5h3"/></svg>';
+}
 function homeGreetingFor(date) {
     const h = date.getHours();
     return h < 5 ? "Hello" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : h < 22 ? "Good evening" : "Hello";
@@ -2015,9 +2038,12 @@ function startHomeClock() {
         if (date) date.textContent = now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
         const greet = document.getElementById("homeGreeting");
         if (greet) greet.textContent = homeGreetingFor(now);
+        const gico = document.getElementById("homeGreetIcon");
+        const gkey = homeGreetIconFor(now);
+        if (gico && gico.dataset.k !== gkey) { gico.innerHTML = gkey; gico.dataset.k = gkey; }
     };
     tick();
-    homeClockTimer = setInterval(tick, 15000);
+    homeClockTimer = setInterval(tick, 1000);
 }
 
 // Counts up to the figure instead of just appearing.
@@ -3976,9 +4002,9 @@ async function renderNewsCards() {
     if (!grid) return;
 
     grid.innerHTML = `
-        <div class="news-empty-state">
-            <div class="news-empty-icon">⏳</div>
-            Loading announcements…
+        <div class="news-empty-state hm-empty">
+            <span class="hm-spin" aria-hidden="true"></span>
+            <span class="hm-empty-sub">Loading announcements…</span>
         </div>`;
 
     try {
@@ -4007,9 +4033,10 @@ async function renderNewsCards() {
 
         if (allVisible.length === 0) {
             grid.innerHTML = `
-                <div class="news-empty-state">
-                    <div class="news-empty-icon">📭</div>
-                    No announcements right now. Check back later.
+                <div class="news-empty-state hm-empty">
+                    <span class="hm-empty-ico">${hmIcon("inbox")}</span>
+                    <strong class="hm-empty-title">No announcements right now</strong>
+                    <span class="hm-empty-sub">Check back later.</span>
                 </div>`;
             return;
         }
@@ -4024,17 +4051,17 @@ async function renderNewsCards() {
             <div class="news-card${isExpired ? " news-card--expired" : ""}">
                 <div class="news-card-top">
                     <span class="news-card-badge">
-                        📢 ${isExpired ? "Expired" : "Announcement"}
+                        ${hmIcon("megaphone")}${isExpired ? "Expired" : "Announcement"}
                     </span>
                     ${currentRole === "Admin" ? `
-                    <button class="btn-delete-news" data-newsid="${n.id}">🗑 Delete</button>
+                    <button class="btn-delete-news" data-newsid="${n.id}" title="Delete this announcement">${hmIcon("trash")}Delete</button>
                     ` : ""}
                 </div>
                 ${newsBody(n, "news-card-text")}
                 <button class="news-card-more" type="button" data-newsid="${n.id}" hidden>Read more →</button>
                 <div class="news-card-footer">
                     <div class="news-card-dates">
-                        📅 ${formatNewsDateTime(startVal, false)} – ${formatNewsDateTime(endVal, true)}
+                        ${hmIcon("calendar")}${formatNewsDateTime(startVal, false)} – ${formatNewsDateTime(endVal, true)}
                     </div>
                 </div>
             </div>`;

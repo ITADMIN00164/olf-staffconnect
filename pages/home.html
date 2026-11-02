@@ -11,7 +11,7 @@
         <span class="hm-blob hm-blob--c" aria-hidden="true"></span>
         <div class="hm-hero-main">
             <div class="hm-eyebrow"><span class="hm-live" aria-hidden="true"></span><span id="homeDate">&nbsp;</span></div>
-            <h1 class="hm-title"><span id="homeGreeting">Welcome back</span>, <span class="hm-name" id="homeUserName">—</span> <span class="hm-wave" aria-hidden="true">👋</span></h1>
+            <h1 class="hm-title"><span id="homeGreeting">Welcome back</span>, <span class="hm-name" id="homeUserName">—</span> <span class="hm-greet-ico" id="homeGreetIcon" aria-hidden="true"></span></h1>
             <p class="hm-sub">One Stop Solution for OLF's Data Management</p>
         </div>
         <div class="hm-clock" aria-hidden="true">
@@ -73,9 +73,9 @@
             </button>
         </div>
         <div class="news-cards-grid" id="newsCardsGrid">
-            <div class="news-empty-state">
-                <div class="news-empty-icon">⏳</div>
-                Loading announcements…
+            <div class="news-empty-state hm-empty">
+                <span class="hm-spin" aria-hidden="true"></span>
+                <span class="hm-empty-sub">Loading announcements…</span>
             </div>
         </div>
     </div>
@@ -115,7 +115,13 @@
 .hm-live { width: 8px; height: 8px; border-radius: 50%; background: #86EFAC; box-shadow: 0 0 0 0 rgba(134,239,172,.7); }
 .hm-title { font-size: 34px; font-weight: 800; letter-spacing: -1px; line-height: 1.12; margin: 0 0 8px; color: #fff; }
 .hm-name { color: #FEF3C7; }
-.hm-wave { display: inline-block; transform-origin: 70% 70%; }
+.hm-greet-ico {
+    display: inline-grid; place-items: center; width: 42px; height: 42px; margin-left: 6px; vertical-align: middle; border-radius: 14px;
+    background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.34); color: #FEF3C7;
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: inset 0 1px 0 rgba(255,255,255,.35);
+}
+.hm-greet-ico svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.hm-rays { transform-origin: 12px 12px; }
 .hm-sub { margin: 0; font-size: 14.5px; font-weight: 500; opacity: .92; }
 
 .hm-clock {
@@ -227,6 +233,55 @@
 .upcoming-chip--tomorrow { background: rgba(79,142,247,0.12); color: #2C63C4; }
 .upcoming-chip--later    { background: rgba(15,23,42,0.06);   color: #5A6577; }
 
+/* ── Icons inside cards ─────────────────────────────────────── */
+.hm .hm-i { width: 14px; height: 14px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.hm .hm-mi { display: inline-flex; align-items: center; gap: 5px; }
+.hm .hm-mi + .hm-mi { margin-left: 12px; }
+.hm .hm-mi .hm-i { width: 13px; height: 13px; color: var(--text-faint); }
+
+/* ── Happening next: the date sits in its own soft tile ─────── */
+.hm .upcoming-card { padding: 14px 16px 14px 18px; gap: 14px; border-radius: 16px; }
+.hm .upcoming-when {
+    flex: 0 0 54px; align-self: flex-start; padding: 8px 0 7px; border: 0; border-radius: 13px;
+    background: color-mix(in srgb, var(--brand, #4F8EF7) 11%, transparent);
+}
+.hm .upcoming-day { font-size: 22px; }
+.hm .upcoming-title { font-size: 13.5px; }
+.hm .upcoming-meta { margin-top: 1px; }
+.hm .upcoming-chip { margin-top: 8px; }
+
+/* ── Announcements ──────────────────────────────────────────── */
+.hm .news-cards-grid { gap: 16px; }
+.hm .news-card {
+    position: relative; overflow: hidden; gap: 12px; padding: 20px 22px 18px 24px; border-radius: 18px; border-top: 0;
+    border: 1px solid var(--hairline); background: var(--glass-strong); box-shadow: var(--shadow-sm);
+    transition: transform .22s var(--ease, ease), box-shadow .22s ease;
+}
+.hm .news-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: linear-gradient(180deg, #10B197, #4F8EF7); }
+.hm .news-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+.hm .news-card-badge { gap: 6px; padding: 5px 12px 5px 9px; border-radius: 999px; font-size: 10.5px; }
+.hm .news-card-badge .hm-i { width: 14px; height: 14px; }
+.hm .news-card-text { font-size: 14px; line-height: 1.65; }
+.hm .news-card-footer { padding-top: 12px; border-top: 1px solid var(--hairline); }
+.hm .news-card-dates { gap: 7px; font-size: 11.5px; font-weight: 600; }
+.hm .news-card-dates .hm-i { color: var(--teal, #10B197); }
+.hm .btn-delete-news { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 5px 11px 5px 9px; }
+.hm .btn-delete-news .hm-i { width: 13px; height: 13px; }
+.hm .news-card--expired { opacity: .6; }
+.hm .news-card--expired::before { background: linear-gradient(180deg, #CBD5E1, #94A3B8); }
+
+/* ── Empty and loading states ───────────────────────────────── */
+.hm .hm-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 34px 20px; border-radius: 20px; }
+.hm .hm-empty-ico {
+    width: 64px; height: 64px; margin-bottom: 6px; border-radius: 20px; display: grid; place-items: center; color: #fff;
+    background: linear-gradient(135deg, #FBBF24, #F59E0B 55%, #F97316); box-shadow: 0 10px 22px rgba(245,158,11,.32), inset 0 1px 0 rgba(255,255,255,.4);
+}
+.hm .hm-empty-ico .hm-i { width: 30px; height: 30px; stroke-width: 1.8; }
+.hm .hm-empty-title { font-size: 15px; font-weight: 800; letter-spacing: -.2px; color: var(--text); }
+.hm .hm-empty-sub { font-size: 13px; font-weight: 500; color: var(--text-soft); }
+.hm .hm-spin { width: 30px; height: 30px; border-radius: 50%; border: 3px solid color-mix(in srgb, var(--brand, #4F8EF7) 22%, transparent); border-top-color: var(--brand, #4F8EF7); animation: hm-spin .8s linear infinite; }
+@keyframes hm-spin { to { transform: rotate(360deg); } }
+
 /* Quiet states and cards follow the theme, so the page reads in dark too */
 .hm .news-empty-state { background: var(--glass, #fafafa); color: var(--text-soft, #9ca3af); border-color: var(--hairline, #e5e7eb); }
 html[data-theme="dark"] .hm .upcoming-card { border-color: var(--hairline); box-shadow: var(--shadow-sm); }
@@ -241,11 +296,15 @@ html[data-theme="dark"] .hm .upcoming-card { border-color: var(--hairline); box-
     .hm-blob--b { animation: hm-drift 18s ease-in-out -6s infinite alternate-reverse; }
     .hm-blob--c { animation: hm-drift 16s ease-in-out -3s infinite alternate; }
     .hm-live { animation: hm-ping 2.2s ease-out infinite; }
-    .hm-wave { animation: hm-wave 2.6s ease-in-out 1s infinite; }
+    .hm-rays { animation: hm-rays 18s linear infinite; }
+    .hm-twinkle { animation: hm-twinkle 2.4s ease-in-out infinite; }
+    .hm .hm-empty-ico { animation: hm-bob 3.2s ease-in-out infinite; }
     @keyframes hm-in { from { opacity: 0; transform: translateY(14px); } }
     @keyframes hm-drift { to { transform: translate(34px, 22px) scale(1.12); } }
     @keyframes hm-ping { 0% { box-shadow: 0 0 0 0 rgba(134,239,172,.7); } 100% { box-shadow: 0 0 0 9px rgba(134,239,172,0); } }
-    @keyframes hm-wave { 0%, 60%, 100% { transform: rotate(0); } 10%, 30% { transform: rotate(16deg); } 20%, 40% { transform: rotate(-10deg); } 50% { transform: rotate(8deg); } }
+    @keyframes hm-rays { to { transform: rotate(360deg); } }
+    @keyframes hm-twinkle { 50% { opacity: .25; } }
+    @keyframes hm-bob { 50% { transform: translateY(-4px); } }
 }
 
 @media (max-width: 900px) {
