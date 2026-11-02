@@ -24,9 +24,9 @@
          actions on the right while Stock Management is showing. -->
     <div class="aw-topbar">
       <nav class="aw-toptabs" role="tablist" aria-label="Award Management">
-        <button type="button" role="tab" class="aw-toptab" data-aw-top="util" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="trophy" aria-hidden="true"></i>Award Utilisation</button>
-        <button type="button" role="tab" class="aw-toptab" data-aw-top="event" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="calendar" aria-hidden="true"></i>Event Management</button>
-        <button type="button" role="tab" class="aw-toptab is-active" data-aw-top="stock" aria-selected="true"><i class="aw-icon" data-aw-icon="stock" aria-hidden="true"></i>Stock Management<span class="act-count" id="top-tab-count" hidden></span></button>
+        <button type="button" role="tab" class="aw-toptab" data-aw-top="util" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="medal" aria-hidden="true"></i>Awards</button>
+        <button type="button" role="tab" class="aw-toptab" data-aw-top="event" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="event" aria-hidden="true"></i>Events</button>
+        <button type="button" role="tab" class="aw-toptab is-active" data-aw-top="stock" aria-selected="true"><i class="aw-icon" data-aw-icon="gift" aria-hidden="true"></i>Gifts<span class="act-count" id="top-tab-count" hidden></span></button>
       </nav>
       <div class="aw-top-right">
         <div class="aw-top-actions" id="aw-stock-actions">
@@ -44,19 +44,19 @@
     </div>
 
     <!-- Award Utilisation: its two views, Award Management and Award Data Dashboard. -->
-    <nav class="aw-subtabs aw-utiltabs" id="aw-util-bar" role="tablist" aria-label="Award Utilisation views" hidden>
-      <button type="button" role="tab" class="aw-utiltab is-active" data-aw-util="award" aria-selected="true"><i class="aw-icon" data-aw-icon="trophy" aria-hidden="true"></i>Award Management</button>
-      <button type="button" role="tab" class="aw-utiltab" data-aw-util="dash" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="chart" aria-hidden="true"></i>Award Data Dashboard</button>
+    <nav class="aw-subtabs aw-utiltabs" id="aw-util-bar" role="tablist" aria-label="Awards views" hidden>
+      <button type="button" role="tab" class="aw-utiltab is-active" data-aw-util="award" aria-selected="true"><i class="aw-icon" data-aw-icon="utilise" aria-hidden="true"></i>Utilisations</button>
+      <button type="button" role="tab" class="aw-utiltab" data-aw-util="dash" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="dashboard" aria-hidden="true"></i>Dashboard</button>
     </nav>
 
     <div id="aw-view-stock">
     <div class="aw-body">
 
-      <nav class="aw-subtabs" role="tablist" aria-label="Stock Management views">
+      <nav class="aw-subtabs" role="tablist" aria-label="Gifts views">
         <button type="button" role="tab" id="aw-subtab-requisition" class="aw-subtab is-active"
                 data-aw-subtab="requisition" aria-controls="aw-subpanel-requisition"
                 aria-selected="true">
-          <i class="aw-icon" data-aw-icon="doc" aria-hidden="true"></i>Requisition<span class="act-count" id="req-tab-count" hidden></span>
+          <i class="aw-icon" data-aw-icon="clipboard" aria-hidden="true"></i>Requisitions<span class="act-count" id="req-tab-count" hidden></span>
         </button>
         <button type="button" role="tab" id="aw-subtab-delivery" class="aw-subtab"
                 data-aw-subtab="delivery" aria-controls="aw-subpanel-delivery"
@@ -66,17 +66,17 @@
         <button type="button" role="tab" id="aw-subtab-stock" class="aw-subtab"
                 data-aw-subtab="stock" aria-controls="aw-subpanel-stock"
                 aria-selected="false" tabindex="-1">
-          <i class="aw-icon" data-aw-icon="stock" aria-hidden="true"></i>Stock
+          <i class="aw-icon" data-aw-icon="boxes" aria-hidden="true"></i>Gift Inventory
         </button>
         <button type="button" role="tab" id="aw-subtab-jute" class="aw-subtab"
                 data-aw-subtab="jute" aria-controls="aw-subpanel-jute"
                 aria-selected="false" tabindex="-1">
-          <i class="aw-icon" data-aw-icon="bag" aria-hidden="true"></i>Jute Bags
+          <i class="aw-icon" data-aw-icon="tote" aria-hidden="true"></i>Jute Bags Inventory
         </button>
         <button type="button" role="tab" id="aw-subtab-settings" class="aw-subtab"
                 data-aw-subtab="settings" aria-controls="aw-subpanel-settings"
                 aria-selected="false" tabindex="-1" hidden>
-          <i class="aw-icon" data-aw-icon="gear" aria-hidden="true"></i>Settings
+          <i class="aw-icon" data-aw-icon="sliders" aria-hidden="true"></i>Settings
         </button>
         <span class="pill" id="row-pill">—</span>
       </nav>
