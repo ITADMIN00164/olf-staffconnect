@@ -575,7 +575,7 @@
   // Called by pos.js after an assignment is added, edited or marked resigned, so the
   // Dashboard stops using the org structure it cached when it first opened.
   var ORG_STALE = false;
-  function orgChanged() { ORG = null; ORG_STALE = true; }
+  function orgChanged() { ORG = null; ORG_STALE = true; MSUM.cache = {}; MSUM.data = null; }
 
   function mount() {
     var root = $("ftrRoot"); if (!root) return;
@@ -586,7 +586,7 @@
     ORG_STALE = false;
     root.dataset.mounted = "1";
     if (!window.posSupabase) { prBody('<div class="pr-empty pr-error">Supabase client not loaded — check that pos-supabase.js is included.</div>'); return; }
-    wireNav(); wireFilters(); wireMonthly(); sumWire();
+    wireNav(); wireFilters(); wireMonthly(); sumWire(); msumWire();
     if ($("prModalSave")) $("prModalSave").addEventListener("click", saveTextModal);
     wireWeekDates();
     if ($("prModalClose")) $("prModalClose").addEventListener("click", closeTextModal);
@@ -605,10 +605,11 @@
         btns.forEach(function (x) { x.classList.remove("is-active"); });
         b.classList.add("is-active");
         var v = b.dataset.view;
-        ["weekly", "summary", "monthly"].forEach(function (name) {
+        ["weekly", "summary", "monthly", "mosum"].forEach(function (name) {
           var el = $("pr" + name.charAt(0).toUpperCase() + name.slice(1)); if (el) el.hidden = (name !== v);
         });
         if (v === "monthly") moSyncFromWeekly();
+        if (v === "mosum") msumOnOpen();
       });
     });
   }
@@ -639,6 +640,7 @@
       populateValue($("prUnit").value);
       moFillFromBase();
       sumFillFromBase();
+      msumFillFromBase();
       prBody('<div class="pr-empty">Choose a review unit, a value and a month, then open the review.</div>');
     }).catch(function (e) {
       prBody('<div class="pr-empty pr-error">Couldn\'t load base data: ' + esc(e.message || String(e)) + '</div>');
@@ -1418,8 +1420,15 @@
   function wireMonthly() {
     if (!$("prMoUnit")) return;
     $("prMoUnit").addEventListener("change", function () { moPopulateValue(); moRefresh(); });
-    $("prMoValue").addEventListener("change", moRefresh);
-    $("prMoMonth").addEventListener("change", moRefresh);
+    // Picking a person (or month) opens their monthly review straight away, so the status
+    // line shows at once. Not when there are unsaved edits — those would be lost.
+    var autoOpen = function () {
+      moRefresh();
+      var dirty = Object.keys(MDIRTY).some(function (c) { return Object.keys(MDIRTY[c]).length; });
+      if (!$("prMoLoad").disabled && !dirty) loadMonthlyView();
+    };
+    $("prMoValue").addEventListener("change", autoOpen);
+    $("prMoMonth").addEventListener("change", autoOpen);
     $("prMoLoad").addEventListener("click", loadMonthlyView);
   }
   function moRefresh() { $("prMoLoad").disabled = !($("prMoUnit").value && $("prMoValue").value && $("prMoMonth").value); }
@@ -1445,17 +1454,19 @@
     moRefresh();
   }
 
+  var MO_LOAD_SEQ = 0;
   function loadMonthlyView() {
     var unit = $("prMoUnit").value, value = $("prMoValue").value, month = $("prMoMonth").value;
     if (!unit || !value || !month) return;
     MDIRTY = {};
+    var ticket = ++MO_LOAD_SEQ;                     // only the latest pick may render
     $("prMoBody").innerHTML = '<div class="pr-empty pr-loading">Loading monthly review\u2026</div>';
     Promise.all([
       sbGetWeeklyView(unit, value, month),
       sbGetAcademic(unit, value, month).catch(function (e) { console.warn("Academic plan not loaded:", e); return null; }),
       sbGetTargets(unit, value, month).catch(function (e) { console.warn("Targets not loaded:", e); return null; })
-    ]).then(function (res) { MVIEW = res[0]; MVIEW.academic = res[1]; MVIEW.targets = res[2]; renderMonthlyView(); })
-      .catch(function (e) { $("prMoBody").innerHTML = '<div class="pr-empty pr-error">Couldn\'t load: ' + esc(e.message || String(e)) + "</div>"; });
+    ]).then(function (res) { if (ticket !== MO_LOAD_SEQ) return; MVIEW = res[0]; MVIEW.academic = res[1]; MVIEW.targets = res[2]; renderMonthlyView(); })
+      .catch(function (e) { if (ticket !== MO_LOAD_SEQ) return; $("prMoBody").innerHTML = '<div class="pr-empty pr-error">Couldn\'t load: ' + esc(e.message || String(e)) + "</div>"; });
   }
 
   /* ---------- scoring ---------- */
@@ -1710,6 +1721,7 @@
     var selfOk = canEditSelf(v), mgrOk = canEditManager(v);
 
     var html = renderHeader(h) + renderBlocks(h, v);
+    html += moStatusBanner(v, w0);
     html += moCards(rp);
 
     var head = '<tr><th class="pr-item">Item</th><th class="pr-num">Weight</th><th class="pr-num">Target</th><th class="pr-num">Done</th><th class="pr-num">% done</th><th class="pr-num">Score</th></tr>';
@@ -1739,6 +1751,90 @@
       s.addEventListener("change", function () { markDirty(s.dataset.wc, s.dataset.fid, s.value); moRefreshScores(); });
     });
     if ($("prMoSave")) $("prMoSave").addEventListener("click", saveMonthly);
+    document.querySelectorAll("#prMoBody .pr-mstat-toggle").forEach(function (t) {
+      t.addEventListener("click", function () {
+        var more = t.closest(".pr-mstat").querySelector(".pr-mstat-more"), open = more.hidden;
+        more.hidden = !open; t.setAttribute("aria-expanded", open ? "true" : "false");
+        t.textContent = open ? "Hide pending items" : "Click here to see what\u2019s pending";
+      });
+    });
+    document.querySelectorAll("#prMoBody [data-jgrp]").forEach(function (b) {
+      b.addEventListener("click", function () { moJump(b.dataset.jgrp, b.dataset.jfid); });
+    });
+  }
+
+  /* ---------- review status banner (same rule as the Monthly Summary tab) ----------
+     Built from what is SAVED for this month, so it changes after Save. Each gap is a
+     button that opens its section and scrolls to the field. */
+  var MO_GRP_NAME = { mA: "A \u00B7 Check-in", mB: "B \u00B7 Last month's actions", mG1: "G1 \u00B7 Academic Programs",
+    mG2: "G2 \u00B7 Life Skills", mG3: "G3 \u00B7 Vibrant Teacher Community", mG4: "G4 \u00B7 Other Goals",
+    mG5: "G5 \u00B7 Self-Development", mG: "G \u00B7 Next month", mH: "H \u00B7 Review record" };
+  var MO_GRP_ORDER = ["mA", "mB", "mG1", "mG2", "mG3", "mG4", "mG5", "mG", "mH"];
+  function moStatusBanner(v, w0) {
+    var h = v.header || {};
+    if (!h.selfEmpId) return "";                                   // District view: nobody's own review
+    var cf = w0.carryForward || {};
+    var prev = { G: { G2: cf.B1, G3: cf.B2, G4: cf.B3, G5: cf.B4, G6: cf.B5 } };
+    var ev = msumEvaluate(w0.sections, prev, v.academic ? acadTotal(v.academic) : 0);
+    var selfName = h.unit === "PO" ? ((h.po && h.po.name) || "the PO") : (h.manager || "the " + h.unit);
+    var rv = msumReviewerOf(person(h.selfEmpId));
+    var rvName = rv ? rv.name + " (" + rv.designation + ")" : "the manager";
+    var chips = function (list) {
+      var by = {};
+      list.forEach(function (x) { (by[x.grp] = by[x.grp] || []).push(x); });
+      return MO_GRP_ORDER.filter(function (g) { return by[g]; }).map(function (g) {
+        return '<div class="pr-mstat-grp"><span class="pr-mstat-sec">' + esc(MO_GRP_NAME[g] || g) + "</span>"
+          + by[g].map(function (x) {
+              return '<button type="button" class="pr-mstat-chip" data-jgrp="' + esc(x.grp) + '" data-jfid="' + esc(x.fid) + '" title="Go to this field">'
+                + esc(x.label) + "</button>";
+            }).join("") + "</div>";
+      }).join("");
+    };
+    var last = [ev.selfAt, ev.mgrAt].sort().pop();
+    var saved = last ? " · last saved " + fmtDMY(last) : "";
+    var n = ev.missingAt.length, items = function (k) { return k + " item" + (k === 1 ? "" : "s"); };
+    var cls, pill, text, list = [];
+    if (!ev.started) {
+      cls = "is-new"; pill = "Not started";
+      text = "Nothing saved for " + monthLabel(v.month).replace(/\s*\(no data yet\)/, "") + " yet — " + items(n) + " for " + selfName + " to fill, then " + rvName + " fills H.";
+      list = ev.missingAt.concat(ev.mgrMissingAt);
+    } else if (ev.st === "none") {
+      cls = "is-none"; pill = "Not done";
+      text = items(n) + " still pending for " + selfName + saved + ".";
+      list = ev.missingAt.concat(ev.mgrMissingAt);
+    } else if (ev.st === "partial") {
+      cls = "is-partial"; pill = "Partially done";
+      text = selfName + "'s points are complete — waiting for " + rvName + " to fill H" + saved + ".";
+      list = ev.mgrMissingAt;
+    } else {
+      cls = "is-done"; pill = "Review done";
+      text = selfName + "'s points and " + rvName + "'s review record (H) are saved" + saved + ".";
+    }
+    return '<div class="pr-panel pr-mstat ' + cls + '">'
+      + '<div class="pr-mstat-line"><span class="pr-mstat-pill">' + pill + "</span>"
+      + '<span class="pr-mstat-text">' + esc(text) + "</span>"
+      + (list.length ? '<button type="button" class="pr-mstat-toggle" aria-expanded="false">Click here to see what’s pending</button>' : "")
+      + "</div>"
+      + (list.length ? '<div class="pr-mstat-more" hidden><div class="pr-mstat-hint">Click an item to go to it. Save monthly review after filling.</div>' + chips(list) + "</div>" : "")
+      + "</div>";
+  }
+  // Open a section of the Monthly table and bring one field into view.
+  function moJump(grp, fid) {
+    var head = document.querySelector('#prMoBody tr.pr-grp[data-grp="' + grp + '"]');
+    if (!head) return;
+    if (!head.classList.contains("is-open")) head.click();
+    var row = null;
+    if (fid) { var el = document.querySelector('#prMoBody tr[data-secrow="' + grp + '"] [data-fid="' + fid + '"]'); row = el && el.closest("tr"); }
+    if (!row && grp === "mG4") row = document.querySelector('#prMoBody tr[data-g4add="1"]:not([style*="none"])') || document.querySelector('#prMoBody tr[data-g4sum="1"]');
+    if (!row && fid) {   // read-only cells have no data-fid: find the row by its label
+      var want = { A1: 0, A2: 1, H1: 0, H2: 1, H3: 2 }[fid];
+      if (want != null) row = document.querySelectorAll('#prMoBody tr[data-secrow="' + grp + '"]')[want] || null;
+    }
+    row = row || head;
+    row.scrollIntoView({ behavior: "smooth", block: "center" });
+    row.classList.remove("pr-flash"); void row.offsetWidth; row.classList.add("pr-flash");
+    var focus = fid && row.querySelector('[data-fid="' + fid + '"]');
+    if (focus && /^(INPUT|SELECT)$/.test(focus.tagName)) setTimeout(function () { try { focus.focus({ preventScroll: true }); } catch (e) {} }, 350);
   }
   function monthLabel(ym) {
     var m = (state.base && state.base.months || []).filter(function (x) { return x.code === ym; })[0];
@@ -1873,7 +1969,7 @@
         var hint = document.querySelector("#prMoBody .pr-savehint");
         if (hint) { hint.textContent = "\u26A0 Save failed \u2014 click Save again to retry. Your changes are NOT lost."; hint.classList.add("is-fail"); }
         toast("Save failed \u2014 please click Save again to retry.");
-      } else { toast("Saved."); MDIRTY = {}; loadMonthlyView(); }
+      } else { toast("Saved."); MDIRTY = {}; MSUM.cache = {}; MSUM.data = null; loadMonthlyView(); }
     });
   }
 
@@ -1887,6 +1983,10 @@
   async function sbGetAcademic(unit, value, month) {
     await loadOrg();
     var rows = await fetchAll(function () { return db().from("academic_targets").select("*").eq("plan_month", month); });
+    return acadFromRows(rows, unit, value);
+  }
+  // The month's academic_targets rows -> the exam list for one unit (also used by Monthly Summary).
+  function acadFromRows(rows, unit, value) {
     var lc = function (s) { return String(s == null ? "" : s).trim().toLowerCase(); };
     var item = function (r) { return { program: r.program_name || "", test: r.test_cycle || "", date: r.fixed_date || "",
                                        pref: r.preferred_month || "", district: r.district || "", pos: [] }; };
@@ -2663,6 +2763,278 @@
       }
 
       sumSave(XLSX, sheets, sumFileStem());
+    }).catch(function (e) { toast(e.message || String(e)); });
+  }
+
+  /* =====================================================================
+     MONTHLY SUMMARY VIEW
+     "Is this month's review written?" for every PO, PM and DM in a state /
+     district. Reads only review_responses for period YYYYMM00 (plus last
+     month's YYYYMM00 for the carried B actions) and the month's Academic
+     Plan, so it is two light queries per month, cached while the tab is open.
+
+     Manual points in the Monthly review:
+       Self (the person under review)
+         A1  mood
+         B1-B5  a status for every action carried from last month's G
+         G2-G6  at least one action for next month
+         M_G1_DONE  exams completed (only when exams are planned)
+         every typed goal entry in MO_GOALS (POM clusters, the 8 G5 Yes/No, Case Study)
+         G4  at least one activity, each with name / weight / target / done, weights = 10
+         (A2 "anything on your mind" and G1 "blocker" are optional text)
+       Manager (PM; DM / COO when the seat above is vacant)
+         H1 Review held + H2 Manager status   (H3 remark optional)
+
+     Status:  Done    = self complete AND manager complete
+              Partial = self complete, manager not yet
+              Not done = self not complete (whatever the manager has written)
+     ===================================================================== */
+  var MSUM = { cache: {}, data: null, filled: false };
+  var MSUM_UNITS = ["PO", "PM", "DM"];
+  var MSUM_LBL = { done: "Review Done", partial: "Partially Done", none: "Not Done" };
+
+  function msumTxt(v) { return String(v == null ? "" : v).trim(); }
+  // B values are saved as { text, status }; older rows may hold the JSON as a string.
+  function msumObj(v) {
+    if (v && typeof v === "object") return v;
+    if (typeof v === "string" && v.charAt(0) === "{") { try { return JSON.parse(v); } catch (e) { return {}; } }
+    return {};
+  }
+  function msumHas(v) { return v !== null && v !== undefined && msumTxt(v) !== ""; }
+
+  // Every typed goal entry (fid) in the Monthly table, in table order — so a field
+  // added to MO_GOALS later is required here automatically.
+  function msumGoalFields() {
+    var out = [];
+    MO_GOALS.forEach(function (g) {
+      g.rows.forEach(function (r) {
+        if (r.fid && ((r.v && r.v.numentry) || (r.yn && r.yn.entry))) out.push({ fid: r.fid, label: r.label, grp: "m" + g.key });
+      });
+    });
+    return out;
+  }
+
+  /* One person's monthly review -> { st, self, mgr, missing[] } */
+  function msumEvaluate(sec, prevSec, examsPlanned) {
+    sec = sec || {}; prevSec = prevSec || {};
+    var A = sec.A || {}, B = sec.B || {}, G = sec.G || {}, H = sec.H || {}, M = sec.M || {}, PG = prevSec.G || {};
+    // Each gap carries where it lives in the Monthly table (grp = accordion, fid = field)
+    // so the review page can jump straight to it.
+    var missAt = [], mgrAt = [];
+    var miss = { push: function (label, grp, fid) { missAt.push({ label: label, grp: grp, fid: fid || "" }); } };
+    var mgrMiss = { push: function (label, grp, fid) { mgrAt.push({ label: label, grp: grp, fid: fid || "" }); } };
+
+    if (!msumHas(A.A1)) miss.push("A1 Mood", "mA", "A1");
+
+    // B: every action carried from last month's plan (G2..G6 -> B1..B5) needs a status.
+    [1, 2, 3, 4, 5].forEach(function (n) {
+      var b = msumObj(B["B" + n]);
+      var carried = msumTxt(PG["G" + (n + 1)]) || msumTxt(b.text);
+      if (carried && !msumHas(b.status)) miss.push("B" + n + " status \u2014 \u201C" + (carried.length > 40 ? carried.slice(0, 38) + "\u2026" : carried) + "\u201D", "mB", "B" + n);
+    });
+
+    if (!["G2", "G3", "G4", "G5", "G6"].some(function (k) { return msumHas(G[k]); })) miss.push("At least one action for next month", "mG", "G2");
+
+    if (examsPlanned > 0 && !msumHas(M.M_G1_DONE)) miss.push("G1 Exams completed", "mG1", "M_G1_DONE");
+
+    msumGoalFields().forEach(function (f) { if (!msumHas(M[f.fid])) miss.push(f.label, f.grp, f.fid); });
+
+    // G4: same rules the Save button enforces, plus a target and done for each activity.
+    var acts = G4_SLOTS.map(function (i) {
+      var x = { name: msumTxt(M["M_G4_" + i + "_NAME"]), w: M["M_G4_" + i + "_W"], t: M["M_G4_" + i + "_T"], d: M["M_G4_" + i + "_D"] };
+      x.used = !!x.name || msumHas(x.w) || msumHas(x.t) || msumHas(x.d);
+      return x;
+    }).filter(function (x) { return x.used; });
+    if (!acts.length) miss.push("G4 Other activities (add at least one)", "mG4", "");
+    else {
+      var wsum = Math.round(acts.reduce(function (a, x) { return a + (msumHas(x.w) ? num(x.w) : 0); }, 0) * 1000) / 1000;
+      if (wsum !== 10) miss.push("G4 weights add up to " + wsum + " (must be 10)", "mG4", "");
+      if (acts.some(function (x) { return !x.name || !msumHas(x.w) || !msumHas(x.t) || !msumHas(x.d); })) miss.push("G4 activity name / weight / target / done", "mG4", "");
+    }
+
+    if (!msumHas(H.H1)) mgrMiss.push("H1 Review held", "mH", "H1");
+    if (!msumHas(H.H2)) mgrMiss.push("H2 Manager status", "mH", "H2");
+
+    var self = !missAt.length, mgr = !mgrAt.length;
+    var started = ["A", "B", "G", "M", "H"].some(function (k) { return hasContent(sec[k]); });
+    var lbl = function (x) { return x.label; };
+    return { st: self ? (mgr ? "done" : "partial") : "none", self: self, mgr: mgr, started: started,
+             missing: missAt.map(lbl), mgrMissing: mgrAt.map(lbl), missingAt: missAt, mgrMissingAt: mgrAt,
+             selfAt: [A, B, G, M].map(function (s) { return s._at || ""; }).sort().pop() || "", mgrAt: H._at || "", mgrBy: H._by || "" };
+  }
+
+  // Who fills H for this person: next seat up that is filled (same chain as buildHeader).
+  function msumReviewerOf(p) {
+    if (!p) return null;
+    var dists = p.assigned_districts || [], mgr = null;
+    var chain = p.designation === "PO" ? ["PM", "DM", "COO"] : p.designation === "PM" ? ["DM", "COO"] : ["COO"];
+    chain.some(function (role) { mgr = peopleOver(role, dists)[0] || null; return !!mgr; });
+    return mgr || ORG.people.filter(function (x) { return x.designation === "COO"; })[0] || null;
+  }
+
+  /* ---------- data: one month, everyone (cached) ---------- */
+  async function sbGetMonthSummary(month) {
+    await loadOrg();
+    if (MSUM.cache[month]) return MSUM.cache[month];
+    var code = month + "00", prevCode = prevMonthCode(month) + "00";
+    var q = await Promise.all([
+      fetchAll(function () {
+        return db().from("review_responses").select("emp_id,period_code,section,field,value,updated_at,updated_by")
+          .in("period_code", [code, prevCode]);
+      }),
+      fetchAll(function () { return db().from("academic_targets").select("*").eq("plan_month", month); })
+        .catch(function (e) { console.warn("Academic plan not loaded:", e); return null; })
+    ]);
+    var byEmp = {};
+    q[0].forEach(function (r) { (byEmp[normId(r.emp_id)] = byEmp[normId(r.emp_id)] || []).push(r); });
+
+    var people = ORG.people.filter(function (p) { return MSUM_UNITS.indexOf(p.designation) >= 0; }).sort(byNameSort).map(function (p) {
+      var secs = sectionsByCode(byEmp[normId(p.emp_id)] || []);
+      var exams = q[1] ? acadTotal(acadFromRows(q[1], p.designation === "PO" ? "PO" : p.designation, p.emp_id)) : 0;
+      var dists = p.assigned_districts || [];
+      var states = [];
+      dists.forEach(function (d) { var r = ORG.distByKey[normDist(d)]; if (r && r.state && states.indexOf(r.state) < 0) states.push(r.state); });
+      var mgr = msumReviewerOf(p);
+      var ev = msumEvaluate(secs[code], secs[prevCode], exams);
+      return { id: p.emp_id, name: p.name, unit: p.designation, email: p.email || "",
+               districts: dists, distKeys: dists.map(normDist), states: states,
+               manager: mgr ? mgr.name + " (" + mgr.designation + ")" : "", exams: exams, acadOk: !!q[1], ev: ev };
+    });
+    var out = { month: month, people: people, acadOk: !!q[1] };
+    MSUM.cache[month] = out;
+    return out;
+  }
+
+  /* ---------- filters ---------- */
+  function msumStates() {
+    if (!ORG) return [];
+    var s = {}; ORG.districts.forEach(function (d) { if (d.state) s[d.state] = 1; });
+    return Object.keys(s).sort();
+  }
+  function msumFillDistricts() {
+    var sel = $("prMsDist"); if (!sel || !ORG) return;
+    var st = $("prMsState").value, keep = sel.value;
+    var list = ORG.districts.filter(function (d) { return !st || d.state === st; }).map(function (d) { return d.name; }).sort();
+    sel.innerHTML = ""; sel.appendChild(opt("", st ? "All districts of " + st : "All districts"));
+    list.forEach(function (n) { sel.appendChild(opt(n, n)); });
+    sel.value = list.indexOf(keep) >= 0 ? keep : "";
+    sel.disabled = false;
+  }
+  function msumFillFromBase() {
+    if (!$("prMsState") || !state.base) return;
+    var ss = $("prMsState"), keepS = ss.value;
+    ss.innerHTML = ""; ss.appendChild(opt("", "All states"));
+    msumStates().forEach(function (s) { ss.appendChild(opt(s, s)); });
+    ss.value = keepS && msumStates().indexOf(keepS) >= 0 ? keepS : ""; ss.disabled = false;
+    msumFillDistricts();
+    var mo = $("prMsMonth"), keepM = mo.value;
+    mo.innerHTML = "";
+    if (!state.base.months.length) mo.innerHTML = '<option value="">No months</option>';
+    else {
+      state.base.months.forEach(function (m) { mo.appendChild(opt(m.code, m.label)); });
+      var pick = state.base.months[Math.max(0, state.base.months.length - 2)];   // newest month with data
+      mo.value = keepM && state.base.months.some(function (m) { return m.code === keepM; }) ? keepM : (pick ? pick.code : "");
+    }
+    mo.disabled = false;
+    MSUM.cache = {}; MSUM.filled = true;
+    if ($("prMosum") && !$("prMosum").hidden) msumLoad();
+  }
+  function msumOnOpen() { if (MSUM.filled && !MSUM.data) msumLoad(); }
+  function msumWire() {
+    if (!$("prMsState")) return;
+    $("prMsState").addEventListener("change", function () { msumFillDistricts(); msumRender(); });
+    $("prMsDist").addEventListener("change", msumRender);
+    $("prMsUnit").addEventListener("change", msumRender);
+    $("prMsMonth").addEventListener("change", msumLoad);
+    $("prMsRefresh").addEventListener("click", function () { delete MSUM.cache[$("prMsMonth").value]; msumLoad(); });
+    $("prMsBody").addEventListener("click", function (e) {
+      var b = e.target.closest ? e.target.closest("[data-msdl]") : null;
+      if (b && !b.disabled) msumDownload(b.dataset.msdl);
+    });
+  }
+
+  function msumBody(html) { var b = $("prMsBody"); if (b) b.innerHTML = html; }
+  function msumLoad() {
+    var month = ($("prMsMonth") || {}).value;
+    if (!month) { msumBody('<div class="pr-empty">Pick a month.</div>'); return; }
+    msumBody('<div class="pr-empty pr-loading">Loading monthly review status…</div>');
+    sbGetMonthSummary(month).then(function (d) {
+      if (($("prMsMonth") || {}).value !== month) return;           // a newer pick is loading
+      MSUM.data = d; msumRender();
+    }).catch(function (e) { msumBody('<div class="pr-empty pr-error">Couldn\'t load: ' + esc(e.message || String(e)) + "</div>"); });
+  }
+
+  // People in scope for the current State / District / Review-unit filters.
+  function msumScope() {
+    var d = MSUM.data; if (!d) return [];
+    var st = $("prMsState").value, dist = $("prMsDist").value, unit = $("prMsUnit").value;
+    var dk = dist ? normDist(dist) : "";
+    var stateKeys = {};
+    if (st && !dist) ORG.districts.forEach(function (x) { if (x.state === st) stateKeys[normDist(x.name)] = 1; });
+    return d.people.filter(function (p) {
+      if (unit && p.unit !== unit) return false;
+      if (dk) return p.distKeys.indexOf(dk) >= 0;
+      if (st) return p.distKeys.some(function (k) { return stateKeys[k]; });
+      return true;
+    });
+  }
+  function msumScopeLabel() {
+    var st = $("prMsState").value, dist = $("prMsDist").value, unit = $("prMsUnit").value;
+    var mo = $("prMsMonth"), ml = mo && mo.selectedOptions[0] ? mo.selectedOptions[0].textContent.replace(/\s*\(no data yet\)/, "") : "";
+    return [ml, dist || st || "All states", unit || "PO · PM · DM"].filter(Boolean).join(" · ");
+  }
+
+  function msumRender() {
+    var d = MSUM.data;
+    if (!d) { msumBody('<div class="pr-empty">Pick a month to see who has written their monthly review.</div>'); return; }
+    var people = msumScope(), c = { done: [], partial: [], none: [] };
+    people.forEach(function (p) { c[p.ev.st].push(p); });
+    var tot = people.length, notStarted = c.none.filter(function (p) { return !p.ev.started; }).length;
+    var split = function (list) {
+      var n = {}; list.forEach(function (p) { n[p.unit] = (n[p.unit] || 0) + 1; });
+      return MSUM_UNITS.filter(function (u) { return n[u]; }).map(function (u) { return u + " " + n[u]; }).join(" · ") || "—";
+    };
+    var DEF = {
+      done:    "Self points and manager's points (H) both saved",
+      partial: "Self points saved · manager's points (H) pending",
+      none:    "Self points not complete yet"
+    };
+    var card = function (st) {
+      var n = c[st].length, pct = tot ? Math.round(n / tot * 100) : 0;
+      return '<div class="pr-card pr-msum-card pr-msum-' + st + '">'
+        + '<div class="pr-card-k"><span>' + MSUM_LBL[st] + '</span><span class="pr-msum-pct">' + pct + "%</span></div>"
+        + '<div class="pr-card-v">' + n + "<small>/ " + tot + "</small></div>"
+        + '<div class="pr-msum-def">' + DEF[st] + "</div>"
+        + '<div class="pr-msum-split">' + esc(split(c[st])) + "</div>"
+        + (st === "none" ? '<div class="pr-msum-def">' + notStarted + " of them not started (nothing saved yet)</div>" : "")
+        + '<button type="button" class="pr-btn pr-msum-dl" data-msdl="' + st + '"' + (n ? "" : " disabled") + ">Download Excel</button>"
+        + "</div>";
+    };
+    var html = '<div class="pr-msum-scope"><span class="pr-sum-period">' + esc(msumScopeLabel()) + "</span>"
+      + "<span>" + tot + (tot === 1 ? " person" : " people") + " in scope</span></div>";
+    if (!tot) html += '<div class="pr-panel"><div class="pr-empty">Nobody matches these filters.</div></div>';
+    else html += '<div class="pr-cards pr-msum-cards">' + card("done") + card("partial") + card("none") + "</div>";
+    html += '<p class="pr-sum-hint pr-msum-rule">Self points = A1 mood, a status for each action carried from last month, at least one action for next month, exams completed (when exams are planned), every typed goal entry (POM clusters, G5 Yes/No items, Case Study) and G4 activities with weights adding up to 10. '
+      + "Manager's points = H1 Review held + H2 Manager status.</p>";
+    if (!d.acadOk) html += '<p class="pr-sum-hint">The Academic Plan could not be loaded, so “G1 Exams completed” is not checked.</p>';
+    msumBody(html);
+  }
+
+  function msumDownload(st) {
+    var people = msumScope().filter(function (p) { return p.ev.st === st; });
+    if (!people.length) return;
+    var month = $("prMsMonth").value, scope = msumScopeLabel();
+    sumLoadXLSX().then(function (XLSX) {
+      var rows = [["Employee ID", "Employee Name", "Role", "State", "District(s)", "Reviewer (fills H)",
+                   "Status", "Self points", "Manager points", "Missing — self", "Missing — manager", "Month", "Filters"]];
+      people.forEach(function (p) {
+        rows.push([p.id, p.name, p.unit, p.states.join(", "), p.districts.join(", "), p.manager,
+                   MSUM_LBL[st] + (st === "none" && !p.ev.started ? " (not started)" : ""), p.ev.self ? "Complete" : "Incomplete", p.ev.mgr ? "Complete" : "Pending",
+                   p.ev.missing.join("; "), p.ev.mgrMissing.join("; "), month, scope]);
+      });
+      var place = ($("prMsDist").value || $("prMsState").value || "All").replace(/[^A-Za-z0-9]+/g, "_");
+      sumSave(XLSX, [{ name: MSUM_LBL[st].slice(0, 28), rows: rows }],
+        "Monthly_Review_" + month + "_" + place + ($("prMsUnit").value ? "_" + $("prMsUnit").value : "") + "_" + MSUM_LBL[st].replace(/\s+/g, ""));
     }).catch(function (e) { toast(e.message || String(e)); });
   }
 

@@ -610,6 +610,7 @@
             <button class="pr-navbtn is-active" data-view="weekly"><span class="fr-ico fr-i-week" aria-hidden="true"></span>Weekly</button>
             <button class="pr-navbtn" data-view="summary"><span class="fr-ico fr-i-sum" aria-hidden="true"></span>Summary</button>
             <button class="pr-navbtn" data-view="monthly"><span class="fr-ico fr-i-month" aria-hidden="true"></span>Monthly</button>
+            <button class="pr-navbtn" data-view="mosum"><span class="fr-ico fr-i-sum" aria-hidden="true"></span>Monthly Summary</button>
           </nav>
         </div>
 
@@ -683,6 +684,31 @@
           </div>
           <div id="prMoBody">
             <div class="pr-empty">Choose a review unit, a value and a month, then open the monthly review.</div>
+          </div>
+        </section>
+
+        <!-- MONTHLY SUMMARY — is this month's review written, per person.
+             Done = self points + manager's H saved · Partial = self only · Not done.
+             Logic in pos-review.js (msum*). -->
+        <section class="pr-view" id="prMosum" hidden>
+          <div class="pr-panel pr-filters">
+            <label class="pr-field"><span>State</span>
+              <select id="prMsState" disabled><option value="">All states</option></select></label>
+            <label class="pr-field"><span>District</span>
+              <select id="prMsDist" disabled><option value="">All districts</option></select></label>
+            <label class="pr-field"><span>Review unit</span>
+              <select id="prMsUnit">
+                <option value="">PO · PM · DM</option>
+                <option value="PO">PO</option>
+                <option value="PM">PM</option>
+                <option value="DM">DM</option>
+              </select></label>
+            <label class="pr-field"><span>Month</span>
+              <select id="prMsMonth" disabled><option value="">—</option></select></label>
+            <button class="pr-btn" id="prMsRefresh" title="Reload the latest saved reviews">Refresh</button>
+          </div>
+          <div id="prMsBody">
+            <div class="pr-empty">Pick a month to see who has written their monthly review.</div>
           </div>
         </section>
 
@@ -1223,6 +1249,55 @@
         .pr-mo-wsum{display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:999px;font-weight:700;background:#F1F5F9;color:var(--ink2);}
         .pr-mo-wsum.ok{color:var(--good-ink);background:var(--good-soft);}
         .pr-mo-wsum.bad{color:var(--bad-ink);background:var(--bad-soft);}
+
+        /* ── Monthly review status line (individual Monthly page) ── */
+        .pr-mstat{padding:11px 16px;margin-bottom:16px;border-left:4px solid var(--mst);}
+        .pr-mstat.is-done{--mst:var(--good);--mst-ink:var(--good-ink);--mst-soft:var(--good-soft);--mst-line:var(--good-line);}
+        .pr-mstat.is-partial{--mst:var(--warn);--mst-ink:var(--warn-ink);--mst-soft:var(--warn-soft);--mst-line:var(--warn-line);}
+        .pr-mstat.is-none{--mst:var(--bad);--mst-ink:var(--bad-ink);--mst-soft:var(--bad-soft);--mst-line:var(--bad-line);}
+        .pr-mstat.is-new{--mst:#94A3B8;--mst-ink:var(--ink2);--mst-soft:#F1F5F9;--mst-line:#E2E8F0;}
+        .pr-mstat-line{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;}
+        .pr-mstat-pill{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 11px 0 9px;border-radius:999px;font-size:12.5px;font-weight:700;
+          color:var(--mst-ink);background:var(--mst-soft);border:1px solid var(--mst-line);white-space:nowrap;}
+        .pr-mstat-pill::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--mst);}
+        .pr-mstat-text{min-width:0;font-size:13px;color:var(--ink2);}
+        .pr-mstat-toggle{border:0;background:none;padding:0;font:inherit;font-size:13px;font-weight:600;color:var(--acc-ink);cursor:pointer;
+          text-decoration:underline;text-underline-offset:3px;white-space:nowrap;}
+        .pr-mstat-toggle:hover{color:var(--acc2);}
+        .pr-mstat-toggle:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:4px;}
+        .pr-mstat-more{margin-top:10px;padding-top:10px;border-top:1px dashed var(--l);}
+        .pr-mstat-hint{font-size:12px;color:var(--mut);}
+        .pr-mstat-grp{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;}
+        .pr-mstat-sec{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink2);min-width:200px;}
+        .pr-mstat-chip{height:28px;padding:0 11px;border-radius:999px;border:1px solid var(--mst-line);background:var(--mst-soft);color:var(--mst-ink);
+          font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+          transition:transform .15s ease,box-shadow .15s ease;}
+        .pr-mstat-chip:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(15,23,42,.1);}
+        .pr-mstat-chip:focus-visible{outline:2px solid var(--acc);outline-offset:2px;}
+        @keyframes prFlash{0%,40%{background:var(--hl);}100%{background:transparent;}}
+        .pr-tbl tr.pr-flash > td{animation:prFlash 1.8s ease-out;}
+        @media (max-width:640px){ .pr-mstat-sec{min-width:100%;} .pr-mstat-text{min-width:100%;} }
+
+        /* ── Monthly Summary: three status cards ── */
+        .pr-msum-scope{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:2px 2px 12px;font-size:12.5px;color:var(--mut);}
+        .pr-msum-scope .pr-sum-period{margin-left:0;}
+        .pr-msum-cards{grid-template-columns:repeat(auto-fit,minmax(240px,1fr));}
+        .pr-msum-card{display:flex;flex-direction:column;gap:6px;padding-left:20px;}
+        .pr-msum-card::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:4px;border-radius:0 3px 3px 0;background:var(--msc);}
+        .pr-msum-done{--msc:var(--good);}
+        .pr-msum-partial{--msc:var(--warn);}
+        .pr-msum-none{--msc:#94A3B8;}
+        .pr-msum-card .pr-card-v{font-size:34px;}
+        .pr-msum-pct{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:999px;font-size:11.5px;letter-spacing:0;text-transform:none;}
+        .pr-msum-done .pr-msum-pct{color:var(--good-ink);background:var(--good-soft);}
+        .pr-msum-partial .pr-msum-pct{color:var(--warn-ink);background:var(--warn-soft);}
+        .pr-msum-none .pr-msum-pct{color:var(--ink2);background:#F1F5F9;}
+        .pr-msum-def{font-size:12px;color:var(--mut);line-height:1.4;}
+        .pr-msum-split{font-size:12px;color:var(--ink2);font-weight:600;font-variant-numeric:tabular-nums;}
+        .pr-msum-dl{align-self:flex-start;margin-top:6px;height:34px;padding:0 13px;font-size:12.5px;display:inline-flex;align-items:center;gap:7px;}
+        .pr-msum-dl::before{content:"";width:15px;height:15px;background:currentColor;-webkit-mask:var(--fr-dl) center/contain no-repeat;mask:var(--fr-dl) center/contain no-repeat;}
+        .pr-msum-dl:disabled{opacity:.45;cursor:not-allowed;}
+        .pr-msum-rule{align-items:flex-start;line-height:1.5;}
 
         @media (max-width:900px){
           .pr-avatar{width:44px;height:44px;border-radius:13px;font-size:15px;}
