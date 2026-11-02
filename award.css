@@ -2529,3 +2529,30 @@
   .award-page .aw-top-right { width: 100%; }
   .award-page .aw-top-right .btn { flex: 1 1 auto; justify-content: center; }
 }
+
+/* ======================================================================
+   Tab hierarchy, set out properly. Level 1 (Awards, Events, Gifts) is the
+   filled segmented bar. Level 2 (the views inside a tab) is a quiet
+   underlined row beneath it, running the full width, so it clearly belongs
+   to the tab above and never competes with it.
+   ====================================================================== */
+.award-page .aw-topbar { margin: 0 0 6px; padding: 0; }
+.award-page .aw-subtabs, .award-page .aw-utiltabs {
+  display: flex; align-items: flex-end; gap: 6px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+  margin: 0 0 18px; padding: 0 4px; border: 0; border-bottom: 1px solid var(--border);
+}
+.award-page .aw-subtabs::-webkit-scrollbar { display: none; }
+.award-page .aw-subtab, .award-page .aw-utiltab {
+  position: relative; display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto;
+  margin: 0 0 -1px; padding: 12px 14px; border: 0; border-bottom: 2px solid transparent; border-radius: 8px 8px 0 0;
+  background: transparent; box-shadow: none; font-size: 13.5px; font-weight: 700; color: var(--text-soft);
+  transition: color .15s ease, background-color .15s ease, border-color .15s ease;
+}
+.award-page .aw-subtab:hover, .award-page .aw-utiltab:hover { transform: none; box-shadow: none; background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; }
+.award-page .aw-subtab.is-active, .award-page .aw-utiltab.is-active {
+  background: transparent; box-shadow: none; color: var(--accent-ink); border-color: transparent; border-bottom-color: var(--accent);
+}
+.award-page .aw-subtab.is-active .aw-icon, .award-page .aw-utiltab.is-active .aw-icon { color: var(--accent); }
+.award-page .aw-subtab:not(.is-active):hover { transform: none; box-shadow: none; }
+.award-page .aw-subtab.is-active .tab-count { background: var(--accent); color: #fff; }
+.award-page .aw-subtabs .pill { align-self: center; }
