@@ -8,6 +8,23 @@
      which of them a person sees depends on what they may do. -->
 <div class="award-page">
 
+    <!-- Same banner as Home, Employees and ER & Dashboards (styles: index.html, pg-*).
+         The one page-wide Refresh sits here; award.js finds it by id. -->
+    <section class="pg-hero">
+      <span class="pg-blob pg-blob--a" aria-hidden="true"></span>
+      <span class="pg-blob pg-blob--b" aria-hidden="true"></span>
+      <div class="pg-hero-lead">
+        <span class="pg-hero-ico" aria-hidden="true"><i class="aw-icon" data-aw-icon="gift"></i></span>
+        <div class="pg-hero-main">
+          <h1 class="pg-hero-title">Awards &amp; Gifts</h1>
+          <p class="pg-hero-sub">Awards, events and gift stock for every district, in one place.</p>
+        </div>
+      </div>
+      <div class="pg-hero-actions">
+        <button type="button" id="aw-refresh-all" class="pg-btn aw-refresh-all" title="Reload the latest data for the tab you are on"><i class="aw-icon" data-aw-icon="refresh" aria-hidden="true"></i><span class="aw-refresh-label" aria-live="polite">Refresh data</span></button>
+      </div>
+    </section>
+
     <!-- Shown only when award.js still holds placeholder credentials, or the
          first Supabase call fails outright. -->
     <div id="setup-banner" class="banner banner-error" hidden>
@@ -36,10 +53,6 @@
             New Requisition
           </button>
         </div>
-        <!-- One Refresh for the whole page: reloads the data of the tab on screen
-             (award.js refreshCurrentView). It replaces the separate Refresh buttons
-             each view used to carry, which are hidden in award.css. -->
-        <button type="button" id="aw-refresh-all" class="btn btn-ghost btn-sm aw-refresh-all" title="Reload the latest data for the tab you are on"><i class="aw-icon" data-aw-icon="refresh" aria-hidden="true"></i><span class="aw-refresh-label" aria-live="polite">Refresh data</span></button>
       </div>
     </div>
 

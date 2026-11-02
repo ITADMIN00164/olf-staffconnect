@@ -2379,3 +2379,16 @@
   .award-page tr.is-loading td { animation: aw-shimmer 1.4s ease-in-out infinite; }
   .award-page .awm-view .pom-modal-box, .award-page .awm-view .pom-prompt-box { animation: aw-pop .3s var(--ease) both; }
 }
+
+
+/* ======================================================================
+   The shared banner (pg-*, index.html) on this page: the page-wide
+   Refresh now lives in it, and award.js still finds it by id.
+   ====================================================================== */
+.award-page .pg-hero { margin-bottom: 18px; }
+.award-page .pg-hero-ico .aw-icon { font-size: 32px; color: #fff; }
+.award-page .pg-hero-ico .aw-icon svg { width: 32px; height: 32px; stroke-width: 1.7; }
+.award-page .pg-btn .aw-icon svg { width: 16px; height: 16px; }
+.award-page .pg-hero .aw-refresh-all { min-width: 148px; justify-content: center; }
+.award-page .pg-hero .aw-refresh-all:disabled { opacity: .85; cursor: progress; }
+.award-page .pg-hero .aw-refresh-all.is-done { color: #fff; background: rgba(34,197,94,.42); border-color: rgba(255,255,255,.5); }
