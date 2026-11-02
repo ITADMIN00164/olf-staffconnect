@@ -2461,6 +2461,7 @@ function syncEmpFilterBar() {
         }).join("") + (keys.length > 1
             ? `<button type="button" class="emp-filter-clear" data-clear-filters>Clear all</button>` : "");
     }
+    requestAnimationFrame(() => requestAnimationFrame(fitEmpTable));
 }
 
 function empSortValue(emp, key) {
@@ -2540,6 +2541,20 @@ function sortableTh(key, label, cls) {
         title="Sort by ${label}">${label}<span class="sort-mark">${mark}</span></th>`;
 }
 
+/* The table takes whatever height the window has left below the banner, the
+   figures and the toolbar, so as many people as fit are on screen without
+   scrolling the page. It is worked out again when the window, the filters or
+   the rows change. */
+function fitEmpTable() {
+    const wrap = document.querySelector(".employees-page .table-wrap");
+    const area = document.getElementById("pageContent");
+    if (!wrap || !area || !wrap.offsetParent) return;
+    const top  = wrap.getBoundingClientRect().top - area.getBoundingClientRect().top + area.scrollTop;
+    const room = area.clientHeight - top - 46;              // the card's own padding and the page's bottom gap
+    wrap.style.maxHeight = Math.max(300, Math.floor(room)) + "px";
+}
+window.addEventListener("resize", () => requestAnimationFrame(fitEmpTable));
+
 function renderEmployees() {
     const searchBox = document.getElementById("searchBox");
     const tableHead = document.getElementById("tableHead");
@@ -2585,6 +2600,7 @@ function renderEmployees() {
         </tr>
     `;
 
+    requestAnimationFrame(fitEmpTable);
     if (filtered.length === 0) {
         tableEl.innerHTML = `
             <tr><td colspan="${colCount}">
