@@ -51,14 +51,6 @@
         </div>
     </div>
 
-    <!-- ── Quick access: built from the menu, so it follows what you can open ── -->
-    <section class="hm-section" id="homeQuick" style="display:none;">
-        <div class="hm-head">
-            <div class="hm-head-title"><span class="hm-head-ico hm-ico--blue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3 4 14h7l-1 7 9-11h-7z"/></svg></span>Quick access</div>
-        </div>
-        <div class="hm-quick" id="homeQuickGrid"></div>
-    </section>
-
     <!-- ── Upcoming events (from Program Calendar) ──
          Hidden until app.js finds something in the today/tomorrow window. -->
     <div class="upcoming-section hm-section" id="upcomingSection" style="display:none;">
@@ -165,31 +157,10 @@
 .hm-head-title { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 800; letter-spacing: -.3px; color: var(--text); }
 .hm-head-ico { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; color: #fff; box-shadow: 0 4px 10px rgba(15,23,42,.16); }
 .hm-head-ico svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.hm-ico--blue  { background: linear-gradient(135deg, #60A5FA, #2563EB); }
 .hm-ico--pink  { background: linear-gradient(135deg, #F472B6, #DB2777); }
 .hm-ico--amber { background: linear-gradient(135deg, #FBBF24, #D97706); }
 .hm-pill { border-radius: 999px !important; padding: 7px 16px !important; transition: transform .18s ease, box-shadow .18s ease, background-color .15s ease !important; }
 .hm-pill:hover { transform: translateY(-1px); box-shadow: 0 6px 14px rgba(15,23,42,.12); }
-
-/* ── Quick access ───────────────────────────────────────────── */
-.hm-quick { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
-.hm-tile {
-    position: relative; display: flex; align-items: center; gap: 13px; padding: 14px 16px; text-align: left; cursor: pointer;
-    border-radius: 16px; border: 1px solid var(--hairline, rgba(15,23,42,.08)); font: inherit; color: var(--text);
-    background: var(--glass-strong, rgba(255,255,255,.88)); box-shadow: var(--shadow-sm);
-    transition: transform .22s var(--ease, ease), box-shadow .22s ease, border-color .2s ease;
-}
-.hm-tile:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: color-mix(in srgb, var(--brand, #4F8EF7) 40%, transparent); }
-.hm-tile:active { transform: translateY(-1px) scale(.98); }
-.hm-tile:focus-visible { outline: 2px solid var(--brand, #4F8EF7); outline-offset: 2px; }
-.hm-tile-ico { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; flex: 0 0 auto; background: var(--surface-tint, rgba(79,142,247,.1)); transition: transform .3s cubic-bezier(.34,1.56,.64,1); }
-.hm-tile-ico svg { width: 26px; height: 26px; filter: drop-shadow(0 2px 2px rgba(15,23,42,.18)); }
-.hm-tile:hover .hm-tile-ico { transform: scale(1.12) rotate(-6deg); }
-.hm-tile-txt { min-width: 0; flex: 1; }
-.hm-tile-name { display: block; font-size: 13.5px; font-weight: 700; letter-spacing: -.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hm-tile-desc { display: block; margin-top: 3px; font-size: 11.5px; font-weight: 500; color: var(--text-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hm-tile-go { position: absolute; right: 14px; top: 50%; margin-top: -10px; font-size: 16px; color: var(--text-faint); opacity: 0; transform: translateX(-6px); transition: opacity .2s ease, transform .2s ease; }
-.hm-tile:hover .hm-tile-go { opacity: 1; transform: none; color: var(--brand, #4F8EF7); }
 
 /* ── Happening next ────────────────────────────────────────────
    Uses the shared tokens from index.html so this strip matches the
@@ -262,11 +233,10 @@ html[data-theme="dark"] .hm .upcoming-card { border-color: var(--hairline); box-
 
 /* ── Motion: everything settles in, the hero keeps a slow drift ─ */
 @media (prefers-reduced-motion: no-preference) {
-    .hm-hero, .hm-stat, .hm-section, .hm-tile { animation: hm-in .6s cubic-bezier(.22,1,.36,1) backwards; }
+    .hm-hero, .hm-stat, .hm-section { animation: hm-in .6s cubic-bezier(.22,1,.36,1) backwards; }
     .hm-hero { animation-delay: .02s; }
     .hm-stat:nth-child(1) { animation-delay: .12s; } .hm-stat:nth-child(2) { animation-delay: .18s; } .hm-stat:nth-child(3) { animation-delay: .24s; }
-    #homeQuick { animation-delay: .3s; } #upcomingSection { animation-delay: .36s; } .news-section.hm-section { animation-delay: .42s; }
-    .hm-tile { animation-delay: calc(var(--n, 0) * 45ms + 350ms); }
+    #upcomingSection { animation-delay: .3s; } .news-section.hm-section { animation-delay: .36s; }
     .hm-blob--a { animation: hm-drift 14s ease-in-out infinite alternate; }
     .hm-blob--b { animation: hm-drift 18s ease-in-out -6s infinite alternate-reverse; }
     .hm-blob--c { animation: hm-drift 16s ease-in-out -3s infinite alternate; }
@@ -287,8 +257,6 @@ html[data-theme="dark"] .hm .upcoming-card { border-color: var(--hairline); box-
     .hm-stats, .stats-row { grid-template-columns: 1fr; }
     .news-cards-grid { grid-template-columns: 1fr; }
     .upcoming-grid { grid-template-columns: 1fr; }
-    .hm-quick { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
-    .hm-tile-go { display: none; }
 }
 </style>
 

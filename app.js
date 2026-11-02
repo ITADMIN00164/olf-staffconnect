@@ -1995,18 +1995,7 @@ async function deriveSchema() {
    HOME PAGE
 ==================================== */
 
-/* Home: greeting, live clock, count-up numbers and the quick-access tiles. */
-const HOME_TILE_INFO = {
-    "employees":         "Staff directory",
-    "er-dashboards":     "Reports and dashboards",
-    "award-management":  "Awards, events and gifts",
-    "calendar":          "Programs and events",
-    "smart-goals":       "Plans and reviews",
-    "pos":               "Field visit reviews",
-    "gr":                "Orders and circulars",
-    "forms":             "Forms and submissions"
-};
-
+/* Home: greeting, live clock and count-up numbers. */
 function homeGreetingFor(date) {
     const h = date.getHours();
     return h < 5 ? "Hello" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : h < 22 ? "Good evening" : "Hello";
@@ -2044,47 +2033,6 @@ function animateCount(el, target) {
     requestAnimationFrame(step);
 }
 
-// One tile for every menu item the person can open right now.
-function renderHomeQuickLinks() {
-    const section = document.getElementById("homeQuick");
-    const grid = document.getElementById("homeQuickGrid");
-    if (!section || !grid) return;
-    const items = [...document.querySelectorAll("#appSidebar .nav-item[data-page]")].filter(b =>
-        b.dataset.page !== "home" && !b.hidden && !b.closest("[hidden]") &&
-        !b.classList.contains("nav-item--locked") && !b.classList.contains("nav-item--locked-admin") &&
-        HOME_TILE_INFO[b.dataset.page]);
-    if (!items.length) { section.style.display = "none"; return; }
-    const tint = { "employees": "139,92,246", "er-dashboards": "14,165,164", "award-management": "245,158,11", "calendar": "236,72,153",
-                   "smart-goals": "239,68,68", "pos": "249,115,22", "gr": "180,83,9", "forms": "99,102,241" };
-    const key = items.map(b => b.dataset.page).join();
-    if (grid.dataset.key === key) return;            // nothing changed: leave the tiles (and their animation) alone
-    grid.dataset.key = key;
-    grid.innerHTML = items.map((b, i) => {
-        const page = b.dataset.page;
-        const icon = b.querySelector(".icon")?.innerHTML || "";
-        const label = (b.querySelector(".label")?.textContent || page).trim();
-        return `<button type="button" class="hm-tile" data-go="${page}" style="--n:${i};--surface-tint:rgba(${tint[page] || "79,142,247"},.12)">
-            <span class="hm-tile-ico">${icon}</span>
-            <span class="hm-tile-txt"><span class="hm-tile-name">${label}</span><span class="hm-tile-desc">${HOME_TILE_INFO[page]}</span></span>
-            <span class="hm-tile-go" aria-hidden="true">→</span></button>`;
-    }).join("");
-    grid.querySelectorAll(".hm-tile").forEach(t => t.addEventListener("click", () => navigate(t.dataset.go)));
-    section.style.display = "";
-}
-
-let homeNavWatcher = null;
-function watchHomeQuickLinks() {
-    if (homeNavWatcher) homeNavWatcher.disconnect();
-    const side = document.getElementById("appSidebar");
-    if (!side) return;
-    let wait = null;
-    homeNavWatcher = new MutationObserver(() => {
-        if (!document.getElementById("homeQuickGrid")) { homeNavWatcher.disconnect(); return; }
-        clearTimeout(wait); wait = setTimeout(renderHomeQuickLinks, 200);
-    });
-    homeNavWatcher.observe(side, { attributes: true, subtree: true, attributeFilter: ["class", "hidden"] });
-}
-
 async function initHomePage() {
     const user  = auth.currentUser;
     const nameEl = document.getElementById("homeUserName");
@@ -2092,8 +2040,6 @@ async function initHomePage() {
         nameEl.textContent = user.displayName?.split(" ")[0] || "there";
     }
     startHomeClock();
-    renderHomeQuickLinks();
-    watchHomeQuickLinks();
 
     // Admin-only: show inline "Add News" button in the news section header
     const addNewsBtn = document.getElementById("addNewsBtn");
