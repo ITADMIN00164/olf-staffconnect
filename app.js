@@ -1948,6 +1948,105 @@ const menuGlider = (() => {
     return { move };
 })();
 
+/* ====================================
+   GLIDING TAB SELECTION, everywhere
+   Every row of tabs gets one piece that glides to the chosen tab instead of
+   the selection jumping. The piece copies the chosen tab's own look (a
+   white pill, a frosted pill, a soft card) or, for rows that mark the
+   chosen tab with an underline, becomes a sliding underline. Rows found
+   anywhere in the page area, including ones a page draws later, are picked
+   up by themselves; nothing in the pages' own code changes.
+==================================== */
+const TAB_ROWS = [
+    "#awHero .aw-toptabs", "#awHero .aw-hero-nav .aw-subtabs",
+    "#sgHero .nav-tabs", "#sgHero .dash-subtabs",
+    "#posPage .pos-top-tabs--header", "#posPage .pos-subtabs", "#prNav",
+    "#pcal-app .pcal-navcard", "#grPage .gr-tabs", "#page-forms .frm-tabs"
+];
+const TAB_ACTIVE = ".is-active, .active, .is-on";
+const tabGliderLast = new Map();                    // where each row's piece last was, so a redrawn row still glides
+function tabRowKey(row) { return row.id || TAB_ROWS.find(s => row.matches(s)) || "row"; }
+
+function moveTabGlider(row) {
+    const glider = row.querySelector(":scope > .tab-glider");
+    if (!glider) return;
+    const btn = [...row.querySelectorAll(TAB_ACTIVE)].find(b => b !== glider && b.offsetParent && !b.hidden);
+    glider.classList.toggle("is-hidden", !btn);
+    if (!btn) return;
+    let x = 0, y = 0;                               // offsets, not screen boxes: the app is zoomed
+    for (let el = btn; el && el !== row; el = el.offsetParent) { x += el.offsetLeft; y += el.offsetTop; }
+    let w = btn.offsetWidth, h = btn.offsetHeight;
+
+    // copy the chosen tab's own look, read with the row's override switched off for a moment
+    row.classList.add("tg-measure");             // no fades while reading, or a half-faded colour gets copied
+    row.classList.remove("has-tab-glider");
+    const cs = getComputedStyle(btn), after = getComputedStyle(btn, "::after");
+    const filled = cs.backgroundColor !== "rgba(0, 0, 0, 0)" || cs.backgroundImage !== "none" || cs.boxShadow !== "none";
+    const line = !filled && after.content !== "none" && parseFloat(after.height) <= 6;
+    if (filled) {
+        glider.style.background = cs.backgroundImage !== "none" ? `${cs.backgroundImage}, ${cs.backgroundColor}` : cs.backgroundColor;
+        glider.style.boxShadow = cs.boxShadow;
+        glider.style.borderRadius = cs.borderRadius;
+    } else if (line) {
+        const l = parseFloat(after.left) || 0, r = parseFloat(after.right) || 0, b = parseFloat(after.bottom) || 0;
+        const lh = parseFloat(after.height) || 2;
+        x += l; w = Math.max(0, w - l - r); y += h - b - lh; h = lh;
+        glider.style.background = after.backgroundImage !== "none" ? after.backgroundImage : after.backgroundColor;
+        glider.style.boxShadow = "none";
+        glider.style.borderRadius = after.borderRadius;
+    }
+    row.classList.add("has-tab-glider");
+    row.classList.toggle("tg-line", line);
+    void row.offsetWidth;
+    row.classList.remove("tg-measure");
+    if (!filled && !line) { glider.classList.add("is-hidden"); return; }
+
+    const to = { x, y, w, h };
+    if (!glider.dataset.placed) {                   // a fresh row: start where this row's piece last was
+        const from = tabGliderLast.get(tabRowKey(row)) || to;
+        glider.classList.add("no-anim");
+        Object.assign(glider.style, { transform: `translate(${from.x}px, ${from.y}px)`, width: from.w + "px", height: from.h + "px" });
+        void glider.offsetWidth;
+        glider.classList.remove("no-anim");
+        glider.dataset.placed = "1";
+    }
+    Object.assign(glider.style, { transform: `translate(${x}px, ${y}px)`, width: w + "px", height: h + "px" });
+    tabGliderLast.set(tabRowKey(row), to);
+}
+
+function attachTabGlider(row) {
+    if (row.dataset.tabGlider) return;
+    row.dataset.tabGlider = "1";
+    if (getComputedStyle(row).position === "static") row.style.position = "relative";
+    const glider = document.createElement("span");
+    glider.className = "tab-glider";
+    glider.setAttribute("aria-hidden", "true");
+    row.prepend(glider);
+    const again = () => requestAnimationFrame(() => moveTabGlider(row));
+    new MutationObserver((list) => {
+        if (list.some(m => m.target !== glider && m.target !== row)) again();
+    }).observe(row, { subtree: true, attributes: true, attributeFilter: ["class", "hidden", "style"] });
+    if (window.ResizeObserver) new ResizeObserver(again).observe(row);
+    again();
+}
+
+function scanTabRows() {
+    TAB_ROWS.forEach(sel => document.querySelectorAll(sel).forEach(attachTabGlider));
+}
+(function () {
+    const area = document.getElementById("pageContent");
+    if (!area || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let queued = false;
+    new MutationObserver(() => {
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(() => { queued = false; scanTabRows(); });
+    }).observe(area, { childList: true, subtree: true });
+    // light/dark changes the chosen tab's look; follow it
+    new MutationObserver(() => document.querySelectorAll("[data-tab-glider]").forEach(r => moveTabGlider(r)))
+        .observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+})();
+
 /* "Where you are" in the top bar: the open page's own colourful picture and
    name, taken from its menu item, sliding in when the page changes. */
 function updateTopbarCrumb(page) {
@@ -2261,11 +2360,20 @@ function renderHomeGreeting(now) {
     const el = document.getElementById("homeGreetText");
     if (!el) return;
     homeGreetingNow = pickHomeGreeting(now || new Date());
-    const plain = homeGreetingNow.replace("{name}", homeFirstName);
+    // "Greeting text | 🎉": the emoji (if any) takes the waving hand's place
+    const [text, emoji] = homeGreetingNow.split("|").map(s => s.trim());
+    const plain = text.replace("{name}", homeFirstName);
     const show = () => {
         el.setAttribute("aria-label", plain);
-        el.innerHTML = `<span class="hm-greet-letters" aria-hidden="true">${greetingLettersHtml(homeGreetingNow)}</span>`;
+        el.innerHTML = `<span class="hm-greet-letters" aria-hidden="true">${greetingLettersHtml(text)}</span>`;
         el.classList.remove("hm-greet-out");
+        const ico = document.querySelector("#homeHand .hm-hand-ico");
+        if (ico) {
+            ico.textContent = emoji || "👋";
+            ico.classList.remove("is-new");
+            void ico.offsetWidth;                   // replay the pop
+            ico.classList.add("is-new");
+        }
     };
     clearTimeout(homeGreetSwapTimer);
     // the greeting on screen floats away first, then the new one cascades in
@@ -2303,6 +2411,7 @@ function wireHomeHand() {
         hand.classList.remove("is-waving");
         void hand.offsetWidth;
         hand.classList.add("is-waving");
+        setTimeout(() => hand.classList.remove("is-waving"), 950);   // so the next emoji can pop in
         if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
         const colours = ["#FDE68A", "#F9A8D4", "#6EE7B7", "#93C5FD", "#FDBA74", "#C4B5FD"];
         for (let i = 0; i < 16; i++) {

@@ -3368,6 +3368,24 @@
     @media (prefers-reduced-motion: reduce) { .nav-glider { transition: opacity .2s ease; } }
 
     /* ======================================================================
+       GLIDING TAB SELECTION (app.js: moveTabGlider)
+       In every tab row the chosen tab's pill / card / underline is one piece
+       that glides between tabs. The tabs keep their own text colours; only
+       their own fill steps aside while the piece is there.
+       ====================================================================== */
+    .tab-glider {
+        position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none;
+        transition: transform .45s cubic-bezier(.34,1.25,.64,1), width .32s cubic-bezier(.22,1,.36,1),
+                    height .32s cubic-bezier(.22,1,.36,1), opacity .2s ease, background-color .3s ease;
+    }
+    .tab-glider.no-anim { transition: none; }
+    .tab-glider.is-hidden { opacity: 0; }
+    .has-tab-glider :is(button, [role="tab"]) { position: relative; z-index: 1; }
+    .has-tab-glider :is(.is-active, .active, .is-on):not(.tab-glider) { background: transparent !important; box-shadow: none !important; }
+    .has-tab-glider.tg-line :is(.is-active, .active, .is-on)::after { opacity: 0 !important; }
+    .tg-measure :is(button, [role="tab"]), .tg-measure :is(button, [role="tab"])::after { transition: none !important; animation: none !important; }
+
+    /* ======================================================================
        COLOURFUL ICONS
        Every icon carries its own colour: --icl, a bright tint that reads on
        the blue banner, and --icd, the deeper shade for white surfaces (the
@@ -3982,7 +4000,7 @@
     </div>
 </div>
 
-<script type="module" src="app.js?v=2026-11-03i"></script>
+<script type="module" src="app.js?v=2026-11-03k"></script>
 <script src="profile.js"></script>
 <script src="pom.js"></script>
 <script src="calendar.js?v=2026-11-02a"></script>

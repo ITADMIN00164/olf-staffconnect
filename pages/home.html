@@ -17,7 +17,7 @@
         </span>
         <div class="pg-hero-main">
             <div class="pg-eyebrow"><span class="pg-live" aria-hidden="true"></span><span id="homeDate">&nbsp;</span></div>
-            <h1 class="pg-hero-title hm-title"><span class="hm-title-text" id="homeGreetText">Welcome back</span><button type="button" class="hm-hand" id="homeHand" title="Say hi!" aria-label="Wave hello and get a new greeting"><span class="hm-hand-ico" aria-hidden="true">👋</span></button></h1>
+            <h1 class="pg-hero-title hm-title"><span class="hm-title-text" id="homeGreetText">Welcome back</span><button type="button" class="hm-hand" id="homeHand" title="Say hi!" aria-label="Get a new greeting"><span class="hm-hand-ico" aria-hidden="true">👋</span></button></h1>
             <p class="pg-hero-sub">One Stop Solution for OLF's Data Management</p>
             <p class="hm-line" id="homeLine" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 7H6a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h3v1a3 3 0 0 1-3 3M20 7h-4a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h3v1a3 3 0 0 1-3 3"/></svg><span id="homeLineText"></span></p>
         </div>
@@ -256,6 +256,9 @@ html[data-theme="dark"] .hm .upcoming-card { border-color: var(--hairline); box-
     #upcomingSection { animation-delay: .3s; } .news-section.hm-section { animation-delay: .36s; }
     .hm-hand-ico { animation: hm-wave 2.6s ease-in-out 1s infinite; }
     .hm-hand.is-waving .hm-hand-ico { animation: hm-wave-big .9s ease-in-out; }
+    /* a new greeting brings its own emoji: it pops in, then keeps the gentle wave */
+    .hm-hand-ico.is-new { animation: hm-emoji-pop .6s cubic-bezier(.34,1.56,.64,1), hm-wave 2.6s ease-in-out 1.2s infinite; }
+    @keyframes hm-emoji-pop { 0% { transform: scale(0) rotate(-30deg); opacity: 0; } 70% { transform: scale(1.25) rotate(8deg); opacity: 1; } 100% { transform: scale(1) rotate(0); } }
     /* the greeting arrives letter by letter and floats away before the next */
     .hm-ch { animation: hm-ch-in .55s cubic-bezier(.22,1,.36,1) backwards; animation-delay: var(--d, 0ms); }
     .hm-greet-out .hm-ch { animation: hm-ch-out .38s cubic-bezier(.55,0,.75,.2) forwards; animation-delay: calc(var(--d, 0ms) * .2); }
