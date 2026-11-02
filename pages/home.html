@@ -115,11 +115,7 @@
 .hm-live { width: 8px; height: 8px; border-radius: 50%; background: #86EFAC; box-shadow: 0 0 0 0 rgba(134,239,172,.7); }
 .hm-title { display: flex; align-items: center; flex-wrap: wrap; gap: 0 12px; font-size: 34px; font-weight: 800; letter-spacing: -1px; line-height: 1.12; margin: 0 0 8px; color: #fff; }
 .hm-name { color: #FEF3C7; }
-.hm-hand {
-    display: inline-block; flex: 0 0 auto; font-size: 1em; line-height: 1; position: relative; top: 1px;
-    font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
-    transform-origin: 72% 78%; filter: drop-shadow(0 4px 6px rgba(15,23,42,.25)); will-change: transform;
-}
+.hm-hand { display: inline-block; flex: 0 0 auto; font-size: 1em; line-height: 1; position: relative; top: 1px; transform-origin: 70% 70%; }
 .hm-sub { margin: 0; font-size: 14.5px; font-weight: 500; opacity: .92; }
 
 .hm-clock {
@@ -294,13 +290,12 @@ html[data-theme="dark"] .hm .upcoming-card { border-color: var(--hairline); box-
     .hm-blob--b { animation: hm-drift 18s ease-in-out -6s infinite alternate-reverse; }
     .hm-blob--c { animation: hm-drift 16s ease-in-out -3s infinite alternate; }
     .hm-live { animation: hm-ping 2.2s ease-out infinite; }
-    .hm-hand { animation: hm-wave 2.8s cubic-bezier(.45,0,.35,1) .8s infinite; }
+    .hm-hand { animation: hm-wave 2.6s ease-in-out 1s infinite; }
     .hm .hm-empty-ico { animation: hm-bob 3.2s ease-in-out infinite; }
     @keyframes hm-in { from { opacity: 0; transform: translateY(14px); } }
     @keyframes hm-drift { to { transform: translate(34px, 22px) scale(1.12); } }
     @keyframes hm-ping { 0% { box-shadow: 0 0 0 0 rgba(134,239,172,.7); } 100% { box-shadow: 0 0 0 9px rgba(134,239,172,0); } }
-    /* a friendly wave a few times, a short rest, then again */
-    @keyframes hm-wave { 0% { transform: rotate(0); } 7% { transform: rotate(16deg); } 14% { transform: rotate(-10deg); } 21% { transform: rotate(16deg); } 28% { transform: rotate(-8deg); } 35% { transform: rotate(12deg); } 42% { transform: rotate(-4deg); } 50%, 100% { transform: rotate(0); } }
+    @keyframes hm-wave { 0%, 60%, 100% { transform: rotate(0); } 10%, 30% { transform: rotate(16deg); } 20%, 40% { transform: rotate(-10deg); } 50% { transform: rotate(8deg); } }
     @keyframes hm-bob { 50% { transform: translateY(-4px); } }
 }
 
