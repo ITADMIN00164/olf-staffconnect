@@ -2,21 +2,24 @@
 <div class="employees-page">
 
     <div class="page-header-emp">
-        <div>
-            <h1 class="page-title">Employee Directory</h1>
-            <p class="page-subtitle">Browse and manage all staff records.</p>
+        <div class="emp-head">
+            <span class="emp-head-ico" aria-hidden="true"><svg viewBox="0 0 32 32"><circle cx="21.5" cy="10.5" r="4.3" fill="#FCD9A8"/><path d="M13.5 27c0-5.2 3.4-8.5 8-8.5s8 3.3 8 8.5z" fill="#BFDBFE"/><circle cx="11" cy="12" r="4.8" fill="#FFD3A1"/><path d="M2.5 28.5c0-5.8 3.7-9.5 8.5-9.5s8.5 3.7 8.5 9.5z" fill="#fff"/></svg></span>
+            <div>
+                <h1 class="page-title">Employee Directory</h1>
+                <p class="page-subtitle">Browse and manage all staff records.</p>
+            </div>
         </div>
         <div class="header-actions">
         <button class="btn-org" id="orgChartBtn" title="View the reporting structure">
-            🌳 Org Chart
+            <svg class="emp-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="5" rx="1.2"/><rect x="3" y="16" width="6" height="5" rx="1.2"/><rect x="15" y="16" width="6" height="5" rx="1.2"/><path d="M12 8v4M6 16v-2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2"/></svg>Org Chart
         </button>
         <div id="adminToolbar" style="display:none;">
             <div class="admin-btn-group">
-                <button class="btn-add" id="addEmployeeBtn">+ Add Employee</button>
-                <button class="btn-sample-excel" id="downloadSampleExcelBtn">⬇ Sample Format</button>
+                <button class="btn-add" id="addEmployeeBtn"><svg class="emp-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add Employee</button>
+                <button class="btn-sample-excel" id="downloadSampleExcelBtn"><svg class="emp-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10m0 0 4-4m-4 4-4-4M5 19h14"/></svg>Sample Format</button>
                 <label class="btn-upload-excel" id="uploadExcelLabel"
                        title="Add new employees, or update existing ones, from Excel">
-                    📤 Upload via Excel
+                    <svg class="emp-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V5m0 0 4 4m-4-4-4 4M5 19h14"/></svg>Upload via Excel
                     <input type="file" id="uploadExcelInput" accept=".xlsx,.xlsm" style="display:none;">
                 </label>
             </div>
@@ -79,19 +82,23 @@
     <div class="card">
         <div class="table-toolbar">
             <div class="toolbar-left">
-                <input
-                    type="text"
-                    id="searchBox"
-                    class="search-input"
-                    placeholder="🔍  Search by name, department, location…">
+                <div class="search-wrap">
+                    <svg class="emp-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
+                    <input
+                        type="text"
+                        id="searchBox"
+                        class="search-input"
+                        placeholder="Search by name, department, location…"
+                        autocomplete="off">
+                </div>
                 <button type="button" class="btn-filters" id="empFiltersBtn" aria-expanded="false">
-                    <span class="btn-filters-ico">⛃</span> Filters
+                    <span class="btn-filters-ico"><svg class="emp-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6 7.5V19l-4 1.500v-8z"/></svg></span> Filters
                     <span class="btn-filters-count" id="empFiltersCount" hidden></span>
                 </button>
             </div>
             <div class="toolbar-right">
                 <div class="table-meta" id="tableMeta"></div>
-                <button class="btn-excel" id="downloadExcelBtn">⬇ Download Excel</button>
+                <button class="btn-excel" id="downloadExcelBtn"><svg class="emp-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10m0 0 4-4m-4 4-4-4M5 19h14"/></svg>Download Excel</button>
             </div>
         </div>
 
@@ -1033,4 +1040,136 @@ tbody tr.row-inactive td.col-actions .btn-delete { opacity: 0.55; }
     .search-input { width: 100%; }
     .table-toolbar { flex-direction: column; align-items: flex-start; }
 }
+
+/* ======================================================================
+   Employees, polished: a proper header, a calmer toolbar, a table that
+   reads easily and rows that respond. Everything below only restyles.
+   ====================================================================== */
+.employees-page {
+    --row-hover: #F2F6FF; --row-line: rgba(15,23,42,.07); --th-bg: #F3F6FB;
+}
+html[data-theme="dark"] .employees-page { --row-hover: #283042; --row-line: rgba(255,255,255,.07); --th-bg: #222934; }
+.employees-page .emp-i { width: 16px; height: 16px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* header */
+.employees-page .page-header-emp { align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
+.employees-page .emp-head { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.employees-page .emp-head-ico {
+    width: 56px; height: 56px; border-radius: 18px; display: grid; place-items: center; flex: 0 0 auto;
+    background: linear-gradient(135deg, #5B9BFF, #4F8EF7 45%, #10B197);
+    box-shadow: 0 10px 22px rgba(79,142,247,.32), inset 0 1px 0 rgba(255,255,255,.4);
+}
+.employees-page .emp-head-ico svg { width: 34px; height: 34px; filter: drop-shadow(0 2px 2px rgba(15,23,42,.2)); }
+.employees-page .page-title { font-size: 27px; font-weight: 800; letter-spacing: -.7px; color: var(--text); margin: 0 0 3px; }
+.employees-page .page-subtitle { font-size: 13.5px; color: var(--text-soft); margin: 0; }
+
+.employees-page .btn-org, .employees-page .btn-add, .employees-page .btn-sample-excel,
+.employees-page .btn-upload-excel, .employees-page .btn-excel, .employees-page .btn-filters {
+    display: inline-flex; align-items: center; gap: 8px; min-height: 40px; border-radius: 12px; font-weight: 700;
+    transition: transform .18s var(--ease, ease), box-shadow .2s ease, background-color .15s ease, border-color .15s ease;
+}
+.employees-page .btn-org:hover, .employees-page .btn-add:hover, .employees-page .btn-sample-excel:hover,
+.employees-page .btn-upload-excel:hover, .employees-page .btn-excel:hover, .employees-page .btn-filters:hover { transform: translateY(-1px); }
+.employees-page .btn-org:active, .employees-page .btn-add:active, .employees-page .btn-sample-excel:active,
+.employees-page .btn-upload-excel:active, .employees-page .btn-excel:active, .employees-page .btn-filters:active { transform: scale(.97); }
+.employees-page .btn-org { background: linear-gradient(135deg, #14B8A6, #0D6B5E); box-shadow: 0 6px 16px rgba(13,107,94,.28); }
+.employees-page .btn-org:hover { background: linear-gradient(135deg, #14B8A6, #0D6B5E); box-shadow: 0 10px 22px rgba(13,107,94,.36); }
+.employees-page .btn-add { background: linear-gradient(135deg, #5B9BFF, #3A7DE8); box-shadow: 0 6px 16px rgba(58,125,232,.3); }
+.employees-page .btn-add:hover { background: linear-gradient(135deg, #5B9BFF, #3A7DE8); box-shadow: 0 10px 22px rgba(58,125,232,.38); }
+.employees-page .btn-sample-excel { background: var(--glass-strong); color: var(--text); border: 1px solid var(--hairline); }
+.employees-page .btn-sample-excel:hover { background: var(--glass-strong); border-color: var(--brand, #4F8EF7); box-shadow: var(--shadow-sm); }
+.employees-page .btn-upload-excel { border-radius: 12px; }
+.employees-page .btn-upload-excel:hover { box-shadow: 0 6px 14px rgba(22,163,74,.18); }
+
+/* the card and its toolbar */
+.employees-page .card { border-radius: 22px; padding: 22px; }
+.employees-page .table-toolbar { margin-bottom: 18px; flex-wrap: wrap; }
+.employees-page .toolbar-left { display: flex; align-items: center; gap: 12px; flex: 1 1 360px; min-width: 0; }
+.employees-page .search-wrap { position: relative; flex: 1 1 280px; max-width: 460px; min-width: 200px; }
+.employees-page .search-wrap .emp-i { position: absolute; left: 14px; top: 50%; width: 17px; height: 17px; margin-top: -8.5px; color: var(--text-faint); pointer-events: none; transition: color .2s ease; }
+.employees-page .search-wrap:focus-within .emp-i { color: var(--brand, #4F8EF7); }
+.employees-page .search-input {
+    width: 100%; height: 44px; padding: 0 16px 0 42px; border-radius: 14px; font-size: 14px; color: var(--text);
+    background: var(--glass-strong); border: 1px solid var(--hairline); box-shadow: inset 0 1px 2px rgba(15,23,42,.05);
+    transition: border-color .2s ease, box-shadow .2s ease;
+}
+.employees-page .search-input::placeholder { color: var(--text-faint); }
+.employees-page .search-input:focus { border-color: var(--brand, #4F8EF7); box-shadow: 0 0 0 4px rgba(79,142,247,.16); }
+.employees-page .btn-filters { height: 44px; padding: 0 16px; background: var(--glass-strong); border: 1px solid var(--hairline); color: var(--text); }
+.employees-page .btn-filters-ico { display: grid; place-items: center; font-size: 0; }
+.employees-page .btn-filters-ico .emp-i { width: 16px; height: 16px; }
+.employees-page .table-meta {
+    padding: 7px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 700; color: var(--text-soft);
+    background: color-mix(in srgb, var(--brand, #4F8EF7) 10%, transparent); font-variant-numeric: tabular-nums;
+}
+.employees-page .btn-excel { padding: 0 18px; height: 44px; background: linear-gradient(135deg, #22C55E, #15803D); box-shadow: 0 6px 16px rgba(21,128,61,.28); }
+.employees-page .btn-excel:hover { background: linear-gradient(135deg, #22C55E, #15803D); box-shadow: 0 10px 22px rgba(21,128,61,.36); }
+
+/* table */
+.employees-page table { width: 100%; }
+.employees-page .table-wrap { border-radius: 16px; border: 1px solid var(--row-line); }
+.employees-page th {
+    padding: 13px 16px; font-size: 11px; font-weight: 800; letter-spacing: .07em; color: var(--text-soft);
+    background: var(--th-bg); border-bottom: 1px solid var(--row-line);
+}
+.employees-page th.col-actions { background: var(--th-bg); }
+.employees-page th.is-sortable:hover { background: var(--row-hover); color: var(--text); }
+.employees-page th.is-sorted { background: var(--row-hover); }
+.employees-page td { padding: 14px 16px; font-size: 13.5px; color: var(--text); border-bottom: 1px solid var(--row-line); }
+.employees-page tbody tr { transition: background-color .12s ease; }
+.employees-page tbody tr:hover, .employees-page tbody tr:hover td, .employees-page tbody tr:hover td.col-actions { background: var(--row-hover); }
+.employees-page tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--brand, #4F8EF7); }
+.employees-page tbody tr:last-child td { border-bottom: 0; }
+
+.employees-page .emp-person { display: flex; align-items: center; gap: 11px; }
+.employees-page .emp-name { font-weight: 700; letter-spacing: -.1px; }
+.employees-page .emp-av {
+    width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; flex: 0 0 auto; color: #fff;
+    font-size: 12px; font-weight: 800; letter-spacing: .02em; box-shadow: 0 3px 8px rgba(15,23,42,.18), inset 0 1px 0 rgba(255,255,255,.35);
+}
+.employees-page .emp-av.av0 { background: linear-gradient(135deg, #60A5FA, #2563EB); }
+.employees-page .emp-av.av1 { background: linear-gradient(135deg, #A78BFA, #7C3AED); }
+.employees-page .emp-av.av2 { background: linear-gradient(135deg, #2DD4BF, #0F766E); }
+.employees-page .emp-av.av3 { background: linear-gradient(135deg, #FBBF24, #D97706); }
+.employees-page .emp-av.av4 { background: linear-gradient(135deg, #F472B6, #DB2777); }
+.employees-page .emp-av.av5 { background: linear-gradient(135deg, #FB923C, #EA580C); }
+.employees-page .emp-id { display: inline-block; padding: 3px 9px; border-radius: 8px; font-size: 12px; font-weight: 700; color: var(--text-soft); background: color-mix(in srgb, var(--text-faint) 16%, transparent); font-variant-numeric: tabular-nums; }
+.employees-page .emp-mail { color: var(--chrome-accent, #3567d4); text-decoration: none; font-weight: 600; }
+.employees-page .emp-mail:hover { text-decoration: underline; }
+
+.employees-page .badge-status { display: inline-flex; align-items: center; gap: 7px; padding: 4px 11px 4px 9px; font-size: 12px; font-weight: 700; background: rgba(34,197,94,.14); color: #15803D; }
+.employees-page .badge-status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #22C55E; box-shadow: 0 0 0 3px rgba(34,197,94,.22); }
+.employees-page .badge-status.is-inactive { background: rgba(148,163,184,.18); color: var(--text-soft); }
+.employees-page .badge-status.is-inactive::before { background: #94A3B8; box-shadow: none; }
+.employees-page .badge-dept { padding: 4px 11px; border-radius: 999px; font-size: 12px; font-weight: 700; background: color-mix(in srgb, var(--brand, #4F8EF7) 13%, transparent); color: var(--chrome-accent, #3567d4); }
+.employees-page .badge-multi { border-radius: 999px; padding: 3px 11px; }
+
+.employees-page .btn-edit, .employees-page .btn-delete { width: 30px; height: 30px; border-radius: 10px; transition: transform .16s var(--ease, ease), background-color .15s ease; }
+.employees-page .btn-edit .emp-i, .employees-page .btn-delete .emp-i { width: 15px; height: 15px; }
+.employees-page .btn-edit:hover, .employees-page .btn-delete:hover { transform: translateY(-1px) scale(1.08); }
+
+.employees-page .empty-state { padding: 54px 20px; }
+.employees-page .empty-icon {
+    width: 64px; height: 64px; margin: 0 auto 12px; border-radius: 20px; display: grid; place-items: center; color: #fff; font-size: 0;
+    background: linear-gradient(135deg, #60A5FA, #4F8EF7 55%, #10B197); box-shadow: 0 10px 22px rgba(79,142,247,.3), inset 0 1px 0 rgba(255,255,255,.4);
+}
+.employees-page .empty-icon .emp-i { width: 30px; height: 30px; stroke-width: 1.8; }
+.employees-page .empty-state .emp-empty-title { display: block; font-size: 15px; font-weight: 800; color: var(--text); margin-bottom: 3px; }
+.employees-page .emp-spin { display: block; width: 30px; height: 30px; margin: 0 auto 12px; border-radius: 50%; border: 3px solid color-mix(in srgb, var(--brand, #4F8EF7) 22%, transparent); border-top-color: var(--brand, #4F8EF7); animation: emp-spin .8s linear infinite; }
+@keyframes emp-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: no-preference) {
+    .employees-page .page-header-emp, .employees-page .card { animation: emp-in .55s cubic-bezier(.22,1,.36,1) backwards; }
+    .employees-page .card { animation-delay: .08s; }
+    @keyframes emp-in { from { opacity: 0; transform: translateY(12px); } }
+}
+@media (max-width: 768px) {
+    .employees-page .page-title { font-size: 22px; }
+    .employees-page .emp-head-ico { width: 46px; height: 46px; border-radius: 15px; }
+    .employees-page .card { padding: 16px; border-radius: 18px; }
+    .employees-page .search-wrap { max-width: none; }
+}
 </style>
+
+<!-- Local Live Server adds its reload script at the closing body tag; this gives it a safe place. -->
+</body>

@@ -2213,7 +2213,7 @@ async function loadEmployees() {
     employees = [];
 
     const tableEl = document.getElementById("employeeTable");
-    if (tableEl) tableEl.innerHTML = `<tr><td colspan="99" class="empty-state"><div class="empty-icon">⏳</div>Loading…</td></tr>`;
+    if (tableEl) tableEl.innerHTML = `<tr><td colspan="99" class="empty-state"><span class="emp-spin" aria-hidden="true"></span>Loading…</td></tr>`;
 
     try {
         await deriveSchema();
@@ -2460,6 +2460,22 @@ function onEmpFiltersToggle() {
     syncEmpFilterBar();
 }
 
+/* Pictures drawn in the Employees page */
+const EMP_ICON_PATHS = {
+    search: '<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>',
+    edit:   '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
+    trash:  '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>'
+};
+function empIcon(name) {
+    return '<svg class="emp-i" viewBox="0 0 24 24" aria-hidden="true">' + EMP_ICON_PATHS[name] + "</svg>";
+}
+// A steady colour for each person's initials, taken from their name.
+function empAvatarTone(name) {
+    let n = 0;
+    for (const c of String(name)) n = (n + c.charCodeAt(0)) % 6;
+    return n;
+}
+
 function sortableTh(key, label, cls) {
     const on = empSort.key === key;
     const mark = on ? (empSort.dir === 1 ? "▲" : "▼") : "⇅";
@@ -2505,8 +2521,9 @@ function renderEmployees() {
         tableEl.innerHTML = `
             <tr><td colspan="${colCount}">
                 <div class="empty-state">
-                    <div class="empty-icon">🔍</div>
-                    No employees match your search or filters.
+                    <div class="empty-icon">${empIcon("search")}</div>
+                    <span class="emp-empty-title">No employees found</span>
+                    Nothing matches your search or filters.
                 </div>
             </td></tr>
         `;
@@ -2517,10 +2534,10 @@ function renderEmployees() {
         <tr class="${isActiveEmployee(emp) ? "" : "row-inactive"}">
             ${currentRole === "Admin" ? `
             <td class="col-actions">
-                <button class="btn-edit"   data-action="edit"   data-id="${escHtml(emp.id)}" title="Edit" aria-label="Edit">✏️</button>
-                <button class="btn-delete" data-action="delete" data-id="${escHtml(emp.id)}" title="Delete" aria-label="Delete">🗑️</button>
+                <button class="btn-edit"   data-action="edit"   data-id="${escHtml(emp.id)}" title="Edit" aria-label="Edit">${empIcon("edit")}</button>
+                <button class="btn-delete" data-action="delete" data-id="${escHtml(emp.id)}" title="Delete" aria-label="Delete">${empIcon("trash")}</button>
             </td>` : ""}
-            <td class="col-id"><code style="font-size:12px;color:#6b7280;">${escHtml(emp.id)}</code></td>
+            <td class="col-id"><span class="emp-id">${escHtml(emp.id)}</span></td>
             ${tableCols.map(key => {
                 const val = emp[key] || "";
                 const cls = colClass(key);
@@ -2531,7 +2548,8 @@ function renderEmployees() {
                 }
                 if (MULTI_VALUE_FIELDS[key]) return `<td class="${cls}">${multiCellHtml(val, emp.id, key)}</td>`;
                 if (key === "Dept") return `<td class="${cls}"><span class="badge-dept">${escHtml(val) || "—"}</span></td>`;
-                if (key === "Email" && val) return `<td class="${cls}"><a href="mailto:${escHtml(val)}" style="color:#4f8ef7;text-decoration:none;">${escHtml(val)}</a></td>`;
+                if (key === "Email" && val) return `<td class="${cls}"><a class="emp-mail" href="mailto:${escHtml(val)}">${escHtml(val)}</a></td>`;
+                if (key === "Name" && val) return `<td class="${cls}"><div class="emp-person"><span class="emp-av av${empAvatarTone(val)}" aria-hidden="true">${escHtml(initialsFrom(val))}</span><span class="emp-name">${escHtml(val)}</span></div></td>`;
                 return `<td class="${cls}">${escHtml(val) || "—"}</td>`;
             }).join("")}
         </tr>
