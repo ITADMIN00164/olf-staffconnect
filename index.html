@@ -2987,6 +2987,40 @@
         .app-body.sb-auto #appSidebar.sb-admin { width: 232px; }
     }
 
+    /* ======================================================================
+       Using the space: the menu rests as a slim icon rail (the pages get
+       almost the full width) and opens over the page when you point at it;
+       the top bar slides away when you scroll down and comes back when you
+       scroll up or touch the top edge. Docked (pinned) menus are unchanged.
+       ====================================================================== */
+    @media (min-width: 769px) {
+        html[data-theme] .app-body.sb-auto #appSidebar {
+            transform: none; width: 72px; padding: 12px 8px 10px; overflow: hidden;
+            transition: width .26s cubic-bezier(.2,.8,.2,1), box-shadow .26s ease;
+        }
+        html[data-theme] .app-body.sb-auto #appSidebar.sb-admin { width: 72px; }
+        html[data-theme] .app-body.sb-auto.sb-open #appSidebar,
+        html[data-theme] .app-body.sb-auto.sb-open #appSidebar.sb-admin { width: 232px; }
+        html[data-theme] .app-body.sb-auto > .content-area { margin-left: 72px; }
+        html[data-theme] .app-body.sb-auto .sidebar-edge { display: none; }
+
+        /* the words and extras appear only while it is open */
+        #appSidebar .nav-item .label, #appSidebar .sidebar-menu-title { white-space: nowrap; transition: opacity .18s ease; }
+        .app-body.sb-auto:not(.sb-open) #appSidebar .nav-item .label,
+        .app-body.sb-auto:not(.sb-open) #appSidebar .sidebar-menu-title,
+        .app-body.sb-auto:not(.sb-open) #appSidebar .nav-access-toggle,
+        .app-body.sb-auto:not(.sb-open) #appSidebar .nav-lock { opacity: 0; width: 0; overflow: hidden; display: none; }
+        .app-body.sb-auto:not(.sb-open) #appSidebar .nav-item { justify-content: center; gap: 0; padding-left: 0; padding-right: 0; }
+        .app-body.sb-auto:not(.sb-open) #appSidebar .nav-row > .nav-item { padding-right: 0; }
+        .app-body.sb-auto:not(.sb-open) #appSidebar .sidebar-toggle-row { justify-content: center; padding: 0; }
+        .app-body.sb-auto.sb-open #appSidebar .nav-item .label { opacity: 1; }
+    }
+
+    /* the top bar tucks away while you read */
+    html[data-theme] .topbar { transition: margin-top .3s cubic-bezier(.2,.8,.2,1), opacity .22s ease; }
+    body.tb-hidden .topbar { margin-top: calc(var(--tb-h, 58px) * -1); opacity: 0; pointer-events: none; }
+    @media (prefers-reduced-motion: reduce) { html[data-theme] .topbar, html[data-theme] .app-body.sb-auto #appSidebar { transition: none; } }
+
     /* ── Layer order for the floating menu ──
        page content (sticky bars, dropdowns…)  <  edge tab (450)
        <  pop-up dialogs (500+)  ;  floating menu (1050) sits above all page
@@ -3447,7 +3481,7 @@
     </div>
 </div>
 
-<script type="module" src="app.js?v=2026-11-02q"></script>
+<script type="module" src="app.js?v=2026-11-02r"></script>
 <script src="profile.js"></script>
 <script src="pom.js"></script>
 <script src="calendar.js"></script>

@@ -285,8 +285,15 @@ if (sidebarToggleBtn && appSidebar && appBody) {
             }
         });
     }
-    appSidebar.addEventListener("mouseenter", () => clearTimeout(closeTimer));
+    // Resting as a slim rail, the menu opens when you point at it.
+    appSidebar.addEventListener("mouseenter", () => {
+        clearTimeout(closeTimer);
+        if (!isAuto() || appBody.classList.contains("sb-open")) return;
+        clearTimeout(openTimer);
+        openTimer = setTimeout(() => { if (!dialogOpen()) setOpen(true); }, 140);
+    });
     appSidebar.addEventListener("mouseleave", () => {
+        clearTimeout(openTimer);
         if (!isAuto()) return;
         closeTimer = setTimeout(() => setOpen(false), 280);
     });
@@ -304,6 +311,45 @@ if (sidebarToggleBtn && appSidebar && appBody) {
         if (e.key === "Escape" && isAuto() && appBody.classList.contains("sb-open")) setOpen(false);
     });
 }
+
+/* ====================================
+   TOP BAR THAT GETS OUT OF THE WAY
+   Scrolling down tucks it away so the page gets the height; scrolling up,
+   or moving the pointer to the very top edge, brings it back. It is always
+   shown at the top of a page and whenever a page is opened.
+==================================== */
+(function () {
+    const bar  = document.querySelector(".topbar");
+    const area = document.getElementById("pageContent");
+    if (!bar || !area) return;
+
+    const last = new WeakMap();
+    let hidden = false;
+    const show = (on) => {
+        if (on === !hidden) return;
+        hidden = !on;
+        document.body.style.setProperty("--tb-h", bar.offsetHeight + "px");
+        document.body.classList.toggle("tb-hidden", hidden);
+    };
+    window.olfTopbarShow = () => show(true);
+
+    // scroll does not bubble, but it can be caught on the way down, so a page
+    // that scrolls inside itself (like HO Plan) is covered too
+    area.addEventListener("scroll", (e) => {
+        const el = e.target;
+        if (!el || el === document) return;
+        const y = el.scrollTop || 0;
+        const before = last.has(el) ? last.get(el) : y;
+        last.set(el, y);
+        const d = y - before;
+        if (y < 24) show(true);
+        else if (d > 10) show(false);
+        else if (d < -10) show(true);
+    }, true);
+
+    document.addEventListener("mousemove", (e) => { if (hidden && e.clientY <= 8) show(true); });
+    document.addEventListener("focusin", (e) => { if (hidden && bar.contains(e.target)) show(true); });
+})();
 
 /* ====================================
    IN-APP NOTIFICATIONS
@@ -1832,6 +1878,7 @@ window.navigate = async function (page) {
         }
     }
     currentPage = page;
+    if (window.olfTopbarShow) window.olfTopbarShow();
 
     // Google Analytics: one page_view per Staff Connect page opened
     trackEvent("page_view", {
