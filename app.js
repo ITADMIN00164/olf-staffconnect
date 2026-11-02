@@ -1581,8 +1581,8 @@ function stopWatchingPageAccess() {
     applyPageAccessNav();
 }
 
-// Paint every menu item: users see switched-off pages greyed out with a
-// lock; IT Admin gets a toggle on each item instead.
+// Paint every menu item: pages IT Admin has switched off are simply not in
+// a user's menu; IT Admin still sees them (greyed) with a toggle on each item.
 function applyPageAccessNav() {
     const sidebar = document.getElementById("appSidebar");
     if (!sidebar) return;
@@ -1596,23 +1596,16 @@ function applyPageAccessNav() {
         const lockedForMe = !on && !admin;
 
         btn.classList.toggle("nav-item--locked", lockedForMe);
+        btn.classList.toggle("nav-item--locked-hidden", lockedForMe);   // a user never sees a closed page
         btn.classList.toggle("nav-item--locked-admin", !on && admin);
         btn.setAttribute("aria-disabled", lockedForMe ? "true" : "false");
         btn.title = on ? label
             : (admin ? `${label} - hidden from users (only IT Admin can open it)`
                      : `${label} - temporarily unavailable`);
 
-        // Lock badge: users only (IT Admin reads the toggle instead).
-        let lock = btn.querySelector(".nav-lock");
-        if (lockedForMe && !lock) {
-            lock = document.createElement("span");
-            lock.className = "nav-lock";
-            lock.setAttribute("aria-hidden", "true");
-            lock.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.200" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
-            btn.appendChild(lock);
-        } else if (!lockedForMe && lock) {
-            lock.remove();
-        }
+        // No lock badge any more: a closed page is not shown to users at all.
+        const oldLock = btn.querySelector(".nav-lock");
+        if (oldLock) oldLock.remove();
 
         // IT Admin toggle. It sits beside the menu button (never inside it,
         // a button can't hold another control), in a shared row.
@@ -1651,7 +1644,7 @@ async function setPageEnabled(page, on) {
     if (!on) {
         const ok = await showAppConfirm({
             title: `Hide ${label} from users?`,
-            message: `Users will see ${label} greyed out in the menu and won't be able to open it. Anyone on it now is sent to Home. You can still open it.`,
+            message: `${label} will disappear from the menu for users and they won't be able to open it. Anyone on it now is sent to Home. You can still open it.`,
             type: "warning",
             confirmText: "Hide from users"
         });
