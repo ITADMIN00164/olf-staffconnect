@@ -29,15 +29,15 @@
   --graphite: #334155;
   --graphite-deep: #1E293B;
 
-  --accent: #0F766E;
-  --accent-hover: #115E59;
-  --accent-line: #5EEAD4;
-  --accent-soft: #F0FDFA;
-  --accent-soft-border: #CCFBF1;
-  --accent-ink: #115E59;
+  --accent: #2F6FE4;
+  --accent-hover: #2457C5;
+  --accent-line: #93B8F7;
+  --accent-soft: #EEF4FF;
+  --accent-soft-border: #D3E2FC;
+  --accent-ink: #2457C5;
   --accent-on: #FFFFFF;
 
-  --accent-2: #0D9488;
+  --accent-2: #10B197;
 
   /* The only other colours in the tab, and each one means a thing: arrived,
      waiting, refused. Taken from the shell, which already says amber for
@@ -169,7 +169,7 @@
 .award-page .field input:focus, .award-page .field select:focus {
   outline: none;
   border-color: var(--accent-line);
-  box-shadow: 0 0 0 3px rgba(15, 118, 110, .15);
+  box-shadow: 0 0 0 3px rgba(47, 111, 228, .15);
 }
 .award-page .field select:disabled, .award-page .field input:disabled {
   background: var(--surface-alt);
@@ -1289,7 +1289,7 @@
   color: var(--text);
 }
 .award-page #stock-table .cell-input:focus { outline: none;
-  box-shadow: 0 0 0 3px rgba(15, 118, 110, .15); }
+  box-shadow: 0 0 0 3px rgba(47, 111, 228, .15); }
 
 /* Said once, above the sheet, so nobody has to discover it by clicking. */
 .award-page .stock-howto {
@@ -1899,7 +1899,7 @@
    ====================================================================== */
 
 .award-page {
-  --tone-block: #0F766E;    --tone-block-soft: rgba(15,118,110,.12);
+  --tone-block: #2F6FE4;    --tone-block-soft: rgba(47,111,228,.12);
   --tone-district: #4F46E5; --tone-district-soft: rgba(79,70,229,.12);
   --tone-ns: #D97706;       --tone-ns-soft: rgba(217,119,6,.14);
   --tone-su: #E11D48;       --tone-su-soft: rgba(225,29,72,.12);
@@ -1922,8 +1922,8 @@
 
 .award-page .aw-subtab { border-radius: 999px; }
 .award-page .aw-subtab.is-active {
-  background: linear-gradient(135deg, var(--accent), #0E9488);
-  box-shadow: 0 4px 12px rgba(15,118,110,.28);
+  background: linear-gradient(135deg, var(--accent), #10B197);
+  box-shadow: 0 4px 12px rgba(47,111,228,.28);
 }
 .award-page .aw-subtab:not(.is-active):hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(15,23,42,.08); }
 
@@ -1931,8 +1931,8 @@
 .award-page .btn { transition: transform .15s var(--ease), box-shadow .2s ease, background-color .15s ease, border-color .15s ease, filter .15s ease; }
 .award-page .btn:not(:disabled):hover { transform: translateY(-1px); }
 .award-page .btn:not(:disabled):active { transform: translateY(0) scale(.98); }
-.award-page .btn-primary { background: linear-gradient(135deg, var(--accent), #0E9488); box-shadow: 0 3px 10px rgba(15,118,110,.25); }
-.award-page .btn-primary:hover:not(:disabled) { box-shadow: 0 7px 18px rgba(15,118,110,.32); }
+.award-page .btn-primary { background: linear-gradient(135deg, var(--accent), #10B197); box-shadow: 0 3px 10px rgba(47,111,228,.25); }
+.award-page .btn-primary:hover:not(:disabled) { box-shadow: 0 7px 18px rgba(47,111,228,.32); }
 .award-page .btn-ghost:hover:not(:disabled) { border-color: var(--accent-line); background: var(--accent-soft); }
 
 /* ---- cards and panels ---- */
@@ -2143,8 +2143,8 @@
 .award-page .admin-row:hover { transform: translateY(-2px); box-shadow: var(--lift); border-color: var(--accent-line); }
 .award-page .admin-avatar {
   display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; flex: none;
-  font-size: .82rem; font-weight: 800; color: #fff; background: linear-gradient(135deg, var(--accent), #0E9488);
-  box-shadow: 0 4px 10px rgba(15,118,110,.28);
+  font-size: .82rem; font-weight: 800; color: #fff; background: linear-gradient(135deg, var(--accent), #10B197);
+  box-shadow: 0 4px 10px rgba(47,111,228,.28);
 }
 .award-page .admin-empty { list-style: none; display: flex; flex-direction: column; align-items: center; padding: 20px 0 6px; color: var(--text-soft); font-weight: 600; }
 .award-page .admin-empty p { margin: 0; }
@@ -2238,7 +2238,7 @@
 .award-page .review-box { display: flex; flex-direction: column; width: min(640px, 96vw); max-width: 640px; max-height: min(90vh, 780px); padding: 0; border-radius: 20px; overflow: hidden; }
 .award-page .rv-head { display: flex; align-items: center; gap: 14px; padding: 18px 22px; border-bottom: 1px solid var(--border); background: linear-gradient(135deg, var(--accent-soft), var(--surface)); }
 .award-page .rv-head .aw-box-heading { flex: 1; min-width: 0; }
-.award-page .rv-badge { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; flex: none; color: #fff; background: linear-gradient(135deg, var(--accent), #0E9488); box-shadow: 0 6px 14px rgba(15,118,110,.3); }
+.award-page .rv-badge { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; flex: none; color: #fff; background: linear-gradient(135deg, var(--accent), #10B197); box-shadow: 0 6px 14px rgba(47,111,228,.3); }
 .award-page .rv-badge .aw-icon svg { width: 22px; height: 22px; }
 .award-page .review-body { flex: 1 1 auto; overflow-y: auto; padding: 18px 22px; }
 
@@ -2359,15 +2359,15 @@
 .award-page .awm-view .pmbtn { min-height: 40px; padding: 9px 20px; border-radius: 10px; font-weight: 800; transition: transform .15s var(--ease), box-shadow .2s ease, background-color .15s ease; }
 .award-page .awm-view .pmbtn:hover { transform: translateY(-1px); }
 .award-page .awm-view .pmbtn:active { transform: scale(.98); }
-.award-page .awm-view .pmbtn.primary { background: linear-gradient(135deg, var(--accent), #0E9488); box-shadow: 0 3px 10px rgba(15,118,110,.25); }
-.award-page .awm-view .pmbtn.primary:hover { background: linear-gradient(135deg, var(--accent-hover), var(--accent)); box-shadow: 0 7px 18px rgba(15,118,110,.32); }
+.award-page .awm-view .pmbtn.primary { background: linear-gradient(135deg, var(--accent), #10B197); box-shadow: 0 3px 10px rgba(47,111,228,.25); }
+.award-page .awm-view .pmbtn.primary:hover { background: linear-gradient(135deg, var(--accent-hover), var(--accent)); box-shadow: 0 7px 18px rgba(47,111,228,.32); }
 
 /* ---- Add records: a friendlier file chooser ---- */
 .award-page .awm-view .awa-file { transition: border-color .15s ease, background-color .15s ease; cursor: pointer; }
 .award-page .awm-view .awa-file:hover { border-color: var(--accent); background: var(--accent-soft); }
 .award-page .awm-view .awa-file::file-selector-button {
   margin-right: 12px; padding: 8px 18px; border: 0; border-radius: 999px; cursor: pointer;
-  background: linear-gradient(135deg, var(--accent), #0E9488); color: #fff; font: inherit; font-weight: 800;
+  background: linear-gradient(135deg, var(--accent), #10B197); color: #fff; font: inherit; font-weight: 800;
   transition: filter .15s ease;
 }
 .award-page .awm-view .awa-file:hover::file-selector-button { filter: brightness(1.08); }
@@ -2414,8 +2414,8 @@
 .award-page .aw-toptab .aw-icon svg { width: 19px; height: 19px; }
 .award-page .aw-toptabs .aw-toptab:hover:not(.is-active) { background: var(--accent-soft); color: var(--accent-ink); }
 .award-page .aw-toptabs .aw-toptab.is-active {
-  color: #fff; border-image: none; background: linear-gradient(135deg, #14B8A6, #0F766E);
-  box-shadow: 0 8px 18px rgba(15,118,110,.34), inset 0 1px 0 rgba(255,255,255,.35);
+  color: #fff; border-image: none; background: linear-gradient(135deg, #4F8EF7, #10B197);
+  box-shadow: 0 8px 18px rgba(47,111,228,.34), inset 0 1px 0 rgba(255,255,255,.35);
 }
 .award-page .aw-toptab:active { transform: scale(.97); }
 
@@ -2423,8 +2423,8 @@
 .award-page .aw-subtabs { border-bottom: 0; padding-bottom: 0; margin-bottom: 18px; gap: 8px; }
 .award-page .aw-subtab, .award-page .aw-utiltab { padding: 9px 18px; font-size: 13px; border-radius: 999px; background: var(--surface); }
 .award-page .aw-utiltab.is-active {
-  background: linear-gradient(135deg, var(--accent), #0E9488); border-color: transparent; color: #fff;
-  box-shadow: 0 6px 14px rgba(15,118,110,.28);
+  background: linear-gradient(135deg, var(--accent), #10B197); border-color: transparent; color: #fff;
+  box-shadow: 0 6px 14px rgba(47,111,228,.28);
 }
 
 /* ---- Awards view: no grey box, a toolbar card, a calmer table card ---- */
@@ -2457,8 +2457,8 @@
   content: ""; display: block; width: 62px; height: 62px; margin: 0 auto 14px; border-radius: 20px;
   background:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 21s-7-6.200-7-11.500a7 7 0 0 1 14 0C19 14.800 12 21 12 21Z'/%3E%3Ccircle cx='12' cy='9.500' r='2.500'/%3E%3C/svg%3E") center / 30px no-repeat,
-    linear-gradient(135deg, #14B8A6, #0F766E);
-  box-shadow: 0 12px 24px rgba(15,118,110,.28), inset 0 1px 0 rgba(255,255,255,.35);
+    linear-gradient(135deg, #4F8EF7, #10B197);
+  box-shadow: 0 12px 24px rgba(47,111,228,.28), inset 0 1px 0 rgba(255,255,255,.35);
 }
 @media (prefers-reduced-motion: no-preference) {
   .award-page .awm-view .pom-msg:not(.error)::before { animation: aw-msg-bob 3.4s ease-in-out infinite; }
