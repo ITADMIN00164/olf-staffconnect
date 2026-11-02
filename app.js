@@ -266,8 +266,11 @@ if (sidebarToggleBtn && appSidebar && appBody) {
 
     sidebarToggleBtn.addEventListener("click", () => setOpen(!appBody.classList.contains("sb-open")));
 
-    // Choosing a page tucks the menu away.
+    // On a phone, choosing a page tucks the drawer away. On a computer the menu
+    // stays put under the pointer and closes when the pointer leaves it, so it
+    // never snaps shut mid-click.
     appSidebar.addEventListener("click", (e) => {
+        if (window.innerWidth > 768) return;
         if (e.target.closest(".nav-item") && !e.target.closest('[aria-disabled="true"]')) autoHide();
     });
 
@@ -327,11 +330,18 @@ if (sidebarToggleBtn && appSidebar && appBody) {
     const area = document.getElementById("pageContent");
     if (!bar || !area) return;
 
-    const last = new WeakMap();
-    let hidden = false;
+    // Where each scrolling box was when it last turned direction. The bar only
+    // moves after a real stretch of scrolling one way (STEP px), never on a
+    // nudge - and showing or hiding it changes the page's height, which moves
+    // the scroll position by itself, so scroll events during that slide are
+    // ignored. Without both, the page shook near the bottom (HO Plan most).
+    const STEP = 48, SETTLE_MS = 450;
+    const anchor = new WeakMap(), last = new WeakMap();
+    let hidden = false, settleUntil = 0;
     const show = (on) => {
         if (on === !hidden) return;
         hidden = !on;
+        settleUntil = performance.now() + SETTLE_MS;
         document.body.style.setProperty("--tb-h", bar.offsetHeight + "px");
         document.body.classList.toggle("tb-hidden", hidden);
     };
@@ -341,14 +351,18 @@ if (sidebarToggleBtn && appSidebar && appBody) {
     // that scrolls inside itself (like HO Plan) is covered too
     area.addEventListener("scroll", (e) => {
         const el = e.target;
-        if (!el || el === document) return;
+        if (!el || el === document || !el.scrollHeight) return;
         const y = el.scrollTop || 0;
         const before = last.has(el) ? last.get(el) : y;
         last.set(el, y);
-        const d = y - before;
-        if (y < 24) show(true);
-        else if (d > 10) show(false);
-        else if (d < -10) show(true);
+        if (performance.now() < settleUntil) { anchor.set(el, y); return; }
+        if (y < 24) { anchor.set(el, y); show(true); return; }
+        // a scroller with too little room to hide the bar for keeps it shown
+        if (el.scrollHeight - el.clientHeight < 160) return;
+        if ((y - before) * ((anchor.get(el) ?? y) - before) > 0) anchor.set(el, before);   // turned round
+        const from = anchor.has(el) ? anchor.get(el) : y;
+        if (y - from > STEP) { anchor.set(el, y); show(false); }
+        else if (from - y > STEP) { anchor.set(el, y); show(true); }
     }, true);
 
     document.addEventListener("mousemove", (e) => { if (hidden && e.clientY <= 8) show(true); });
@@ -504,6 +518,7 @@ onAuthStateChanged(auth, async (user) => {
         loadMyEmployeeRecord(email);   // fills the profile chip / ID card
         prefetchPages();               // warm page fragments while idle
         maybeShowNewsPopup();          // once-per-session announcement nudge
+        refreshNewsBell();             // live announcements count on the bell
 
         await navigate("home");
     } else {
@@ -1034,13 +1049,37 @@ function openNewsDetail(items) {
             const endVal   = n.endDateTime   || n.endDate;
             return `<div class="nd-item">
                         ${newsBody(n, "nd-text")}
-                        <div class="nd-dates">\u{1F4C5} ${formatNewsDateTime(startVal, false)} \u2013 ${formatNewsDateTime(endVal, true)}</div>
+                        <div class="nd-dates">${hmIcon("calendar")} ${formatNewsDateTime(startVal, false)} \u2013 ${formatNewsDateTime(endVal, true)}</div>
                     </div>`;
         }).join("")
         : `<div class="nd-empty">No active announcements right now.</div>`;
 
     modal.classList.add("open");
 }
+
+/* The bell in the top bar: how many announcements are live right now, and
+   a click opens them. Refreshed at sign-in and whenever one is added or
+   deleted. */
+async function refreshNewsBell(items) {
+    const btn = document.getElementById("tbBellBtn");
+    if (!btn) return;
+    if (!items) {
+        try { items = await getActiveNews(); } catch (err) { return; }
+    }
+    const n = items.length;
+    const badge = btn.querySelector(".tb-bell-n");
+    if (badge) { badge.textContent = n > 9 ? "9+" : String(n); badge.hidden = n === 0; }
+    btn.classList.toggle("has-news", n > 0);
+    const label = n ? `${n} active announcement${n === 1 ? "" : "s"}` : "No active announcements";
+    btn.setAttribute("aria-label", label);
+    btn.title = label;
+}
+document.getElementById("tbBellBtn")?.addEventListener("click", async () => {
+    let items = [];
+    try { items = await getActiveNews(); } catch (err) { console.error("Announcements load failed:", err); }
+    refreshNewsBell(items);
+    openNewsDetail(items);
+});
 
 /* Shown once per session, on whatever page the person happens to be on. */
 const NEWS_POPUP_FLAG = "olf_news_popup_seen";
@@ -1686,6 +1725,7 @@ function applyPageAccessNav() {
         tgl.title = on ? `${label} is visible to all users - click to hide it from users`
                        : `${label} is hidden from users - click to show it to everyone`;
     });
+    requestAnimationFrame(() => menuGlider.move());      // items may have come or gone
 }
 
 async function setPageEnabled(page, on) {
@@ -1870,6 +1910,60 @@ async function setAwardTabLocked(key, locked) {
 // Retired page names still lead somewhere sensible (old links, bookmarks).
 const PAGE_ALIASES = { "expense-report": "er-dashboards", "data-dashboards": "er-dashboards" };
 
+/* The menu's selected card is one piece that glides to the page you open,
+   rather than jumping. It follows the menu as it opens and closes, and hides
+   if the open page isn't in the menu for this person. */
+const menuGlider = (() => {
+    const nav = document.querySelector("#appSidebar .sidebar-nav");
+    if (!nav) return { move() {} };
+    const glider = document.createElement("span");
+    glider.className = "nav-glider";
+    glider.setAttribute("aria-hidden", "true");
+    nav.prepend(glider);
+    nav.classList.add("has-glider");
+    let placed = false;
+    const move = () => {
+        const btn = nav.querySelector(".nav-item.active");
+        const shown = btn && btn.offsetParent && getComputedStyle(btn).display !== "none";
+        glider.classList.toggle("is-hidden", !shown);
+        if (!shown) return;
+        // offsets, not screen boxes: the app is zoomed and these stay in CSS px
+        let top = 0, left = 0;
+        for (let el = btn; el && el !== nav; el = el.offsetParent) { top += el.offsetTop; left += el.offsetLeft; }
+        if (!placed) glider.classList.add("no-anim");
+        glider.style.transform = `translate(${left}px, ${top}px)`;
+        glider.style.width  = btn.offsetWidth + "px";
+        glider.style.height = btn.offsetHeight + "px";
+        glider.style.setProperty("--pg", getComputedStyle(btn).getPropertyValue("--pg") || "#2F6FE4");
+        if (!placed) { void glider.offsetWidth; glider.classList.remove("no-anim"); placed = true; }
+    };
+    // the menu widens and narrows as it opens and closes; keep up with it
+    if (window.ResizeObserver) new ResizeObserver(() => move()).observe(nav);
+    // pages that appear or disappear later (Field Review System, IT Admin's switches) shift the rest
+    new MutationObserver((list) => {
+        if (list.some(m => m.target !== glider)) requestAnimationFrame(move);
+    }).observe(nav, { subtree: true, attributes: true, attributeFilter: ["hidden", "class"] });
+    window.addEventListener("resize", () => requestAnimationFrame(move));
+    document.getElementById("appSidebar")?.addEventListener("transitionend", move);
+    return { move };
+})();
+
+/* "Where you are" in the top bar: the open page's own colourful picture and
+   name, taken from its menu item, sliding in when the page changes. */
+function updateTopbarCrumb(page) {
+    menuGlider.move();
+    const btn  = document.querySelector(`#appSidebar .nav-item[data-page="${page}"]`);
+    const ico  = document.getElementById("tbCrumbIco");
+    const name = document.getElementById("tbCrumbName");
+    const box  = document.getElementById("tbCrumbPage");
+    if (!btn || !ico || !name || !box) return;
+    ico.innerHTML = btn.querySelector(".icon")?.innerHTML || "";
+    name.textContent = (btn.querySelector(".label")?.textContent || btn.title || "").trim();
+    box.classList.remove("is-new");
+    void box.offsetWidth;                           // replay the slide-in
+    box.classList.add("is-new");
+}
+
 /* The thin bar along the top while a page opens. It only shows if loading
    takes longer than a blink, so cached pages open without a flicker. */
 let routeBarTimer = null;
@@ -1931,6 +2025,7 @@ window.navigate = async function (page) {
     document.querySelectorAll("#appSidebar .nav-item").forEach(el => {
         el.classList.toggle("active", el.dataset.page === page);
     });
+    updateTopbarCrumb(page);
 
     routeBar(true);
     pageContent.innerHTML = await getPageHtml(page);
@@ -2093,25 +2188,185 @@ function hmIcon(name) {
     return '<svg class="hm-i" viewBox="0 0 24 24" aria-hidden="true">' + HM_ICON_PATHS[name] + "</svg>";
 }
 
-function homeGreetingFor(date) {
+/* The Home banner follows the day: morning, afternoon, evening and night
+   each have their own colours and their own picture in the sky. */
+function homeTimeOfDay(date) {
     const h = date.getHours();
-    return h < 5 ? "Hello" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : h < 22 ? "Good evening" : "Hello";
+    return h >= 5 && h < 12 ? "morning" : h < 17 && h >= 12 ? "afternoon" : h >= 17 && h < 20 ? "evening" : "night";
+}
+
+/* A different, light-hearted greeting each time Home opens, to raise a smile.
+   The greetings live in greetings.txt, in [morning] / [afternoon] / [evening]
+   / [night] sections plus [monday] [friday] [saturday] [sunday] specials;
+   {name} is the person's first name. Picked from the time of day, with the
+   odd day special; tapping the waving hand picks another. If the file can't
+   be read, the plain greetings below are used. */
+let homeGreetings = {
+    morning: ["Good morning, {name}"], afternoon: ["Good afternoon, {name}"],
+    evening: ["Good evening, {name}"], night: ["Hello, {name}"]
+};
+let homeGreetingsLoaded = false;
+async function loadHomeGreetings() {
+    if (homeGreetingsLoaded) return;
+    try {
+        const res = await fetch("greetings.txt", { cache: "no-cache" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const sets = {};
+        let section = null;
+        (await res.text()).split(/\r?\n/).forEach(raw => {
+            const line = raw.trim();
+            if (!line || line.startsWith("#")) return;
+            const head = line.match(/^\[([a-z]+)\]$/i);
+            if (head) { section = head[1].toLowerCase(); sets[section] = sets[section] || []; return; }
+            if (section) sets[section].push(line);
+        });
+        ["morning", "afternoon", "evening", "night"].forEach(k => { if (sets[k] && sets[k].length) homeGreetings[k] = sets[k]; });
+        ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"].forEach(k => {
+            if (sets[k] && sets[k].length) homeGreetings[k] = sets[k];
+        });
+        homeGreetingsLoaded = true;
+    } catch (err) {
+        console.warn("Greetings not loaded, using the plain ones:", err);
+    }
+}
+const HOME_WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+let homeFirstName = "there";
+let homeGreetingNow = "";
+const homeGreetRecent = [];                         // the last few shown, so none comes round again too soon
+function pickHomeGreeting(now) {
+    let pool = homeGreetings[homeTimeOfDay(now)];
+    const special = homeGreetings[HOME_WEEKDAYS[now.getDay()]];
+    if (special && special.length && Math.random() < 0.25) pool = special;
+    let choices = pool.filter(g => !homeGreetRecent.includes(g));
+    if (!choices.length) choices = pool.filter(g => g !== homeGreetingNow);
+    if (!choices.length) choices = pool;
+    const pick = choices[Math.floor(Math.random() * choices.length)];
+    homeGreetRecent.push(pick);
+    if (homeGreetRecent.length > 8) homeGreetRecent.shift();
+    return pick;
+}
+/* A greeting arrives letter by letter: each word is kept whole (so lines
+   break between words) and each letter rises in a beat after the one before.
+   The name sits in its own golden span. Screen readers get the plain text. */
+function greetingLettersHtml(text) {
+    let i = 0;
+    const letters = (s) => [...s].map(ch => `<span class="hm-ch" style="--d:${(i++) * 26}ms">${escHtml(ch)}</span>`).join("");
+    const words = (s) => s.split(" ").map(w => w ? `<span class="hm-w">${letters(w)}</span>` : "").join(" ");
+    const [before, after = ""] = text.split("{name}");
+    const name = text.includes("{name}") ? `<span class="hm-name" id="homeUserName">${words(homeFirstName)}</span>` : "";
+    return words(before) + name + words(after);
+}
+let homeGreetSwapTimer = null;
+function renderHomeGreeting(now) {
+    const el = document.getElementById("homeGreetText");
+    if (!el) return;
+    homeGreetingNow = pickHomeGreeting(now || new Date());
+    const plain = homeGreetingNow.replace("{name}", homeFirstName);
+    const show = () => {
+        el.setAttribute("aria-label", plain);
+        el.innerHTML = `<span class="hm-greet-letters" aria-hidden="true">${greetingLettersHtml(homeGreetingNow)}</span>`;
+        el.classList.remove("hm-greet-out");
+    };
+    clearTimeout(homeGreetSwapTimer);
+    // the greeting on screen floats away first, then the new one cascades in
+    if (el.querySelector(".hm-ch") && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        el.classList.add("hm-greet-out");
+        homeGreetSwapTimer = setTimeout(show, 420);
+    } else {
+        show();
+    }
+}
+
+/* While Home is open the greeting changes by itself every few seconds. It
+   holds still while the pointer is on it, while the tab isn't on screen, and
+   for anyone who has asked their computer for less motion. */
+const HOME_GREET_EVERY_MS = 5000;
+let homeGreetRotateTimer = null;
+function startGreetingRotation() {
+    clearInterval(homeGreetRotateTimer);
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    homeGreetRotateTimer = setInterval(() => {
+        const el = document.getElementById("homeGreetText");
+        if (!el) { clearInterval(homeGreetRotateTimer); homeGreetRotateTimer = null; return; }
+        if (document.hidden || el.closest(".hm-title")?.matches(":hover")) return;
+        renderHomeGreeting();
+    }, HOME_GREET_EVERY_MS);
+}
+
+/* The waving hand: a big wave, a little burst of confetti, a new greeting. */
+function wireHomeHand() {
+    const hand = document.getElementById("homeHand");
+    if (!hand || hand.dataset.wired) return;
+    hand.dataset.wired = "1";
+    hand.addEventListener("click", () => {
+        renderHomeGreeting();
+        hand.classList.remove("is-waving");
+        void hand.offsetWidth;
+        hand.classList.add("is-waving");
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        const colours = ["#FDE68A", "#F9A8D4", "#6EE7B7", "#93C5FD", "#FDBA74", "#C4B5FD"];
+        for (let i = 0; i < 16; i++) {
+            const bit = document.createElement("span");
+            bit.className = "hm-confetti";
+            const angle = (Math.PI * 2 * i) / 16 + Math.random() * 0.4;
+            const dist = 38 + Math.random() * 34;
+            bit.style.setProperty("--dx", Math.cos(angle) * dist + "px");
+            bit.style.setProperty("--dy", Math.sin(angle) * dist - 10 + "px");
+            bit.style.setProperty("--rot", Math.round(Math.random() * 360) + "deg");
+            bit.style.background = colours[i % colours.length];
+            hand.appendChild(bit);
+            setTimeout(() => bit.remove(), 900);
+        }
+    });
+}
+
+/* Line of the day, read from lines-of-the-day.txt (one line per line, # for
+   notes). Everyone sees the same line on a given day; it moves on at
+   midnight. If the file can't be read the line simply stays hidden. */
+let homeLines = null;
+async function showLineOfDay() {
+    const box = document.getElementById("homeLine");
+    const text = document.getElementById("homeLineText");
+    if (!box || !text) return;
+    try {
+        if (!homeLines) {
+            const res = await fetch("lines-of-the-day.txt", { cache: "no-cache" });
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            homeLines = (await res.text()).split(/\r?\n/)
+                .map(l => l.trim())
+                .filter(l => l && !l.startsWith("#"));
+        }
+        if (!homeLines.length) return;
+        const now = new Date();
+        const dayNo = Math.floor(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) / 86400000);
+        text.textContent = homeLines[dayNo % homeLines.length];
+        box.hidden = false;
+    } catch (err) {
+        console.warn("Line of the day not loaded:", err);
+    }
 }
 
 let homeClockTimer = null;
 function startHomeClock() {
     if (homeClockTimer) clearInterval(homeClockTimer);
+    let lastDay = null;
     const tick = () => {
         const clock = document.getElementById("homeClock");
         if (!clock) { clearInterval(homeClockTimer); homeClockTimer = null; return; }
         const now = new Date();
+        const hero = clock.closest(".hm-hero");
+        const tod = homeTimeOfDay(now);
+        if (hero && hero.dataset.tod !== tod) {
+            hero.dataset.tod = tod;
+            renderHomeGreeting(now);                    // on opening, and when the day moves on
+        }
+        if (lastDay !== null && lastDay !== now.getDate()) showLineOfDay();   // a new day, a new line
+        lastDay = now.getDate();
         clock.textContent = now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
         const day = document.getElementById("homeClockDay");
         if (day) day.textContent = now.toLocaleDateString("en-IN", { weekday: "long" });
         const date = document.getElementById("homeDate");
         if (date) date.textContent = now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-        const greet = document.getElementById("homeGreeting");
-        if (greet) greet.textContent = homeGreetingFor(now);
     };
     tick();
     homeClockTimer = setInterval(tick, 1000);
@@ -2132,11 +2387,13 @@ function animateCount(el, target) {
 
 async function initHomePage() {
     const user  = auth.currentUser;
-    const nameEl = document.getElementById("homeUserName");
-    if (nameEl && user) {
-        nameEl.textContent = user.displayName?.split(" ")[0] || "there";
-    }
-    startHomeClock();
+    homeFirstName = (user && user.displayName?.split(" ")[0]) || "there";
+    // the greetings file is small; wait for it (briefly) so the first greeting is a fun one
+    await Promise.race([loadHomeGreetings(), new Promise(r => setTimeout(r, 1500))]);
+    startHomeClock();                               // also picks the greeting
+    wireHomeHand();
+    startGreetingRotation();
+    showLineOfDay();
 
     // Admin-only: show inline "Add News" button in the news section header
     const addNewsBtn = document.getElementById("addNewsBtn");
@@ -4163,6 +4420,7 @@ async function renderNewsCards() {
 
         // Sort: soonest-expiring first
         active.sort((a, b) => getNewsRange(a).end - getNewsRange(b).end);
+        refreshNewsBell(active);
         expired.sort((a, b) => getNewsRange(b).end - getNewsRange(a).end);
 
         const allVisible = currentRole === "Admin"

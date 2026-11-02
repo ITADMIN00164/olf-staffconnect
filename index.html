@@ -3227,6 +3227,404 @@
         .olf-route-bar { display: none; }
     }
 
+    /* ── Announcements bell in the top bar ── */
+    .tb-bell {
+        position: relative; display: grid; place-items: center; width: 38px; height: 38px; padding: 0; flex: none; cursor: pointer;
+        border-radius: 12px; border: 1px solid var(--hairline, rgba(15,23,42,.08)); background: var(--glass-strong, #fff); color: var(--text-soft, #475467);
+        box-shadow: var(--shadow-sm); transition: color .15s ease, border-color .15s ease, transform .18s ease, box-shadow .18s ease;
+    }
+    .tb-bell svg { width: 19px; height: 19px; transform-origin: 50% 12%; }
+    .tb-bell:hover { color: #2457C5; border-color: rgba(47,111,228,.35); transform: translateY(-1px); box-shadow: 0 6px 14px -6px rgba(36,87,197,.4); }
+    .tb-bell:focus-visible { outline: 2px solid #2F6FE4; outline-offset: 2px; }
+    .tb-bell.has-news { color: #2457C5; }
+    .tb-bell-n {
+        position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+        display: grid; place-items: center; font-size: 10.5px; font-weight: 800; line-height: 1; color: #fff;
+        background: linear-gradient(135deg, #F04438, #E04F6B); box-shadow: 0 0 0 2px var(--chrome-bg, #fff), 0 3px 8px rgba(240,68,56,.4);
+    }
+    .tb-bell-n[hidden] { display: none; }
+    @media (max-width: 480px) {
+        .topbar-logo .logo-sc { display: none; }        /* just "OLF" on a phone, so the buttons fit */
+        .tp-group { gap: 8px; }
+        .tb-bell { width: 34px; height: 34px; }
+    }
+    @media (prefers-reduced-motion: no-preference) {
+        .tb-bell.has-news svg { animation: tb-ring 7s ease-in-out 2s infinite; }
+        .tb-bell:hover svg { animation: tb-ring-once .8s ease-in-out; }
+        .tb-bell-n:not([hidden]) { animation: tb-pop .45s cubic-bezier(.34,1.56,.64,1); }
+        @keyframes tb-ring { 0%, 88%, 100% { transform: rotate(0); } 90% { transform: rotate(14deg); } 92% { transform: rotate(-12deg); } 94% { transform: rotate(8deg); } 96% { transform: rotate(-5deg); } }
+        @keyframes tb-ring-once { 0%, 100% { transform: rotate(0); } 20% { transform: rotate(14deg); } 40% { transform: rotate(-12deg); } 60% { transform: rotate(7deg); } 80% { transform: rotate(-4deg); } }
+        @keyframes tb-pop { from { transform: scale(0); } }
+    }
+
+    /* drawn icons in the announcement pop-ups (no emoji) */
+    .nd-title { display: flex; align-items: center; gap: 10px; }
+    .nd-title-ico {
+        width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; flex: none; color: #fff;
+        background: linear-gradient(135deg, #FBBF24, #D97706); box-shadow: 0 4px 10px rgba(217,119,6,.3);
+    }
+    .nd-title-ico svg { width: 17px; height: 17px; }
+    .news-popup-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; color: #fff; background: linear-gradient(135deg, #FBBF24, #D97706); box-shadow: 0 4px 10px rgba(217,119,6,.3); }
+    .news-popup-icon svg { width: 18px; height: 18px; }
+    .nd-dates { display: flex; align-items: center; gap: 6px; }
+    .nd-dates .hm-i { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* ── Menu items: hover and the page you are on ──
+       The page you are on is a clean white card lifted off the menu, with a
+       blue-to-teal bar on its left edge and its name in bold blue. Hover is a
+       soft white wash with a fine edge; a click gives a small press. */
+    html[data-theme] #appSidebar .nav-item {
+        position: relative; border: 1px solid transparent;
+        transition: background-color .2s ease, border-color .2s ease, box-shadow .25s ease, color .15s ease, transform .15s ease;
+    }
+    html[data-theme] #appSidebar .nav-item:not(.active):hover {
+        background: rgba(255,255,255,.62); border-color: rgba(255,255,255,.9); color: var(--chrome-ink);
+        box-shadow: 0 2px 8px -2px rgba(36,87,197,.14);
+    }
+    html[data-theme] #appSidebar .nav-item .label { transition: transform .22s cubic-bezier(.22,1,.36,1); }
+    html[data-theme] #appSidebar .nav-item:not(.active):hover .label { transform: translateX(3px); }
+    html[data-theme] #appSidebar .nav-item.active {
+        background: #fff; border-color: rgba(47,111,228,.16); color: #2457C5; font-weight: 700;
+        box-shadow: 0 6px 16px -6px rgba(36,87,197,.38), 0 1px 2px rgba(15,23,42,.06);
+    }
+    /* the marker: a short rounded bar just inside the card's left edge,
+       centred on the item - the same place in the slim rail and the open
+       menu (outside the card it would be cut off by the scrolling list) */
+    html[data-theme] #appSidebar .nav-item.active::before {
+        content: ""; position: absolute; left: 4px; top: 50%; bottom: auto; width: 4px; height: 18px; margin: -9px 0 0;
+        border-radius: 4px; background: linear-gradient(180deg, #2F6FE4, #0B8F7A); box-shadow: 0 0 8px rgba(47,111,228,.45);
+        transform: none;   /* an older rule also shifted it up by half its height */
+    }
+    html[data-theme] #appSidebar .nav-item.active .icon svg { transform: scale(1.1); }
+    /* a click is just a click: no shrinking, squeezing or ring */
+    html[data-theme] #appSidebar .nav-item:active { transform: none; }
+    html[data-theme] #appSidebar .nav-item:not(.active):active .icon svg { transform: none; }
+    html[data-theme] #appSidebar .nav-item:active .icon::after { animation: none; }
+    html[data-theme="dark"] #appSidebar .nav-item:not(.active):hover {
+        background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.08); box-shadow: none;
+    }
+    html[data-theme="dark"] #appSidebar .nav-item.active {
+        background: #2A3242; border-color: rgba(122,168,255,.28); color: #9DBEFF;
+        box-shadow: 0 6px 16px -6px rgba(0,0,0,.6);
+    }
+    @media (prefers-reduced-motion: no-preference) {
+        html[data-theme] #appSidebar .nav-item.active::before { animation: nav-bar-in .35s cubic-bezier(.22,1,.36,1); }
+        @keyframes nav-bar-in { from { transform: scaleY(0); opacity: 0; } }
+    }
+
+    /* ======================================================================
+       MENU: one gliding card, each page in its own colour
+       The white card behind the open page is a single piece (app.js moves
+       it) that springs to the page you choose. Each page carries its own
+       colour (--pg): the marker bar, the name and the card's glow take it,
+       and hovering a page gives a hint of it.
+       ====================================================================== */
+    #appSidebar .nav-item[data-page="home"]             { --pg: #F97316; }
+    #appSidebar .nav-item[data-page="employees"]        { --pg: #8B5CF6; }
+    #appSidebar .nav-item[data-page="er-dashboards"]    { --pg: #0EA5A4; }
+    #appSidebar .nav-item[data-page="award-management"] { --pg: #F59E0B; }
+    #appSidebar .nav-item[data-page="calendar"]         { --pg: #EC4899; }
+    #appSidebar .nav-item[data-page="smart-goals"]      { --pg: #EF4444; }
+    #appSidebar .nav-item[data-page="pos"]              { --pg: #F43F5E; }
+    #appSidebar .nav-item[data-page="gr"]               { --pg: #D97706; }
+    #appSidebar .nav-item[data-page="forms"]            { --pg: #6366F1; }
+    #appSidebar .nav-item[data-page="pom"]              { --pg: #64748B; }
+    #appSidebar .nav-item[data-page="team-performance"] { --pg: #10B981; }
+
+    #appSidebar .sidebar-nav.has-glider { position: relative; }
+    .nav-glider {
+        --pg: #2F6FE4;
+        position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; border-radius: 12px;
+        background: #fff; border: 1px solid color-mix(in srgb, var(--pg) 24%, transparent);
+        box-shadow: 0 8px 18px -8px color-mix(in srgb, var(--pg) 55%, transparent), 0 1px 2px rgba(15,23,42,.06);
+        transition: transform .55s cubic-bezier(.34,1.3,.64,1), width .25s ease, height .25s ease,
+                    border-color .35s ease, box-shadow .35s ease, opacity .2s ease;
+    }
+    .nav-glider::after {   /* a faint wash of the page's colour on the card */
+        content: ""; position: absolute; inset: 0; border-radius: inherit;
+        background: linear-gradient(90deg, color-mix(in srgb, var(--pg) 12%, transparent), transparent 70%);
+    }
+    .nav-glider.no-anim { transition: none; }
+    .nav-glider.is-hidden { opacity: 0; }
+    html[data-theme="dark"] .nav-glider { background: #2A3242; }
+
+    html[data-theme] #appSidebar .sidebar-nav.has-glider .nav-item { position: relative; z-index: 1; }
+    html[data-theme] #appSidebar .sidebar-nav.has-glider .nav-item.active {
+        background: transparent; border-color: transparent; box-shadow: none;
+        color: color-mix(in srgb, var(--pg, #2F6FE4) 72%, #0F172A);
+    }
+    html[data-theme="dark"] #appSidebar .sidebar-nav.has-glider .nav-item.active { color: color-mix(in srgb, var(--pg, #7AA8FF) 55%, #fff); }
+    html[data-theme] #appSidebar .sidebar-nav.has-glider .nav-item.active::before {
+        background: linear-gradient(180deg, var(--pg, #2F6FE4), color-mix(in srgb, var(--pg, #2F6FE4) 55%, #fff));
+        box-shadow: 0 0 8px color-mix(in srgb, var(--pg, #2F6FE4) 55%, transparent);
+    }
+    html[data-theme] #appSidebar .sidebar-nav.has-glider .nav-item:not(.active):hover {
+        background: color-mix(in srgb, var(--pg, #2F6FE4) 9%, rgba(255,255,255,.55));
+        border-color: color-mix(in srgb, var(--pg, #2F6FE4) 18%, transparent);
+    }
+    html[data-theme="dark"] #appSidebar .sidebar-nav.has-glider .nav-item:not(.active):hover {
+        background: color-mix(in srgb, var(--pg, #7AA8FF) 12%, transparent);
+    }
+    @media (prefers-reduced-motion: reduce) { .nav-glider { transition: opacity .2s ease; } }
+
+    /* ======================================================================
+       COLOURFUL ICONS
+       Every icon carries its own colour: --icl, a bright tint that reads on
+       the blue banner, and --icd, the deeper shade for white surfaces (the
+       chosen tab, white buttons, tab cards). The page picture on each
+       banner is the same full-colour one the menu uses.
+       ====================================================================== */
+    .pg-hero-ico .hero-color-ico, #sgHero .sg-hero-ico .hero-color-ico { width: 32px; height: 32px; filter: drop-shadow(0 2px 2px rgba(15,23,42,.2)); }
+    .award-page #awHero .pg-hero-ico .hero-color-ico { width: 30px; height: 30px; }
+
+    /* the page picture on a banner lives a little: its tile floats, a shine
+       sweeps the glass now and then, the picture gives a small tilt, and it
+       springs up when you point at the banner */
+    .pg-hero-ico, #sgHero .sg-hero-ico { position: relative; overflow: hidden; }
+    .pg-hero-ico::after, #sgHero .sg-hero-ico::after {
+        content: ""; position: absolute; inset: -40%; pointer-events: none; transform: translateX(-120%) rotate(20deg);
+        background: linear-gradient(90deg, transparent 40%, rgba(255,255,255,.55) 50%, transparent 60%);
+    }
+    .pg-hero-ico svg, #sgHero .sg-hero-ico svg { transform-origin: 50% 65%; transition: transform .45s cubic-bezier(.34,1.56,.64,1); }
+    .pg-hero:hover .pg-hero-ico svg, #sgHero:hover .sg-hero-ico svg { transform: scale(1.14) rotate(-6deg); }
+    @media (prefers-reduced-motion: no-preference) {
+        .pg-hero-ico, #sgHero .sg-hero-ico { animation: hero-ico-float 4.8s ease-in-out infinite; }
+        .pg-hero-ico::after, #sgHero .sg-hero-ico::after { animation: hero-ico-shine 6s ease-in-out 1.4s infinite; }
+        .pg-hero-ico .hero-color-ico, .pg-hero-ico > svg, #sgHero .sg-hero-ico .hero-color-ico { animation: hero-ico-tilt 6s ease-in-out 2s infinite; }
+        .pg-hero:hover .pg-hero-ico > svg, .pg-hero:hover .pg-hero-ico .hero-color-ico, #sgHero:hover .sg-hero-ico .hero-color-ico { animation: none; }
+        @keyframes hero-ico-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+        @keyframes hero-ico-shine { 0%, 62% { transform: translateX(-120%) rotate(20deg); } 82%, 100% { transform: translateX(120%) rotate(20deg); } }
+        @keyframes hero-ico-tilt { 0%, 78%, 100% { transform: rotate(0); } 84% { transform: rotate(-9deg) scale(1.06); } 90% { transform: rotate(7deg) scale(1.06); } 95% { transform: rotate(-3deg); } }
+    }
+
+    /* Awards & Gifts: section switch, views, buttons */
+    .award-page #awHero [data-aw-icon="medal"]     { --icl: #FCD34D; --icd: #D97706; }
+    .award-page #awHero [data-aw-icon="event"]     { --icl: #F9A8D4; --icd: #DB2777; }
+    .award-page #awHero [data-aw-icon="gift"]      { --icl: #FDA4AF; --icd: #E11D48; }
+    .award-page #awHero [data-aw-icon="utilise"]   { --icl: #6EE7B7; --icd: #059669; }
+    .award-page #awHero [data-aw-icon="dashboard"] { --icl: #93C5FD; --icd: #2563EB; }
+    .award-page #awHero [data-aw-icon="clipboard"] { --icl: #FDE68A; --icd: #D97706; }
+    .award-page #awHero [data-aw-icon="truck"]     { --icl: #FDBA74; --icd: #EA580C; }
+    .award-page #awHero [data-aw-icon="boxes"]     { --icl: #C4B5FD; --icd: #7C3AED; }
+    .award-page #awHero [data-aw-icon="tote"]      { --icl: #BEF264; --icd: #65A30D; }
+    .award-page #awHero [data-aw-icon="sliders"]   { --icl: #E2E8F0; --icd: #475569; }
+    .award-page #awHero [data-aw-icon="refresh"]   { --icl: #A5F3FC; --icd: #0891B2; }
+    .award-page #awHero [data-aw-icon="plus"]      { --icl: #6EE7B7; --icd: #059669; }
+    body .award-page #awHero .aw-toptab .aw-icon,
+    body .award-page #awHero .aw-hero-nav .aw-subtab .aw-icon,
+    body .award-page #awHero .aw-hero-nav .aw-utiltab .aw-icon,
+    body .award-page #awHero .aw-top-right .aw-icon { color: var(--icl, currentColor); opacity: 1; }
+    body .award-page #awHero .aw-toptabs .aw-toptab.is-active .aw-icon,
+    body .award-page #awHero .aw-top-right .btn-primary .aw-icon { color: var(--icd, currentColor); }
+
+    /* buttons on the other banners */
+    #orgChartBtn             { --icl: #C4B5FD; }
+    #addEmployeeBtn          { --icd: #059669; }
+    #downloadSampleExcelBtn  { --icl: #86EFAC; }
+    #pcal-past-btn           { --icl: #FDE68A; }
+    #pcal-add-btn            { --icd: #059669; }
+    #grRefreshAll, #page-forms .pg-hero .pg-btn, #sg-refresh-btn { --icl: #A5F3FC; }
+    .pg-hero .pg-btn:not(.pg-btn--solid) svg, #sg-app #sgHero #sg-refresh-btn .sg-i { color: var(--icl, currentColor); }
+    .pg-hero .pg-btn--solid svg { color: var(--icd, currentColor); }
+
+    /* Field Review System: Dashboard / Admin on its banner */
+    #posPage .pg-hero .pos-top-tab .fr-i-dash  { --icl: #93C5FD; --icd: #2563EB; }
+    #posPage .pg-hero .pos-top-tab .fr-i-admin { --icl: #FDE68A; --icd: #D97706; }
+    #posPage .pg-hero .pos-top-tabs--header .pos-top-tab .fr-ico { color: var(--icl, currentColor); }
+    #posPage .pg-hero .pos-top-tabs--header .pos-top-tab.active .fr-ico { color: var(--icd, currentColor); }
+
+    /* Program Calendar: its views (on a white card) */
+    #pcal-app .pcal-nav-item[data-pcal-tab="calendar"] .pcal-i { color: #2563EB; }
+    #pcal-app .pcal-nav-item[data-pcal-tab="settings"] .pcal-i { color: #64748B; }
+    #pcal-app .pcal-nav-item[data-pcal-tab="past"]     .pcal-i { color: #D97706; }
+    #pcal-app .pcal-nav-item[data-pcal-tab="bulk"]     .pcal-i { color: #059669; }
+
+    /* GRs & Circulars: its views (on a white card) */
+    #grPage .gr-tab[data-tab="upload"]    .gr-i { color: #2563EB; }
+    #grPage .gr-tab[data-tab="detailed"]  .gr-i { color: #7C3AED; }
+    #grPage .gr-tab[data-tab="summary"]   .gr-i { color: #0E9384; }
+    #grPage .gr-tab[data-tab="analytics"] .gr-i { color: #E11D48; }
+
+    /* ======================================================================
+       THE HEADER
+       A frosted white bar with a fine edge. On the left the wordmark: "OLF"
+       heavy, in the brand's blue-to-teal with a soft sheen passing now and
+       then; a hairline; "Staff Connect" in crisp dark type. On the right one
+       matching set of controls - same height, same white card, same hover -
+       the theme switch (a white thumb slides to your choice), the bell, a
+       divider, and you.
+       ====================================================================== */
+    html[data-theme] #appShell .topbar {
+        --tb-ctl: 40px;
+        --tb-card: #FFFFFF; --tb-line: rgba(15,23,42,.09); --tb-track: #EEF2F8; --tb-ink: #101828; --tb-soft: #475467; --tb-faint: #667085;
+        --tb-ctl-shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.04);
+        height: 62px; padding: 0 20px 0 18px; gap: 16px;
+        background: rgba(255,255,255,.82); background-image: none;
+        -webkit-backdrop-filter: blur(14px) saturate(160%); backdrop-filter: blur(14px) saturate(160%);
+        border-bottom: 1px solid var(--tb-line);
+        box-shadow: 0 4px 18px -10px rgba(36,87,197,.22);
+    }
+    html[data-theme="dark"] #appShell .topbar {
+        --tb-card: #1D2430; --tb-line: rgba(255,255,255,.08); --tb-track: #141922; --tb-ink: #E8ECF2; --tb-soft: #A9B2C0; --tb-faint: #8691A3;
+        --tb-ctl-shadow: 0 1px 2px rgba(0,0,0,.4);
+        background: rgba(21,26,34,.86); box-shadow: 0 4px 18px -10px rgba(0,0,0,.6);
+    }
+    html[data-theme] #appShell .topbar::after { height: 1.5px; opacity: .55; }
+
+    /* wordmark */
+    #appShell .topbar-logo { align-items: center; gap: 12px; font-size: 27px; line-height: 1; }
+    #appShell .topbar-logo .logo-olf {
+        font-weight: 900; letter-spacing: -1.2px; animation: none; filter: none;
+        background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,.85) 50%, transparent 60%) no-repeat,
+                    linear-gradient(120deg, #2457C5 0%, #2F6FE4 45%, #0B8F7A 100%);
+        background-size: 250% 100%, 100% 100%; background-position: 160% 0, 0 0;
+        -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
+    }
+    #appShell .topbar-logo .logo-olf i { -webkit-text-fill-color: inherit; }
+    #appShell .topbar-logo .logo-sc {
+        position: relative; padding-left: 13px; gap: .25em; font-size: .86em; font-weight: 700; letter-spacing: -.4px;
+    }
+    #appShell .topbar-logo .logo-sc::before {
+        content: ""; position: absolute; left: 0; top: 50%; width: 1.5px; height: 20px; margin-top: -10px; border-radius: 2px;
+        background: linear-gradient(180deg, transparent, rgba(47,111,228,.45), transparent);
+    }
+    #appShell .topbar-logo .logo-sc i {
+        background: none; -webkit-background-clip: border-box; background-clip: border-box;
+        -webkit-text-fill-color: currentColor; color: var(--tb-ink); animation: none;
+    }
+    @media (prefers-reduced-motion: no-preference) {
+        #appShell .topbar-logo .logo-olf { animation: tb-olf-sheen 7s ease-in-out 1.5s infinite; }
+        @keyframes tb-olf-sheen { 0%, 70% { background-position: 160% 0, 0 0; } 100% { background-position: -60% 0, 0 0; } }
+    }
+
+    /* the controls: one family */
+    html[data-theme] #appShell .tp-group { gap: 10px; }
+    html[data-theme] #appShell .theme-switch {
+        --ts-w: 34px; height: var(--tb-ctl); padding: 3px; gap: 2px; border-radius: 12px;
+        background: var(--tb-track); border: 1px solid var(--tb-line); box-shadow: inset 0 1px 2px rgba(16,24,40,.05);
+    }
+    html[data-theme] #appShell .theme-switch::before {
+        top: 3px; bottom: 3px; left: 3px; width: var(--ts-w); border-radius: 9px;
+        background: var(--tb-card); box-shadow: 0 1px 3px rgba(16,24,40,.14), 0 0 0 1px var(--tb-line);
+    }
+    html[data-theme] #appShell .theme-switch button { width: var(--ts-w); height: 100%; border-radius: 9px; color: var(--tb-faint); }
+    html[data-theme] #appShell .theme-switch button:hover { color: var(--tb-ink); }
+    html[data-theme] #appShell .theme-switch button[aria-checked="true"] { color: #2F6FE4; }
+    html[data-theme] #appShell .theme-switch button svg { width: 16px; height: 16px; }
+
+    html[data-theme] #appShell .tb-bell {
+        width: var(--tb-ctl); height: var(--tb-ctl); border-radius: 12px; color: var(--tb-soft);
+        background: var(--tb-card); border: 1px solid var(--tb-line); box-shadow: var(--tb-ctl-shadow);
+    }
+    html[data-theme] #appShell .tb-bell.has-news { color: #2457C5; }
+    html[data-theme] #appShell .tb-bell .tb-bell-n { box-shadow: 0 0 0 2px var(--tb-card), 0 3px 8px rgba(240,68,56,.4); }
+
+    html[data-theme] #appShell .topbar-profile {
+        position: relative; height: var(--tb-ctl); gap: 10px; padding: 0 12px 0 4px; margin-left: 7px; border-radius: 12px;
+        background: var(--tb-card); border: 1px solid var(--tb-line); box-shadow: var(--tb-ctl-shadow);
+        transition: border-color .18s ease, box-shadow .2s ease, transform .18s ease;
+    }
+    /* a thin divider between the tools and you */
+    html[data-theme] #appShell .topbar-profile::before {
+        content: ""; position: absolute; left: -10px; top: 9px; bottom: 9px; width: 1px; background: var(--tb-line);
+    }
+    html[data-theme] #appShell .tb-bell:hover, html[data-theme] #appShell .topbar-profile:hover,
+    html[data-theme] #appShell .topbar-profile[aria-expanded="true"] {
+        border-color: rgba(47,111,228,.35); box-shadow: 0 6px 14px -6px rgba(36,87,197,.35); transform: translateY(-1px);
+    }
+    html[data-theme] #appShell .topbar-profile:active { transform: none; box-shadow: var(--tb-ctl-shadow); }
+    html[data-theme] #appShell .tp-avatar {
+        width: 32px; height: 32px; font-size: 11.5px; font-weight: 800; color: #fff;
+        background: linear-gradient(135deg, #2F6FE4, #0B8F7A);
+        box-shadow: 0 0 0 2px var(--tb-card), 0 0 0 3.5px rgba(47,111,228,.35);
+    }
+    html[data-theme] #appShell .tp-avatar::after { box-shadow: 0 0 0 2px var(--tb-card); width: 9px; height: 9px; right: -1px; bottom: -1px; animation: none; }
+    html[data-theme] #appShell .tp-name { color: var(--tb-ink); font-size: 13.5px; font-weight: 700; letter-spacing: -.1px; }
+    html[data-theme] #appShell .tp-dept { color: var(--tb-faint); font-size: 11.5px; font-weight: 600; }
+    html[data-theme] #appShell .tp-caret { color: var(--tb-faint); }
+
+    @media (max-width: 768px) {
+        html[data-theme] #appShell .topbar { height: 58px; padding: 0 12px; gap: 10px; }
+        html[data-theme] #appShell .topbar { --tb-ctl: 36px; }
+        html[data-theme] #appShell .theme-switch { --ts-w: 28px; }
+        html[data-theme] #appShell .topbar-profile { padding: 0 3px; margin-left: 0; }
+        html[data-theme] #appShell .topbar-profile::before { display: none; }
+        #appShell .topbar-logo { font-size: 21px; }
+    }
+
+    /* ======================================================================
+       HEADER, TWO-TONE: a slanted blue-to-teal brand block on the left with
+       the wordmark in white (a soft shine crosses it now and then, a few
+       light dots drift in it), then "where you are" - the open page's own
+       picture and name - and the tools and you on the right.
+       ====================================================================== */
+    html[data-theme] #appShell .topbar { padding-left: 0; gap: 18px; overflow: hidden; }
+    #appShell .topbar-logo {
+        position: relative; isolation: isolate; align-self: stretch; display: flex; align-items: center; gap: 12px; flex: none;
+        padding: 0 58px 0 24px; margin-right: -6px; font-size: 25px; color: #fff;
+        background: linear-gradient(115deg, #2457C5 0%, #2F6FE4 48%, #0B8F7A 100%);
+        clip-path: polygon(0 0, 100% 0, calc(100% - 30px) 100%, 0 100%);
+    }
+    /* a thin teal sliver along the slant, for depth */
+    #appShell .topbar-logo::before {
+        content: ""; position: absolute; z-index: -1; inset: 0;
+        background: radial-gradient(circle at 18% 120%, rgba(253,224,71,.35), transparent 38%),
+                    radial-gradient(circle at 82% -20%, rgba(255,255,255,.35), transparent 40%),
+                    radial-gradient(rgba(255,255,255,.22) 1px, transparent 1.3px) 0 0 / 14px 14px;
+    }
+    #appShell .topbar-logo::after {
+        content: ""; position: absolute; z-index: -1; inset: 0; transform: translateX(-110%);
+        background: linear-gradient(100deg, transparent 35%, rgba(255,255,255,.35) 50%, transparent 65%);
+    }
+    #appShell .topbar-logo .logo-olf {
+        background: none; -webkit-text-fill-color: #fff; color: #fff; animation: none;
+        font-weight: 900; letter-spacing: -1px; text-shadow: 0 2px 8px rgba(15,23,42,.25);
+    }
+    #appShell .topbar-logo .logo-sc { font-size: .8em; font-weight: 700; padding-left: 13px; }
+    #appShell .topbar-logo .logo-sc::before { background: rgba(255,255,255,.55); height: 22px; margin-top: -11px; }
+    #appShell .topbar-logo .logo-sc i { color: #fff; -webkit-text-fill-color: #fff; }
+
+    /* where you are */
+    .tb-crumb { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: 14px; }
+    .tb-crumb-root { font-weight: 600; color: var(--tb-faint, #667085); white-space: nowrap; }
+    .tb-crumb-sep { width: 16px; height: 16px; flex: none; fill: none; stroke: var(--tb-faint, #98A2B3); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    .tb-crumb-page {
+        display: inline-flex; align-items: center; gap: 9px; min-width: 0; padding: 5px 14px 5px 6px; border-radius: 999px;
+        font-weight: 700; color: var(--tb-ink, #101828); white-space: nowrap;
+        background: linear-gradient(90deg, rgba(47,111,228,.10), rgba(11,143,122,.08)); border: 1px solid rgba(47,111,228,.18);
+    }
+    .tb-crumb-page > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+    .tb-crumb-ico { width: 28px; height: 28px; flex: none; display: grid; place-items: center; border-radius: 50%; background: var(--tb-card, #fff); box-shadow: 0 2px 6px rgba(36,87,197,.18); }
+    .tb-crumb-ico svg { width: 19px; height: 19px; }
+    html[data-theme="dark"] .tb-crumb-page { background: linear-gradient(90deg, rgba(110,155,255,.14), rgba(45,212,191,.10)); border-color: rgba(110,155,255,.25); }
+
+    /* you: name with the department under it */
+    html[data-theme] #appShell .topbar-profile { height: 44px; padding: 0 14px 0 5px; }
+    html[data-theme] #appShell .tp-text { gap: 2px; }
+    html[data-theme] #appShell .tp-dept {
+        display: inline-flex; align-items: center; gap: 5px; max-width: 190px; overflow: hidden; text-overflow: ellipsis;
+        color: #0B8F7A; font-weight: 700; font-size: 11px; letter-spacing: .02em;
+    }
+    html[data-theme] #appShell .tp-dept::before { content: ""; width: 6px; height: 6px; flex: none; border-radius: 50%; background: linear-gradient(135deg, #2F6FE4, #0B8F7A); }
+    html[data-theme="dark"] #appShell .tp-dept { color: #5EEAD4; }
+
+    @media (prefers-reduced-motion: no-preference) {
+        #appShell .topbar-logo::after { animation: tb-brand-shine 8s ease-in-out 2s infinite; }
+        @keyframes tb-brand-shine { 0%, 75% { transform: translateX(-110%); } 100% { transform: translateX(110%); } }
+        #appShell .topbar-logo::before { animation: tb-brand-drift 14s linear infinite; }
+        @keyframes tb-brand-drift { to { background-position: 0 0, 0 0, 28px 14px; } }
+        .tb-crumb-page.is-new { animation: tb-crumb-in .45s cubic-bezier(.22,1,.36,1); }
+        .tb-crumb-page.is-new .tb-crumb-ico { animation: tb-crumb-pop .55s cubic-bezier(.34,1.56,.64,1); }
+        @keyframes tb-crumb-in { from { opacity: 0; transform: translateX(-10px); } }
+        @keyframes tb-crumb-pop { from { transform: scale(.4) rotate(-20deg); } }
+    }
+    @media (max-width: 1100px) { .tb-crumb-root, .tb-crumb-sep { display: none; } }
+    @media (max-width: 768px) {
+        #appShell .topbar-logo { order: -1; padding: 0 34px 0 14px; font-size: 21px; margin: 0; clip-path: polygon(0 0, 100% 0, calc(100% - 18px) 100%, 0 100%); }
+        .tb-crumb { display: none; }
+        html[data-theme] #appShell .topbar-profile { height: 38px; padding: 0 3px; }
+    }
+
     /* phones: a proper menu button in the top bar (its three lines fold into
        a cross while the menu is open) instead of the thin strip on the edge */
     .tb-menu-btn { display: none; }
@@ -3262,7 +3660,7 @@
 <!-- The ?v= is bumped whenever award.css or award.js changes: without it
      a browser keeps the copy it already has, and the tab carries on
      behaving as it did before the change. -->
-<link rel="stylesheet" href="award.css?v=2026-11-02l">
+<link rel="stylesheet" href="award.css?v=2026-11-02r">
 <link rel="stylesheet" href="award-manage.css?v=2026-11-02b">
 <link rel="stylesheet" href="award-dash.css?v=2026-10-29a">
 <link rel="stylesheet" href="award-event.css?v=2026-10-26e">
@@ -3313,6 +3711,12 @@
         <div class="topbar-logo" role="img" aria-label="OLF Staff Connect">
             <span class="logo-olf" aria-hidden="true"><i style="--i:0">O</i><i style="--i:1">L</i><i style="--i:2">F</i></span><span class="logo-sc" aria-hidden="true"><span class="lw"><i style="--i:3">S</i><i style="--i:4">t</i><i style="--i:5">a</i><i style="--i:6">f</i><i style="--i:7">f</i></span><span class="lw"><i style="--i:8">C</i><i style="--i:9">o</i><i style="--i:10">n</i><i style="--i:11">n</i><i style="--i:12">e</i><i style="--i:13">c</i><i style="--i:14">t</i></span></span>
         </div>
+        <!-- Where you are: the open page's own picture and name (app.js) -->
+        <nav class="tb-crumb" id="tbCrumb" aria-label="You are here">
+            <span class="tb-crumb-root">Staff Connect</span>
+            <svg class="tb-crumb-sep" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+            <span class="tb-crumb-page" id="tbCrumbPage"><span class="tb-crumb-ico" id="tbCrumbIco" aria-hidden="true"></span><span id="tbCrumbName">Home</span></span>
+        </nav>
         <div class="tp-group">
             <div class="theme-switch" id="olfThemeSwitch" role="radiogroup" aria-label="Colour theme">
                 <button type="button" role="radio" data-theme-choice="light" aria-checked="false" title="Light theme" aria-label="Light theme">
@@ -3325,6 +3729,10 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12.5" rx="2"/><path d="M8.5 20.5h7M12 16.5v4"/></svg>
                 </button>
             </div>
+            <button class="tb-bell" id="tbBellBtn" type="button" aria-label="Announcements" title="Announcements">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9.5a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15.5 6 9.5z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg>
+                <span class="tb-bell-n" hidden>0</span>
+            </button>
             <button class="topbar-profile" id="olfProfileBtn" type="button"
                     aria-haspopup="dialog" aria-expanded="false" title="View your ID card">
                 <span class="tp-avatar" id="topbarAvatar">?</span>
@@ -3380,7 +3788,7 @@
     <div id="newsDetailModal" class="modal-overlay">
         <div class="modal-box" style="width:560px;">
             <div class="modal-header">
-                <h2>📢 Announcements</h2>
+                <h2 class="nd-title"><span class="nd-title-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4a1 1 0 0 0 1 1h2l5 4V5L7 9H5a1 1 0 0 0-1 1z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg></span>Announcements</h2>
                 <button class="modal-close" id="closeNewsDetailBtn" type="button">✕</button>
             </div>
             <div class="modal-body" id="newsDetailBody"></div>
@@ -3393,7 +3801,7 @@
     <!-- ── Session popup: shown once per session on any page ── -->
     <div class="news-popup" id="newsPopup" hidden>
         <button class="news-popup-x" id="newsPopupClose" type="button" aria-label="Dismiss">✕</button>
-        <div class="news-popup-icon">📢</div>
+        <div class="news-popup-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4a1 1 0 0 0 1 1h2l5 4V5L7 9H5a1 1 0 0 0-1 1z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg></div>
         <div class="news-popup-body">
             <div class="news-popup-label" id="newsPopupLabel">New announcement</div>
             <div class="news-popup-text" id="newsPopupText"></div>
@@ -3574,13 +3982,13 @@
     </div>
 </div>
 
-<script type="module" src="app.js?v=2026-11-02u"></script>
+<script type="module" src="app.js?v=2026-11-03i"></script>
 <script src="profile.js"></script>
 <script src="pom.js"></script>
 <script src="calendar.js?v=2026-11-02a"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="sg-supabase.js"></script>
-<script src="smartgoal.js?v=2026-11-02z"></script>
+<script src="smartgoal.js?v=2026-11-03a"></script>
 <script src="gr.js?v=2026-11-02f"></script>
 <script src="forms.js"></script>
 <!-- ARCHIVED 2026-10-07: <script src="po.js"></script> - old PO Review page, no longer loaded. -->
