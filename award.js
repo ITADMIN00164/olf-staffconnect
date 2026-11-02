@@ -3791,7 +3791,6 @@ window.AWARD_CONFIG = {
     var events = stockEvents(requisitions, movements, ids);
     var months = fyMonthKeys(fyStart);
     var live = goLiveFy() === fyStart;
-    if (live) months = months.filter(function (k) { return k >= goLive.slice(0, 7); });
     var rows = [];
 
     places.forEach(function (place) {
@@ -4476,8 +4475,13 @@ window.AWARD_CONFIG = {
      carry forward is the March before the year, so it is settled as soon as
      the year has started. */
   function monthHasHappened(monthKey, fy) {
-    return monthKey ? monthKey <= monthKeyOf(new Date())
+    return monthKey ? monthKey <= monthKeyOf(new Date()) && !beforeGoLive(monthKey, fy)
                     : fy <= fyStartOf(new Date());
+  }
+
+  // A month of the go-live year that came before the go-live month: the opening figure stands for it.
+  function beforeGoLive(monthKey, fy) {
+    return !!goLive && goLiveFy() === fy && monthKey < goLive.slice(0, 7);
   }
 
   /* ------------------------------------------------------------ editing
