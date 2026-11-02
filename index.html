@@ -1697,28 +1697,11 @@
             border-bottom: 1px solid var(--hairline-dk);
             box-shadow: 0 1px 24px rgba(11,18,32,0.28);
         }
-        /* The name: it is simply there when the page opens; Staff Connect in flowing brand colours with a passing shine. All of it keeps moving on its own. */
-        .topbar-logo { position: relative; display: flex; align-items: baseline; gap: 9px; font-size: 24px; line-height: 1; cursor: default; user-select: none; }
-        .topbar-logo .logo-olf { display: inline-flex; font-weight: 900; letter-spacing: -1px; }
-        .topbar-logo .logo-olf i { font-style: normal; display: inline-block; }
-        .topbar-logo .logo-sc { display: inline-flex; gap: .26em; font-weight: 800; letter-spacing: -0.6px; padding-right: 2px; }
-        .topbar-logo .lw { display: inline-flex; }
-        .topbar-logo .logo-sc i {
-            font-style: normal; display: inline-block;
-            background:
-                linear-gradient(105deg, transparent 38%, rgba(255,255,255,.95) 50%, transparent 62%),
-                linear-gradient(92deg, var(--brand) 0%, var(--teal) 50%, var(--brand) 100%);
-            background-attachment: fixed; background-repeat: no-repeat, repeat-x;
-            background-size: 360px 100%, 260px 100%; background-position: -400px 0, 0 0;
-            -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-        }
-        @media (prefers-reduced-motion: no-preference) {
-            .topbar-logo .logo-sc i { animation: logo-sheen 9s linear infinite; }
-            .topbar-logo .logo-olf { animation: logo-glow 2.6s ease-in-out infinite alternate; }
-            @keyframes logo-glow { from { filter: drop-shadow(0 0 0 rgba(79,142,247,0)); } to { filter: drop-shadow(0 0 7px rgba(79,142,247,.55)); } }
-            /* the colours flow without stopping; every so often a shine passes over them */
-            @keyframes logo-sheen { 0% { background-position: -400px 0, 0 0; } 70% { background-position: -400px 0, 182px 0; } 100% { background-position: 360px 0, 260px 0; } }
-        }
+        /* The name: still and plain. OLF in strong type, a hairline, then Staff Connect in a lighter weight. */
+        .topbar-logo { display: flex; align-items: center; gap: 12px; line-height: 1; cursor: default; user-select: none; }
+        .topbar-logo .logo-olf { font-size: 22px; font-weight: 800; letter-spacing: .01em; }
+        .topbar-logo .logo-div { width: 1px; height: 22px; background: currentColor; opacity: .22; }
+        .topbar-logo .logo-sc { font-size: 17px; font-weight: 600; letter-spacing: .01em; color: var(--chrome-accent, var(--brand)); }
 
         /* ── Sidebar: dark glass panel ────────────────────────── */
         .sidebar {
@@ -2178,7 +2161,10 @@
             .tp-text, .tp-caret { display: none; }
             .topbar-profile { padding: 4px; max-width: none; }
             .olf-id-card { left: 10px; right: 10px; width: auto; }
-            .topbar-logo { font-size: 18px; gap: 6px; }
+            .topbar-logo { gap: 8px; }
+            .topbar-logo .logo-olf { font-size: 18px; }
+            .topbar-logo .logo-sc { font-size: 14px; }
+            .topbar-logo .logo-div { height: 18px; }
         }
 
         /* ==========================================================
@@ -2794,7 +2780,6 @@
 
     /* a taller bar with a soft lit top edge */
     html[data-theme] .topbar { height: 58px; background-image: linear-gradient(180deg, var(--chrome-hi), transparent 70%); }
-    html[data-theme] .topbar-logo { font-size: 25px; }
 
     /* profile chip */
     .tp-avatar { position: relative; width: 32px; height: 32px; font-size: 12px; box-shadow: 0 0 0 2px var(--chrome-bg, #fff), 0 0 0 3.5px rgba(79,142,247,.55), 0 4px 10px rgba(79,142,247,.35); }
@@ -3076,7 +3061,7 @@
     <!-- Top Bar -->
     <div class="topbar">
         <div class="topbar-logo" role="img" aria-label="OLF Staff Connect">
-            <span class="logo-olf" aria-hidden="true"><i style="--i:0">O</i><i style="--i:1">L</i><i style="--i:2">F</i></span><span class="logo-sc" aria-hidden="true"><span class="lw"><i style="--i:3">S</i><i style="--i:4">t</i><i style="--i:5">a</i><i style="--i:6">f</i><i style="--i:7">f</i></span><span class="lw"><i style="--i:8">C</i><i style="--i:9">o</i><i style="--i:10">n</i><i style="--i:11">n</i><i style="--i:12">e</i><i style="--i:13">c</i><i style="--i:14">t</i></span></span>
+            <span class="logo-olf" aria-hidden="true">OLF</span><span class="logo-div" aria-hidden="true"></span><span class="logo-sc" aria-hidden="true">Staff Connect</span>
         </div>
         <div class="tp-group">
             <div class="theme-switch" id="olfThemeSwitch" role="radiogroup" aria-label="Colour theme">
@@ -3339,7 +3324,7 @@
     </div>
 </div>
 
-<script type="module" src="app.js?v=2026-11-02g"></script>
+<script type="module" src="app.js?v=2026-11-02h"></script>
 <script src="profile.js"></script>
 <script src="pom.js"></script>
 <script src="calendar.js"></script>
