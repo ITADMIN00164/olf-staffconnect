@@ -1163,6 +1163,106 @@ html[data-theme="dark"] .employees-page { --row-hover: #283042; --row-line: rgba
     .employees-page .card { padding: 16px; border-radius: 18px; }
     .employees-page .search-wrap { max-width: none; }
 }
+
+/* ======================================================================
+   Organisation chart, polished: the same banner header as the pages, cards
+   with a picture and a department colour, softer lines, a calm background.
+   Only the look changes; the data, zoom, expand and details work as before.
+   ====================================================================== */
+#orgModal .modal-header, #orgBranchModal .org-bar {
+    background: linear-gradient(120deg, #2457C5 0%, #2F6FE4 40%, #0B8F7A 100%); border-bottom: 0; color: #fff; padding: 14px 24px;
+}
+#orgModal .modal-header h2 { color: #fff; font-size: 20px; font-weight: 800; letter-spacing: -.4px; margin: 0; }
+#orgModal .org-sub { color: rgba(255,255,255,.9); font-size: 12.5px; font-weight: 500; }
+#orgModal .org-btn-mini, #orgBranchModal .org-btn-mini {
+    background: rgba(255,255,255,.17); border: 1px solid rgba(255,255,255,.36); color: #fff; border-radius: 10px; padding: 6px 12px; font-weight: 700;
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); transition: background-color .15s ease, transform .15s ease;
+}
+#orgModal .org-btn-mini:hover, #orgBranchModal .org-btn-mini:hover { background: rgba(255,255,255,.3); color: #fff; border-color: rgba(255,255,255,.5); transform: translateY(-1px); }
+#orgModal .modal-close, #orgBranchModal .modal-close {
+    width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 15px;
+    background: rgba(255,255,255,.17); border: 1px solid rgba(255,255,255,.36); transition: background-color .15s ease, transform .2s ease;
+}
+#orgModal .modal-close:hover, #orgBranchModal .modal-close:hover { background: rgba(255,255,255,.32); transform: rotate(90deg); }
+#orgBranchModal .org-branch-title { color: #fff; font-size: 15px; }
+#orgBranchModal .org-branch-crumbs { color: rgba(255,255,255,.85); }
+
+.org-body {
+    background:
+        radial-gradient(rgba(79,142,247,.16) 1.2px, transparent 1.4px) 0 0 / 24px 24px,
+        linear-gradient(180deg, #F4F8FF 0%, #EEF4FB 100%);
+    padding: 44px 28px 48px;
+}
+
+/* lines: softer, brand-blue */
+.org-tree ul::before { border-left: 2px solid #A9C0EE; }
+.org-tree li::before, .org-tree li::after { border-top: 2px solid #A9C0EE; }
+.org-tree li::after { border-left: 2px solid #A9C0EE; }
+.org-tree li:last-child::before { border-right: 2px solid #A9C0EE; border-radius: 0 8px 0 0; }
+.org-tree li:first-child::after { border-radius: 8px 0 0 0; }
+.org-vlist li::after { border-left: 2px solid #A9C0EE; }
+.org-vlist li::before { border-top: 2px solid #A9C0EE; }
+
+/* the card: a picture on its top edge, the department as a coloured rule */
+.org-node {
+    --dc: #4F8EF7; width: 208px; padding: 30px 12px 12px; margin-top: 18px; border-radius: 16px; border: 1px solid rgba(15,23,42,.08);
+    border-top: 3px solid var(--dc); background: #fff; box-shadow: 0 2px 6px rgba(15,23,42,.06), 0 10px 22px -12px rgba(15,23,42,.18);
+    transition: transform .2s cubic-bezier(.22,1,.36,1), box-shadow .2s ease, border-color .2s ease;
+}
+.org-node:hover { transform: translateY(-3px); border-color: var(--dc); box-shadow: 0 4px 10px rgba(15,23,42,.08), 0 16px 28px -12px color-mix(in srgb, var(--dc) 55%, transparent); }
+.org-node:focus-visible { outline: 3px solid color-mix(in srgb, var(--dc) 55%, transparent); outline-offset: 2px; }
+.org-av {
+    position: absolute; left: 50%; top: -19px; transform: translateX(-50%); width: 38px; height: 38px; border-radius: 50%;
+    display: grid; place-items: center; color: #fff; font-size: 13px; font-weight: 800; letter-spacing: .02em;
+    box-shadow: 0 0 0 3px #fff, 0 6px 12px rgba(15,23,42,.2); transition: transform .25s cubic-bezier(.34,1.56,.64,1);
+}
+.org-node:hover .org-av { transform: translateX(-50%) scale(1.1); }
+.org-av.av0 { background: linear-gradient(135deg, #60A5FA, #2563EB); }
+.org-av.av1 { background: linear-gradient(135deg, #A78BFA, #7C3AED); }
+.org-av.av2 { background: linear-gradient(135deg, #2DD4BF, #0F766E); }
+.org-av.av3 { background: linear-gradient(135deg, #FBBF24, #D97706); }
+.org-av.av4 { background: linear-gradient(135deg, #F472B6, #DB2777); }
+.org-av.av5 { background: linear-gradient(135deg, #FB923C, #EA580C); }
+.org-node .org-role { font-size: 12.5px; font-weight: 800; color: #1E293B; letter-spacing: -.1px; }
+.org-node .org-name { font-size: 11.5px; font-weight: 600; color: #475569; margin-top: 3px; }
+.org-node .org-dept { display: inline-block; margin-top: 6px; padding: 2px 9px; border-radius: 999px; font-size: 10px; font-weight: 700; color: color-mix(in srgb, var(--dc) 78%, #000); background: color-mix(in srgb, var(--dc) 13%, transparent); }
+
+/* the top of the house */
+.org-node.is-root { background: linear-gradient(135deg, #2F6FE4, #0B8F7A); border: 0; border-top: 0; box-shadow: 0 10px 28px rgba(36,87,197,.38); }
+.org-node.is-root .org-role { color: #fff; font-size: 14px; }
+.org-node.is-root .org-name { color: rgba(255,255,255,.95); }
+.org-node.is-root .org-dept { color: #fff; background: rgba(255,255,255,.2); }
+.org-node.is-root .org-av { background: #fff; color: #2457C5; }
+.org-node.is-orphan { margin-top: 0; padding-top: 12px; border-top-width: 1px; }
+
+/* open / close a team */
+.org-toggle {
+    margin-top: 10px; min-width: 44px; padding: 3px 11px; border: 1.5px solid #A9C0EE; border-radius: 999px; background: #fff; color: #2457C5;
+    font-size: 11px; font-weight: 800; box-shadow: 0 2px 6px rgba(36,87,197,.12); transition: background-color .15s ease, color .15s ease, transform .15s ease, box-shadow .15s ease;
+}
+.org-toggle:hover { background: linear-gradient(135deg, #2F6FE4, #0B8F7A); color: #fff; border-color: transparent; transform: translateY(-1px); box-shadow: 0 6px 14px rgba(36,87,197,.28); }
+
+/* "Not linked": a tinted panel instead of loose text */
+.org-group-title { display: block; width: max-content; margin: 44px auto 6px; padding: 5px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 800; color: #92400E; background: #FEF3C7; border: 1px solid #FDE68A; }
+.org-group-note { color: #64748B; font-size: 12px; margin-bottom: 18px; }
+
+/* the stacked team view */
+.org-vrow .org-node, .org-vhead .org-node { display: flex; align-items: center; gap: 12px; width: 360px; margin-top: 0; padding: 11px 14px; text-align: left; border-top-width: 3px; }
+.org-vrow .org-av, .org-vhead .org-av { position: static; transform: none; flex: 0 0 auto; width: 40px; height: 40px; box-shadow: 0 0 0 2px #fff, 0 4px 10px rgba(15,23,42,.18); }
+.org-vrow .org-node:hover .org-av { transform: scale(1.08); }
+.org-vhead .org-node.is-root .org-av { box-shadow: 0 0 0 2px rgba(255,255,255,.5); }
+.org-txt { min-width: 0; }
+
+/* the person's details */
+.org-person-box { border-radius: 20px; box-shadow: 0 28px 70px rgba(15,23,42,.35); }
+.org-person-head { background: linear-gradient(120deg, #2457C5 0%, #2F6FE4 45%, #0B8F7A 100%); padding: 18px 22px; }
+.org-person-close { border-radius: 50%; width: 32px; height: 32px; display: grid; place-items: center; padding: 0; }
+
+@media (prefers-reduced-motion: no-preference) {
+    .org-node { animation: org-in .45s cubic-bezier(.22,1,.36,1) backwards; }
+    @keyframes org-in { from { opacity: 0; transform: translateY(10px); } }
+}
+@media (prefers-reduced-motion: reduce) { .org-node, .org-node:hover, .org-av, .org-toggle { transition: none; animation: none; } }
 </style>
 
 <!-- Local Live Server adds its reload script at the closing body tag; this gives it a safe place. -->

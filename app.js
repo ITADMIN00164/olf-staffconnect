@@ -2147,6 +2147,18 @@ async function initEmployeesPage() {
         });
     }
 
+    ["orgBody", "orgBranchBody"].forEach(bodyId => {
+        const host = document.getElementById(bodyId);
+        if (!host) return;
+        host.addEventListener("keydown", (e) => {
+            if (e.key !== "Enter" && e.key !== " ") return;
+            const card = e.target.closest && e.target.closest(".org-node[data-emp]");
+            if (!card || e.target !== card) return;
+            e.preventDefault();
+            openOrgPerson(card.dataset.emp);
+        });
+    });
+
     const zoomIn    = document.getElementById("orgZoomIn");
     const zoomOut   = document.getElementById("orgZoomOut");
     const zoomReset = document.getElementById("orgZoomReset");
@@ -2628,6 +2640,23 @@ function countDescendants(id, childrenOf, seen = new Set()) {
         .reduce((n, kid) => n + 1 + countDescendants(kid, childrenOf, seen), 0);
 }
 
+// Each department keeps one colour wherever it turns up in the chart.
+const ORG_TONES = ["#3B82F6", "#8B5CF6", "#14B8A6", "#F59E0B", "#EC4899", "#F97316"];
+function orgToneOf(emp) {
+    return ORG_TONES[empAvatarTone(String(emp["Dept"] || emp["Name"] || ""))];
+}
+// The picture and the words of one card, shared by the tree and the stacked team view.
+function orgCardInner(emp, id) {
+    const role     = emp["Designation"] || emp["Name"] || id;
+    const showName = emp["Designation"] ? emp["Name"] : "";
+    return `<span class="org-av av${empAvatarTone(emp["Name"] || id)}" aria-hidden="true">${escHtml(initialsFrom(emp["Name"] || id))}</span>
+        <div class="org-txt">
+            <div class="org-role">${escHtml(role)}</div>
+            ${showName ? `<div class="org-name">${escHtml(showName)}</div>` : ""}
+            ${emp["Dept"] ? `<div class="org-dept">${escHtml(emp["Dept"])}</div>` : ""}
+        </div>`;
+}
+
 function orgNodeHtml(id, tree, depth, seen) {
     const { byId, childrenOf } = tree;
     const emp = byId.get(id);
@@ -2644,14 +2673,10 @@ function orgNodeHtml(id, tree, depth, seen) {
 
     const kids      = childrenOf.get(id) || [];
     const collapsed = orgCollapsed.has(id);
-    const role      = emp["Designation"] || emp["Name"] || id;
-    const showName  = emp["Designation"] ? emp["Name"] : "";
 
-    let html = `<li><div class="org-node${depth === 0 ? " is-root" : ""}"
-        data-emp="${escHtml(id)}" title="${escHtml(emp.id)} — click for details">
-        <div class="org-role">${escHtml(role)}</div>
-        ${showName ? `<div class="org-name">${escHtml(showName)}</div>` : ""}
-        ${emp["Dept"] ? `<div class="org-dept">${escHtml(emp["Dept"])}</div>` : ""}
+    let html = `<li><div class="org-node${depth === 0 ? " is-root" : ""}" tabindex="0" role="button"
+        data-emp="${escHtml(id)}" style="--dc:${orgToneOf(emp)}" title="${escHtml(emp.id)} — click for details">
+        ${orgCardInner(emp, id)}
     </div>`;
 
     if (kids.length) {
@@ -2909,15 +2934,11 @@ function orgBranchHtml(id, tree) {
     const card = (eid, isHead) => {
         const e = byId.get(eid);
         if (!e) return "";
-        const role     = e["Designation"] || e["Name"] || eid;
-        const showName = e["Designation"] ? e["Name"] : "";
         const below    = countDescendants(eid, childrenOf);
         const mine     = (childrenOf.get(eid) || []).length;
-        return `<div class="org-node${isHead ? " is-root" : ""}"
-                data-emp="${escHtml(eid)}" title="${escHtml(eid)} \u2014 click for details">
-                <div class="org-role">${escHtml(role)}</div>
-                ${showName ? `<div class="org-name">${escHtml(showName)}</div>` : ""}
-                ${e["Dept"] ? `<div class="org-dept">${escHtml(e["Dept"])}</div>` : ""}
+        return `<div class="org-node${isHead ? " is-root" : ""}" tabindex="0" role="button"
+                data-emp="${escHtml(eid)}" style="--dc:${orgToneOf(e)}" title="${escHtml(eid)} \u2014 click for details">
+                ${orgCardInner(e, eid)}
             </div>
             ${!isHead && mine ? `<button class="org-toggle" data-org-toggle="${escHtml(eid)}"
                     title="Open this team">+${below}</button>` : ""}`;
