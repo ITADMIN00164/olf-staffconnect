@@ -2579,3 +2579,42 @@
 @media (max-width: 720px) {
   .award-page .aw-topbar { padding: 8px; }
 }
+
+
+/* ======================================================================
+   Where the buttons go. One rule for every view: the thing you do most
+   sits next to what it works on, the file tools sit together at the far
+   right, and nothing floats on a line of its own.
+   ====================================================================== */
+
+/* Gift Inventory: Year / State / Division / District, then Fetch; the file tools at the right. */
+.award-page .stock-controls { align-items: flex-end; gap: 12px; }
+.award-page .stock-controls > #stock-fetch { height: 38px; padding: 0 20px; margin-bottom: 0; }
+.award-page .stock-actions { gap: 8px; align-items: flex-end; }
+.award-page .stock-actions .btn { height: 38px; }
+
+/* The "5 items" chip repeated the count already shown over the table. */
+.award-page .aw-subtabs .pill { display: none; }
+
+/* Events: the same toolbar card as Awards, with the export at the far right. */
+.award-page .awe-view .pev-toolbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 12px; margin: 0 0 12px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 1px 6px rgba(15,23,42,.04);
+}
+.award-page .awe-view .pev-toolbar .pom-select { height: 38px; min-width: 150px; padding: 0 12px; border-radius: 10px; font-size: 13.5px; background-color: var(--surface-alt, #f4f6fa); border: 1px solid var(--border); box-shadow: none; }
+.award-page .awe-view .pev-toolbar .pom-select:hover { border-color: var(--accent); }
+.award-page .awe-view .pev-toolbar .pom-select:disabled { opacity: .55; cursor: not-allowed; }
+.award-page .awe-view .pev-hint { margin-left: auto; font-size: 12px; color: var(--text-muted); }
+.award-page .awe-view .pev-export-btn {
+  display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border-radius: 10px; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 700; color: var(--accent-ink); background: var(--surface); border: 1px solid var(--border);
+  transition: border-color .15s ease, background-color .15s ease, transform .15s var(--ease);
+}
+.award-page .awe-view .pev-export-btn:hover { border-color: var(--accent); background: var(--accent-soft); transform: translateY(-1px); }
+
+/* Awards: the admin's "Add records" sits beside the district, the year pill at the far right. */
+.award-page .awm-view .awa-open { height: 38px; padding: 0 14px; border-radius: 10px; font-weight: 700; }
+@media (max-width: 720px) {
+  .award-page .stock-controls > #stock-fetch { flex: 1 1 100%; justify-content: center; }
+  .award-page .awe-view .pev-hint { margin-left: 0; flex: 1 1 100%; }
+}
