@@ -628,6 +628,15 @@ window.AWARD_CONFIG = {
      treats a fragment containing inline <svg> as a document to inject its
      reload script into, and truncates the response. */
   var ICONS = {
+    medal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="5.5"/><path d="m12 6.6 .9 1.8 2 .3-1.45 1.4.35 2-1.8-.95-1.8.95.35-2L9.1 8.7l2-.3z"/><path d="M8.6 13.6 7 21l5-2.8 5 2.8-1.6-7.4"/></svg>',
+    event: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 9.5h16M8.5 3v4M15.5 3v4"/><path d="m12 12.3.95 1.95 2.15.3-1.55 1.5.37 2.1L12 17.1l-1.92 1.05.37-2.1L8.9 14.55l2.15-.3z"/></svg>',
+    gift: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="10" width="17" height="10.5" rx="1.5"/><rect x="3" y="6.5" width="18" height="3.5" rx="1"/><path d="M12 6.5v14M12 6.5C10 6.5 7.8 5.7 8 4.3c.2-1.5 2.2-1.4 3.2-.3.5.6.8 1.6.8 2.5Zm0 0c2 0 4.2-.8 4-2.2-.2-1.5-2.2-1.4-3.2-.3-.5.6-.8 1.6-.8 2.5Z"/></svg>',
+    utilise: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4.5" width="14" height="16.5" rx="2"/><path d="M9 4.5V3.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M9 13l2.2 2.2L15.5 11"/></svg>',
+    dashboard: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="9" rx="1.8"/><rect x="13.5" y="3.5" width="7" height="5.5" rx="1.8"/><rect x="3.5" y="15.5" width="7" height="5" rx="1.8"/><rect x="13.5" y="12" width="7" height="8.5" rx="1.8"/></svg>',
+    clipboard: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4.5" width="14" height="16.5" rx="2"/><path d="M9 4.5V3.5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1M9 11h6M9 15h4"/></svg>',
+    boxes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="13" width="8" height="8" rx="1.6"/><rect x="13" y="13" width="8" height="8" rx="1.6"/><rect x="8" y="3" width="8" height="8" rx="1.6"/></svg>',
+    tote: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 8h13l1 12.5a1 1 0 0 1-1 1.1H5.5a1 1 0 0 1-1-1.1z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8M9 12.5v.5M15 12.5v.5"/></svg>',
+    sliders: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.4"/><circle cx="8" cy="17" r="2.4"/></svg>',
     alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
            'stroke-width="2" stroke-linecap="round">' +
            '<path d="M12 8v5M12 16.5v.01"/><circle cx="12" cy="12" r="9"/></svg>',
