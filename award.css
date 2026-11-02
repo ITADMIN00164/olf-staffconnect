@@ -2392,3 +2392,81 @@
 .award-page .pg-hero .aw-refresh-all { min-width: 148px; justify-content: center; }
 .award-page .pg-hero .aw-refresh-all:disabled { opacity: .85; cursor: progress; }
 .award-page .pg-hero .aw-refresh-all.is-done { color: #fff; background: rgba(34,197,94,.42); border-color: rgba(255,255,255,.5); }
+
+/* ======================================================================
+   Awards & Gifts, one more pass: the tab bar becomes a segmented control,
+   the Awards view loses its grey box and gets a proper toolbar card, and
+   the empty message gets a picture. Only the look changes.
+   ====================================================================== */
+
+/* ---- top tabs: a glass track, the chosen tab filled ---- */
+.award-page .aw-topbar { border-bottom: 0; align-items: center; margin: 0 0 18px; }
+.award-page .aw-toptabs {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px; border-radius: 20px;
+  background: var(--surface); border: 1px solid var(--border); box-shadow: 0 2px 10px rgba(15,23,42,.06);
+}
+.award-page .aw-toptab {
+  display: inline-flex; align-items: center; gap: 9px; margin: 0; padding: 11px 22px; border: 0; border-radius: 15px;
+  font-size: 14.5px; font-weight: 800; letter-spacing: -.1px; color: var(--text-soft); background: transparent;
+  transition: color .18s ease, background-color .18s ease, box-shadow .22s ease, transform .15s var(--ease);
+}
+.award-page .aw-toptab .aw-icon { margin: 0; }
+.award-page .aw-toptab .aw-icon svg { width: 19px; height: 19px; }
+.award-page .aw-toptabs .aw-toptab:hover:not(.is-active) { background: var(--accent-soft); color: var(--accent-ink); }
+.award-page .aw-toptabs .aw-toptab.is-active {
+  color: #fff; border-image: none; background: linear-gradient(135deg, #14B8A6, #0F766E);
+  box-shadow: 0 8px 18px rgba(15,118,110,.34), inset 0 1px 0 rgba(255,255,255,.35);
+}
+.award-page .aw-toptab:active { transform: scale(.97); }
+
+/* ---- views inside a tab: a lighter segmented row ---- */
+.award-page .aw-subtabs { border-bottom: 0; padding-bottom: 0; margin-bottom: 18px; gap: 8px; }
+.award-page .aw-subtab, .award-page .aw-utiltab { padding: 9px 18px; font-size: 13px; border-radius: 999px; background: var(--surface); }
+.award-page .aw-utiltab.is-active {
+  background: linear-gradient(135deg, var(--accent), #0E9488); border-color: transparent; color: #fff;
+  box-shadow: 0 6px 14px rgba(15,118,110,.28);
+}
+
+/* ---- Awards view: no grey box, a toolbar card, a calmer table card ---- */
+.award-page .awm-view .pom-page { background: transparent; padding: 0; height: auto; }
+.award-page .awm-view .pom-filter-card {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 14px 18px; margin-bottom: 18px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 20px; box-shadow: 0 2px 10px rgba(15,23,42,.05);
+}
+.award-page .awm-view .pom-select {
+  height: 46px; min-width: 240px; padding: 0 16px; border-radius: 14px; font-size: 14px; font-weight: 600;
+  background-color: var(--surface-alt, #f4f6fa); border: 1px solid var(--border); box-shadow: none; cursor: pointer;
+  transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease;
+}
+.award-page .awm-view .pom-select:hover { border-color: var(--accent); }
+.award-page .awm-view .pom-select:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); background-color: var(--surface); }
+.award-page .awm-view .awm-ay {
+  display: inline-flex; align-items: center; gap: 8px; margin-left: auto; padding: 8px 15px; font-size: 12.5px;
+  background: linear-gradient(135deg, #FFFBEB, #FEF3C7); border: 1px solid #FDE68A; color: #B45309;
+}
+.award-page .awm-view .awm-ay::before {
+  content: ""; width: 15px; height: 15px; background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='5' width='16' height='15' rx='2.5'/%3E%3Cpath d='M4 10h16M8.5 3v4M15.5 3v4'/%3E%3C/svg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='5' width='16' height='15' rx='2.5'/%3E%3Cpath d='M4 10h16M8.5 3v4M15.5 3v4'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.award-page .awm-view .pom-card { border-radius: 20px; border: 1px solid var(--border); box-shadow: 0 2px 10px rgba(15,23,42,.05); }
+
+/* ---- the empty message: a picture, a line ---- */
+.award-page .awm-view .pom-msg { padding: 44px 20px 40px; font-size: 14.5px; font-weight: 700; color: var(--text-soft); }
+.award-page .awm-view .pom-msg:not(.error)::before {
+  content: ""; display: block; width: 62px; height: 62px; margin: 0 auto 14px; border-radius: 20px;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 21s-7-6.200-7-11.500a7 7 0 0 1 14 0C19 14.800 12 21 12 21Z'/%3E%3Ccircle cx='12' cy='9.500' r='2.500'/%3E%3C/svg%3E") center / 30px no-repeat,
+    linear-gradient(135deg, #14B8A6, #0F766E);
+  box-shadow: 0 12px 24px rgba(15,118,110,.28), inset 0 1px 0 rgba(255,255,255,.35);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .award-page .awm-view .pom-msg:not(.error)::before { animation: aw-msg-bob 3.4s ease-in-out infinite; }
+  @keyframes aw-msg-bob { 50% { transform: translateY(-4px); } }
+}
+@media (max-width: 720px) {
+  .award-page .aw-toptabs { width: 100%; justify-content: space-between; }
+  .award-page .aw-toptab { padding: 10px 14px; flex: 1 1 auto; justify-content: center; }
+  .award-page .awm-view .pom-select { min-width: 0; width: 100%; max-width: none; }
+  .award-page .awm-view .awm-ay { margin-left: 0; }
+}
