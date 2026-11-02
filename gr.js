@@ -68,10 +68,10 @@
     function remarkCell(r, editable) {
         const has = !!r.validatorRemark;
         if (editable) {
-            return `<button type="button" class="gr-desc-btn${has ? "" : " gr-desc-btn--empty"}" data-act="remark-edit" data-id="${escHtml(r.recordId)}" title="${has ? "View / edit validator remark" : "Add a validator remark"}">${has ? "💬" : "✎"}</button>`;
+            return `<button type="button" class="gr-desc-btn${has ? "" : " gr-desc-btn--empty"}" data-act="remark-edit" data-id="${escHtml(r.recordId)}" title="${has ? "View / edit validator remark" : "Add a validator remark"}">${has ? grIc("chat") : grIc("edit")}</button>`;
         }
         return has
-            ? `<button type="button" class="gr-desc-btn" data-act="remark" data-desc="${escHtml(r.validatorRemark)}" title="View validator remark">💬</button>`
+            ? `<button type="button" class="gr-desc-btn" data-act="remark" data-desc="${escHtml(r.validatorRemark)}" title="View validator remark">${grIc("chat")}</button>`
             : `<span class="gr-muted">—</span>`;
     }
 
@@ -573,7 +573,7 @@
         const ic = grBusyEl("grBusyIcon");
         if (ic) {
             ic.className = "gr-busy-icon gr-busy-icon--ok";
-            ic.textContent = "✓";
+            ic.innerHTML = grIc("check");
             ic.style.display = "";
         }
         set("grBusyTitle", "Upload successful");
@@ -594,7 +594,7 @@
         const ic = grBusyEl("grBusyIcon");
         if (ic) {
             ic.className = "gr-busy-icon gr-busy-icon--fail";
-            ic.textContent = "!";
+            ic.innerHTML = grIc("alert");
             ic.style.display = "";
         }
         set("grBusyTitle", "NOT saved — please re-upload");
@@ -618,7 +618,7 @@
         const ic = grBusyEl("grBusyIcon");
         if (ic) {
             ic.className = "gr-busy-icon gr-busy-icon--warn";
-            ic.textContent = "?";
+            ic.innerHTML = grIc("question");
             ic.style.display = "";
         }
         set("grBusyTitle", "Could not confirm — do not re-upload yet");
@@ -1354,7 +1354,7 @@
             // It did save after all.
             adoptSavedRecord(localId, v.record);
             grBusySuccess();
-            notify("Saved ✓ (the reply was lost, but the record is on the server)", "success");
+            notify("Saved (the reply was lost, but the record is on the server)", "success");
             refreshMonthOptions();
             rerenderAll();
             return;
@@ -1471,8 +1471,8 @@
         } catch (err) {
             console.error(err);
             if (firstLoad) {
-                setEmptyBody("grMyBody", 11, "⚠️", err.message);
-                setEmptyBody("grDetailedBody", 13, "⚠️", err.message);
+                setEmptyBody("grMyBody", 11, "alert", err.message);
+                setEmptyBody("grDetailedBody", 13, "alert", err.message);
             } else {
                 notify("Refresh failed: " + err.message, "error");
             }
@@ -1606,7 +1606,7 @@
 
         el.className = "gr-banner " + (bad ? "gr-banner--fail" : "gr-banner--busy");
         el.innerHTML =
-            '<span class="gr-banner-ic">⚠</span>' +
+            '<span class="gr-banner-ic">' + grIc("alert") + '</span>' +
             '<span class="gr-banner-msg">' + escHtml(msg) + '</span>' +
             '<button type="button" class="gr-banner-btn" data-act="gotoUpload">View</button>' +
             (orphanAttempts.length
@@ -1666,11 +1666,11 @@
         }
 
         if (!mine.length) {
-            setEmptyBody("grMyBody", 11, "📂", "You haven't uploaded any GRs / Circulars yet. Click “+ Add New GR / Circular” to get started.");
+            setEmptyBody("grMyBody", 11, "folder", "You haven't uploaded any GRs / Circulars yet. Click “+ Add New GR / Circular” to get started.");
             return;
         }
         if (!shown.length) {
-            setEmptyBody("grMyBody", 11, "📭", "No uploads match the current filters.");
+            setEmptyBody("grMyBody", 11, "inbox", "No uploads match the current filters.");
             return;
         }
 
@@ -1742,13 +1742,13 @@
     function myRowHtml(r, sr) {
         let fileCell;
         if (r._sync === "uploading") {
-            fileCell = `<span class="gr-sync gr-sync--busy">⏳ Uploading…</span>`;
+            fileCell = `<span class="gr-sync gr-sync--busy">${grIc("hourglass")} Uploading…</span>`;
         } else if (r._sync === "failed") {
-            fileCell = `<button type="button" class="gr-sync gr-sync--fail" data-act="why" data-desc="${escHtml(r._syncError || "Upload failed")}" title="Tap to see why" style="font:inherit;font-size:11px;font-weight:700;border:0;cursor:pointer;">⚠ NOT saved</button>`;
+            fileCell = `<button type="button" class="gr-sync gr-sync--fail" data-act="why" data-desc="${escHtml(r._syncError || "Upload failed")}" title="Tap to see why" style="font:inherit;font-size:11px;font-weight:700;border:0;cursor:pointer;">${grIc("alert")} NOT saved</button>`;
         } else if (r._sync === "unknown") {
             fileCell = `<button type="button" class="gr-sync gr-sync--unknown" data-act="why" data-desc="${escHtml(r._syncError || "Could not confirm")}" title="Tap to see why" style="font:inherit;font-size:11px;font-weight:700;border:0;cursor:pointer;">? Unconfirmed</button>`;
         } else if (r.fileUrl) {
-            fileCell = `<a href="${escHtml(r.fileUrl)}" target="_blank" rel="noopener" class="gr-file-link gr-file-icon" title="Open file">📄</a>`;
+            fileCell = `<a href="${escHtml(r.fileUrl)}" target="_blank" rel="noopener" class="gr-file-link gr-file-icon" title="Open file">${grIc("file")}</a>`;
         } else {
             fileCell = "—";
         }
@@ -1757,8 +1757,8 @@
         if (r._sync === "failed" || r._sync === "unknown") {
             actionCell = `
                 <div class="gr-row-actions">
-                    <button class="gr-btn-mini gr-btn-retry" data-act="retry" data-id="${escHtml(r.recordId)}">↻ Retry</button>
-                    <button class="gr-btn-mini gr-btn-discard" data-act="discard" data-id="${escHtml(r.recordId)}">✕</button>
+                    <button class="gr-btn-mini gr-btn-retry" data-act="retry" data-id="${escHtml(r.recordId)}">${grIc("retry")} Retry</button>
+                    <button class="gr-btn-mini gr-btn-discard" data-act="discard" data-id="${escHtml(r.recordId)}">${grIc("x")}</button>
                 </div>`;
         } else if (r._sync === "uploading") {
             actionCell = `<span class="gr-muted">…</span>`;
@@ -1889,7 +1889,7 @@
         updateDetailedMeta(rows.length);
 
         if (!rows.length) {
-            setEmptyBody("grDetailedBody", 13, "📭", "No GRs / Circulars found for this selection.");
+            setEmptyBody("grDetailedBody", 13, "inbox", "No GRs / Circulars found for this selection.");
             return;
         }
 
@@ -1918,8 +1918,8 @@
 
     function statusChip(status) {
         const s = (status || "Pending").toLowerCase();
-        if (s === "validated") return `<span class="gr-chip gr-chip--ok gr-chip--icon" title="Validated">✔</span>`;
-        if (s === "rejected") return `<span class="gr-chip gr-chip--rej gr-chip--icon" title="Rejected">✕</span>`;
+        if (s === "validated") return `<span class="gr-chip gr-chip--ok gr-chip--icon" title="Validated">${grIc("check")}</span>`;
+        if (s === "rejected") return `<span class="gr-chip gr-chip--rej gr-chip--icon" title="Rejected">${grIc("x")}</span>`;
         return `<span class="gr-chip gr-chip--pend gr-chip--icon" title="Pending">●</span>`;
     }
 
@@ -1936,27 +1936,27 @@
             actionCell = `<span class="gr-muted">View only</span>`;
         } else if (s === "validated") {
             // Locked forever — no buttons at all.
-            actionCell = `<span class="gr-locked gr-locked--icon" title="Locked">🔒</span>`;
+            actionCell = `<span class="gr-locked gr-locked--icon" title="Locked">${grIc("lock")}</span>`;
         } else if (s === "rejected") {
             // A rejected record can still be validated later.
             actionCell = `
                 <div class="gr-row-actions">
-                    <button class="gr-btn-ok gr-btn-icon" data-act="validate" data-id="${escHtml(r.recordId)}" title="Validate">✔</button>
+                    <button class="gr-btn-ok gr-btn-icon" data-act="validate" data-id="${escHtml(r.recordId)}" title="Validate">${grIc("check")}</button>
                 </div>`;
         } else {
             actionCell = `
                 <div class="gr-row-actions">
-                    <button class="gr-btn-ok gr-btn-icon" data-act="validate" data-id="${escHtml(r.recordId)}" title="Validate">✔</button>
-                    <button class="gr-btn-rej gr-btn-icon" data-act="reject" data-id="${escHtml(r.recordId)}" title="Reject">✕</button>
+                    <button class="gr-btn-ok gr-btn-icon" data-act="validate" data-id="${escHtml(r.recordId)}" title="Validate">${grIc("check")}</button>
+                    <button class="gr-btn-rej gr-btn-icon" data-act="reject" data-id="${escHtml(r.recordId)}" title="Reject">${grIc("x")}</button>
                 </div>`;
         }
 
         let fileCell;
-        if (r._sync === "uploading") fileCell = `<span class="gr-sync gr-sync--busy">⏳</span>`;
-        else if (r._sync === "failed") fileCell = `<span class="gr-sync gr-sync--fail">⚠</span>`;
+        if (r._sync === "uploading") fileCell = `<span class="gr-sync gr-sync--busy">${grIc("hourglass")}</span>`;
+        else if (r._sync === "failed") fileCell = `<span class="gr-sync gr-sync--fail">${grIc("alert")}</span>`;
         else if (r._sync === "unknown") fileCell = `<span class="gr-sync gr-sync--unknown">?</span>`;
         else fileCell = r.fileUrl
-            ? `<a href="${escHtml(r.fileUrl)}" target="_blank" rel="noopener" class="gr-file-link gr-file-icon" title="Open file">📄</a>`
+            ? `<a href="${escHtml(r.fileUrl)}" target="_blank" rel="noopener" class="gr-file-link gr-file-icon" title="Open file">${grIc("file")}</a>`
             : "—";
 
         return `
@@ -1964,7 +1964,7 @@
             <td>${sr}</td>
             <td>${typeCell(r.type)}</td>
             <td class="gr-td-title">${escHtml(r.title)}</td>
-            <td class="gr-td-icon">${r.description ? `<button type="button" class="gr-desc-btn" data-act="desc" data-desc="${escHtml(r.description)}" title="View description">📄</button>` : `<span class="gr-muted">—</span>`}</td>
+            <td class="gr-td-icon">${r.description ? `<button type="button" class="gr-desc-btn" data-act="desc" data-desc="${escHtml(r.description)}" title="View description">${grIc("file")}</button>` : `<span class="gr-muted">—</span>`}</td>
             <td class="gr-td-date">${fmtDate(r.docDate)}</td>
             <td>${escHtml(r.district)}</td>
             <td>${stateCell(r.state)}</td>
@@ -2147,7 +2147,7 @@
             const i2 = allRecords.findIndex(r => String(r.recordId) === String(recordId));
             if (i2 >= 0) allRecords[i2] = data.record ? data.record : { ...allRecords[i2], _sync: "" };
             persistLocal();
-            notify("Remark saved ✓", "success");
+            notify("Remark saved", "success");
         } catch (err) {
             console.error(err);
             const i2 = allRecords.findIndex(r => String(r.recordId) === String(recordId));
@@ -2951,7 +2951,7 @@
         const pend = pool.filter(r => sxStatus(r) === "pend");
         if (!pend.length) {
             return sxPanel("Pending queue", "", `
-                <div class="gr-sx-allclear"><span>✓</span>Nothing is waiting for validation.</div>`);
+                <div class="gr-sx-allclear"><span>${grIc("check")}</span>Nothing is waiting for validation.</div>`);
         }
         const buckets = [
             { label: "Under 2 days", max: 2,        color: "#fcd34d" },
@@ -3371,7 +3371,7 @@
 
         if (!rows.length) {
             body.innerHTML = "<tr><td colspan=\"" + span + "\" class=\"gr-empty-cell\">" +
-                grEmptyHtml("\ud83d\udced", "No districts match these filters.") + "</td></tr>";
+                grEmptyHtml("inbox", "No districts match these filters.") + "</td></tr>";
             if (foot) foot.innerHTML = "";
             if (meta) meta.textContent = "";
             anLastView = null;   // nothing to export
@@ -3445,7 +3445,7 @@
             // master 50 that no mapping rule covers. Normally absent.
             if (unmapped) {
                 const list = [...unmappedNames].sort().join(", ");
-                html += ' <span class="gr-an-warn" title="These uploads are not counted in the table above, because their district is not one of the 50. Correct the district in the sheet, or tell me to add a mapping rule.">\u26a0 ' +
+                html += ' <span class="gr-an-warn" title="These uploads are not counted in the table above, because their district is not one of the 50. Correct the district in the sheet, or tell me to add a mapping rule.">' + grIc("alert") + ' ' +
                         unmapped + " upload" + (unmapped === 1 ? "" : "s") +
                         " not counted — unknown district: " + escHtml(list) + "</span>";
             }
@@ -3453,7 +3453,7 @@
             // so they are left out while a date filter is on — said plainly
             // rather than silently.
             if (noUploadDate) {
-                html += ' <span class="gr-an-warn" title="These records have no upload timestamp in the sheet, so they cannot be matched against a date range. Clear the dates to include them.">\u26a0 ' +
+                html += ' <span class="gr-an-warn" title="These records have no upload timestamp in the sheet, so they cannot be matched against a date range. Clear the dates to include them.">' + grIc("alert") + ' ' +
                         noUploadDate + " record" + (noUploadDate === 1 ? "" : "s") +
                         " skipped — no upload date recorded</span>";
             }
@@ -3742,15 +3742,40 @@
     /* ====================================================
        SHARED RENDER HELPERS
     ==================================================== */
-    function grEmptyHtml(icon, msg) {
-        return `<div class="gr-empty"><div class="gr-empty-icon">${icon}</div>${escHtml(msg)}</div>`;
+    /* Small drawn pictures used instead of emoji. */
+const GR_IC = {
+  upload:   '<path d="M12 15V5m0 0 4 4m-4-4-4 4M5 19h14"/>',
+  download: '<path d="M12 4v10m0 0 4-4m-4 4-4-4M5 19h14"/>',
+  list:     '<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
+  chart:    '<path d="M5 20V11M12 20V5M19 20v-7"/>',
+  trend:    '<path d="m3 17 6-6 4 4 8-8M15 7h6v6"/>',
+  chat:     '<path d="M4 5h16v11H9l-5 4z"/>',
+  edit:     '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
+  file:     '<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 16h5"/>',
+  folder:   '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  inbox:    '<path d="M4 13l2.5-7.5A2 2 0 0 1 8.4 4h7.2a2 2 0 0 1 1.9 1.5L20 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M4 13h4.5A1.5 1.5 0 0 1 10 14.5a2 2 0 0 0 4 0 1.5 1.5 0 0 1 1.5-1.5H20"/>',
+  alert:    '<path d="M12 4 2.5 20h19z"/><path d="M12 10v4.5M12 17.5v.01"/>',
+  hourglass:'<path d="M6 3h12M6 21h12M7 3c0 5 5 6 5 9s-5 4-5 9M17 3c0 5-5 6-5 9s5 4 5 9"/>',
+  lock:     '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  check:    '<path d="m5 12.5 4.500 4.500L19 7.500"/>',
+  x:        '<path d="m7 7 10 10M17 7 7 17"/>',
+  retry:    '<path d="M20 11a8 8 0 1 0-2.300 5.700M20 4v7h-7"/>',
+  clear:    '<path d="M4 4v6h6M4.500 10a8 8 0 1 1-.5 4"/>',
+  question: '<circle cx="12" cy="12" r="9"/><path d="M9.500 9a2.500 2.500 0 0 1 5 .5c0 1.500-2.500 2-2.500 3.500M12 17v.01"/>'
+};
+function grIc(name) {
+  return '<svg class="gr-i" viewBox="0 0 24 24" aria-hidden="true">' + (GR_IC[name] || "") + "</svg>";
+}
+
+function grEmptyHtml(icon, msg) {
+        return `<div class="gr-empty"><div class="gr-empty-icon">${GR_IC[icon] ? grIc(icon) : icon}</div>${escHtml(msg)}</div>`;
     }
     function setEmptyBody(tbodyId, colspan, icon, msg) {
         const b = document.getElementById(tbodyId);
         if (b) b.innerHTML = `<tr><td colspan="${colspan}" class="gr-empty-cell">${grEmptyHtml(icon, msg)}</td></tr>`;
     }
     function setLoadingBody(tbodyId, colspan, msg) {
-        setEmptyBody(tbodyId, colspan, "⏳", msg);
+        setEmptyBody(tbodyId, colspan, "hourglass", msg);
     }
 
 })();

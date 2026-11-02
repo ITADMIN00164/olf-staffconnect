@@ -213,8 +213,11 @@ if (sidebarToggleBtn && appSidebar && appBody) {
     appSidebar.classList.remove("collapsed");          // old icon-rail mode is retired
     try { localStorage.removeItem("olf_sidebar_collapsed"); } catch (e) {}
 
-    let pinned = false;
-    try { pinned = localStorage.getItem("olf_sidebar_pinned") === "1"; } catch (e) {}
+    // The menu always rests as a slim rail and opens when pointed at, so there
+    // is nothing left to pin. An old saved "pinned" choice is forgotten.
+    const pinned = false;
+    try { localStorage.removeItem("olf_sidebar_pinned"); } catch (e) {}
+    appBody.classList.add("sb-auto");
     let openTimer = null, closeTimer = null;
 
     const isAuto = () => appBody.classList.contains("sb-auto");
@@ -254,13 +257,7 @@ if (sidebarToggleBtn && appSidebar && appBody) {
     };
     paintPin();
 
-    sidebarToggleBtn.addEventListener("click", () => {
-        pinned = !pinned;
-        try { localStorage.setItem("olf_sidebar_pinned", pinned ? "1" : "0"); } catch (e) {}
-        paintPin();
-        if (pinned) appBody.classList.remove("sb-auto", "sb-open");   // dock it
-        else autoHide();
-    });
+    sidebarToggleBtn.addEventListener("click", () => setOpen(!appBody.classList.contains("sb-open")));
 
     // Choosing a page tucks the menu away.
     appSidebar.addEventListener("click", (e) => {
@@ -285,8 +282,15 @@ if (sidebarToggleBtn && appSidebar && appBody) {
             }
         });
     }
-    appSidebar.addEventListener("mouseenter", () => clearTimeout(closeTimer));
+    // Resting as a slim rail, the menu opens when you point at it.
+    appSidebar.addEventListener("mouseenter", () => {
+        clearTimeout(closeTimer);
+        if (!isAuto() || appBody.classList.contains("sb-open")) return;
+        clearTimeout(openTimer);
+        openTimer = setTimeout(() => { if (!dialogOpen()) setOpen(true); }, 140);
+    });
     appSidebar.addEventListener("mouseleave", () => {
+        clearTimeout(openTimer);
         if (!isAuto()) return;
         closeTimer = setTimeout(() => setOpen(false), 280);
     });
@@ -306,13 +310,58 @@ if (sidebarToggleBtn && appSidebar && appBody) {
 }
 
 /* ====================================
+   TOP BAR THAT GETS OUT OF THE WAY
+   Scrolling down tucks it away so the page gets the height; scrolling up,
+   or moving the pointer to the very top edge, brings it back. It is always
+   shown at the top of a page and whenever a page is opened.
+==================================== */
+(function () {
+    const bar  = document.querySelector(".topbar");
+    const area = document.getElementById("pageContent");
+    if (!bar || !area) return;
+
+    const last = new WeakMap();
+    let hidden = false;
+    const show = (on) => {
+        if (on === !hidden) return;
+        hidden = !on;
+        document.body.style.setProperty("--tb-h", bar.offsetHeight + "px");
+        document.body.classList.toggle("tb-hidden", hidden);
+    };
+    window.olfTopbarShow = () => show(true);
+
+    // scroll does not bubble, but it can be caught on the way down, so a page
+    // that scrolls inside itself (like HO Plan) is covered too
+    area.addEventListener("scroll", (e) => {
+        const el = e.target;
+        if (!el || el === document) return;
+        const y = el.scrollTop || 0;
+        const before = last.has(el) ? last.get(el) : y;
+        last.set(el, y);
+        const d = y - before;
+        if (y < 24) show(true);
+        else if (d > 10) show(false);
+        else if (d < -10) show(true);
+    }, true);
+
+    document.addEventListener("mousemove", (e) => { if (hidden && e.clientY <= 8) show(true); });
+    document.addEventListener("focusin", (e) => { if (hidden && bar.contains(e.target)) show(true); });
+})();
+
+/* ====================================
    IN-APP NOTIFICATIONS
    Replaces native alert()/confirm() with
    styled, in-app toasts and a modal so
    users never see a browser popup.
 ==================================== */
 
-const NOTIFY_ICONS = { success: "✅", error: "⛔", warning: "⚠️", info: "ℹ️" };
+// Drawn, not emoji: a filled disc or triangle with a white mark.
+const NOTIFY_ICONS = {
+    success: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#22C55E"/><path d="m7.5 12.5 3 3 6-6.500" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    error:   '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#EF4444"/><path d="m8.500 8.500 7 7M15.500 8.500l-7 7" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>',
+    warning: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 1.800 20.500h20.400z" fill="#F59E0B" stroke="#F59E0B" stroke-width="1.600" stroke-linejoin="round"/><path d="M12 9.500v5M12 17.500v.01" stroke="#fff" stroke-width="2.400" stroke-linecap="round"/></svg>',
+    info:    '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#4F8EF7"/><path d="M12 11v6M12 7.500v.01" stroke="#fff" stroke-width="2.400" stroke-linecap="round"/></svg>'
+};
 
 // Lightweight toast for quick, non-blocking feedback (auto-dismisses).
 function notify(message, type = "info", duration = 4500) {
@@ -343,7 +392,7 @@ function showAppAlert({ title = "Notice", message = "", type = "info", list = nu
         const modal = document.getElementById("appMsgModal");
         if (!modal) { console.log(`[${type}] ${title}: ${message}`); resolve(true); return; }
 
-        document.getElementById("appMsgIcon").textContent  = NOTIFY_ICONS[type] || NOTIFY_ICONS.info;
+        document.getElementById("appMsgIcon").innerHTML  = NOTIFY_ICONS[type] || NOTIFY_ICONS.info;
         document.getElementById("appMsgIcon").className    = `app-msg-icon app-msg-icon--${type}`;
         document.getElementById("appMsgTitle").textContent = title;
         document.getElementById("appMsgText").innerHTML    = escHtml(message).replace(/\n/g, "<br>");
@@ -377,7 +426,7 @@ function showAppConfirm({ title = "Please confirm", message = "", type = "warnin
         const modal = document.getElementById("appMsgModal");
         if (!modal) { resolve(window.confirm(message)); return; }
 
-        document.getElementById("appMsgIcon").textContent  = NOTIFY_ICONS[type] || NOTIFY_ICONS.warning;
+        document.getElementById("appMsgIcon").innerHTML  = NOTIFY_ICONS[type] || NOTIFY_ICONS.warning;
         document.getElementById("appMsgIcon").className    = `app-msg-icon app-msg-icon--${type}`;
         document.getElementById("appMsgTitle").textContent = title;
         document.getElementById("appMsgText").innerHTML    = escHtml(message).replace(/\n/g, "<br>");
@@ -1575,8 +1624,8 @@ function stopWatchingPageAccess() {
     applyPageAccessNav();
 }
 
-// Paint every menu item: users see switched-off pages greyed out with a
-// lock; IT Admin gets a toggle on each item instead.
+// Paint every menu item: pages IT Admin has switched off are simply not in
+// a user's menu; IT Admin still sees them (greyed) with a toggle on each item.
 function applyPageAccessNav() {
     const sidebar = document.getElementById("appSidebar");
     if (!sidebar) return;
@@ -1590,23 +1639,16 @@ function applyPageAccessNav() {
         const lockedForMe = !on && !admin;
 
         btn.classList.toggle("nav-item--locked", lockedForMe);
+        btn.classList.toggle("nav-item--locked-hidden", lockedForMe);   // a user never sees a closed page
         btn.classList.toggle("nav-item--locked-admin", !on && admin);
         btn.setAttribute("aria-disabled", lockedForMe ? "true" : "false");
         btn.title = on ? label
             : (admin ? `${label} - hidden from users (only IT Admin can open it)`
                      : `${label} - temporarily unavailable`);
 
-        // Lock badge: users only (IT Admin reads the toggle instead).
-        let lock = btn.querySelector(".nav-lock");
-        if (lockedForMe && !lock) {
-            lock = document.createElement("span");
-            lock.className = "nav-lock";
-            lock.setAttribute("aria-hidden", "true");
-            lock.textContent = "🔒";
-            btn.appendChild(lock);
-        } else if (!lockedForMe && lock) {
-            lock.remove();
-        }
+        // No lock badge any more: a closed page is not shown to users at all.
+        const oldLock = btn.querySelector(".nav-lock");
+        if (oldLock) oldLock.remove();
 
         // IT Admin toggle. It sits beside the menu button (never inside it,
         // a button can't hold another control), in a shared row.
@@ -1645,7 +1687,7 @@ async function setPageEnabled(page, on) {
     if (!on) {
         const ok = await showAppConfirm({
             title: `Hide ${label} from users?`,
-            message: `Users will see ${label} greyed out in the menu and won't be able to open it. Anyone on it now is sent to Home. You can still open it.`,
+            message: `${label} will disappear from the menu for users and they won't be able to open it. Anyone on it now is sent to Home. You can still open it.`,
             type: "warning",
             confirmText: "Hide from users"
         });
@@ -1833,6 +1875,7 @@ window.navigate = async function (page) {
         }
     }
     currentPage = page;
+    if (window.olfTopbarShow) window.olfTopbarShow();
 
     // Google Analytics: one page_view per Staff Connect page opened
     trackEvent("page_view", {
@@ -2002,6 +2045,7 @@ const HM_ICON_PATHS = {
     calendar:  '<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M8.5 3v4M15.5 3v4"/>',
     megaphone: '<path d="M4 10v4a1 1 0 0 0 1 1h2l5 4V5L7 9H5a1 1 0 0 0-1 1z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/>',
     trash:     '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+    alert:     '<path d="M12 4 2.500 20h19z"/><path d="M12 10v4.500M12 17.500v.01"/>',
     inbox:     '<path d="M4 13l2.5-7.5A2 2 0 0 1 8.4 4h7.2a2 2 0 0 1 1.9 1.5L20 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M4 13h4.5A1.5 1.5 0 0 1 10 14.5a2 2 0 0 0 4 0 1.5 1.5 0 0 1 1.5-1.5H20"/>'
 };
 function hmIcon(name) {
@@ -2417,6 +2461,7 @@ function syncEmpFilterBar() {
         }).join("") + (keys.length > 1
             ? `<button type="button" class="emp-filter-clear" data-clear-filters>Clear all</button>` : "");
     }
+    requestAnimationFrame(() => requestAnimationFrame(fitEmpTable));
 }
 
 function empSortValue(emp, key) {
@@ -2496,6 +2541,20 @@ function sortableTh(key, label, cls) {
         title="Sort by ${label}">${label}<span class="sort-mark">${mark}</span></th>`;
 }
 
+/* The table takes whatever height the window has left below the banner, the
+   figures and the toolbar, so as many people as fit are on screen without
+   scrolling the page. It is worked out again when the window, the filters or
+   the rows change. */
+function fitEmpTable() {
+    const wrap = document.querySelector(".employees-page .table-wrap");
+    const area = document.getElementById("pageContent");
+    if (!wrap || !area || !wrap.offsetParent) return;
+    const top  = wrap.getBoundingClientRect().top - area.getBoundingClientRect().top + area.scrollTop;
+    const room = area.clientHeight - top - 46;              // the card's own padding and the page's bottom gap
+    wrap.style.maxHeight = Math.max(300, Math.floor(room)) + "px";
+}
+window.addEventListener("resize", () => requestAnimationFrame(fitEmpTable));
+
 function renderEmployees() {
     const searchBox = document.getElementById("searchBox");
     const tableHead = document.getElementById("tableHead");
@@ -2541,6 +2600,7 @@ function renderEmployees() {
         </tr>
     `;
 
+    requestAnimationFrame(fitEmpTable);
     if (filtered.length === 0) {
         tableEl.innerHTML = `
             <tr><td colspan="${colCount}">
@@ -3979,15 +4039,15 @@ async function renderNewsBanners() {
             const endVal   = n.endDateTime   || n.endDate;
             return `
             <div class="news-banner">
-                <div class="news-banner-icon">📢</div>
+                <div class="news-banner-icon">${hmIcon("megaphone")}</div>
                 <div class="news-banner-body">
                     <div class="news-banner-label">Announcement</div>
                     ${newsBody(n, "news-banner-text")}
-                    <div class="news-banner-dates">📅 ${formatNewsDateTime(startVal, false)} – ${formatNewsDateTime(endVal, true)}</div>
+                    <div class="news-banner-dates">${hmIcon("calendar")} ${formatNewsDateTime(startVal, false)} – ${formatNewsDateTime(endVal, true)}</div>
                 </div>
                 ${currentRole === "Admin" ? `
                 <div class="news-banner-actions">
-                    <button class="btn-delete-news" data-newsid="${n.id}">🗑 Delete</button>
+                    <button class="btn-delete-news" data-newsid="${n.id}">${hmIcon("trash")} Delete</button>
                 </div>` : ""}
             </div>
         `;
@@ -4158,7 +4218,7 @@ async function renderNewsCards() {
         console.error("News cards load failed:", err);
         grid.innerHTML = `
             <div class="news-empty-state">
-                <div class="news-empty-icon">⚠️</div>
+                <div class="news-empty-icon">${hmIcon("alert")}</div>
                 Failed to load announcements.
             </div>`;
     }

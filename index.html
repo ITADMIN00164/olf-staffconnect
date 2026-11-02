@@ -2896,6 +2896,14 @@
     }
     @media (max-width: 640px) { .pg-stats { grid-template-columns: 1fr; } .pg-hero-ico { width: 48px; height: 48px; border-radius: 16px; } .pg-hero-ico svg { width: 30px; height: 30px; } }
 
+    /* drawn status pictures in toasts, message windows and the menu lock */
+    .app-toast-icon svg { width: 18px; height: 18px; display: block; margin-top: 1px; }
+    .app-msg-icon svg { width: 30px; height: 30px; display: block; }
+    .nav-item .nav-lock svg { width: 13px; height: 13px; display: block; }
+
+    /* a page IT Admin has closed is not in a user's menu at all */
+    #appSidebar .nav-item.nav-item--locked-hidden { display: none !important; }
+
     /* profile chip */
     .tp-avatar { position: relative; width: 32px; height: 32px; font-size: 12px; box-shadow: 0 0 0 2px var(--chrome-bg, #fff), 0 0 0 3.5px rgba(79,142,247,.55), 0 4px 10px rgba(79,142,247,.35); }
     .tp-avatar::after {
@@ -2978,6 +2986,44 @@
         .app-body:not(.sb-auto) #appSidebar.sb-admin .nav-row > .nav-item { padding-right: 10px; }
         .app-body.sb-auto #appSidebar.sb-admin { width: 232px; }
     }
+
+    /* ======================================================================
+       Using the space: the menu rests as a slim icon rail (the pages get
+       almost the full width) and opens over the page when you point at it;
+       the top bar slides away when you scroll down and comes back when you
+       scroll up or touch the top edge. Docked (pinned) menus are unchanged.
+       ====================================================================== */
+    @media (min-width: 769px) {
+        html[data-theme] .app-body.sb-auto #appSidebar {
+            transform: none; width: 72px; padding: 12px 8px 10px; overflow: hidden;
+            transition: width .26s cubic-bezier(.2,.8,.2,1), box-shadow .26s ease;
+        }
+        html[data-theme] .app-body.sb-auto #appSidebar.sb-admin { width: 72px; }
+        html[data-theme] .app-body.sb-auto.sb-open #appSidebar,
+        html[data-theme] .app-body.sb-auto.sb-open #appSidebar.sb-admin { width: 232px; }
+        html[data-theme] .app-body.sb-auto > .content-area { margin-left: 72px; }
+        html[data-theme] .app-body.sb-auto .sidebar-edge { display: none; }
+
+        /* the words and extras appear only while it is open */
+        #appSidebar .nav-item .label, #appSidebar .sidebar-menu-title { white-space: nowrap; transition: opacity .18s ease; }
+        .app-body.sb-auto:not(.sb-open) #appSidebar .nav-item .label,
+        .app-body.sb-auto:not(.sb-open) #appSidebar .sidebar-menu-title,
+        .app-body.sb-auto:not(.sb-open) #appSidebar .nav-access-toggle,
+        .app-body.sb-auto:not(.sb-open) #appSidebar .nav-lock { opacity: 0; width: 0; overflow: hidden; display: none; }
+        .app-body.sb-auto:not(.sb-open) #appSidebar .nav-item { justify-content: center; gap: 0; padding-left: 0; padding-right: 0; }
+        .app-body.sb-auto:not(.sb-open) #appSidebar .nav-row > .nav-item { padding-right: 0; }
+        .app-body.sb-auto:not(.sb-open) #appSidebar .sidebar-toggle-row { justify-content: center; padding: 0; }
+        .app-body.sb-auto.sb-open #appSidebar .nav-item .label { opacity: 1; }
+    }
+
+    /* nothing to pin any more: the menu is always a rail that opens on hover */
+    #appSidebar .sidebar-pin-btn { display: none; }
+    @media (min-width: 769px) { .app-body.sb-auto:not(.sb-open) #appSidebar .sidebar-toggle-row { display: none; } }
+
+    /* the top bar tucks away while you read */
+    html[data-theme] .topbar { transition: margin-top .3s cubic-bezier(.2,.8,.2,1), opacity .22s ease; }
+    body.tb-hidden .topbar { margin-top: calc(var(--tb-h, 58px) * -1); opacity: 0; pointer-events: none; }
+    @media (prefers-reduced-motion: reduce) { html[data-theme] .topbar, html[data-theme] .app-body.sb-auto #appSidebar { transition: none; } }
 
     /* ── Layer order for the floating menu ──
        page content (sticky bars, dropdowns…)  <  edge tab (450)
@@ -3130,7 +3176,7 @@
 <!-- The ?v= is bumped whenever award.css or award.js changes: without it
      a browser keeps the copy it already has, and the tab carries on
      behaving as it did before the change. -->
-<link rel="stylesheet" href="award.css?v=2026-11-02k">
+<link rel="stylesheet" href="award.css?v=2026-11-02l">
 <link rel="stylesheet" href="award-manage.css?v=2026-10-26g">
 <link rel="stylesheet" href="award-dash.css?v=2026-10-29a">
 <link rel="stylesheet" href="award-event.css?v=2026-10-26e">
@@ -3283,7 +3329,7 @@
         </button>
     </div>
 
-    <div class="app-body">
+    <div class="app-body sb-auto">
 
         <!-- Hover strip on the left edge: brings the auto-hidden menu back. -->
         <div class="sidebar-edge" id="sidebarEdge" role="button" tabindex="0"
@@ -3428,7 +3474,7 @@
 <!-- Generic in-app message / confirm modal (replaces native alert()/confirm()) -->
 <div id="appMsgModal" class="modal-overlay">
     <div class="modal-box app-msg-box">
-        <div class="app-msg-icon" id="appMsgIcon">ℹ️</div>
+        <div class="app-msg-icon" id="appMsgIcon"></div>
         <div class="app-msg-title" id="appMsgTitle">Notice</div>
         <div class="app-msg-text" id="appMsgText"></div>
         <ul class="app-msg-list" id="appMsgList" style="display:none;"></ul>
@@ -3439,24 +3485,24 @@
     </div>
 </div>
 
-<script type="module" src="app.js?v=2026-11-02o"></script>
+<script type="module" src="app.js?v=2026-11-02t"></script>
 <script src="profile.js"></script>
 <script src="pom.js"></script>
 <script src="calendar.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="sg-supabase.js"></script>
-<script src="smartgoal.js"></script>
-<script src="gr.js?v=2026-10-28b"></script>
+<script src="smartgoal.js?v=2026-11-02z"></script>
+<script src="gr.js?v=2026-11-02f"></script>
 <script src="forms.js"></script>
 <!-- ARCHIVED 2026-10-07: <script src="po.js"></script> - old PO Review page, no longer loaded. -->
 <script src="pos-supabase.js"></script>
-<script src="pos.js"></script>
-<script src="pos-review.js"></script>
+<script src="pos.js?v=2026-11-02f"></script>
+<script src="pos-review.js?v=2026-11-02f"></script>
 <script src="award.js?v=2026-11-02c"></script>
-<script src="award-manage.js?v=2026-11-02c"></script>
+<script src="award-manage.js?v=2026-11-02d"></script>
 <script src="award-dash.js?v=2026-10-31a"></script>
-<script src="award-event.js?v=2026-10-30f"></script>
-<script src="award-append.js?v=2026-10-27b"></script>
+<script src="award-event.js?v=2026-11-02a"></script>
+<script src="award-append.js?v=2026-11-02a"></script>
 <script src="award-admin.js?v=2026-10-26e"></script>
 <script src="team-performance-data.js?v=20261023e"></script>
 <script src="team-performance.js?v=20261023e"></script>

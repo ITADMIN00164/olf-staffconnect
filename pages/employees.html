@@ -1104,7 +1104,7 @@ html[data-theme="dark"] .employees-page { --row-hover: #283042; --row-line: rgba
 
 /* table */
 .employees-page table { width: 100%; }
-.employees-page .table-wrap { max-height: max(340px, calc(100vh - 480px)); border-radius: 16px; border: 1px solid var(--row-line); }
+.employees-page .table-wrap { max-height: max(300px, calc(100vh - 400px)); border-radius: 16px; border: 1px solid var(--row-line); }
 .employees-page th {
     padding: 13px 16px; font-size: 11px; font-weight: 800; letter-spacing: .07em; color: var(--text-soft);
     background: var(--th-bg); border-bottom: 1px solid var(--row-line);
@@ -1154,6 +1154,31 @@ html[data-theme="dark"] .employees-page { --row-hover: #283042; --row-line: rgba
 .employees-page .empty-state .emp-empty-title { display: block; font-size: 15px; font-weight: 800; color: var(--text); margin-bottom: 3px; }
 .employees-page .emp-spin { display: block; width: 30px; height: 30px; margin: 0 auto 12px; border-radius: 50%; border: 3px solid color-mix(in srgb, var(--brand, #4F8EF7) 22%, transparent); border-top-color: var(--brand, #4F8EF7); animation: emp-spin .8s linear infinite; }
 @keyframes emp-spin { to { transform: rotate(360deg); } }
+
+
+/* ---- a tighter page, so seven or more people are on screen at once ---- */
+.employees-page .pg-hero { padding: 14px 24px; margin-bottom: 14px; gap: 10px 20px; border-radius: 18px; }
+.employees-page .pg-hero-ico { width: 44px; height: 44px; border-radius: 14px; }
+.employees-page .pg-hero-ico svg { width: 28px; height: 28px; }
+.employees-page .pg-hero-title { font-size: 24px; letter-spacing: -.6px; margin: 0 0 2px; }
+.employees-page .pg-hero-sub { font-size: 13px; }
+.employees-page .pg-hero .pg-btn { min-height: 38px; padding: 0 15px; font-size: 13px; border-radius: 12px; }
+.employees-page .pg-stats { gap: 12px; margin-bottom: 14px; }
+.employees-page .pg-stat { padding: 11px 18px; gap: 12px; border-radius: 16px; }
+.employees-page .pg-stat-icon { width: 42px; height: 42px; border-radius: 13px; }
+.employees-page .pg-stat-icon svg { width: 26px; height: 26px; }
+.employees-page .pg-stat-value { font-size: 24px; letter-spacing: -.6px; }
+.employees-page .pg-stat-label { margin-top: 3px; font-size: 12px; }
+.employees-page .card { padding: 14px 16px 16px; border-radius: 20px; }
+.employees-page .table-toolbar { margin-bottom: 10px; }
+.employees-page .search-input, .employees-page .btn-filters, .employees-page .btn-excel { height: 40px; }
+.employees-page .emp-chips { margin: 0 0 10px; }
+.employees-page th { padding: 9px 14px; }
+.employees-page td { padding: 7px 14px; font-size: 13px; }
+.employees-page .emp-av { width: 28px; height: 28px; font-size: 11px; }
+.employees-page .emp-person { gap: 9px; }
+.employees-page .badge-dept, .employees-page .badge-status { padding-top: 2px; padding-bottom: 2px; }
+.employees-page .btn-edit, .employees-page .btn-delete { width: 28px; height: 28px; }
 
 @media (prefers-reduced-motion: no-preference) {
     .employees-page .card { animation: emp-in .55s cubic-bezier(.22,1,.36,1) .3s backwards; }

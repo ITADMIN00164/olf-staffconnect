@@ -12,10 +12,10 @@
   --text:      #1A2533;
   --text2:     #5A6B7A;
   --text3:     #8A9AAA;
-  --brand:        #0D6B5E;
-  --brand-dark:   #084D44;
-  --brand-lt:     #E8F5F3;
-  --brand-border: #1A8577;
+  --brand:        #2F6FE4;
+  --brand-dark:   #2457C5;
+  --brand-lt:     #EEF4FF;
+  --brand-border: #7FA6F0;
   --green:  #3F6B2A; --green-lt:  #D7E6CF; --green-bd: #A8C596;
   --amber:  #C07C0A; --amber-lt:  #FDF3E2; --amber-bd: #E7C287;
   --red:    #C0392B; --red-lt:    #F8E3E0; --red-bd:   #E0AEA6;
@@ -23,8 +23,8 @@
   --slate:  #5A6B7A; --slate-lt:  #F7FAFC; --slate-bd: #D8E4EC;
   --violet: #4C1D95; --violet-lt: #F5F3FF; --violet-bd:#C4B5FD;
   --col-a-hd: #1F3F6E;   --col-a-hdt:#DCE7F5;   --col-a-bg: #EEF4FB;
-  --col-b-hd: #084D44;   --col-b-hdt:#E8F5F3;   --col-b-bg: #F2FAF9;
-  --col-c-hd: #084D44;   --col-c-hdt:#E8F5F3;   --col-c-bg: #F2FAF9;
+  --col-b-hd: #2457C5;   --col-b-hdt:#EEF4FF;   --col-b-bg: #F3F7FF;
+  --col-c-hd: #0B7A67;   --col-c-hdt:#E6F7F3;   --col-c-bg: #F2FAF9;
   --col-d-hd: #8A5A06;   --col-d-hdt:#FDF3E2;   --col-d-bg: #FFFBF3;
   --col-e-hd: #1A2533;   --col-e-hdt:#F4F7FA;   --col-e-bg: #F7FAFC;
   --radius:    6px;
@@ -33,7 +33,7 @@
 }
 
 #sg-app * { box-sizing: border-box; margin: 0; padding: 0; }
-#sg-app { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+#sg-app { font-family: inherit; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 
 /* Host override: this app is injected into .content-area, which has its own
    padding + scroll. Cancel those so #sg-app fills the pane and owns its scroll,
@@ -175,7 +175,7 @@
 /* ── BUTTONS ── */
 #sg-app .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius); font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: all .15s; font-family: inherit; }
 #sg-app .btn-primary { background: var(--brand); color: #fff; border-color: var(--brand); }
-#sg-app .btn-primary:hover { background: #063F37; }
+#sg-app .btn-primary:hover { background: #2457C5; }
 #sg-app .btn-secondary { background: var(--surface); color: var(--text2); border-color: var(--border2); }
 #sg-app .btn-secondary:hover { background: var(--surface2); }
 #sg-app .btn-save { background: #EFF6FF; color: var(--blue); border-color: var(--blue-bd); }
@@ -199,8 +199,8 @@
 /* compact date chip in the plan table */
 #sg-app .sg-date-btn { background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius); padding: 3px 8px; font-size: 11px; font-family: inherit; color: var(--text2); cursor: pointer; white-space: nowrap; }
 #sg-app .sg-date-btn:hover { background: var(--brand-lt); color: var(--brand); border-color: var(--brand); }
-#sg-app .plan-tbl .col-hd .h-plan { background: #2E5FA3; color: #DCE7F5; }
-#sg-app .plan-tbl .col-hd .h-status { background: #1A8577; color: #E8F5F3; }
+#sg-app .plan-tbl .col-hd .h-plan { background: #3A6FD1; color: #E4EDFF; }
+#sg-app .plan-tbl .col-hd .h-status { background: #0B8F7A; color: #E6F7F3; }
 #sg-app .plan-tbl .col-hd .h-act { background: #33404D; color: #F4F7FA; }
 #sg-app .plan-tbl .col-hd .h-mgr { background: #7E5FB0; color: #F0EAF9; }
 
@@ -327,9 +327,9 @@
 #sg-app .sg-sum-hd { background: linear-gradient(180deg, var(--brand) 0%, var(--brand-dark, var(--brand)) 100%); color: #fff; }
 #sg-app .sg-sum-hd > div { padding: 10px 14px; font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
 #sg-app .sg-sum-row { cursor: pointer; transition: background .12s; }
-#sg-app .sg-sum-row > div { padding: 8px 12px; border-bottom: 1px solid rgba(13,107,94,0.08); }
+#sg-app .sg-sum-row > div { padding: 8px 12px; border-bottom: 1px solid rgba(47,111,228,0.08); }
 #sg-app .sg-sum-row.alt > div { background: rgba(255,255,255,0.42); }
-#sg-app .sg-sum-row:hover > div { background: rgba(13,107,94,0.07); }
+#sg-app .sg-sum-row:hover > div { background: rgba(47,111,228,0.07); }
 #sg-app .sg-sum-row.open > div { background: var(--brand-lt); }
 #sg-app .sg-sum-total { background: var(--surface2); font-weight: 700; }
 #sg-app .sg-sum-total > div { padding: 8px 12px; }
@@ -466,7 +466,7 @@
    radius, motion. No selector renamed, no element removed, no
    handler touched — delete this block to get the old look back.
 
-   The brand green already in the tokens (--brand #0D6B5E) is
+   The brand green already in the tokens (--brand #2F6FE4) is
    the anchor; the canvas carries a low-opacity green field so
    the translucent surfaces have something to sit on.
 ========================================================== */
@@ -485,14 +485,14 @@
   --sg-glass:        rgba(255,255,255,0.74);
   --sg-glass-strong: rgba(255,255,255,0.88);
   --sg-edge:         rgba(255,255,255,0.85);
-  --sg-hair:         rgba(13,107,94,0.12);
+  --sg-hair:         rgba(47,111,228,0.12);
   --sg-shadow-sm:    0 1px 2px rgba(8,77,68,0.05), 0 1px 3px rgba(8,77,68,0.06);
   --sg-shadow-md:    0 2px 4px rgba(8,77,68,0.05), 0 8px 22px rgba(8,77,68,0.09);
   --sg-shadow-lg:    0 12px 30px rgba(8,77,68,0.15), 0 2px 8px rgba(8,77,68,0.07);
   --sg-ease:         cubic-bezier(0.4, 0, 0.2, 1);
 
   background:
-    radial-gradient(760px 520px at 4% -6%,   rgba(13,107,94,0.34),  transparent 58%),
+    radial-gradient(760px 520px at 4% -6%,   rgba(47,111,228,0.34),  transparent 58%),
     radial-gradient(900px 620px at 100% 2%,  rgba(26,133,119,0.30), transparent 60%),
     radial-gradient(680px 640px at 74% 108%, rgba(63,107,42,0.20),  transparent 62%),
     linear-gradient(180deg, #EAF4F1 0%, #D8E7E5 100%);
@@ -507,15 +507,15 @@
   box-shadow: 0 1px 16px rgba(8,77,68,0.08);
 }
 #sg-app .nav-tab { position: relative; border-bottom-color: transparent; }
-#sg-app .nav-tab:hover { background: rgba(13,107,94,0.06); color: var(--brand); }
-#sg-app .nav-tab.active { background: rgba(13,107,94,0.07); font-weight: 600; }
+#sg-app .nav-tab:hover { background: rgba(47,111,228,0.06); color: var(--brand); }
+#sg-app .nav-tab.active { background: rgba(47,111,228,0.07); font-weight: 600; }
 /* The underline becomes a rounded, softly lit bar */
 #sg-app .nav-tab.active::after {
   content: "";
   position: absolute; left: 14px; right: 14px; bottom: 0;
   height: 2.5px; border-radius: 3px 3px 0 0;
   background: linear-gradient(90deg, var(--brand), var(--brand-border));
-  box-shadow: 0 0 10px rgba(13,107,94,0.45);
+  box-shadow: 0 0 10px rgba(47,111,228,0.45);
 }
 
 /* ── Left sidebar ─────────────────────────────────────── */
@@ -531,14 +531,14 @@
 #sg-app .sb-dept-hd:hover { transform: translateX(2px); }
 #sg-app .sb-dept-icon {
   background: linear-gradient(135deg, var(--brand), var(--brand-border));
-  box-shadow: 0 2px 8px rgba(13,107,94,0.30);
+  box-shadow: 0 2px 8px rgba(47,111,228,0.30);
   border-radius: 6px;
 }
 #sg-app .sb-dept-children { background: rgba(232,245,243,0.45); border-top-color: var(--sg-hair); }
 #sg-app .sb-member { transition: background .12s var(--sg-ease), transform .12s var(--sg-ease); }
 #sg-app .sb-member:hover { transform: translateX(2px); }
 #sg-app .sb-divider { background: var(--sg-hair); }
-#sg-app .sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(13,107,94,0.22); }
+#sg-app .sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(47,111,228,0.22); }
 
 /* ── Cards ────────────────────────────────────────────── */
 #sg-app .card {
@@ -572,7 +572,7 @@
   box-shadow: var(--sg-shadow-md), inset 0 1px 0 rgba(255,255,255,0.85);
 }
 #sg-app .metric-val { font-variant-numeric: tabular-nums; letter-spacing: -0.6px; }
-#sg-app .bar { background: rgba(13,107,94,0.10); height: 5px; border-radius: 3px; }
+#sg-app .bar { background: rgba(47,111,228,0.10); height: 5px; border-radius: 3px; }
 
 /* ── Filter bar: loose selects become one glass strip ─── */
 #sg-app .filter-bar {
@@ -594,7 +594,7 @@
 #sg-app .filter-bar select:focus {
   outline: none;
   border-color: var(--brand);
-  box-shadow: 0 0 0 3px rgba(13,107,94,0.14);
+  box-shadow: 0 0 0 3px rgba(47,111,228,0.14);
 }
 
 /* ── Tables ───────────────────────────────────────────── */
@@ -609,10 +609,10 @@
   border-bottom: none;
   box-shadow: inset 0 -1px 0 rgba(255,255,255,0.12);
 }
-#sg-app .tbl td { border-bottom: 1px solid rgba(13,107,94,0.08); }
+#sg-app .tbl td { border-bottom: 1px solid rgba(47,111,228,0.08); }
 #sg-app .tbl tbody tr:nth-child(even) td { background: rgba(255,255,255,0.42); }
 #sg-app .tbl tbody tr { transition: background .12s var(--sg-ease); }
-#sg-app .tbl tr:hover td { background: rgba(13,107,94,0.07); }
+#sg-app .tbl tr:hover td { background: rgba(47,111,228,0.07); }
 
 /* ── Buttons ──────────────────────────────────────────── */
 #sg-app .btn { transition: transform .14s var(--sg-ease), box-shadow .14s var(--sg-ease), background .14s var(--sg-ease), border-color .14s var(--sg-ease); }
@@ -621,9 +621,9 @@
 #sg-app .btn-primary {
   background: linear-gradient(180deg, var(--brand-border), var(--brand));
   border-color: var(--brand);
-  box-shadow: 0 2px 8px rgba(13,107,94,0.28);
+  box-shadow: 0 2px 8px rgba(47,111,228,0.28);
 }
-#sg-app .btn-primary:hover { box-shadow: 0 4px 14px rgba(13,107,94,0.34); }
+#sg-app .btn-primary:hover { box-shadow: 0 4px 14px rgba(47,111,228,0.34); }
 #sg-app .btn-secondary {
   background: rgba(255,255,255,0.85);
   border-color: var(--sg-hair);
@@ -638,15 +638,15 @@
 /* ── Inputs inside tables ─────────────────────────────── */
 #sg-app .tbl-input:focus {
   border-color: var(--brand);
-  box-shadow: 0 0 0 3px rgba(13,107,94,0.14);
+  box-shadow: 0 0 0 3px rgba(47,111,228,0.14);
 }
 
 /* ── Page scrollbar ───────────────────────────────────── */
-#sg-app .page-content { scrollbar-width: thin; scrollbar-color: rgba(13,107,94,0.25) transparent; }
+#sg-app .page-content { scrollbar-width: thin; scrollbar-color: rgba(47,111,228,0.25) transparent; }
 #sg-app .page-content::-webkit-scrollbar { width: 8px; }
 #sg-app .page-content::-webkit-scrollbar-track { background: transparent; }
-#sg-app .page-content::-webkit-scrollbar-thumb { background: rgba(13,107,94,0.22); border-radius: 4px; }
-#sg-app .page-content::-webkit-scrollbar-thumb:hover { background: rgba(13,107,94,0.34); }
+#sg-app .page-content::-webkit-scrollbar-thumb { background: rgba(47,111,228,0.22); border-radius: 4px; }
+#sg-app .page-content::-webkit-scrollbar-thumb:hover { background: rgba(47,111,228,0.34); }
 
 /* ── Motion preferences ───────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
@@ -670,7 +670,7 @@
    added a lit bar as well. Kill the border and keep the bar. */
 #sg-app .nav-tab.active { border-bottom-color: transparent; background: transparent; }
 #sg-app .nav-tab.active::after { left: 12px; right: 12px; height: 2.5px; }
-#sg-app .nav-tab:hover { background: rgba(13,107,94,0.05); }
+#sg-app .nav-tab:hover { background: rgba(47,111,228,0.05); }
 
 /* ── 2. Neutrals into the green family ───────────────────
    --border was a pale blue-grey that disappeared against the
@@ -685,16 +685,16 @@
   --bg:       #EAF4F1;
 }
 
-/* ── 3. Column bands: navy / violet -> one green scale ────
+/* ── 3. Column bands: one blue scale with a teal accent ────
    These tokens are read by smartgoal.js when it builds the
    grouped table headers, so retinting them here retints every
    band without touching the table code.                     */
 #sg-app {
-  --col-a-hd:  #12544D;  --col-a-hdt: #DDF0EC;  --col-a-bg: #EDF6F4;
-  --col-b-hd:  #0D6B5E;  --col-b-hdt: #E8F5F3;  --col-b-bg: #F1FAF8;
-  --col-c-hd:  #1A8577;  --col-c-hdt: #EAF7F5;  --col-c-bg: #F3FBF9;
-  --col-d-hd:  #4E7A2E;  --col-d-hdt: #F0F7E9;  --col-d-bg: #F5FAF1;
-  --col-e-hd:  #274B45;  --col-e-hdt: #EAF2F0;  --col-e-bg: #F4F8F7;
+  --col-a-hd:  #2457C5;  --col-a-hdt: #E4EDFF;  --col-a-bg: #F1F6FF;
+  --col-b-hd:  #2F6FE4;  --col-b-hdt: #EEF4FF;  --col-b-bg: #F3F7FF;
+  --col-c-hd:  #0B8F7A;  --col-c-hdt: #E6F7F3;  --col-c-bg: #F1FAF8;
+  --col-d-hd:  #B7791F;  --col-d-hdt: #FFF6E3;  --col-d-bg: #FFFAF0;
+  --col-e-hd:  #334155;  --col-e-hdt: #EEF2F7;  --col-e-bg: #F5F7FA;
 }
 /* The grouped review table hard-codes two band tints; re-declare
    them here so they join the same green scale. */
@@ -702,7 +702,7 @@
 #sg-app .tbl.tbl-grouped tbody td:nth-child(4),
 #sg-app .tbl.tbl-grouped tbody td:nth-child(5),
 #sg-app .tbl.tbl-grouped tbody td:nth-child(6),
-#sg-app .tbl.tbl-grouped tbody td:nth-child(7) { background: #EDF6F4; }
+#sg-app .tbl.tbl-grouped tbody td:nth-child(7) { background: #F1F6FF; }
 #sg-app .tbl.tbl-grouped tbody td:nth-child(8) { background: #E4F3EF; }
 
 /* ── 4. Dropdowns that belong to the page ────────────────
@@ -728,7 +728,7 @@
   background-repeat: no-repeat;
   background-position: right 10px center;
   padding-right: 28px;
-  border: 1px solid rgba(13,107,94,0.14);
+  border: 1px solid rgba(47,111,228,0.14);
   border-radius: 8px;
   color: var(--text);
   font-weight: 500;
@@ -749,7 +749,7 @@
 #sg-app select.tbl-input:focus {
   outline: none;
   border-color: var(--brand);
-  box-shadow: 0 0 0 3px rgba(13,107,94,0.15);
+  box-shadow: 0 0 0 3px rgba(47,111,228,0.15);
 }
 /* The open list is drawn by the OS; these are the parts a
    browser will honour. */
@@ -765,7 +765,7 @@
 /* Text inputs in the filter strip match the selects */
 #sg-app .filter-bar input {
   background: rgba(255,255,255,0.62);
-  border: 1px solid rgba(13,107,94,0.14);
+  border: 1px solid rgba(47,111,228,0.14);
   border-radius: 8px;
   padding: 7px 10px;
   font-family: inherit;
@@ -777,7 +777,7 @@
 #sg-app .filter-bar input:hover { background: rgba(255,255,255,0.9); border-color: var(--brand-border); }
 #sg-app .filter-bar input:focus {
   outline: none; border-color: var(--brand);
-  box-shadow: 0 0 0 3px rgba(13,107,94,0.15);
+  box-shadow: 0 0 0 3px rgba(47,111,228,0.15);
   background: #fff;
 }
 
@@ -791,18 +791,18 @@
   box-shadow: var(--sg-shadow-lg);
   padding: 12px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(13,107,94,0.25) transparent;
+  scrollbar-color: rgba(47,111,228,0.25) transparent;
 }
 #sg-app .cols-panel::-webkit-scrollbar { width: 7px; }
 #sg-app .cols-panel::-webkit-scrollbar-track { background: transparent; }
-#sg-app .cols-panel::-webkit-scrollbar-thumb { background: rgba(13,107,94,0.22); border-radius: 4px; }
+#sg-app .cols-panel::-webkit-scrollbar-thumb { background: rgba(47,111,228,0.22); border-radius: 4px; }
 #sg-app .cols-panel-group {
   color: var(--brand);
-  border-bottom: 1px solid rgba(13,107,94,0.12);
+  border-bottom: 1px solid rgba(47,111,228,0.12);
   padding-bottom: 4px;
 }
 #sg-app .cols-panel label { border-radius: 7px; padding: 4px 6px; transition: background .12s var(--sg-ease); }
-#sg-app .cols-panel label:hover { background: rgba(13,107,94,0.07); color: var(--brand); }
+#sg-app .cols-panel label:hover { background: rgba(47,111,228,0.07); color: var(--brand); }
 #sg-app .cols-panel input[type="checkbox"] { accent-color: var(--brand); }
 
 /* ── 5b. Legend dots ─────────────────────────────────────
@@ -816,9 +816,9 @@
 #sg-app .col-legend-dot { border-radius: 3px; box-shadow: 0 1px 2px rgba(8,77,68,0.2); }
 
 /* ── 6. Panels JS builds from the tokens above ───────────── */
-#sg-app .sg-detail-panel { border-color: rgba(13,107,94,0.18); }
+#sg-app .sg-detail-panel { border-color: rgba(47,111,228,0.18); }
 #sg-app .review-section-hd { color: var(--text); }
-#sg-app .sg-review-hd:hover { background: rgba(13,107,94,0.05); }
+#sg-app .sg-review-hd:hover { background: rgba(47,111,228,0.05); }
 
 
 /* ── Ticket Flow (Back Office - IT Ops) ─────────────────── */
@@ -924,6 +924,75 @@
 #sg-app .tf-drawer .tf-tl-item { font-size: .95em; }
 #sg-app .tf-drawer .tf-tl-sub { font-size: .82em; }
 #sg-app .tf-drawer .tf-dur { font-size: .8em; }
+
+/* ======================================================================
+   HO Plan & Review, in the same look as the other pages: the top bar is the
+   shared blue-to-teal banner, the tabs are pills on it, cards and buttons
+   are rounder, the accents are the brand blue. Only the look changes.
+   ====================================================================== */
+#sg-app .sg-i { width: 15px; height: 15px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -3px; }
+#sg-app { background: transparent; }
+
+#sg-app .app-nav {
+  height: 64px; padding: 0 24px; gap: 14px; border-bottom: 0; position: relative; z-index: 5;
+  background: linear-gradient(120deg, #2457C5 0%, #2F6FE4 40%, #0B8F7A 100%);
+  box-shadow: 0 10px 24px rgba(36,87,197,.28), inset 0 1px 0 rgba(255,255,255,.3);
+}
+#sg-app .nav-brand { margin-right: 14px; color: #fff; font-size: 17px; letter-spacing: -.4px; }
+#sg-app .nav-brand span { color: rgba(255,255,255,.85); }
+#sg-app .nav-tabs { gap: 4px; padding: 4px; border-radius: 16px; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.3); }
+#sg-app .nav-tab {
+  height: 36px; padding: 0 16px; border: 0; border-radius: 12px; font-weight: 700; color: rgba(255,255,255,.92);
+  transition: background-color .15s ease, color .15s ease, box-shadow .2s ease;
+}
+#sg-app .nav-tab:hover { background: rgba(255,255,255,.18); color: #fff; }
+#sg-app .nav-tab.active { background: #fff; color: #2457C5; border-bottom-color: transparent; box-shadow: 0 6px 14px rgba(15,23,42,.18); }
+#sg-app #nav-dept-label { color: rgba(255,255,255,.9) !important; font-weight: 600; }
+#sg-app .nav-right .btn-secondary, #sg-app .dept-selector {
+  background: rgba(255,255,255,.17); border: 1px solid rgba(255,255,255,.36); color: #fff; border-radius: 12px; box-shadow: inset 0 1px 0 rgba(255,255,255,.3);
+}
+#sg-app .nav-right .btn-secondary:hover { background: rgba(255,255,255,.28); }
+#sg-app .dept-selector label, #sg-app .dept-selector select { color: #fff; }
+#sg-app .dept-selector select option { color: #1A2533; }
+
+/* sidebar, cards, buttons */
+#sg-app .sidebar { background: var(--surface); border-right: 1px solid var(--border); }
+#sg-app .sb-dept-hd.active-dept, #sg-app .sb-all.active-dept { background: linear-gradient(135deg, rgba(79,142,247,.16), rgba(16,177,151,.12)); color: var(--brand-dark); }
+#sg-app .sb-dept-icon { background: linear-gradient(135deg, #4F8EF7, #2F6FE4); border-radius: 8px; }
+#sg-app .sb-all-icon .sg-i { width: 18px; height: 18px; }
+#sg-app .card { border-radius: 16px; border-color: var(--border); box-shadow: 0 2px 6px rgba(15,23,42,.04), 0 12px 26px -18px rgba(15,23,42,.18); }
+#sg-app .card-header { background: linear-gradient(180deg, rgba(79,142,247,.06), transparent); }
+#sg-app .btn { border-radius: 11px; transition: transform .15s ease, box-shadow .2s ease, background-color .15s ease; }
+#sg-app .btn:not(:disabled):hover { transform: translateY(-1px); }
+#sg-app .btn:not(:disabled):active { transform: scale(.97); }
+#sg-app .btn-primary { background: linear-gradient(135deg, #4F8EF7, #2F6FE4); border-color: transparent; box-shadow: 0 6px 14px rgba(47,111,228,.28); }
+#sg-app .btn-primary:hover { background: linear-gradient(135deg, #4F8EF7, #2F6FE4); box-shadow: 0 10px 20px rgba(47,111,228,.36); }
+#sg-app .dash-subtab-btn.active { background: linear-gradient(135deg, #4F8EF7, #2F6FE4); color: #fff; border-color: transparent; box-shadow: 0 6px 14px rgba(47,111,228,.28); }
+#sg-app .empty-icon { display: grid; place-items: center; width: 62px; height: 62px; margin: 0 auto 12px; border-radius: 20px; font-size: 0; color: #fff;
+  background: linear-gradient(135deg, #4F8EF7, #10B197); box-shadow: 0 10px 22px rgba(47,111,228,.28), inset 0 1px 0 rgba(255,255,255,.4); }
+#sg-app .empty-icon .sg-i { width: 30px; height: 30px; stroke-width: 1.8; vertical-align: 0; }
+#sg-app .btn .sg-i, #sg-app .tf-chip .sg-i, #sg-app .sg-date-btn .sg-i { vertical-align: -3px; }
+#sg-app .tf-chip .sg-i { width: 12px; height: 12px; }
+
+
+/* ---- final pass: coloured KPI cards, stronger page titles ---- */
+#sg-app .metric-card { position: relative; overflow: hidden; border-radius: 16px; box-shadow: 0 2px 6px rgba(15,23,42,.04), 0 10px 22px -16px rgba(15,23,42,.2); }
+#sg-app .metric-card::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 4px; background: var(--mc, linear-gradient(90deg, #4F8EF7, #10B197)); }
+#sg-app .metrics-row .metric-card:nth-child(2) { --mc: var(--green); }
+#sg-app .metrics-row .metric-card:nth-child(3) { --mc: var(--amber); }
+#sg-app .metrics-row .metric-card:nth-child(4) { --mc: var(--red); }
+#sg-app .metrics-row .metric-card:nth-child(5) { --mc: var(--blue); }
+#sg-app .metrics-row .metric-card:nth-child(6) { --mc: var(--red); }
+#sg-app .metrics-row .metric-card:nth-child(7) { --mc: #7C3AED; }
+#sg-app .metrics-row .metric-card:nth-child(8) { --mc: #0B8F7A; }
+#sg-app .metric-label { color: var(--text2); }
+#sg-app .page > div:first-child > h1 { font-size: 24px !important; font-weight: 800 !important; letter-spacing: -.6px !important; }
+#sg-app .tbl th { background: linear-gradient(180deg, #3A6FD1, #2457C5); }
+
+@media (max-width: 900px) {
+  #sg-app .app-nav { height: auto; flex-wrap: wrap; padding: 10px 14px; }
+  #sg-app .nav-tabs { order: 3; width: 100%; overflow-x: auto; }
+}
 </style>
 <nav class="app-nav">
   <div class="nav-brand">OLF <span>Tracker</span></div>
@@ -936,7 +1005,7 @@
   </div>
   <div class="nav-right" style="display:flex;align-items:center;gap:8px">
     <button class="btn btn-secondary btn-sm" id="sg-refresh-btn" onclick="sgRefresh()" title="Reload the latest data from the server (no page reload needed)">
-      <span class="sg-refresh-ico">⟳</span> Refresh
+      <span class="sg-refresh-ico"><svg class="sg-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.300 5.700M20 4v7h-7"/></svg></span> Refresh
     </button>
     <span style="font-size:11px;color:var(--text3)" id="nav-dept-label"></span>
     <div id="user-badge" style="display:flex;align-items:center"></div>
@@ -1008,8 +1077,8 @@
       <select id="tf-pri" onchange="tfRender()" style="display:none"><option value="">Any priority</option></select>
       <input id="tf-q" type="text" placeholder="Search ticket ID / name…" oninput="tfRender()" style="min-width:190px">
       <span style="margin-left:auto;display:flex;gap:8px">
-        <button class="btn btn-secondary btn-sm" id="tf-rep-btn" onclick="tfToggleReport()" title="Task summary (Total, Closed, SLA Met) for a date range, as an Excel file">📊 Summary report</button>
-        <button class="btn btn-secondary btn-sm" id="tf-cfg-btn" onclick="tfToggleConfig()">⚙ Configuration</button>
+        <button class="btn btn-secondary btn-sm" id="tf-rep-btn" onclick="tfToggleReport()" title="Task summary (Total, Closed, SLA Met) for a date range, as an Excel file"><svg class="sg-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V5M19 20v-7"/></svg> Summary report</button>
+        <button class="btn btn-secondary btn-sm" id="tf-cfg-btn" onclick="tfToggleConfig()"><svg class="sg-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.600 5.600l2.100 2.100M16.300 16.300l2.100 2.100M18.400 5.600l-2.100 2.100M7.700 16.300l-2.100 2.100"/></svg> Configuration</button>
       </span>
     </div>
     <div class="card" id="tf-report" style="display:none;margin-bottom:16px">
@@ -1023,7 +1092,7 @@
             <button class="btn btn-secondary btn-sm" onclick="tfReportPreset('last')">Last month</button>
             <button class="btn btn-secondary btn-sm" onclick="tfReportPreset('30')">Last 30 days</button>
           </span>
-          <button class="btn btn-primary btn-sm" onclick="tfDownloadReport()" style="margin-left:auto">⬇ Download Excel</button>
+          <button class="btn btn-primary btn-sm" onclick="tfDownloadReport()" style="margin-left:auto"><svg class="sg-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10m0 0 4-4m-4 4-4-4M5 19h14"/></svg> Download Excel</button>
         </div>
         <div class="tbl-wrap"><table class="tbl" id="tf-rep-table"><thead><tr><th>S.no</th><th>Task List</th><th class="tf-num">Total</th><th class="tf-num">Closed</th><th class="tf-num">SLA Met</th></tr></thead><tbody id="tf-rep-body"></tbody></table></div>
         <div class="tf-note" id="tf-rep-note" style="margin-top:8px"></div>
@@ -1059,7 +1128,7 @@
           </div>
           <span style="display:flex;gap:8px;align-items:center">
             <select id="tf-psize" onchange="tfRender()" class="tf-psize"><option value="10">10 / page</option><option value="20">20 / page</option></select>
-            <button class="btn btn-secondary btn-sm" onclick="tfExportExcel()" title="Exports every ticket in the current tab and filters">⬇ Excel</button>
+            <button class="btn btn-secondary btn-sm" onclick="tfExportExcel()" title="Exports every ticket in the current tab and filters"><svg class="sg-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10m0 0 4-4m-4 4-4-4M5 19h14"/></svg> Excel</button>
           </span>
         </div>
         <div class="card-body">
@@ -1111,17 +1180,17 @@
     </div>
     <div style="display:flex;gap:8px;align-items:center">
       <div class="cols-panel-wrap">
-        <button class="btn btn-secondary" onclick="toggleColsPanel()">☰ Columns</button>
+        <button class="btn btn-secondary" onclick="toggleColsPanel()"><svg class="sg-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.500" y="4" width="17" height="16" rx="2"/><path d="M9.500 4v16M15 4v16"/></svg> Columns</button>
         <div class="cols-panel" id="cols-panel"></div>
       </div>
-      <button class="btn btn-secondary" onclick="exportPlanExcel()" title="Download the current view as Excel">⬇ Excel</button>
+      <button class="btn btn-secondary" onclick="exportPlanExcel()" title="Download the current view as Excel"><svg class="sg-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10m0 0 4-4m-4 4-4-4M5 19h14"/></svg> Excel</button>
       <button class="btn btn-primary" onclick="openAddTask()">+ Add Task</button>
     </div>
   </div>
 
   <div class="col-legend">
     <div class="col-legend-item"><div class="col-legend-dot" style="background:#2E5FA3"></div>Plan</div>
-    <div class="col-legend-item"><div class="col-legend-dot" style="background:#1A8577"></div>Status Update</div>
+    <div class="col-legend-item"><div class="col-legend-dot" style="background:#0B8F7A"></div>Status Update</div>
     <div class="col-legend-item"><div class="col-legend-dot" style="background:#33404D"></div>Actions</div>
   </div>
 
@@ -1322,7 +1391,7 @@
     </div>
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeModal('success-measures-modal')">Close</button>
-      <button class="btn btn-secondary" id="sm-edit-btn" onclick="sgEditSuccessMeasures()">✏️ Edit</button>
+      <button class="btn btn-secondary" id="sm-edit-btn" onclick="sgEditSuccessMeasures()"><svg class="sg-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.500 6.500 4 4"/></svg> Edit</button>
       <button class="btn btn-primary" id="sm-save-btn" onclick="sgSaveSuccessMeasures()" style="display:none">Save</button>
     </div>
   </div>
@@ -1405,7 +1474,7 @@
         <span style="color:var(--green);font-weight:600">Member Score</span> = filled by team member &nbsp;·&nbsp;
         <span style="color:var(--blue);font-weight:600">Manager Score</span> = filled by Dept Head / Admin.
       </p>
-      <button class="btn btn-secondary" style="margin-bottom:14px" onclick="loadGoalsForReview()">⟳ Load Goals</button>
+      <button class="btn btn-secondary" style="margin-bottom:14px" onclick="loadGoalsForReview()"><svg class="sg-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.300 5.700M20 4v7h-7"/></svg> Load Goals</button>
       <div id="review-assist"></div>
       <div id="review-score-table"></div>
     </div>
@@ -1518,3 +1587,6 @@
 
 <div class="sg-loader-overlay" id="sg-loader"><div class="sg-spinner"></div></div>
 </div>
+
+<!-- Local Live Server adds its reload script at the closing body tag; this gives it a safe place. -->
+</body>

@@ -206,7 +206,7 @@ function renderBlocksTable() {
 
     if (posData.blocks.length === 0) {
         tbody.innerHTML = `<tr><td colspan="4" class="empty-state">
-            <div class="empty-icon">🗺️</div>No blocks yet. Add a state, then a district, then a block.
+            <div class="empty-icon"><span class="fr-ico fr-i-pin" aria-hidden="true"></span></div>No blocks yet. Add a state, then a district, then a block.
         </td></tr>`;
     } else {
         tbody.innerHTML = posData.blocks.map(b => {
@@ -218,8 +218,8 @@ function renderBlocksTable() {
                 <td>${escHtml(dName)}</td>
                 <td>${escHtml(b.name)}</td>
                 <td class="pos-col-actions">
-                    <button class="pos-icon-btn edit" title="Edit" onclick="window.POSAdmin.openEditBlockModal(${b.id})">✏️</button>
-                    <button class="pos-icon-btn delete" title="Delete" onclick="window.POSAdmin.deleteBlock(${b.id})">🗑️</button>
+                    <button class="pos-icon-btn edit" title="Edit" onclick="window.POSAdmin.openEditBlockModal(${b.id})"></button>
+                    <button class="pos-icon-btn delete" title="Delete" onclick="window.POSAdmin.deleteBlock(${b.id})"></button>
                 </td>
             </tr>`;
         }).join("");
@@ -243,7 +243,7 @@ function renderAssignmentsTable() {
 
     if (posData.assignments.length === 0) {
         tbody.innerHTML = `<tr><td colspan="5" class="empty-state">
-            <div class="empty-icon">👤</div>No assignments yet.
+            <div class="empty-icon"><span class="fr-ico fr-i-users" aria-hidden="true"></span></div>No assignments yet.
         </td></tr>`;
     } else {
         tbody.innerHTML = posData.assignments.map(a => {
@@ -256,8 +256,8 @@ function renderAssignmentsTable() {
                 <td>${escHtml(a.designation)}</td>
                 <td>${statusBadge}</td>
                 <td class="pos-col-actions">
-                    <button class="pos-icon-btn edit" title="Edit" onclick="window.POSAdmin.openAssignmentModal(${a.id})">✏️</button>
-                    ${a.status !== "resigned" ? `<button class="pos-icon-btn delete" title="Mark Resigned" onclick="window.POSAdmin.markResigned(${a.id})">🗑️</button>` : ""}
+                    <button class="pos-icon-btn edit" title="Edit" onclick="window.POSAdmin.openAssignmentModal(${a.id})"></button>
+                    ${a.status !== "resigned" ? `<button class="pos-icon-btn delete" title="Mark Resigned" onclick="window.POSAdmin.markResigned(${a.id})"></button>` : ""}
                 </td>
             </tr>`;
         }).join("");
@@ -2039,7 +2039,7 @@ function renderAliasTable() {
                + "— fine when it's one person spelled several ways, wrong when they're different people" : ""));
 
     if (!rows.length) {
-        tbody.innerHTML = `<tr><td colspan="5" class="empty-state"><div class="empty-icon">\u{1F517}</div>`
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-state"><div class="empty-icon"><span class="fr-ico fr-i-link" aria-hidden="true"></span></div>`
             + (aliasRows.length ? "No mapping matches." : "No name mappings saved yet.") + "</td></tr>";
         return;
     }
@@ -2055,8 +2055,8 @@ function renderAliasTable() {
             <td>${escHtml(r.emp_id)}${who ? ` <span style="color:#9ca3af;">${escHtml(who)}</span>` : ` <span style="color:#b45309;">not in assignments</span>`}</td>
             <td>${shared.length ? `<span style="color:#b45309;font-size:11.5px;">also mapped from: ${escHtml(shared.join(", "))}</span>` : ""}</td>
             <td class="pos-col-actions">
-                <button class="pos-icon-btn edit" title="Re-map" onclick="window.POSAdmin.editAlias('${escHtml(String(r.id))}')">✏️</button>
-                <button class="pos-icon-btn delete" title="Delete" onclick="window.POSAdmin.deleteAlias('${escHtml(String(r.id))}')">\u{1F5D1}️</button>
+                <button class="pos-icon-btn edit" title="Re-map" onclick="window.POSAdmin.editAlias('${escHtml(String(r.id))}')"></button>
+                <button class="pos-icon-btn delete" title="Delete" onclick="window.POSAdmin.deleteAlias('${escHtml(String(r.id))}')"></button>
             </td>
         </tr>`;
     }).join("");
@@ -2530,7 +2530,7 @@ function renderAcademicTable() {
         return [r.po_id, r.po_name, r.district, r.program_name, r.test_cycle].some(v => String(v || "").toLowerCase().includes(q));
     });
     if (!rows.length) {
-        tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="empty-icon">🎓</div>${acadRows.length ? "No rows match." : "No academic plan yet. Upload the Academic Targets Excel."}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="empty-icon"><span class="fr-ico fr-i-cap" aria-hidden="true"></span></div>${acadRows.length ? "No rows match." : "No academic plan yet. Upload the Academic Targets Excel."}</td></tr>`;
     } else {
         tbody.innerHTML = rows.map(r => `<tr>
             <td>${escHtml(r.po_id)}</td><td>${escHtml(r.po_name)}</td><td>${escHtml(r.district)}</td>
@@ -2538,8 +2538,8 @@ function renderAcademicTable() {
             <td>${escHtml(r.fixed_date || "")}</td>
             <td>${r.plan_month ? escHtml(acadMonthLabel(r.plan_month)) : '<span class="pos-acad-warn" title="No usable Fixed Date or Preferred Month">Needs attention</span>'}</td>
             <td class="pos-col-actions">
-                <button class="pos-icon-btn edit" title="Edit" onclick="window.POSAdmin.openAcadModal(${r.id})">✏️</button>
-                <button class="pos-icon-btn delete" title="Delete" onclick="window.POSAdmin.deleteAcadRow(${r.id})">🗑️</button>
+                <button class="pos-icon-btn edit" title="Edit" onclick="window.POSAdmin.openAcadModal(${r.id})"></button>
+                <button class="pos-icon-btn delete" title="Delete" onclick="window.POSAdmin.deleteAcadRow(${r.id})"></button>
             </td></tr>`).join("");
     }
     const noMonth = acadRows.filter(r => !r.plan_month).length;
@@ -2871,7 +2871,7 @@ function renderTargetsTable() {
     const flags = tgtBlockCheck(tgtRows);
     const rows = tgtRows.filter(r => !q || [r.po_id, r.po_name, r.district, r.pm].some(v => String(v || "").toLowerCase().includes(q)));
     if (!rows.length) {
-        tbody.innerHTML = `<tr><td colspan="${TGT_NUM.length + 5}" class="empty-state"><div class="empty-icon">🎯</div>`
+        tbody.innerHTML = `<tr><td colspan="${TGT_NUM.length + 5}" class="empty-state"><div class="empty-icon"><span class="fr-ico fr-i-target" aria-hidden="true"></span></div>`
             + (tgtMonths.length ? "No rows match." : "No targets yet. Pick a month and upload the targets Excel.") + "</td></tr>";
     } else {
         tbody.innerHTML = rows.map(r => {
@@ -2884,8 +2884,8 @@ function renderTargetsTable() {
                     const shown = v == null ? "" : (isNaN(Number(v)) ? escHtml(v) : Number(v).toLocaleString("en-IN", { maximumFractionDigits: 4 }));   // display only
                     return `<td class="pos-num${v === 0 ? " pos-zero" : ""}">${v == null ? "" : shown + (c.pct ? "%" : "")}</td>`;
                 }).join("")
-                + `<td class="pos-col-actions"><button class="pos-icon-btn edit" title="Edit" onclick="window.POSAdmin.openTgtModal(${r.id})">✏️</button>`
-                + `<button class="pos-icon-btn delete" title="Delete" onclick="window.POSAdmin.deleteTgtRow(${r.id})">🗑️</button></td></tr>`;
+                + `<td class="pos-col-actions"><button class="pos-icon-btn edit" title="Edit" onclick="window.POSAdmin.openTgtModal(${r.id})"></button>`
+                + `<button class="pos-icon-btn delete" title="Delete" onclick="window.POSAdmin.deleteTgtRow(${r.id})"></button></td></tr>`;
         }).join("");
     }
     const flagged = rows.filter(r => (flags[r.id] || []).length).length;
@@ -3149,7 +3149,7 @@ function renderLastUpload(elId, entries, deleteFnName) {
         <span>${when}</span>
         ${more}
         <button class="pos-icon-btn delete" title="Delete this upload"
-            onclick="window.POSAdmin.${deleteFnName}(${e.year},${e.month},${e.week})">🗑️</button>
+            onclick="window.POSAdmin.${deleteFnName}(${e.year},${e.month},${e.week})"></button>
     </div>`;
 }
 
