@@ -2008,17 +2008,6 @@ function hmIcon(name) {
     return '<svg class="hm-i" viewBox="0 0 24 24" aria-hidden="true">' + HM_ICON_PATHS[name] + "</svg>";
 }
 
-// The small picture beside the greeting follows the time of day.
-function homeGreetIconFor(date) {
-    const h = date.getHours();
-    if (h >= 5 && h < 17) {
-        return '<svg viewBox="0 0 24 24" aria-hidden="true"><g class="hm-rays"><path d="M12 2.5V5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M18.7 5.3l-1.8 1.8M7.1 16.9l-1.8 1.8"/></g><circle cx="12" cy="12" r="4.2"/></svg>';
-    }
-    if (h >= 17 && h < 20) {
-        return '<svg viewBox="0 0 24 24" aria-hidden="true"><g class="hm-rays"><path d="M12 5V3M5.6 8.6 4.2 7.2M18.4 8.6l1.4-1.4M3 15H5M19 15h2"/></g><path d="M7.5 15a4.5 4.5 0 0 1 9 0M3 19h18"/></svg>';
-    }
-    return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/><path class="hm-twinkle" d="M17 3v3M15.5 4.5h3"/></svg>';
-}
 function homeGreetingFor(date) {
     const h = date.getHours();
     return h < 5 ? "Hello" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : h < 22 ? "Good evening" : "Hello";
@@ -2038,9 +2027,6 @@ function startHomeClock() {
         if (date) date.textContent = now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
         const greet = document.getElementById("homeGreeting");
         if (greet) greet.textContent = homeGreetingFor(now);
-        const gico = document.getElementById("homeGreetIcon");
-        const gkey = homeGreetIconFor(now);
-        if (gico && gico.dataset.k !== gkey) { gico.innerHTML = gkey; gico.dataset.k = gkey; }
     };
     tick();
     homeClockTimer = setInterval(tick, 1000);
