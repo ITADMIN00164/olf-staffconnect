@@ -2896,6 +2896,11 @@
     }
     @media (max-width: 640px) { .pg-stats { grid-template-columns: 1fr; } .pg-hero-ico { width: 48px; height: 48px; border-radius: 16px; } .pg-hero-ico svg { width: 30px; height: 30px; } }
 
+    /* drawn status pictures in toasts, message windows and the menu lock */
+    .app-toast-icon svg { width: 18px; height: 18px; display: block; margin-top: 1px; }
+    .app-msg-icon svg { width: 30px; height: 30px; display: block; }
+    .nav-item .nav-lock svg { width: 13px; height: 13px; display: block; }
+
     /* profile chip */
     .tp-avatar { position: relative; width: 32px; height: 32px; font-size: 12px; box-shadow: 0 0 0 2px var(--chrome-bg, #fff), 0 0 0 3.5px rgba(79,142,247,.55), 0 4px 10px rgba(79,142,247,.35); }
     .tp-avatar::after {
@@ -3130,7 +3135,7 @@
 <!-- The ?v= is bumped whenever award.css or award.js changes: without it
      a browser keeps the copy it already has, and the tab carries on
      behaving as it did before the change. -->
-<link rel="stylesheet" href="award.css?v=2026-11-02k">
+<link rel="stylesheet" href="award.css?v=2026-11-02l">
 <link rel="stylesheet" href="award-manage.css?v=2026-10-26g">
 <link rel="stylesheet" href="award-dash.css?v=2026-10-29a">
 <link rel="stylesheet" href="award-event.css?v=2026-10-26e">
@@ -3428,7 +3433,7 @@
 <!-- Generic in-app message / confirm modal (replaces native alert()/confirm()) -->
 <div id="appMsgModal" class="modal-overlay">
     <div class="modal-box app-msg-box">
-        <div class="app-msg-icon" id="appMsgIcon">ℹ️</div>
+        <div class="app-msg-icon" id="appMsgIcon"></div>
         <div class="app-msg-title" id="appMsgTitle">Notice</div>
         <div class="app-msg-text" id="appMsgText"></div>
         <ul class="app-msg-list" id="appMsgList" style="display:none;"></ul>
@@ -3439,7 +3444,7 @@
     </div>
 </div>
 
-<script type="module" src="app.js?v=2026-11-02o"></script>
+<script type="module" src="app.js?v=2026-11-02p"></script>
 <script src="profile.js"></script>
 <script src="pom.js"></script>
 <script src="calendar.js"></script>
@@ -3453,10 +3458,10 @@
 <script src="pos.js"></script>
 <script src="pos-review.js"></script>
 <script src="award.js?v=2026-11-02c"></script>
-<script src="award-manage.js?v=2026-11-02c"></script>
+<script src="award-manage.js?v=2026-11-02d"></script>
 <script src="award-dash.js?v=2026-10-31a"></script>
-<script src="award-event.js?v=2026-10-30f"></script>
-<script src="award-append.js?v=2026-10-27b"></script>
+<script src="award-event.js?v=2026-11-02a"></script>
+<script src="award-append.js?v=2026-11-02a"></script>
 <script src="award-admin.js?v=2026-10-26e"></script>
 <script src="team-performance-data.js?v=20261023e"></script>
 <script src="team-performance.js?v=20261023e"></script>

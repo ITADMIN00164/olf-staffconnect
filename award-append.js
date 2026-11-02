@@ -529,7 +529,7 @@ async function add() {
   }
   el("awaFile").disabled = false;
   btn.disabled = false;
-  el("awaResult").innerHTML = '<p class="awa-note awa-done">✓ ' + added + " record" + (added === 1 ? "" : "s") +
+  el("awaResult").innerHTML = '<p class="awa-note awa-done">' + added + " record" + (added === 1 ? "" : "s") +
     " added to " + esc(month.label) + ".</p>";
   btn.textContent = "Done";
   parsed = null;

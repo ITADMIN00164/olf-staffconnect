@@ -312,7 +312,13 @@ if (sidebarToggleBtn && appSidebar && appBody) {
    users never see a browser popup.
 ==================================== */
 
-const NOTIFY_ICONS = { success: "✅", error: "⛔", warning: "⚠️", info: "ℹ️" };
+// Drawn, not emoji: a filled disc or triangle with a white mark.
+const NOTIFY_ICONS = {
+    success: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#22C55E"/><path d="m7.5 12.5 3 3 6-6.500" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    error:   '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#EF4444"/><path d="m8.500 8.500 7 7M15.500 8.500l-7 7" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>',
+    warning: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 1.800 20.500h20.400z" fill="#F59E0B" stroke="#F59E0B" stroke-width="1.600" stroke-linejoin="round"/><path d="M12 9.500v5M12 17.500v.01" stroke="#fff" stroke-width="2.400" stroke-linecap="round"/></svg>',
+    info:    '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#4F8EF7"/><path d="M12 11v6M12 7.500v.01" stroke="#fff" stroke-width="2.400" stroke-linecap="round"/></svg>'
+};
 
 // Lightweight toast for quick, non-blocking feedback (auto-dismisses).
 function notify(message, type = "info", duration = 4500) {
@@ -343,7 +349,7 @@ function showAppAlert({ title = "Notice", message = "", type = "info", list = nu
         const modal = document.getElementById("appMsgModal");
         if (!modal) { console.log(`[${type}] ${title}: ${message}`); resolve(true); return; }
 
-        document.getElementById("appMsgIcon").textContent  = NOTIFY_ICONS[type] || NOTIFY_ICONS.info;
+        document.getElementById("appMsgIcon").innerHTML  = NOTIFY_ICONS[type] || NOTIFY_ICONS.info;
         document.getElementById("appMsgIcon").className    = `app-msg-icon app-msg-icon--${type}`;
         document.getElementById("appMsgTitle").textContent = title;
         document.getElementById("appMsgText").innerHTML    = escHtml(message).replace(/\n/g, "<br>");
@@ -377,7 +383,7 @@ function showAppConfirm({ title = "Please confirm", message = "", type = "warnin
         const modal = document.getElementById("appMsgModal");
         if (!modal) { resolve(window.confirm(message)); return; }
 
-        document.getElementById("appMsgIcon").textContent  = NOTIFY_ICONS[type] || NOTIFY_ICONS.warning;
+        document.getElementById("appMsgIcon").innerHTML  = NOTIFY_ICONS[type] || NOTIFY_ICONS.warning;
         document.getElementById("appMsgIcon").className    = `app-msg-icon app-msg-icon--${type}`;
         document.getElementById("appMsgTitle").textContent = title;
         document.getElementById("appMsgText").innerHTML    = escHtml(message).replace(/\n/g, "<br>");
@@ -1602,7 +1608,7 @@ function applyPageAccessNav() {
             lock = document.createElement("span");
             lock.className = "nav-lock";
             lock.setAttribute("aria-hidden", "true");
-            lock.textContent = "🔒";
+            lock.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.200" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
             btn.appendChild(lock);
         } else if (!lockedForMe && lock) {
             lock.remove();
@@ -2002,6 +2008,7 @@ const HM_ICON_PATHS = {
     calendar:  '<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M8.5 3v4M15.5 3v4"/>',
     megaphone: '<path d="M4 10v4a1 1 0 0 0 1 1h2l5 4V5L7 9H5a1 1 0 0 0-1 1z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/>',
     trash:     '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+    alert:     '<path d="M12 4 2.500 20h19z"/><path d="M12 10v4.500M12 17.500v.01"/>',
     inbox:     '<path d="M4 13l2.5-7.5A2 2 0 0 1 8.4 4h7.2a2 2 0 0 1 1.9 1.5L20 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M4 13h4.5A1.5 1.5 0 0 1 10 14.5a2 2 0 0 0 4 0 1.5 1.5 0 0 1 1.5-1.5H20"/>'
 };
 function hmIcon(name) {
@@ -3979,15 +3986,15 @@ async function renderNewsBanners() {
             const endVal   = n.endDateTime   || n.endDate;
             return `
             <div class="news-banner">
-                <div class="news-banner-icon">📢</div>
+                <div class="news-banner-icon">${hmIcon("megaphone")}</div>
                 <div class="news-banner-body">
                     <div class="news-banner-label">Announcement</div>
                     ${newsBody(n, "news-banner-text")}
-                    <div class="news-banner-dates">📅 ${formatNewsDateTime(startVal, false)} – ${formatNewsDateTime(endVal, true)}</div>
+                    <div class="news-banner-dates">${hmIcon("calendar")} ${formatNewsDateTime(startVal, false)} – ${formatNewsDateTime(endVal, true)}</div>
                 </div>
                 ${currentRole === "Admin" ? `
                 <div class="news-banner-actions">
-                    <button class="btn-delete-news" data-newsid="${n.id}">🗑 Delete</button>
+                    <button class="btn-delete-news" data-newsid="${n.id}">${hmIcon("trash")} Delete</button>
                 </div>` : ""}
             </div>
         `;
@@ -4158,7 +4165,7 @@ async function renderNewsCards() {
         console.error("News cards load failed:", err);
         grid.innerHTML = `
             <div class="news-empty-state">
-                <div class="news-empty-icon">⚠️</div>
+                <div class="news-empty-icon">${hmIcon("alert")}</div>
                 Failed to load announcements.
             </div>`;
     }

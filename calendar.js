@@ -147,6 +147,23 @@
     return r ? Array.prototype.slice.call(r.querySelectorAll(sel)) : [];
   }
   function on(id, evt, fn) { var el = $(id); if (el) el.addEventListener(evt, fn); }
+  /* Small drawn pictures used in place of emoji. */
+  var PI = {
+    pin:     '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/>',
+    clock:   '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    search:  '<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>',
+    inbox:   '<path d="M4 13l2.5-7.5A2 2 0 0 1 8.4 4h7.2a2 2 0 0 1 1.9 1.5L20 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M4 13h4.5A1.5 1.5 0 0 1 10 14.5a2 2 0 0 0 4 0 1.5 1.5 0 0 1 1.5-1.5H20"/>',
+    pointer: '<path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11m0-1.5a1.5 1.5 0 0 1 3 0V12m0-1a1.500 1.500 0 0 1 3 0v4.500a6 6 0 0 1-6 6h-1.500a6 6 0 0 1-5-2.700L4 14.500a1.500 1.500 0 0 1 2.500-1.700L9 15.500"/>',
+    alert:   '<path d="M12 4 2.500 20h19z"/><path d="M12 10v4.500M12 17.500v.01"/>',
+    check:   '<circle cx="12" cy="12" r="9"/><path d="m8 12.500 2.800 2.800L16 9.500"/>',
+    plus:    '<path d="M12 5v14M5 12h14"/>',
+    edit:    '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.500 6.500 4 4"/>',
+    copy:    '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>'
+  };
+  function pi(name) {
+    return '<svg class="pcal-i" viewBox="0 0 24 24" aria-hidden="true">' + PI[name] + '</svg>';
+  }
+
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -635,7 +652,7 @@
         var n = g.list.length;
         var label = n === 1 ? evtLabel(g.list[0]) : g.name;
         var lines = g.list.slice(0, 6).map(function (ev) {
-          return '<div class="pcal-tip-line">📍 ' + esc(ev.district || '—') +
+          return '<div class="pcal-tip-line">' + pi('pin') + esc(ev.district || '—') +
             (ev.eventName ? ' <span class="pcal-tip-muted">· ' + esc(ev.eventName) + '</span>' : '') + '</div>';
         }).join('');
         if (n > 6) lines += '<div class="pcal-tip-muted">+' + (n - 6) + ' more — click the day</div>';
@@ -700,7 +717,7 @@
 
     if (!day) {
       if (title) title.innerHTML = '<span>' + esc('Events \u2014 ' + MONTHS[viewMonth] + ' ' + viewYear) + '</span>';
-      list.innerHTML = '<div class="empty-state"><div class="empty-icon">\uD83D\uDC46</div>' +
+      list.innerHTML = '<div class="empty-state"><div class="empty-icon">' + pi('pointer') + '</div>' +
         'Click any day on the calendar to see its events.</div>';
       return;
     }
@@ -724,8 +741,8 @@
 
     if (!shown.length) {
       list.innerHTML = hiddenCount > 0
-        ? '<div class="empty-state"><div class="empty-icon">\uD83D\uDD0D</div>No events for the selected programs ' + (isTodayView ? 'today.' : 'on this day.') + '</div>'
-        : '<div class="empty-state"><div class="empty-icon">\uD83D\uDCED</div>No events ' + (isTodayView ? 'today.' : 'on this day.') +
+        ? '<div class="empty-state"><div class="empty-icon">' + pi('search') + '</div>No events for the selected programs ' + (isTodayView ? 'today.' : 'on this day.') + '</div>'
+        : '<div class="empty-state"><div class="empty-icon">' + pi('inbox') + '</div>No events ' + (isTodayView ? 'today.' : 'on this day.') +
           '<br><span style="font-size:.78rem">Click another day on the calendar to see its events.</span></div>';
       return;
     }
@@ -757,8 +774,8 @@
         return '<div class="event-list-item" style="--c:' + getProgramColor(programOf(e)) + '" data-pcal-view-event="' + esc(e.id) + '" title="Click to view details">' +
             '<div class="event-info">' +
               '<div class="evt-title">' + esc(e.eventName || programOf(e)) + '</div>' +
-              '<div class="evt-meta"><span>📍 ' + esc(e.district || '—') + '</span>' +
-                (t ? '<span>🕒 ' + esc(t) + '</span>' : '') + '</div>' +
+              '<div class="evt-meta"><span>' + pi('pin') + esc(e.district || '—') + '</span>' +
+                (t ? '<span>' + pi('clock') + esc(t) + '</span>' : '') + '</div>' +
               '<span class="evt-prog">' + esc(programOf(e)) + '</span>' +
             '</div>' + delBtn +
           '</div>';
@@ -1117,7 +1134,7 @@
       var h12 = ((s.h % 12) || 12), ap = s.h < 12 ? 'AM' : 'PM';
       var hourOpts = ''; for (var hh = 1; hh <= 12; hh++) hourOpts += '<option value="' + hh + '"' + (hh === h12 ? ' selected' : '') + '>' + ('0' + hh).slice(-2) + '</option>';
       var minOpts = ''; for (var mm = 0; mm < 60; mm++) minOpts += '<option value="' + mm + '"' + (mm === s.mi ? ' selected' : '') + '>' + ('0' + mm).slice(-2) + '</option>';
-      timeHtml = '<div class="pcal-dtp-time"><span class="pcal-dtp-clock">\uD83D\uDD52</span>' +
+      timeHtml = '<div class="pcal-dtp-time"><span class="pcal-dtp-clock">' + pi('clock') + '</span>' +
         '<select id="pcal-dtp-h">' + hourOpts + '</select><span>:</span>' +
         '<select id="pcal-dtp-mi">' + minOpts + '</select>' +
         '<select id="pcal-dtp-ap"><option' + (ap === 'AM' ? ' selected' : '') + '>AM</option><option' + (ap === 'PM' ? ' selected' : '') + '>PM</option></select></div>';
@@ -1169,7 +1186,7 @@
   function openEventModal(evt) {
     if (!isAdmin) return;
     var isEdit = !!evt;
-    $('pcal-add-title').textContent = isEdit ? '\u270F\uFE0F Edit Event' : '\u2795 Add New Event';
+    $('pcal-add-title').innerHTML = isEdit ? pi('edit') + ' Edit Event' : pi('plus') + ' Add New Event';
     $('pcal-evt-id').value = isEdit ? evt.id : '';
     $('pcal-evt-host').value = currentEmail || '';
 
@@ -1339,7 +1356,7 @@
     switchTab('calendar');
     openEventModal(clone);            // no id -> saved as a brand-new event
     $('pcal-evt-id').value = '';
-    $('pcal-add-title').textContent = '\u2795 Copy Event';
+    $('pcal-add-title').innerHTML = pi('copy') + ' Copy Event';
   }
 
   function deleteEvent(id) {
@@ -1378,7 +1395,7 @@
       row('Event', '<span class="pcal-detail-dot" style="background:' + color + '"></span>' + esc(evt.eventName || evt.type)) +
       row('When', esc(when)) +
       row('State', esc(STATE_LABELS[evt.state] || evt.state || '\u2014')) +
-      row('District', '\uD83D\uDCCD ' + esc(evt.district)) +
+      row('District', pi('pin') + ' ' + esc(evt.district)) +
       row('Host', esc(evt.host || '\u2014')) +
       ((evt.guests && evt.guests.length) ? row('Guests', esc(evt.guests.join(', '))) : '') +
       (evt.desc ? '<div class="pcal-detail-row col"><span class="pcal-detail-label">Description</span><div class="pcal-detail-desc">' + esc(evt.desc) + '</div></div>' : '') +
@@ -2180,7 +2197,7 @@
     var shown = errs.slice(0, 60);
     bulkReport(
       '<div class="pcal-bulk-block err">' +
-        '<div class="pcal-bulk-block-title">\u26a0 ' + errs.length + ' problem(s) in ' + esc(fileName) +
+        '<div class="pcal-bulk-block-title">' + pi('alert') + ' ' + errs.length + ' problem(s) in ' + esc(fileName) +
           ' \u2014 nothing has been saved</div>' +
         '<div class="pcal-bulk-block-sub">Fix these rows in the same file and upload it again. All ' +
           rowCount + ' row(s) were rejected together, so no partial import can happen.</div>' +
@@ -2217,7 +2234,7 @@
         (noInviteCount ? ' <span class="pcal-bulk-muted">(' + noInviteCount + ' row(s) have Send Invites = No.)</span>' : '') +
       '</div>' +
       (bulkParsed.warnings.length
-        ? '<div class="pcal-bulk-block warn"><div class="pcal-bulk-block-title">\u26a0 ' + bulkParsed.warnings.length +
+        ? '<div class="pcal-bulk-block warn"><div class="pcal-bulk-block-title">' + pi('alert') + ' ' + bulkParsed.warnings.length +
             ' thing(s) to check</div><ul class="pcal-bulk-warnlist">' +
             bulkParsed.warnings.slice(0, 25).map(function (w) {
               return '<li>Row ' + w.row + ' \u00b7 ' + esc(w.col) + ': ' + esc(w.msg) + '</li>';
@@ -2335,7 +2352,7 @@
     var cls = (failed.length || unsent.length || stopped) ? 'warn' : 'ok';
     var html = '<div class="pcal-bulk-block ' + cls + '">' +
       '<div class="pcal-bulk-block-title">' +
-        (stopped ? '\u26a0 Import stopped' : (failed.length ? '\u26a0 Import finished with problems' : '\u2713 Import complete')) +
+        (stopped ? pi('alert') + ' Import stopped' : (failed.length ? pi('alert') + ' Import finished with problems' : pi('check') + ' Import complete')) +
       '</div>' +
       '<div class="pcal-bulk-block-sub">' + esc(fileName) + ' \u00b7 ' + total + ' row(s) submitted</div>' +
       '<ul class="pcal-bulk-warnlist">' +
@@ -2397,7 +2414,7 @@
   function showToast(msg, isError) {
     var t = $('pcal-toast');
     if (!t) return;
-    t.textContent = (isError ? '⚠ ' : '✓ ') + msg;
+    t.innerHTML = pi(isError ? 'alert' : 'check') + ' ' + esc(msg);
     t.classList.toggle('error', !!isError);
     t.classList.add('show');
     clearTimeout(t._pcalTimer);
@@ -2414,7 +2431,7 @@
 
   function showError(msg) {
     var list = $('pcal-events-list');
-    if (list) list.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div>' + esc(msg) + '</div>';
+    if (list) list.innerHTML = '<div class="empty-state"><div class="empty-icon">' + pi('alert') + '</div>' + esc(msg) + '</div>';
   }
 
   // ── ROLE VISIBILITY ───────────────────────────────────────────────
