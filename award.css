@@ -2556,3 +2556,26 @@
 .award-page .aw-subtab:not(.is-active):hover { transform: none; box-shadow: none; }
 .award-page .aw-subtab.is-active .tab-count { background: var(--accent); color: #fff; }
 .award-page .aw-subtabs .pill { align-self: center; }
+
+/* ======================================================================
+   One navigation card. The tab bar, Refresh and the page action are its
+   top row; the views of the tab you are on are its bottom row. They read
+   as a single piece of the page, with the work underneath.
+   ====================================================================== */
+.award-page .aw-topbar {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 8px 10px 8px 8px;
+  margin: 0 0 16px; box-shadow: 0 2px 10px rgba(15,23,42,.05);
+}
+.award-page:has(#aw-util-bar:not([hidden])) .aw-topbar,
+.award-page:has(#aw-view-stock:not([hidden])) .aw-topbar { border-radius: 18px 18px 0 0; margin-bottom: 0; box-shadow: none; }
+.award-page .aw-toptabs { background: transparent; border: 0; box-shadow: none; padding: 0; }
+.award-page .aw-utiltabs, .award-page #aw-view-stock .aw-body > .aw-subtabs {
+  background: var(--surface); border: 1px solid var(--border); border-top: 0; border-radius: 0 0 18px 18px;
+  padding: 0 14px; margin: 0 0 16px; box-shadow: 0 6px 12px -8px rgba(15,23,42,.10);
+}
+.award-page .aw-utiltabs[hidden] { display: none; }
+.award-page .aw-subtab, .award-page .aw-utiltab { padding: 11px 14px; margin: 0; }
+.award-page .aw-subtabs .pill { margin-right: 4px; }
+@media (max-width: 720px) {
+  .award-page .aw-topbar { padding: 8px; }
+}
