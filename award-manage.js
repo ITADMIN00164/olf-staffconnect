@@ -923,6 +923,24 @@ function openFilterPop(key, btn) {
   awmPopOpenedAt = Date.now();
 }
 
+/* Where a record stands: verified, rejected, awarded and waiting to be verified,
+   or not awarded yet. Counted for the chips above the table and used for each
+   row's coloured edge. */
+function recStatus(r) {
+  if (r.verified === "Yes") return "verified";
+  if (r.verified === "Rejected") return "rejected";
+  if (r._dirty) return "unsaved";
+  return r.awarded === "Yes" ? "saved" : "pending";
+}
+
+function statusChips() {
+  const n = { verified: 0, rejected: 0, unsaved: 0, saved: 0, pending: 0 };
+  currentRecords.forEach(r => { n[recStatus(r)] += 1; });
+  const chip = (cls, count, label) => count ? '<span class="awm-chip is-' + cls + '">' + count + " " + label + "</span>" : "";
+  return chip("verified", n.verified, "verified") + chip("saved", n.saved + n.unsaved, "to verify") +
+         chip("pending", n.pending, "not awarded") + chip("rejected", n.rejected, "rejected");
+}
+
 // The funnels in the headings and the line above the table; both follow the filters.
 function renderFilterBar() {
   const strip = document.getElementById("awmFilters");
@@ -932,8 +950,7 @@ function renderFilterBar() {
     strip.innerHTML = filtersActive()
       ? 'Showing <b>' + shown + '</b> of ' + currentRecords.length + ' records' +
         '<button type="button" class="awm-f-clear" id="awmFclear">Clear filters</button>'
-      : '<b>' + currentRecords.length + '</b> record' + (currentRecords.length === 1 ? "" : "s") +
-        ' <span class="awm-f-tip">Use the funnels in the column headings to filter.</span>';
+      : '<b>' + currentRecords.length + '</b> record' + (currentRecords.length === 1 ? "" : "s") + statusChips();
     const clear = document.getElementById("awmFclear");
     if (clear) clear.addEventListener("click", function () { resetFilters(); renderTable(); });
   }
@@ -999,7 +1016,7 @@ function renderTable() {
     const dis = viewOnly ? "disabled" : "";
     const lt  = locked ? `title="${LOCK_MSG}"` : (isVerifier ? `title="View only — verifier access"` : "");
     return `
-    <tr class="${locked ? "locked-row" : ""}" ${lt}>
+    <tr class="${[locked ? "locked-row" : "", "rec-" + recStatus(r)].filter(Boolean).join(" ")}" ${lt}>
       <td class="name-cell">
         <div class="nc-name">${r.fullName || ""}</div>
         <div class="nc-sub">${r.mobile || ""}${r.mobile && r.schoolName ? " · " : ""}${r.schoolName || ""}</div>
@@ -1322,24 +1339,6 @@ async function decideRecord(index, decision) {   // decision: "Yes" (verify) | "
     // 3) Still present → record the decision on the current (authoritative) record.
     const decided = { ...match, verified: decision, verifiedBy: me };
     decided.late = isLate(decided, selectedMonth) ? "Yes" : "No";
-
-    /* Verifying takes the award off the district's stock. When there is none
-       left, say so first: the award may well have been given, and verifying
-       is a fact worth recording, but the shortfall is somebody's to fix. */
-    if (decision === "Yes" && window.awardStockApi) {
-      const held = await window.awardStockApi.balanceFor(decided.districtName || district, decided.awardCategory);
-      if (held !== null && held <= 0) {
-        const go = await showModal({
-          title: "No stock left",
-          message: `${decided.districtName || district} has ${held} in stock. Verify anyway?`,
-          buttons: [
-            { label: "Cancel", value: "no", variant: "cancel" },
-            { label: "Verify anyway", value: "yes", variant: "primary" }
-          ]
-        });
-        if (go !== "yes") { if (cell) cell.innerHTML = renderVerifyCell(index); return; }
-      }
-    }
 
     await dbDecide(decided, decision === "Yes" ? "verified" : "rejected");
 
