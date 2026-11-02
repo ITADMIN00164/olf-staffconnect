@@ -1697,7 +1697,7 @@
             border-bottom: 1px solid var(--hairline-dk);
             box-shadow: 0 1px 24px rgba(11,18,32,0.28);
         }
-        /* The name: letters that pop in one by one; Staff Connect in flowing brand colours with a passing shine. All of it keeps moving on its own. */
+        /* The name: it is simply there when the page opens; Staff Connect in flowing brand colours with a passing shine. All of it keeps moving on its own. */
         .topbar-logo { position: relative; display: flex; align-items: baseline; gap: 9px; font-size: 24px; line-height: 1; cursor: default; user-select: none; }
         .topbar-logo .logo-olf { display: inline-flex; font-weight: 900; letter-spacing: -1px; }
         .topbar-logo .logo-olf i { font-style: normal; display: inline-block; }
@@ -1713,10 +1713,8 @@
             -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
         }
         @media (prefers-reduced-motion: no-preference) {
-            .topbar-logo .logo-olf i, .topbar-logo .logo-sc i { animation: logo-rise .7s cubic-bezier(.34,1.56,.64,1) backwards; animation-delay: calc(var(--i) * 70ms + 100ms); }
-            .topbar-logo .logo-sc i { animation: logo-rise .7s cubic-bezier(.34,1.56,.64,1) backwards, logo-sheen 9s linear infinite; animation-delay: calc(var(--i) * 70ms + 100ms), 1.2s; }
+            .topbar-logo .logo-sc i { animation: logo-sheen 9s linear infinite; }
             .topbar-logo .logo-olf { animation: logo-glow 2.6s ease-in-out infinite alternate; }
-            @keyframes logo-rise { from { opacity: 0; transform: translateY(70%) scale(.7); } }
             @keyframes logo-glow { from { filter: drop-shadow(0 0 0 rgba(79,142,247,0)); } to { filter: drop-shadow(0 0 7px rgba(79,142,247,.55)); } }
             /* the colours flow without stopping; every so often a shine passes over them */
             @keyframes logo-sheen { 0% { background-position: -400px 0, 0 0; } 70% { background-position: -400px 0, 182px 0; } 100% { background-position: 360px 0, 260px 0; } }
@@ -3341,7 +3339,7 @@
     </div>
 </div>
 
-<script type="module" src="app.js?v=2026-11-02f"></script>
+<script type="module" src="app.js?v=2026-11-02g"></script>
 <script src="profile.js"></script>
 <script src="pom.js"></script>
 <script src="calendar.js"></script>
