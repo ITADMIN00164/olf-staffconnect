@@ -238,7 +238,14 @@ if (sidebarToggleBtn && appSidebar && appBody) {
         clearTimeout(openTimer); clearTimeout(closeTimer);
         appBody.classList.toggle("sb-open", open);
         if (sidebarEdge) sidebarEdge.setAttribute("aria-expanded", open ? "true" : "false");
+        if (tbMenuBtn) {
+            tbMenuBtn.setAttribute("aria-expanded", open ? "true" : "false");
+            tbMenuBtn.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+        }
     };
+    // Phones: the menu button in the top bar.
+    const tbMenuBtn = document.getElementById("tbMenuBtn");
+    if (tbMenuBtn) tbMenuBtn.addEventListener("click", () => setOpen(!appBody.classList.contains("sb-open")));
     const autoHide = () => {
         if (pinned) return;
         if (!isAuto()) {
@@ -302,7 +309,7 @@ if (sidebarToggleBtn && appSidebar && appBody) {
     // Tap outside / Esc closes the floating menu.
     document.addEventListener("pointerdown", (e) => {
         if (isAuto() && appBody.classList.contains("sb-open") &&
-            !appSidebar.contains(e.target) && e.target !== sidebarEdge) setOpen(false);
+            !appSidebar.contains(e.target) && e.target !== sidebarEdge && !e.target.closest("#tbMenuBtn")) setOpen(false);
     });
     document.addEventListener("keydown", (e) => {
         if (e.key === "Escape" && isAuto() && appBody.classList.contains("sb-open")) setOpen(false);
@@ -1863,6 +1870,36 @@ async function setAwardTabLocked(key, locked) {
 // Retired page names still lead somewhere sensible (old links, bookmarks).
 const PAGE_ALIASES = { "expense-report": "er-dashboards", "data-dashboards": "er-dashboards" };
 
+/* The thin bar along the top while a page opens. It only shows if loading
+   takes longer than a blink, so cached pages open without a flicker. */
+let routeBarTimer = null;
+function routeBar(on) {
+    let bar = document.getElementById("olfRouteBar");
+    if (!bar) {
+        bar = document.createElement("div");
+        bar.id = "olfRouteBar";
+        bar.className = "olf-route-bar";
+        bar.setAttribute("aria-hidden", "true");
+        document.body.appendChild(bar);
+    }
+    clearTimeout(routeBarTimer);
+    if (on) {
+        bar.classList.remove("is-done");
+        routeBarTimer = setTimeout(() => bar.classList.add("is-on"), 120);
+    } else if (bar.classList.contains("is-on")) {
+        bar.classList.add("is-done");
+        routeBarTimer = setTimeout(() => bar.classList.remove("is-on", "is-done"), 600);
+    }
+}
+let pageEnterTimer = null;
+function playPageEnter() {
+    clearTimeout(pageEnterTimer);
+    pageContent.classList.remove("pc-enter");
+    void pageContent.offsetWidth;                   // restart the motion for the new page
+    pageContent.classList.add("pc-enter");
+    pageEnterTimer = setTimeout(() => pageContent.classList.remove("pc-enter"), 1100);
+}
+
 window.navigate = async function (page) {
     page = PAGE_ALIASES[page] || page;
     // Any page except Home can be switched off for everyone but IT Admin
@@ -1895,7 +1932,11 @@ window.navigate = async function (page) {
         el.classList.toggle("active", el.dataset.page === page);
     });
 
+    routeBar(true);
     pageContent.innerHTML = await getPageHtml(page);
+    pageContent.scrollTop = 0;
+    playPageEnter();
+    routeBar(false);
 
     if (page === "home") {
         initHomePage();

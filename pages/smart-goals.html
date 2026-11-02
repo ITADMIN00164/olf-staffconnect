@@ -11,7 +11,7 @@
   --border2:   #B0C4D4;
   --text:      #1A2533;
   --text2:     #5A6B7A;
-  --text3:     #8A9AAA;
+  --text3:     #66778A;
   --brand:        #2F6FE4;
   --brand-dark:   #2457C5;
   --brand-lt:     #EEF4FF;
@@ -992,6 +992,13 @@
 @media (max-width: 900px) {
   #sg-app .app-nav { height: auto; flex-wrap: wrap; padding: 10px 14px; }
   #sg-app .nav-tabs { order: 3; width: 100%; overflow-x: auto; }
+}
+/* side-by-side blocks stack on a phone, and nothing inside a grid can push
+   it wider than the screen (wide tables scroll in their own box instead) */
+#sg-app [style*="display:grid"] > * { min-width: 0; }
+@media (max-width: 760px) {
+  #sg-app [style*="grid-template-columns:1.5fr 1fr"], #sg-app [style*="grid-template-columns:2fr 1fr"],
+  #sg-app [style*="grid-template-columns:1.3fr 1fr"], #sg-app [style*="grid-template-columns:1fr 1fr"] { grid-template-columns: 1fr !important; }
 }
 </style>
 <nav class="app-nav">
