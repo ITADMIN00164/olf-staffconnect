@@ -4112,30 +4112,6 @@ window.AWARD_CONFIG = {
     proceed();
   }
 
-  /* What a district holds today in the column an award comes off, for the
-     warning before a verify that would take it below nothing. null means
-     there is nothing to say: no go-live date, or a category with no column. */
-  window.awardStockApi = {
-    balanceFor: function (district, category) {
-      return new Promise(function (resolve) {
-        try {
-          var t = typeForCategory(category);
-          if (!db || !t || !district) return resolve(null);
-          loadStock(function () {
-            if (!goLive || todayLocalISO() < goLive) return resolve(null);
-            var fy = fyStartOf(new Date());
-            var rows = stockRows(fy, allRequisitions, stockMovements,
-              [{ state: "", division: "", district: district, pm: "" }], [t.id]);
-            var now = monthKeyOf(new Date());
-            var row = rows.filter(function (r) { return r.monthKey === now; })[0] ||
-                      rows.filter(function (r) { return r.monthKey === ""; })[0];
-            resolve(row ? (row.balance[t.id] || 0) : null);
-          });
-        } catch (e) { resolve(null); }
-      });
-    }
-  };
-
   function loadStockMovements(done) {
     if (!hasStock) { stockMovements = []; return done && done(); }
 
@@ -4948,7 +4924,25 @@ window.AWARD_CONFIG = {
       catch (err) { showImportResult(null, "That file could not be read: " + messageOf(err)); return; }
 
       var count = Object.keys(result.edits).length;
-      if (!count) { showStockEditError(""); renderStock(); showImportResult(result, null); return; }
+
+      /* A file of zeros against an empty book changes no figure - and still has
+         one job: the month it names fixes the go-live date, which is what
+         starts the stock counting verified awards. */
+      if (!count) {
+        if (result.blocked || goLive === result.goLive) {
+          showStockEditError(""); renderStock(); showImportResult(result, null);
+          return;
+        }
+        var setLive = function () {
+          saveGoLive(result.goLive, function () {
+            result.liveNote = "Stock is live from " + dayText(result.goLive) + ". Opening stock stays as it is.";
+            showStockEditError(""); renderStock(); showImportResult(result, null);
+          }, true);
+        };
+        if (!goLive) return setLive();
+        return awConfirm("Move the go-live date?", "Stock will go live on " + dayText(result.goLive) + " instead of " + dayText(goLive) + ".", "Move it", "warning")
+          .then(function (ok) { if (ok) setLive(); });
+      }
 
       var already = stockMovements.some(function (m) {
         return String(m.occurred_on || "").slice(0, 7) === fyOfDay(result.goLive) + "-03";
@@ -5012,6 +5006,7 @@ window.AWARD_CONFIG = {
 
       sub = result.blocked
         ? "Nothing was uploaded. Fix the file and try again."
+        : (!count && result.liveNote) ? result.liveNote
         : count
         ? (count === 1 ? "1 figure" : count + " figures") + " in " +
           (districts === 1 ? "1 district" : districts + " districts") +
