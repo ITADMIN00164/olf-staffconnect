@@ -515,15 +515,49 @@ function sgSheetBLinkHtml(raw) {
   const linkPart = clickable
     ? `<a href="${esc(href)}" target="_blank" rel="noopener" style="color:var(--blue);font-weight:600">Click Here</a>`
     : `<span style="word-break:break-all">${esc(v)}</span>`;
-  return `<p style="font-size:12px;color:var(--text2);margin:0;padding:8px 12px;background:var(--surface2);border-radius:var(--radius);border-left:3px solid var(--blue)">🔗 <span style="font-weight:600;color:var(--text)">Sheet B Link</span> - ${linkPart}</p>`;
+  return `<p style="font-size:12px;color:var(--text2);margin:0;padding:8px 12px;background:var(--surface2);border-radius:var(--radius);border-left:3px solid var(--blue)">${sgIc('link')} <span style="font-weight:600;color:var(--text)">Sheet B Link</span> - ${linkPart}</p>`;
 }
 // Render the overall-remark callout as "📝 Overall Performance - <what the user entered>".
 function sgOverallHtml(remarks) {
   const v = (remarks==null?'':String(remarks)).trim();
   if (!v) return '';
-  return `<p style="font-size:12px;color:var(--text2);margin:0;padding:8px 12px;background:var(--surface2);border-radius:var(--radius);border-left:3px solid var(--brand);overflow-wrap:anywhere;word-break:break-word">📝 <span style="font-weight:600;color:var(--text)">Overall Performance</span> - ${esc(v)}</p>`;
+  return `<p style="font-size:12px;color:var(--text2);margin:0;padding:8px 12px;background:var(--surface2);border-radius:var(--radius);border-left:3px solid var(--brand);overflow-wrap:anywhere;word-break:break-word">${sgIc('note')} <span style="font-weight:600;color:var(--text)">Overall Performance</span> - ${esc(v)}</p>`;
 }
 function formatDate(d) { if(!d) return '—'; const dt=new Date(d); if(isNaN(dt)) return d; const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return `${String(dt.getDate()).padStart(2,'0')}-${mo[dt.getMonth()]}-${String(dt.getFullYear()).slice(-2)}`; }
+/* Small drawn pictures, used instead of emoji anywhere this page needs an icon. */
+var SG_IC = {
+  link: '<path d="M10 14a4 4 0 0 0 5.700 0l3-3a4 4 0 0 0-5.700-5.700l-1 1"/><path d="M14 10a4 4 0 0 0-5.700 0l-3 3a4 4 0 0 0 5.700 5.700l1-1"/>',
+  note: '<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 16h5"/>',
+  alert: '<path d="M12 4 2.500 20h19z"/><path d="M12 10v4.500M12 17.500v.01"/>',
+  chart: '<path d="M5 20V11M12 20V5M19 20v-7"/>',
+  hourglass: '<path d="M6 3h12M6 21h12M7 3c0 5 5 6 5 9s-5 4-5 9M17 3c0 5-5 6-5 9s5 4 5 9"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  pin: '<path d="M12 21s-7-6.200-7-11.500a7 7 0 0 1 14 0C19 14.800 12 21 12 21Z"/><circle cx="12" cy="9.500" r="2.500"/>',
+  timer: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.500 1.500M9.500 3h5"/>',
+  check: '<circle cx="12" cy="12" r="9"/><path d="m8 12.500 2.800 2.800L16 9.500"/>',
+  x: '<path d="m7 7 10 10M17 7 7 17"/>',
+  building: '<rect x="5" y="3" width="10" height="18" rx="1.500"/><path d="M15 9h4v12h-4M9 7h2M9 11h2M9 15h2"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4.500 21c0-4 3.500-6.500 7.500-6.500s7.500 2.500 7.500 6.500"/>',
+  target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.200"/>',
+  calendar: '<rect x="4" y="5" width="16" height="15" rx="2.500"/><path d="M4 10h16M8.500 3v4M15.500 3v4"/>',
+  clipboard: '<rect x="5" y="4.500" width="14" height="16.500" rx="2"/><path d="M9 4.500v-1h6v1M9 11h6M9 15h4"/>',
+  search: '<circle cx="11" cy="11" r="6.500"/><path d="m16 16 4.500 4.500"/>',
+  edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.500 6.500 4 4"/>',
+  trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+  eye: '<path d="M2 12s3.500-7 10-7 10 7 10 7-3.500 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+  save: '<path d="M5 3h11l4 4v14H5z"/><path d="M8 3v6h8V3M8 21v-7h8v7"/>',
+  trend: '<path d="m3 17 6-6 4 4 8-8M15 7h6v6"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.500 9a2.500 2.500 0 0 1 5 .5c0 1.500-2.500 2-2.500 3.500M12 17v.01"/>',
+  block: '<circle cx="12" cy="12" r="9"/><path d="m6 6 12 12"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.600 5.600l2.100 2.100M16.300 16.300l2.100 2.100M18.400 5.600l-2.100 2.100M7.700 16.300l-2.100 2.100"/>',
+  download: '<path d="M12 4v10m0 0 4-4m-4 4-4-4M5 19h14"/>',
+  columns: '<rect x="3.500" y="4" width="17" height="16" rx="2"/><path d="M9.500 4v16M15 4v16"/>',
+  refresh: '<path d="M20 11a8 8 0 1 0-2.300 5.700M20 4v7h-7"/>'
+};
+function sgIc(name) {
+  return '<svg class="sg-i" viewBox="0 0 24 24" aria-hidden="true">' + (SG_IC[name] || '') + '</svg>';
+}
+
 function esc(s) { return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 // safe to embed inside a single-quoted JS string literal that itself sits inside an HTML onclick="..." attribute
 function escJs(s) { return esc(String(s??'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/[\r\n]+/g,' ')); }
@@ -931,7 +965,7 @@ function _reviewMemberTable(base,deptFilter,month){
   var members=(DB.settings.members||[]).filter(function(m){return m.dept===dept;}).map(function(m){return m.name;});
   var rows=members.map(function(mn){
     var a=mp(mn,refMonth), b=mp(mn,pm1), c=mp(mn,pm2);
-    var flag=(a!=null&&b!=null&&a<50&&b<50)?'<span title="Low two months running" style="color:var(--red);font-weight:700">⚠</span>':'';
+    var flag=(a!=null&&b!=null&&a<50&&b<50)?'<span title="Low two months running" style="color:var(--red);font-weight:700">'+sgIc('alert')+'</span>':'';
     return '<tr><td>'+_memberLink(mn,dept)+'</td><td style="text-align:center">'+_perfCell(a)+'</td><td style="text-align:center">'+_perfCell(b)+'</td><td style="text-align:center">'+_perfCell(c)+'</td><td style="text-align:center">'+flag+'</td></tr>';
   }).join('');
   return '<div class="sub-hd" style="margin-top:14px">Member Performance — '+esc(dept)+' <span style="font-weight:400;color:var(--text3);font-size:11px">(reference: '+refMonth+')</span></div>'
@@ -1155,7 +1189,7 @@ function renderReviewAssist(){
   var ot=met.ot.onTimePct==null?'—':'<span style="color:'+pctColor(met.ot.onTimePct)+'">'+met.ot.onTimePct+'%</span>'+_arrow(met.ot.onTimePct, prev&&prev.ot.onTimePct);
 
   el.innerHTML='<div style="border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:14px;background:var(--surface2)">'
-    +'<div style="font-size:12px;font-weight:700;margin-bottom:8px">📊 Plan Effectiveness Snapshot — '+esc(member)+', '+esc(month)+(year?' '+esc(year):'')+' <span style="font-weight:400;color:var(--text3)">('+met.n+' tasks)</span></div>'
+    +'<div style="font-size:12px;font-weight:700;margin-bottom:8px">'+sgIc('chart')+' Plan Effectiveness Snapshot — '+esc(member)+', '+esc(month)+(year?' '+esc(year):'')+' <span style="font-weight:400;color:var(--text3)">('+met.n+' tasks)</span></div>'
     +'<div style="display:flex;gap:16px;flex-wrap:wrap">'+cell('Est vs Actual Hrs',hvTxt)+cell('Items Completion',it)+cell('Mgr Quality',q)+cell('On-Time Completion',ot)+'</div>'
     +'<div style="font-size:10px;color:var(--text3);margin-top:8px">Reviewer-only · ▲/▼ vs '+(pm||'previous month')+'</div></div>';
 }
@@ -1191,16 +1225,16 @@ function renderWatchlist(){
   var items=[];
 
   var awaiting=reviews.filter(function(r){return computeReviewPerformance(r).status==='awaiting';});
-  if(awaiting.length) items.push({icon:'⏳',color:'var(--amber)',text:awaiting.length+' review'+(awaiting.length>1?'s':'')+' awaiting manager score',detail:awaiting.slice(0,5).map(function(r){return r.member+' ('+r.month+')';}).join(', ')+(awaiting.length>5?' …':'')});
+  if(awaiting.length) items.push({icon:sgIc('hourglass'),color:'var(--amber)',text:awaiting.length+' review'+(awaiting.length>1?'s':'')+' awaiting manager score',detail:awaiting.slice(0,5).map(function(r){return r.member+' ('+r.month+')';}).join(', ')+(awaiting.length>5?' …':'')});
 
   var stale=tasks.filter(isTaskStale);
-  if(stale.length) items.push({icon:'🕒',color:'var(--red)',text:stale.length+' overdue task'+(stale.length>1?'s':'')+' untouched ≥'+STALE_DAYS+' days',detail:stale.slice(0,4).map(function(t){return t.member+' — '+String(t.action||t.goal||'').slice(0,40);}).join('; ')+(stale.length>4?' …':'')});
+  if(stale.length) items.push({icon:sgIc('clock'),color:'var(--red)',text:stale.length+' overdue task'+(stale.length>1?'s':'')+' untouched ≥'+STALE_DAYS+' days',detail:stale.slice(0,4).map(function(t){return t.member+' — '+String(t.action||t.goal||'').slice(0,40);}).join('; ')+(stale.length>4?' …':'')});
 
   var odDepts=depts.map(function(d){return {d:d,n:tasks.filter(function(t){return t.dept===d&&isTaskOverdue(t);}).length};}).filter(function(x){return x.n>0;});
-  if(odDepts.length) items.push({icon:'📌',color:'var(--red)',text:'Overdue tasks in '+odDepts.length+' department'+(odDepts.length>1?'s':''),detail:odDepts.map(function(x){return x.d+' ('+x.n+')';}).join(', ')});
+  if(odDepts.length) items.push({icon:sgIc('pin'),color:'var(--red)',text:'Overdue tasks in '+odDepts.length+' department'+(odDepts.length>1?'s':''),detail:odDepts.map(function(x){return x.d+' ('+x.n+')';}).join(', ')});
 
   var over=depts.map(function(d){var v=computeHoursVariance(tasks.filter(function(t){return t.dept===d;}));return {d:d,v:v.variancePct};}).filter(function(x){return x.v!=null&&x.v>=30;});
-  if(over.length) items.push({icon:'⏱',color:'var(--red)',text:over.length+' department'+(over.length>1?'s':'')+' ≥30% over hours estimate',detail:over.map(function(x){return x.d+' (+'+x.v+'%)';}).join(', ')});
+  if(over.length) items.push({icon:sgIc('timer'),color:'var(--red)',text:over.length+' department'+(over.length>1?'s':'')+' ≥30% over hours estimate',detail:over.map(function(x){return x.d+' (+'+x.v+'%)';}).join(', ')});
 
   var base=applyRoleFilter(DB.reviews,'review'); if(year) base=base.filter(function(r){return r.year===year;});
   var low=[];
@@ -1214,10 +1248,10 @@ function renderWatchlist(){
       if(a!=null&&b!=null&&a<50&&b<50) low.push(m.name+' ('+d+')');
     });
   });
-  if(low.length) items.push({icon:'⚠',color:'var(--red)',text:low.length+' member'+(low.length>1?'s':'')+' low performance two months running',detail:low.slice(0,6).join(', ')+(low.length>6?' …':'')});
+  if(low.length) items.push({icon:sgIc('alert'),color:'var(--red)',text:low.length+' member'+(low.length>1?'s':'')+' low performance two months running',detail:low.slice(0,6).join(', ')+(low.length>6?' …':'')});
 
-  var _wlHd='<div style="font-size:12px;font-weight:700;color:var(--text2);border-top:1px solid var(--border);padding-top:10px;margin-bottom:4px">⚠ Watchlist</div>';
-  if(!items.length){ el.innerHTML=_wlHd+'<div style="padding:6px 2px;color:var(--green);font-size:13px;font-weight:600">✓ All clear — no flags in the current scope.</div>'; return; }
+  var _wlHd='<div style="font-size:12px;font-weight:700;color:var(--text2);border-top:1px solid var(--border);padding-top:10px;margin-bottom:4px">'+sgIc('alert')+' Watchlist</div>';
+  if(!items.length){ el.innerHTML=_wlHd+'<div style="padding:6px 2px;color:var(--green);font-size:13px;font-weight:600">'+sgIc('check')+' All clear — no flags in the current scope.</div>'; return; }
   el.innerHTML=_wlHd+items.map(function(x){
     return '<div style="display:flex;gap:10px;padding:7px 2px;border-bottom:1px solid var(--border)">'
       +'<div style="font-size:15px;line-height:1.3">'+x.icon+'</div>'
@@ -1350,11 +1384,11 @@ function renderSmartGoals() {
 
   // Cascading gate: pick a Department, then a Member, before anything shows.
   if (!dept) {
-    listEl.innerHTML = `<div class="empty"><div class="empty-icon">🏢</div><p>Select a <b>Department</b> above to begin.</p></div>`;
+    listEl.innerHTML = `<div class="empty"><div class="empty-icon">${sgIc('building')}</div><p>Select a <b>Department</b> above to begin.</p></div>`;
     return;
   }
   if (!member) {
-    listEl.innerHTML = `<div class="empty"><div class="empty-icon">👤</div><p>Now select a <b>Member</b> to view their SMART Goals.</p></div>`;
+    listEl.innerHTML = `<div class="empty"><div class="empty-icon">${sgIc('user')}</div><p>Now select a <b>Member</b> to view their SMART Goals.</p></div>`;
     return;
   }
 
@@ -1362,7 +1396,7 @@ function renderSmartGoals() {
   if (year) goals = goals.filter(g=>g.year===year);
 
   if (!goals.length) {
-    listEl.innerHTML = `<div class="empty"><div class="empty-icon">🎯</div><p>No SMART goals for <b>${esc(member)}</b> yet.<br>Click "+ Add SMART Goal" to start.</p></div>`;
+    listEl.innerHTML = `<div class="empty"><div class="empty-icon">${sgIc('target')}</div><p>No SMART goals for <b>${esc(member)}</b> yet.<br>Click "+ Add SMART Goal" to start.</p></div>`;
     return;
   }
 
@@ -1435,8 +1469,8 @@ function renderSmartGoals() {
           <span style="font-size:12px;color:var(--text2);font-style:${r0.description?'normal':'italic'}">${esc(r0.description||'—')}</span>
           <span class="actions-cell" onclick="event.stopPropagation()">
             ${sgSuccessEyeBtn(r0.year, r0.dept, r0.member, grp.goal, r0.id)}
-            ${canEdit ? `<button class="btn btn-secondary btn-sm" onclick="editGoalGroup('${escJs(r0.year)}','${escJs(r0.dept)}','${escJs(r0.member)}','${escJs(grp.goal)}')" title="Edit SMART Goal">✏️</button>
-            <button class="btn btn-danger btn-sm" onclick="deleteGoalGroup('${escJs(r0.year)}','${escJs(r0.dept)}','${escJs(r0.member)}','${escJs(grp.goal)}')" title="Delete SMART Goal">🗑️</button>
+            ${canEdit ? `<button class="btn btn-secondary btn-sm" onclick="editGoalGroup('${escJs(r0.year)}','${escJs(r0.dept)}','${escJs(r0.member)}','${escJs(grp.goal)}')" title="Edit SMART Goal">${sgIc('edit')}</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteGoalGroup('${escJs(r0.year)}','${escJs(r0.dept)}','${escJs(r0.member)}','${escJs(grp.goal)}')" title="Delete SMART Goal">${sgIc('trash')}</button>
             <button class="btn btn-secondary btn-sm" onclick="openGoalModal(null,{year:'${escJs(r0.year)}',dept:'${escJs(r0.dept)}',member:'${escJs(r0.member)}',goal:'${escJs(grp.goal)}',weightage:${grp.weightage},description:'${escJs(r0.description||'')}'})">+ Add Activity</button>` : `<span style="font-size:11px;color:var(--text3)">View only</span>`}
           </span>
         </div>
@@ -1449,8 +1483,8 @@ function renderSmartGoals() {
             <span class="gi-cat">${esc(r.particulars||'—')}</span>
             <span style="text-align:center;font-weight:700">${r.maxScore}</span>
             <span class="actions-cell">
-              ${canEdit ? `<button class="btn btn-secondary btn-sm" onclick="openGoalModal('${r.id}')" title="Edit">✏️</button>
-              <button class="btn btn-danger btn-sm" onclick="deleteGoal('${r.id}')" title="Delete">🗑️</button>` : ''}
+              ${canEdit ? `<button class="btn btn-secondary btn-sm" onclick="openGoalModal('${r.id}')" title="Edit">${sgIc('edit')}</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteGoal('${r.id}')" title="Delete">${sgIc('trash')}</button>` : ''}
             </span>
           </div>`).join('')}
         </div>
@@ -1585,7 +1619,7 @@ function editGoalGroup(year, dept, member, goal) {
   document.getElementById('gg-description').value = rows.length ? (rows[0].description || '') : '';
   const smRow = rows.find(x => x.successMeasures);
   const smBtn = document.getElementById('gg-success-btn');
-  if (smBtn) smBtn.textContent = smRow ? '👁 View / Edit Success Measures' : '+ Add Success Measures';
+  if (smBtn) smBtn.innerHTML = smRow ? sgIc('eye') + ' View / Edit Success Measures' : '+ Add Success Measures';
   document.getElementById('gg-context').textContent = `${member} · ${dept} · ${academicYearShort(year)}`;
   openModal('goalgroup-modal');
 }
@@ -1742,7 +1776,7 @@ function dateChip(val) { return `<span style="font-size:11px;color:var(--text2);
 function dateCellEditable(id, field, val) {
   const label = val ? formatDate(val) : 'Set date';
   return `<td class="c-status" style="white-space:nowrap">
-    <button type="button" class="sg-date-btn" onclick="sgToggleDate(this)" title="Set date">📅 <span class="sg-date-val">${label}</span></button>
+    <button type="button" class="sg-date-btn" onclick="sgToggleDate(this)" title="Set date">${sgIc('calendar')} <span class="sg-date-val">${label}</span></button>
     <input class="tbl-input sg-date-input" type="date" value="${val||''}" data-id="${id}" data-field="${field}" onchange="sgSyncDate(this)" style="display:none;min-width:130px">
   </td>`;
 }
@@ -1790,7 +1824,7 @@ function planCellHtml(t, key) {
     case 'managerComment': {
       const _has = !!(t.managerComment && String(t.managerComment).trim());
       const _ed = canEditMgrTaskFields(t);
-      const _icon = _ed ? '✏️' : '👁';
+      const _icon = _ed ? sgIc('edit') : sgIc('eye');
       const _ttl = _ed ? 'View / edit manager comment' : 'View manager comment';
       return `<td class="c-mgr" style="text-align:center"><button type="button" class="btn btn-secondary btn-sm" onclick="openMgrComment('${t.id}')" title="${_ttl}" style="padding:2px 9px">${_icon}${_has?' •':''}</button></td>`;
     }
@@ -1798,9 +1832,9 @@ function planCellHtml(t, key) {
       : `<td class="c-status" style="white-space:nowrap">${dateChip(t.revisedTgtDate)}</td>`;
     case 'actions': return ed ? `<td class="c-act">
       <div class="actions-cell">
-        <button class="btn btn-save btn-sm" onclick="saveInlineRow('${t.id}')" title="Save row">💾</button>
-        <button class="btn btn-secondary btn-sm" onclick="openEditTask('${t.id}')" title="Edit task">✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteTask('${t.id}')" title="Delete">🗑️</button>
+        <button class="btn btn-save btn-sm" onclick="saveInlineRow('${t.id}')" title="Save row">${sgIc('save')}</button>
+        <button class="btn btn-secondary btn-sm" onclick="openEditTask('${t.id}')" title="Edit task">${sgIc('edit')}</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteTask('${t.id}')" title="Delete">${sgIc('trash')}</button>
       </div>
     </td>` : `<td class="c-act"><span style="font-size:11px;color:var(--text3)">View only</span></td>`;
     default: return '<td></td>';
@@ -1817,7 +1851,7 @@ function renderPlan() {
   // Academic Year, Month and Department are mandatory; Week is optional (All Weeks).
   if (!year || !month || !dept) {
     document.getElementById('plan-thead').innerHTML='';
-    tbody.innerHTML=`<tr><td colspan="23"><div class="empty"><div class="empty-icon">🗓️</div><p>Select <b>Academic Year</b>, <b>Month</b> and <b>Department</b> above to view the plan.</p></div></td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="23"><div class="empty"><div class="empty-icon">${sgIc('calendar')}</div><p>Select <b>Academic Year</b>, <b>Month</b> and <b>Department</b> above to view the plan.</p></div></td></tr>`;
     return;
   }
 
@@ -1845,7 +1879,7 @@ function renderPlan() {
   });
 
   const cols = visibleCols();
-  if(!tasks.length){tbody.innerHTML=`<tr><td colspan="${cols.length}"><div class="empty"><div class="empty-icon">📋</div><p>No tasks for this selection.</p></div></td></tr>`;return;}
+  if(!tasks.length){tbody.innerHTML=`<tr><td colspan="${cols.length}"><div class="empty"><div class="empty-icon">${sgIc('clipboard')}</div><p>No tasks for this selection.</p></div></td></tr>`;return;}
 
   tbody.innerHTML=tasks.map(t=>`<tr id="row-${t.id}">${cols.map(c=>planCellHtml(t,c.key)).join('')}</tr>`).join('') + planTotalRowHtml(tasks, cols);
 }
@@ -1952,7 +1986,7 @@ async function exportPlanExcel() {
 
   let XLSX;
   try { XLSX = await ensureXLSX(); }
-  catch (e) { toast('⚠ ' + (e.message || 'Could not load Excel library')); return; }
+  catch (e) { toast(e.message || 'Could not load Excel library'); return; }
 
   const header = cols.map(c => c.label);
   const rows   = tasks.map(t => cols.map(c => planCellValue(t, c.key)));
@@ -1978,7 +2012,7 @@ async function exportPlanExcel() {
   const parts = ['Monthly-Plan', safe(dept), safe(month), safe(year), week ? safe(week) : 'All-Weeks'];
   const fname = parts.filter(Boolean).join('_') + '.xlsx';
   XLSX.writeFile(wb, fname);
-  toast('Excel downloaded ✓');
+  toast('Excel downloaded');
 }
 
 
@@ -1993,8 +2027,8 @@ function saveInlineRow(id) {
     else t[field]=el.value;
   });
   save();
-  toast('Row saved ✓');
-  row.style.outline='2px solid #1A8577';
+  toast('Row saved');
+  row.style.outline='2px solid #7FA6F0';
   setTimeout(()=>row.style.outline='',1200);
 }
 
@@ -2016,14 +2050,14 @@ function saveMgrComment() {
   const t = DB.tasks.find(x=>x.id===_mgrCommentTaskId); if (!t) return;
   if (!canEditMgrTaskFields(t)) { toast('Not allowed'); return; }
   t.managerComment = document.getElementById('mc-text').value;
-  save(); closeModal('mgr-comment-modal'); renderPlan(); toast('Comment saved ✓');
+  save(); closeModal('mgr-comment-modal'); renderPlan(); toast('Comment saved');
 }
 // Manager Grade auto-saves on change (a reporting manager may not have the row's save button).
 function sgSetGrade(id, val) {
   const t = DB.tasks.find(x=>x.id===id); if (!t) return;
   if (!canEditMgrTaskFields(t)) { toast('Not allowed'); renderPlan(); return; }
   t.managerGrade = val || '';
-  save(); renderPlan(); toast('Grade saved ✓');
+  save(); renderPlan(); toast('Grade saved');
 }
 
 // Compact date field: chip shows the value; clicking expands the picker in-cell.
@@ -2165,7 +2199,7 @@ function renderReviews() {
   // Default view is blank — Dept Head / Admin must pick a Member (via filters) before anything shows.
   // Members viewing their own reviews (dept/member filters hidden) see their data immediately.
   if (viewOthers && !memberF) {
-    document.getElementById('review-list').innerHTML = `<div class="empty"><div class="empty-icon">🔎</div><p>Select a Member from the filters above to view their review.</p></div>`;
+    document.getElementById('review-list').innerHTML = `<div class="empty"><div class="empty-icon">${sgIc('search')}</div><p>Select a Member from the filters above to view their review.</p></div>`;
     return;
   }
 
@@ -2177,7 +2211,7 @@ function renderReviews() {
   if (memberF) reviews = reviews.filter(r => r.member === memberF);
 
   if (!reviews.length) {
-    document.getElementById('review-list').innerHTML = `<div class="empty"><div class="empty-icon">📊</div><p>${!viewOthers ? 'You have no reviews yet. Click "+ Submit Self Review" to submit yours.' : 'No reviews found for this selection.'}</p></div>`;
+    document.getElementById('review-list').innerHTML = `<div class="empty"><div class="empty-icon">${sgIc('chart')}</div><p>${!viewOthers ? 'You have no reviews yet. Click "+ Submit Self Review" to submit yours.' : 'No reviews found for this selection.'}</p></div>`;
     return;
   }
 
@@ -2191,9 +2225,9 @@ function renderReviews() {
     const mgrDone = items.some(i => sgScoreEntered(i.mgrScore));
     const memDone = items.some(i => sgScoreEntered(i.memberScore));
     const statusPill = mgrDone
-      ? `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--green-lt);color:var(--green);border:1px solid var(--green)">✓ Mgr Scored</span>`
+      ? `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--green-lt);color:var(--green);border:1px solid var(--green)">${sgIc('check')} Mgr Scored</span>`
       : memDone
-        ? `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--blue-lt);color:var(--blue);border:1px solid var(--blue)">⏳ Awaiting Mgr Score</span>`
+        ? `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--blue-lt);color:var(--blue);border:1px solid var(--blue)">${sgIc('hourglass')} Awaiting Mgr Score</span>`
         : `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--surface2);color:var(--text3);border:1px solid var(--border2)">Draft</span>`;
 
     const groups = groupByGoal(items);
@@ -2221,7 +2255,7 @@ function renderReviews() {
           <td>${esc(i.particulars||'—')}</td>
           <td style="text-align:center">${esc(i.target||'—')}</td>
           <td style="text-align:center">${esc(i.actual||'—')}</td>
-          <td style="text-align:center"><button type="button" class="remark-icon-btn ${hasRemark?'has-remark':''}" title="${hasRemark?'View / edit remark':(canEditRemark?'Add remark':'No remark')}" onclick="sgOpenItemRemarkModal('${r.id}',${itemIndex})">${hasRemark?'📝':'✏️'}</button></td>
+          <td style="text-align:center"><button type="button" class="remark-icon-btn ${hasRemark?'has-remark':''}" title="${hasRemark?'View / edit remark':(canEditRemark?'Add remark':'No remark')}" onclick="sgOpenItemRemarkModal('${r.id}',${itemIndex})">${hasRemark?sgIc('note'):sgIc('edit')}</button></td>
           <td style="text-align:center;font-weight:700">${i.maxScore}</td>
           <td style="text-align:center"><span class="score-badge ${scoreClass(i.memberScore,i.maxScore)}">${sgScoreEntered(i.memberScore)?i.memberScore:'—'}</span></td>
           <td style="text-align:center">${sgScoreEntered(i.mgrScore)?`<span class="score-badge ${scoreClass(i.mgrScore,i.maxScore)}">${i.mgrScore}</span>`:'<span style="font-size:11px;color:var(--text3)">—</span>'}</td>
@@ -2269,8 +2303,8 @@ function renderReviews() {
 
     const overallHtml = sgOverallHtml(r.remarks);
     const sheetBHtml = sgSheetBLinkHtml(r.sheetBLink);
-    const helpHtml = sgReviewNoteHtml('🆘', 'Help Needed', r.helpNeeded);
-    const areasHtml = sgReviewNoteHtml('📈', 'Areas of Improvement', r.areasOfImprovement);
+    const helpHtml = sgReviewNoteHtml(sgIc('help'), 'Help Needed', r.helpNeeded);
+    const areasHtml = sgReviewNoteHtml(sgIc('trend'), 'Areas of Improvement', r.areasOfImprovement);
     const summaryHtml = `<div style="margin-bottom:18px">
       <div class="review-section-hd">Summary of Review — ${monthYearLabel(r.year,r.month)} <span style="font-weight:400;font-size:11px;color:var(--text3);text-transform:none;letter-spacing:0">— click a SMART Goal to view its details</span></div>
       ${(overallHtml || sheetBHtml) ? `<div style="margin:10px 0 8px;display:grid;grid-template-columns:minmax(0,1fr) 200px;gap:8px;align-items:start">${overallHtml||'<span></span>'}${sheetBHtml||'<span></span>'}</div>` : ''}
@@ -2304,7 +2338,7 @@ function renderReviews() {
         <div style="font-size:11px;color:var(--text3)">Reviewer: ${esc(r.reviewer||'—')}</div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap" onclick="event.stopPropagation()">
           <span class="score-badge" style="background:${pctColor(totalPerformance)}22;color:${pctColor(totalPerformance)};border:1px solid ${pctColor(totalPerformance)}55">Performance: ${totalPerformance}%</span>
-          ${(canEditMemberScore(r)||canEditMgrScore(r))?`<button class="btn btn-secondary btn-sm" onclick="openReviewModal('${r.id}')">✏️ Edit</button>`:''}
+          ${(canEditMemberScore(r)||canEditMgrScore(r))?`<button class="btn btn-secondary btn-sm" onclick="openReviewModal('${r.id}')">${sgIc('edit')} Edit</button>`:''}
           ${currentUser.role===ROLES.ADMIN||currentUser.role===ROLES.DEPT_HEAD?`<button class="btn btn-danger btn-sm" onclick="deleteReview('${r.id}')">Delete</button>`:''}
         </div>
       </div>
@@ -2701,7 +2735,7 @@ function sgSmRenderEditor() {
       <div class="sm-ed-blockhd">
         <span class="sm-label" style="margin:0">Grading Schema —</span>
         <input class="sm-title" value="${esc(b.title)}" placeholder="e.g. Annexure C — Light and Right Academic Reports and Forms" data-p="${bi}.t" oninput="sgSmInput(this)">
-        <button type="button" class="btn btn-danger btn-sm" onclick="sgSmAct('delBlock',${bi})" title="Remove this grading schema">🗑️</button>
+        <button type="button" class="btn btn-danger btn-sm" onclick="sgSmAct('delBlock',${bi})" title="Remove this grading schema">${sgIc('trash')}</button>
       </div>`;
     b.items.forEach((it, ii) => {
       if (it.type === 'text') {
@@ -2807,7 +2841,7 @@ function sgSaveSuccessMeasures() {
     b.title = text ? 'View Success Measures' : 'No Success Measures yet';
   });
   const smBtn = document.getElementById('gg-success-btn');
-  if (smBtn && editingGoalGroup) smBtn.textContent = text ? '👁 View / Edit Success Measures' : '+ Add Success Measures';
+  if (smBtn && editingGoalGroup) smBtn.innerHTML = text ? sgIc('eye') + ' View / Edit Success Measures' : '+ Add Success Measures';
   toast('Success Measures saved');
 }
 // From the Edit SMART Goal form: open the same structured editor.
@@ -2899,8 +2933,8 @@ function renderSettings() {
           </div>
           <div style="font-size:11px;color:var(--text3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${m.managerName ? ('Mgr: ' + esc(m.managerName)) : 'Mgr: —'}</div>
         </div>
-        <button class="btn btn-secondary btn-sm" title="Edit member" onclick="openEditMemberModal(${i})">✎ Edit</button>
-        <button class="btn btn-danger btn-sm" title="Delete member permanently" onclick="removeMember(${i})">🗑</button>
+        <button class="btn btn-secondary btn-sm" title="Edit member" onclick="openEditMemberModal(${i})">${sgIc('edit')} Edit</button>
+        <button class="btn btn-danger btn-sm" title="Delete member permanently" onclick="removeMember(${i})">${sgIc('trash')}</button>
       </div>`;
       }).join('');
     membersEl.innerHTML = rowsHtml || '<p style="font-size:12px;color:var(--text3)">No team members in '+esc(currentDept)+' yet. Use “+ Add Member”.</p>';
@@ -3169,7 +3203,7 @@ function deptInitial(name) {
 }
 
 function deptColor(idx) {
-  const colors = ['#0D6B5E','#2E5FA3','#C07C0A','#4C1D95','#084D44','#5A6B7A','#1F3F6E'];
+  const colors = ['#2F6FE4','#0B8F7A','#C07C0A','#4C1D95','#2457C5','#5A6B7A','#1F3F6E'];
   return colors[idx % colors.length];
 }
 
@@ -3181,7 +3215,7 @@ function renderSidebar() {
 
   const allActive = !currentDept ? 'active-dept' : '';
   html += `<div class="sb-all ${allActive}" onclick="selectDept('')">
-    <span class="sb-all-icon">🏢</span>
+    <span class="sb-all-icon">${sgIc('building')}</span>
     <span style="transition:opacity .15s">All Departments</span>
   </div>`;
 
@@ -3512,7 +3546,7 @@ function _saveToastCheck(t) {
   if (!allIn) return;
   t.done = true;
   t.el.className = 'sg-stoast saved show';
-  t.el.innerHTML = '<span class="sg-ck">✓</span><span>Saved</span>';
+  t.el.innerHTML = '<span class="sg-ck">' + sgIc('check') + '</span><span>Saved</span>';
   setTimeout(function () {
     t.el.classList.remove('show');
     setTimeout(function () {
@@ -4284,7 +4318,7 @@ function tfDT(d) { return d ? d.toLocaleString('en-IN', { day: '2-digit', month:
 function tfAgo(d) { if (!d) return '—'; var m = Math.round((tfNow() - d) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' d ago'; }
 function tfChip(s) {
   var c = { 'Within SLA': 'ok', 'On track': 'neu', 'At risk': 'warn', 'Breached': 'bad', 'No SLA': 'neu' }[s] || 'neu';
-  var i = { 'Within SLA': '✓', 'On track': '•', 'At risk': '!', 'Breached': '✕', 'No SLA': '–' }[s] || '';
+  var i = { 'Within SLA': sgIc('check'), 'On track': '•', 'At risk': sgIc('alert'), 'Breached': sgIc('x'), 'No SLA': '–' }[s] || '';
   return '<span class="tf-chip ' + c + '">' + i + ' ' + esc(s) + '</span>';
 }
 function tfVal(id) { var el = document.getElementById(id); return el ? el.value : ''; }
@@ -4475,7 +4509,7 @@ function tfRenderDwell(T) {
     var y = i * rowH + 4, w = r.med ? Math.max(3, (W - LW - 70) * r.med / max) : 0;
     var lab = r.l.label.length > 24 ? r.l.label.slice(0, 23) + '…' : r.l.label;
     s += '<g data-tip="' + i + '"><rect x="0" y="' + (y - 2) + '" width="' + W + '" height="' + rowH + '" fill="transparent"/>' +
-      '<text x="' + (LW - 8) + '" y="' + (y + 14) + '" text-anchor="end" style="fill:var(--text2)">' + esc(lab) + (r.l.pausesSla ? ' ⏸' : '') + '</text>' +
+      '<text x="' + (LW - 8) + '" y="' + (y + 14) + '" text-anchor="end" style="fill:var(--text2)">' + esc(lab) + (r.l.pausesSla ? ' (paused)' : '') + '</text>' +
       (w ? '<path d="M' + LW + ',' + (y + 4) + ' H' + (LW + w - 4) + ' Q' + (LW + w) + ',' + (y + 4) + ' ' + (LW + w) + ',' + (y + 8) + ' V' + (y + 14) + ' Q' + (LW + w) + ',' + (y + 18) + ' ' + (LW + w - 4) + ',' + (y + 18) + ' H' + LW + ' Z" fill="var(--tf-s1)"/>' : '') +
       (r.l.targetHours ? '<line x1="' + (LW + (W - LW - 70) * r.l.targetHours / max) + '" x2="' + (LW + (W - LW - 70) * r.l.targetHours / max) + '" y1="' + (y + 1) + '" y2="' + (y + 21) + '" stroke="var(--text)" stroke-width="2" stroke-dasharray="3 2"/>' : '') +
       '<text x="' + (LW + w + 6) + '" y="' + (y + 15) + '" style="fill:var(--text);font-weight:600">' + (r.med == null ? 'no data' : tfH(r.med)) + '</text></g>';
@@ -4498,7 +4532,7 @@ function tfRenderBoards(T) {
     var c = bt.filter(function (t) { return t.done; }), o = bt.filter(function (t) { return !t.done; });
     var sc = c.filter(function (t) { return t.sla !== 'No SLA'; });
     var pct = sc.length ? Math.round(sc.filter(function (t) { return t.sla === 'Within SLA'; }).length / sc.length * 100) : null;
-    var chip = pct == null ? '<span class="tf-chip neu">– none closed</span>' : pct >= 85 ? '<span class="tf-chip ok">✓ ' + pct + '%</span>' : pct >= 60 ? '<span class="tf-chip warn">! ' + pct + '%</span>' : '<span class="tf-chip bad">✕ ' + pct + '%</span>';
+    var chip = pct == null ? '<span class="tf-chip neu">– none closed</span>' : pct >= 85 ? '<span class="tf-chip ok">' + sgIc('check') + ' ' + pct + '%</span>' : pct >= 60 ? '<span class="tf-chip warn">! ' + pct + '%</span>' : '<span class="tf-chip bad">' + sgIc('x') + ' ' + pct + '%</span>';
     return '<tr data-b="' + esc(b.uid) + '"' + (sel === b.uid ? ' class="tf-sel"' : '') + '><td><b>' + esc(b.label) + '</b></td><td>' + esc(b.tracker) + '</td>' +
       '<td class="tf-num">' + o.length + '</td><td class="tf-num">' + c.length + '</td><td class="tf-num">' + tfH(tfMedian(c.map(function (t) { return t.hrs; }).filter(function (h) { return h != null; }))) + '</td>' +
       '<td class="tf-num">' + (b.slaHours ? b.slaHours + 'h' : '—') + '</td><td>' + chip + '</td>' +
@@ -4536,9 +4570,9 @@ function tfPickBy(name) {
 }
 function tfWhy(t) {
   var out = [];
-  if (t.sla === 'Breached') out.push('<span class="tf-chip bad">✕ Over SLA by ' + tfH(t.hrs - t.board.slaHours) + '</span>');
-  if (t.overdue > 0) out.push('<span class="tf-chip bad">⏰ Due ' + tfH(t.overdue) + ' ago</span>');
-  if (t.blocked) out.push('<span class="tf-chip bad" title="' + esc(t.blocked) + '">⛔ Blocked</span>');
+  if (t.sla === 'Breached') out.push('<span class="tf-chip bad">' + sgIc('x') + ' Over SLA by ' + tfH(t.hrs - t.board.slaHours) + '</span>');
+  if (t.overdue > 0) out.push('<span class="tf-chip bad">' + sgIc('clock') + ' Due ' + tfH(t.overdue) + ' ago</span>');
+  if (t.blocked) out.push('<span class="tf-chip bad" title="' + esc(t.blocked) + '">' + sgIc('block') + ' Blocked</span>');
   if (t.inStageHrs >= t.board.attnHrs) out.push('<span class="tf-chip warn">! ' + tfH(t.inStageHrs) + ' in ' + esc(t.cur) + '</span>');
   return '<span class="tf-why">' + out.join('') + '</span>';
 }
@@ -4587,7 +4621,7 @@ function tfRenderTickets(T) {
       '<td>' + esc(t.board.label) + '</td><td>' + tfOwnerCell(t) + '</td><td>' + tfD(t.created) + '</td>' +
       '<td><span class="tf-stage">' + esc(t.cur) + '</span></td><td>' + note + '</td>' +
       '<td class="tf-num">' + tfH(t.hrs) + '</td><td>' + tfChip(t.sla) + '</td></tr>';
-  }).join('') || '<tr><td colspan="9" class="tf-empty">' + (tab === 'attention' ? '✓ Nothing needs attention for these filters.' : 'No tickets match these filters.') + '</td></tr>';
+  }).join('') || '<tr><td colspan="9" class="tf-empty">' + (tab === 'attention' ? sgIc('check') + ' Nothing needs attention for these filters.' : 'No tickets match these filters.') + '</td></tr>';
   body.querySelectorAll('tr[data-i]').forEach(function (tr) { tr.onclick = function () { tfOpenDrawer(slice[+tr.getAttribute('data-i')]); }; });
 
   document.getElementById('tf-pager').innerHTML = rows.length > size
@@ -4612,8 +4646,8 @@ function tfOpenDrawer(t) {
     (t.responsible && t.responsible !== t.by ? '<dt>Responsible</dt><dd>' + esc(t.responsible) + '</dd>' : '') +
     (t.owners.length ? '<dt>Owners</dt><dd>' + esc(t.owners.join(', ')) + '</dd>' : '') +
     (t.priority ? '<dt>Priority</dt><dd>' + esc(t.priority) + '</dd>' : '') +
-    (t.due ? '<dt>Due date</dt><dd>' + tfD(t.due) + (t.overdue ? ' <span class="tf-chip bad">⏰ ' + tfH(t.overdue) + ' overdue</span>' : '') + '</dd>' : '') +
-    (t.blocked ? '<dt>Blocked</dt><dd><span class="tf-chip bad">⛔</span> ' + esc(t.blocked) + '</dd>' : '') +
+    (t.due ? '<dt>Due date</dt><dd>' + tfD(t.due) + (t.overdue ? ' <span class="tf-chip bad">' + sgIc('clock') + ' ' + tfH(t.overdue) + ' overdue</span>' : '') + '</dd>' : '') +
+    (t.blocked ? '<dt>Blocked</dt><dd><span class="tf-chip bad">' + sgIc('block') + '</span> ' + esc(t.blocked) + '</dd>' : '') +
     (t.requestedBy ? '<dt>Requested by</dt><dd>' + esc(t.requestedBy) + '</dd>' : '') +
     (t.category ? '<dt>Activity</dt><dd>' + esc(t.category) + '</dd>' : '') +
     (t.nwStatus ? '<dt>NimbleWork</dt><dd>' + esc(t.nwStatus) + (t.nwClosed && !isNaN(Date.parse(t.nwClosed)) ? ' · closed ' + tfD(tfWall(Date.parse(t.nwClosed))) : '') + '</dd>' : '') +
@@ -4626,8 +4660,8 @@ function tfOpenDrawer(t) {
     '</dl><div style="font-weight:700;margin-bottom:10px">Stage timeline <span class="tf-note">(first time each lane was reached)</span></div><div class="tf-tl">' +
     lanes.map(function (l, i) {
       var st = t.stamps[i], sg = segByLane[i];
-      var dur = sg && sg.to ? '<span class="tf-dur">' + (sg.open ? 'here for ' : '') + tfH(tfSpanH(sg.from, sg.to, t.board)) + (l.pausesSla ? ' ⏸' : '') + '</span>' : '';
-      var over = sg && sg.to && l.targetHours && tfSpanH(sg.from, sg.to, t.board) > l.targetHours ? ' <span class="tf-chip bad">✕ over ' + l.targetHours + 'h target</span>' : '';
+      var dur = sg && sg.to ? '<span class="tf-dur">' + (sg.open ? 'here for ' : '') + tfH(tfSpanH(sg.from, sg.to, t.board)) + (l.pausesSla ? ' (paused)' : '') + '</span>' : '';
+      var over = sg && sg.to && l.targetHours && tfSpanH(sg.from, sg.to, t.board) > l.targetHours ? ' <span class="tf-chip bad">' + sgIc('x') + ' over ' + l.targetHours + 'h target</span>' : '';
       return '<div class="tf-tl-item' + (st ? '' : ' pending') + '"><div style="font-weight:600">' + esc(l.label) + dur + over + '</div><div class="tf-tl-sub">' + (st ? tfDT(st) : 'not reached') + '</div></div>';
     }).join('') + '</div><div id="tf-d-events"><div class="tf-note">Loading full movement history…</div></div>';
   document.getElementById('tf-d-body').innerHTML = html;
@@ -4667,7 +4701,7 @@ document.addEventListener('keydown', function (e) { if (e.key === 'Escape') tfCl
 // ── configuration (read-only mirror of the Flow_* tabs) ──
 function tfToggleConfig() {
   TF.config = !TF.config;
-  var b = document.getElementById('tf-cfg-btn'); if (b) b.textContent = TF.config ? '← Back to dashboard' : '⚙ Configuration';
+  var b = document.getElementById('tf-cfg-btn'); if (b) b.innerHTML = TF.config ? '← Back to dashboard' : sgIc('gear') + ' Configuration';
   tfRender();
 }
 function tfRenderConfig() {
@@ -4688,7 +4722,7 @@ function tfRenderConfig() {
       html += '<div class="sub-hd" style="margin-top:14px">' + esc(b.label) + ' <span style="color:var(--text3);font-weight:500">· board ' + esc(b.id) + ' · sheet "' + esc(b.sheet) + '"' + (b.archiveSheet ? ' + "' + esc(b.archiveSheet) + '"' : '') + ' · SLA ' + (b.slaHours ? esc(b.slaHours) + 'h' : 'none') + '</span></div>' +
         '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>#</th><th>Lane key</th><th>Label</th><th class="tf-num">Sheet column</th><th>Type</th><th>Pauses SLA</th><th class="tf-num">Stage target</th></tr></thead><tbody>' +
         b.lanes.map(function (l, i) {
-          return '<tr style="cursor:default"><td>' + (i + 1) + '</td><td style="color:var(--text3)">' + esc(l.key) + '</td><td>' + esc(l.label) + '</td><td class="tf-num">' + esc(l.col) + '</td><td>' + esc(l.type) + '</td><td>' + (l.pausesSla ? 'Yes ⏸' : 'No') + '</td><td class="tf-num">' + (l.targetHours ? esc(l.targetHours) + 'h' : '—') + '</td></tr>';
+          return '<tr style="cursor:default"><td>' + (i + 1) + '</td><td style="color:var(--text3)">' + esc(l.key) + '</td><td>' + esc(l.label) + '</td><td class="tf-num">' + esc(l.col) + '</td><td>' + esc(l.type) + '</td><td>' + (l.pausesSla ? 'Yes (pauses SLA)' : 'No') + '</td><td class="tf-num">' + (l.targetHours ? esc(l.targetHours) + 'h' : '—') + '</td></tr>';
         }).join('') + '</tbody></table></div>';
     });
     html += '</div></div>';
