@@ -2470,3 +2470,38 @@
   .award-page .awm-view .pom-select { min-width: 0; width: 100%; max-width: none; }
   .award-page .awm-view .awm-ay { margin-left: 0; }
 }
+
+/* ======================================================================
+   Slimmer: the same pieces, less bulk. A compact banner, shorter tabs and
+   a tighter toolbar so more of the page is the work itself.
+   ====================================================================== */
+.award-page .pg-hero { padding: 16px 24px; margin-bottom: 14px; border-radius: 18px; gap: 12px 20px; }
+.award-page .pg-hero-lead { gap: 14px; }
+.award-page .pg-hero-ico { width: 44px; height: 44px; border-radius: 14px; }
+.award-page .pg-hero-ico .aw-icon { font-size: 24px; }
+.award-page .pg-hero-ico .aw-icon svg { width: 24px; height: 24px; }
+.award-page .pg-hero-title { font-size: 22px; letter-spacing: -.5px; margin: 0 0 2px; }
+.award-page .pg-hero-sub { font-size: 13px; }
+.award-page .pg-hero .pg-btn { min-height: 36px; padding: 0 14px; font-size: 13px; border-radius: 11px; }
+.award-page .pg-hero .aw-refresh-all { min-width: 130px; }
+
+.award-page .aw-topbar { margin-bottom: 12px; }
+.award-page .aw-toptabs { padding: 4px; border-radius: 14px; gap: 4px; box-shadow: 0 1px 6px rgba(15,23,42,.05); }
+.award-page .aw-toptab { padding: 8px 16px; border-radius: 11px; font-size: 13.5px; gap: 7px; }
+.award-page .aw-toptab .aw-icon svg { width: 16px; height: 16px; }
+.award-page .aw-toptabs .aw-toptab.is-active { box-shadow: 0 4px 10px rgba(47,111,228,.3), inset 0 1px 0 rgba(255,255,255,.35); }
+
+.award-page .aw-subtabs { margin-bottom: 12px; gap: 6px; }
+.award-page .aw-subtab, .award-page .aw-utiltab { padding: 6px 14px; font-size: 12.5px; }
+.award-page .aw-utiltab.is-active, .award-page .aw-subtab.is-active { box-shadow: 0 3px 8px rgba(47,111,228,.26); }
+
+.award-page .awm-view .pom-filter-card { padding: 8px 12px; margin-bottom: 12px; border-radius: 14px; gap: 10px; box-shadow: 0 1px 6px rgba(15,23,42,.04); }
+.award-page .awm-view .pom-select { height: 38px; min-width: 210px; padding: 0 12px; border-radius: 10px; font-size: 13.5px; }
+.award-page .awm-view .awm-ay { padding: 5px 12px; font-size: 12px; }
+.award-page .awm-view .pom-card { border-radius: 14px; box-shadow: 0 1px 6px rgba(15,23,42,.04); }
+.award-page .awm-view .pom-msg { padding: 28px 16px 26px; font-size: 13.5px; }
+.award-page .awm-view .pom-msg:not(.error)::before { width: 46px; height: 46px; margin-bottom: 10px; border-radius: 15px; background-size: 24px, auto; box-shadow: 0 8px 16px rgba(47,111,228,.24), inset 0 1px 0 rgba(255,255,255,.35); }
+@media (max-width: 720px) {
+  .award-page .pg-hero { padding: 14px 16px; }
+  .award-page .aw-toptab { padding: 8px 12px; }
+}
