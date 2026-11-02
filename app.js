@@ -1544,6 +1544,19 @@ function pageLabel(page) {
     return el ? el.textContent.trim() : page;
 }
 
+// The bar at the top names the page you are on, with the same picture as the menu.
+function updateTopbarCrumb(page) {
+    const el = document.getElementById("tbCrumb");
+    if (!el) return;
+    const btn = document.querySelector(`#appSidebar .nav-item[data-page="${page}"]`);
+    const icon = btn ? (btn.querySelector(".icon")?.innerHTML || "") : "";
+    el.innerHTML = `<span class="tb-crumb-ico" aria-hidden="true">${icon}</span><span>${escHtml(pageLabel(page))}</span>`;
+    el.hidden = false;
+    el.classList.remove("is-in");
+    void el.offsetWidth;
+    el.classList.add("is-in");
+}
+
 function watchPageAccess() {
     if (pageAccessUnsub) return;
     pageAccessUnsub = onSnapshot(PAGE_ACCESS_DOC, (snap) => {
@@ -1851,6 +1864,7 @@ window.navigate = async function (page) {
     document.querySelectorAll("#appSidebar .nav-item").forEach(el => {
         el.classList.toggle("active", el.dataset.page === page);
     });
+    updateTopbarCrumb(page);
 
     pageContent.innerHTML = await getPageHtml(page);
 

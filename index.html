@@ -2794,6 +2794,28 @@
     .theme-switch button[aria-checked="true"] svg { transform: scale(1.1); }
     @media (max-width: 520px) { .theme-switch { --ts-w: 26px; } }
 
+    /* a taller bar with a soft lit top edge */
+    html[data-theme] .topbar { height: 58px; background-image: linear-gradient(180deg, var(--chrome-hi), transparent 70%); }
+    html[data-theme] .topbar-logo { font-size: 25px; }
+
+    /* where you are: a small pill beside the name, it changes as you move around */
+    .tb-crumb {
+        display: inline-flex; align-items: center; gap: 9px; margin-left: 4px; padding: 0 14px 0 0; min-width: 0;
+        font-size: 13px; font-weight: 700; letter-spacing: -.1px; color: var(--chrome-ink); white-space: nowrap;
+    }
+    .tb-crumb[hidden] { display: none; }
+    .tb-crumb::before { content: ""; width: 1px; height: 24px; margin-right: 6px; background: linear-gradient(180deg, transparent, var(--chrome-faint), transparent); opacity: .55; }
+    .tb-crumb-ico {
+        width: 30px; height: 30px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 10px; background: var(--chrome-bg);
+        box-shadow: -2px -2px 5px var(--chrome-hi), 2px 2px 5px var(--chrome-lo);
+    }
+    .tb-crumb-ico svg { width: 20px; height: 20px; display: block; }
+    @media (prefers-reduced-motion: no-preference) {
+        .tb-crumb.is-in { animation: tb-crumb-in .45s cubic-bezier(.22,1,.36,1); }
+        @keyframes tb-crumb-in { from { opacity: 0; transform: translateX(-10px); } }
+    }
+    @media (max-width: 900px) { .tb-crumb { display: none; } }
+
     /* profile chip */
     .tp-avatar { position: relative; width: 32px; height: 32px; font-size: 12px; box-shadow: 0 0 0 2px var(--chrome-bg, #fff), 0 0 0 3.5px rgba(79,142,247,.55), 0 4px 10px rgba(79,142,247,.35); }
     .tp-avatar::after {
@@ -3076,6 +3098,7 @@
         <div class="topbar-logo" role="img" aria-label="OLF Staff Connect">
             <span class="logo-olf" aria-hidden="true"><i style="--i:0">O</i><i style="--i:1">L</i><i style="--i:2">F</i></span><span class="logo-sc" aria-hidden="true"><span class="lw"><i style="--i:3">S</i><i style="--i:4">t</i><i style="--i:5">a</i><i style="--i:6">f</i><i style="--i:7">f</i></span><span class="lw"><i style="--i:8">C</i><i style="--i:9">o</i><i style="--i:10">n</i><i style="--i:11">n</i><i style="--i:12">e</i><i style="--i:13">c</i><i style="--i:14">t</i></span></span>
         </div>
+        <div class="tb-crumb" id="tbCrumb" hidden aria-live="polite"></div>
         <div class="tp-group">
             <div class="theme-switch" id="olfThemeSwitch" role="radiogroup" aria-label="Colour theme">
                 <button type="button" role="radio" data-theme-choice="light" aria-checked="false" title="Light theme" aria-label="Light theme">
@@ -3337,7 +3360,7 @@
     </div>
 </div>
 
-<script type="module" src="app.js?v=2026-11-02d"></script>
+<script type="module" src="app.js?v=2026-11-02e"></script>
 <script src="profile.js"></script>
 <script src="pom.js"></script>
 <script src="calendar.js"></script>
