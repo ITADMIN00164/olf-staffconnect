@@ -29,15 +29,15 @@
   --graphite: #334155;
   --graphite-deep: #1E293B;
 
-  --accent: #0F766E;
-  --accent-hover: #115E59;
-  --accent-line: #5EEAD4;
-  --accent-soft: #F0FDFA;
-  --accent-soft-border: #CCFBF1;
-  --accent-ink: #115E59;
+  --accent: #2F6FE4;
+  --accent-hover: #2457C5;
+  --accent-line: #93B8F7;
+  --accent-soft: #EEF4FF;
+  --accent-soft-border: #D3E2FC;
+  --accent-ink: #2457C5;
   --accent-on: #FFFFFF;
 
-  --accent-2: #0D9488;
+  --accent-2: #10B197;
 
   /* The only other colours in the tab, and each one means a thing: arrived,
      waiting, refused. Taken from the shell, which already says amber for
@@ -169,7 +169,7 @@
 .award-page .field input:focus, .award-page .field select:focus {
   outline: none;
   border-color: var(--accent-line);
-  box-shadow: 0 0 0 3px rgba(15, 118, 110, .15);
+  box-shadow: 0 0 0 3px rgba(47, 111, 228, .15);
 }
 .award-page .field select:disabled, .award-page .field input:disabled {
   background: var(--surface-alt);
@@ -1289,7 +1289,7 @@
   color: var(--text);
 }
 .award-page #stock-table .cell-input:focus { outline: none;
-  box-shadow: 0 0 0 3px rgba(15, 118, 110, .15); }
+  box-shadow: 0 0 0 3px rgba(47, 111, 228, .15); }
 
 /* Said once, above the sheet, so nobody has to discover it by clicking. */
 .award-page .stock-howto {
@@ -1899,7 +1899,7 @@
    ====================================================================== */
 
 .award-page {
-  --tone-block: #0F766E;    --tone-block-soft: rgba(15,118,110,.12);
+  --tone-block: #2F6FE4;    --tone-block-soft: rgba(47,111,228,.12);
   --tone-district: #4F46E5; --tone-district-soft: rgba(79,70,229,.12);
   --tone-ns: #D97706;       --tone-ns-soft: rgba(217,119,6,.14);
   --tone-su: #E11D48;       --tone-su-soft: rgba(225,29,72,.12);
@@ -1922,8 +1922,8 @@
 
 .award-page .aw-subtab { border-radius: 999px; }
 .award-page .aw-subtab.is-active {
-  background: linear-gradient(135deg, var(--accent), #0E9488);
-  box-shadow: 0 4px 12px rgba(15,118,110,.28);
+  background: linear-gradient(135deg, var(--accent), #10B197);
+  box-shadow: 0 4px 12px rgba(47,111,228,.28);
 }
 .award-page .aw-subtab:not(.is-active):hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(15,23,42,.08); }
 
@@ -1931,8 +1931,8 @@
 .award-page .btn { transition: transform .15s var(--ease), box-shadow .2s ease, background-color .15s ease, border-color .15s ease, filter .15s ease; }
 .award-page .btn:not(:disabled):hover { transform: translateY(-1px); }
 .award-page .btn:not(:disabled):active { transform: translateY(0) scale(.98); }
-.award-page .btn-primary { background: linear-gradient(135deg, var(--accent), #0E9488); box-shadow: 0 3px 10px rgba(15,118,110,.25); }
-.award-page .btn-primary:hover:not(:disabled) { box-shadow: 0 7px 18px rgba(15,118,110,.32); }
+.award-page .btn-primary { background: linear-gradient(135deg, var(--accent), #10B197); box-shadow: 0 3px 10px rgba(47,111,228,.25); }
+.award-page .btn-primary:hover:not(:disabled) { box-shadow: 0 7px 18px rgba(47,111,228,.32); }
 .award-page .btn-ghost:hover:not(:disabled) { border-color: var(--accent-line); background: var(--accent-soft); }
 
 /* ---- cards and panels ---- */
@@ -2143,8 +2143,8 @@
 .award-page .admin-row:hover { transform: translateY(-2px); box-shadow: var(--lift); border-color: var(--accent-line); }
 .award-page .admin-avatar {
   display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; flex: none;
-  font-size: .82rem; font-weight: 800; color: #fff; background: linear-gradient(135deg, var(--accent), #0E9488);
-  box-shadow: 0 4px 10px rgba(15,118,110,.28);
+  font-size: .82rem; font-weight: 800; color: #fff; background: linear-gradient(135deg, var(--accent), #10B197);
+  box-shadow: 0 4px 10px rgba(47,111,228,.28);
 }
 .award-page .admin-empty { list-style: none; display: flex; flex-direction: column; align-items: center; padding: 20px 0 6px; color: var(--text-soft); font-weight: 600; }
 .award-page .admin-empty p { margin: 0; }
@@ -2238,7 +2238,7 @@
 .award-page .review-box { display: flex; flex-direction: column; width: min(640px, 96vw); max-width: 640px; max-height: min(90vh, 780px); padding: 0; border-radius: 20px; overflow: hidden; }
 .award-page .rv-head { display: flex; align-items: center; gap: 14px; padding: 18px 22px; border-bottom: 1px solid var(--border); background: linear-gradient(135deg, var(--accent-soft), var(--surface)); }
 .award-page .rv-head .aw-box-heading { flex: 1; min-width: 0; }
-.award-page .rv-badge { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; flex: none; color: #fff; background: linear-gradient(135deg, var(--accent), #0E9488); box-shadow: 0 6px 14px rgba(15,118,110,.3); }
+.award-page .rv-badge { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; flex: none; color: #fff; background: linear-gradient(135deg, var(--accent), #10B197); box-shadow: 0 6px 14px rgba(47,111,228,.3); }
 .award-page .rv-badge .aw-icon svg { width: 22px; height: 22px; }
 .award-page .review-body { flex: 1 1 auto; overflow-y: auto; padding: 18px 22px; }
 
@@ -2359,15 +2359,15 @@
 .award-page .awm-view .pmbtn { min-height: 40px; padding: 9px 20px; border-radius: 10px; font-weight: 800; transition: transform .15s var(--ease), box-shadow .2s ease, background-color .15s ease; }
 .award-page .awm-view .pmbtn:hover { transform: translateY(-1px); }
 .award-page .awm-view .pmbtn:active { transform: scale(.98); }
-.award-page .awm-view .pmbtn.primary { background: linear-gradient(135deg, var(--accent), #0E9488); box-shadow: 0 3px 10px rgba(15,118,110,.25); }
-.award-page .awm-view .pmbtn.primary:hover { background: linear-gradient(135deg, var(--accent-hover), var(--accent)); box-shadow: 0 7px 18px rgba(15,118,110,.32); }
+.award-page .awm-view .pmbtn.primary { background: linear-gradient(135deg, var(--accent), #10B197); box-shadow: 0 3px 10px rgba(47,111,228,.25); }
+.award-page .awm-view .pmbtn.primary:hover { background: linear-gradient(135deg, var(--accent-hover), var(--accent)); box-shadow: 0 7px 18px rgba(47,111,228,.32); }
 
 /* ---- Add records: a friendlier file chooser ---- */
 .award-page .awm-view .awa-file { transition: border-color .15s ease, background-color .15s ease; cursor: pointer; }
 .award-page .awm-view .awa-file:hover { border-color: var(--accent); background: var(--accent-soft); }
 .award-page .awm-view .awa-file::file-selector-button {
   margin-right: 12px; padding: 8px 18px; border: 0; border-radius: 999px; cursor: pointer;
-  background: linear-gradient(135deg, var(--accent), #0E9488); color: #fff; font: inherit; font-weight: 800;
+  background: linear-gradient(135deg, var(--accent), #10B197); color: #fff; font: inherit; font-weight: 800;
   transition: filter .15s ease;
 }
 .award-page .awm-view .awa-file:hover::file-selector-button { filter: brightness(1.08); }
@@ -2379,3 +2379,246 @@
   .award-page tr.is-loading td { animation: aw-shimmer 1.4s ease-in-out infinite; }
   .award-page .awm-view .pom-modal-box, .award-page .awm-view .pom-prompt-box { animation: aw-pop .3s var(--ease) both; }
 }
+
+
+/* ======================================================================
+   The shared banner (pg-*, index.html) on this page: the page-wide
+   Refresh now lives in it, and award.js still finds it by id.
+   ====================================================================== */
+.award-page .pg-hero { margin-bottom: 18px; }
+.award-page .pg-hero-ico .aw-icon { font-size: 32px; color: #fff; }
+.award-page .pg-hero-ico .aw-icon svg { width: 32px; height: 32px; stroke-width: 1.7; }
+.award-page .pg-btn .aw-icon svg { width: 16px; height: 16px; }
+.award-page .pg-hero .aw-refresh-all { min-width: 148px; justify-content: center; }
+.award-page .pg-hero .aw-refresh-all:disabled { opacity: .85; cursor: progress; }
+.award-page .pg-hero .aw-refresh-all.is-done { color: #fff; background: rgba(34,197,94,.42); border-color: rgba(255,255,255,.5); }
+
+/* ======================================================================
+   Awards & Gifts, one more pass: the tab bar becomes a segmented control,
+   the Awards view loses its grey box and gets a proper toolbar card, and
+   the empty message gets a picture. Only the look changes.
+   ====================================================================== */
+
+/* ---- top tabs: a glass track, the chosen tab filled ---- */
+.award-page .aw-topbar { border-bottom: 0; align-items: center; margin: 0 0 18px; }
+.award-page .aw-toptabs {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px; border-radius: 20px;
+  background: var(--surface); border: 1px solid var(--border); box-shadow: 0 2px 10px rgba(15,23,42,.06);
+}
+.award-page .aw-toptab {
+  display: inline-flex; align-items: center; gap: 9px; margin: 0; padding: 11px 22px; border: 0; border-radius: 15px;
+  font-size: 14.5px; font-weight: 800; letter-spacing: -.1px; color: var(--text-soft); background: transparent;
+  transition: color .18s ease, background-color .18s ease, box-shadow .22s ease, transform .15s var(--ease);
+}
+.award-page .aw-toptab .aw-icon { margin: 0; }
+.award-page .aw-toptab .aw-icon svg { width: 19px; height: 19px; }
+.award-page .aw-toptabs .aw-toptab:hover:not(.is-active) { background: var(--accent-soft); color: var(--accent-ink); }
+.award-page .aw-toptabs .aw-toptab.is-active {
+  color: #fff; border-image: none; background: linear-gradient(135deg, #4F8EF7, #10B197);
+  box-shadow: 0 8px 18px rgba(47,111,228,.34), inset 0 1px 0 rgba(255,255,255,.35);
+}
+.award-page .aw-toptab:active { transform: scale(.97); }
+
+/* ---- views inside a tab: a lighter segmented row ---- */
+.award-page .aw-subtabs { border-bottom: 0; padding-bottom: 0; margin-bottom: 18px; gap: 8px; }
+.award-page .aw-subtab, .award-page .aw-utiltab { padding: 9px 18px; font-size: 13px; border-radius: 999px; background: var(--surface); }
+.award-page .aw-utiltab.is-active {
+  background: linear-gradient(135deg, var(--accent), #10B197); border-color: transparent; color: #fff;
+  box-shadow: 0 6px 14px rgba(47,111,228,.28);
+}
+
+/* ---- Awards view: no grey box, a toolbar card, a calmer table card ---- */
+.award-page .awm-view .pom-page { background: transparent; padding: 0; height: auto; }
+.award-page .awm-view .pom-filter-card {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 14px 18px; margin-bottom: 18px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 20px; box-shadow: 0 2px 10px rgba(15,23,42,.05);
+}
+.award-page .awm-view .pom-select {
+  height: 46px; min-width: 240px; padding: 0 16px; border-radius: 14px; font-size: 14px; font-weight: 600;
+  background-color: var(--surface-alt, #f4f6fa); border: 1px solid var(--border); box-shadow: none; cursor: pointer;
+  transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease;
+}
+.award-page .awm-view .pom-select:hover { border-color: var(--accent); }
+.award-page .awm-view .pom-select:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); background-color: var(--surface); }
+.award-page .awm-view .awm-ay {
+  display: inline-flex; align-items: center; gap: 8px; margin-left: auto; padding: 8px 15px; font-size: 12.5px;
+  background: linear-gradient(135deg, #FFFBEB, #FEF3C7); border: 1px solid #FDE68A; color: #B45309;
+}
+.award-page .awm-view .awm-ay::before {
+  content: ""; width: 15px; height: 15px; background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='5' width='16' height='15' rx='2.5'/%3E%3Cpath d='M4 10h16M8.5 3v4M15.5 3v4'/%3E%3C/svg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='5' width='16' height='15' rx='2.5'/%3E%3Cpath d='M4 10h16M8.5 3v4M15.5 3v4'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.award-page .awm-view .pom-card { border-radius: 20px; border: 1px solid var(--border); box-shadow: 0 2px 10px rgba(15,23,42,.05); }
+
+/* ---- the empty message: a picture, a line ---- */
+.award-page .awm-view .pom-msg { padding: 44px 20px 40px; font-size: 14.5px; font-weight: 700; color: var(--text-soft); }
+.award-page .awm-view .pom-msg:not(.error)::before {
+  content: ""; display: block; width: 62px; height: 62px; margin: 0 auto 14px; border-radius: 20px;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 21s-7-6.200-7-11.500a7 7 0 0 1 14 0C19 14.800 12 21 12 21Z'/%3E%3Ccircle cx='12' cy='9.500' r='2.500'/%3E%3C/svg%3E") center / 30px no-repeat,
+    linear-gradient(135deg, #4F8EF7, #10B197);
+  box-shadow: 0 12px 24px rgba(47,111,228,.28), inset 0 1px 0 rgba(255,255,255,.35);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .award-page .awm-view .pom-msg:not(.error)::before { animation: aw-msg-bob 3.4s ease-in-out infinite; }
+  @keyframes aw-msg-bob { 50% { transform: translateY(-4px); } }
+}
+@media (max-width: 720px) {
+  .award-page .aw-toptabs { width: 100%; justify-content: space-between; }
+  .award-page .aw-toptab { padding: 10px 14px; flex: 1 1 auto; justify-content: center; }
+  .award-page .awm-view .pom-select { min-width: 0; width: 100%; max-width: none; }
+  .award-page .awm-view .awm-ay { margin-left: 0; }
+}
+
+/* ======================================================================
+   Slimmer: the same pieces, less bulk. A compact banner, shorter tabs and
+   a tighter toolbar so more of the page is the work itself.
+   ====================================================================== */
+.award-page .pg-hero { padding: 16px 24px; margin-bottom: 14px; border-radius: 18px; gap: 12px 20px; }
+.award-page .pg-hero-lead { gap: 14px; }
+.award-page .pg-hero-ico { width: 44px; height: 44px; border-radius: 14px; }
+.award-page .pg-hero-ico .aw-icon { font-size: 24px; }
+.award-page .pg-hero-ico .aw-icon svg { width: 24px; height: 24px; }
+.award-page .pg-hero-title { font-size: 22px; letter-spacing: -.5px; margin: 0 0 2px; }
+.award-page .pg-hero-sub { font-size: 13px; }
+.award-page .pg-hero .pg-btn { min-height: 36px; padding: 0 14px; font-size: 13px; border-radius: 11px; }
+.award-page .pg-hero .aw-refresh-all { min-width: 130px; }
+
+.award-page .aw-topbar { margin-bottom: 12px; }
+.award-page .aw-toptabs { padding: 4px; border-radius: 14px; gap: 4px; box-shadow: 0 1px 6px rgba(15,23,42,.05); }
+.award-page .aw-toptab { padding: 8px 16px; border-radius: 11px; font-size: 13.5px; gap: 7px; }
+.award-page .aw-toptab .aw-icon svg { width: 16px; height: 16px; }
+.award-page .aw-toptabs .aw-toptab.is-active { box-shadow: 0 4px 10px rgba(47,111,228,.3), inset 0 1px 0 rgba(255,255,255,.35); }
+
+.award-page .aw-subtabs { margin-bottom: 12px; gap: 6px; }
+.award-page .aw-subtab, .award-page .aw-utiltab { padding: 6px 14px; font-size: 12.5px; }
+.award-page .aw-utiltab.is-active, .award-page .aw-subtab.is-active { box-shadow: 0 3px 8px rgba(47,111,228,.26); }
+
+.award-page .awm-view .pom-filter-card { padding: 8px 12px; margin-bottom: 12px; border-radius: 14px; gap: 10px; box-shadow: 0 1px 6px rgba(15,23,42,.04); }
+.award-page .awm-view .pom-select { height: 38px; min-width: 210px; padding: 0 12px; border-radius: 10px; font-size: 13.5px; }
+.award-page .awm-view .awm-ay { padding: 5px 12px; font-size: 12px; }
+.award-page .awm-view .pom-card { border-radius: 14px; box-shadow: 0 1px 6px rgba(15,23,42,.04); }
+.award-page .awm-view .pom-msg { padding: 28px 16px 26px; font-size: 13.5px; }
+.award-page .awm-view .pom-msg:not(.error)::before { width: 46px; height: 46px; margin-bottom: 10px; border-radius: 15px; background-size: 24px, auto; box-shadow: 0 8px 16px rgba(47,111,228,.24), inset 0 1px 0 rgba(255,255,255,.35); }
+@media (max-width: 720px) {
+  .award-page .pg-hero { padding: 14px 16px; }
+  .award-page .aw-toptab { padding: 8px 12px; }
+}
+
+
+/* ======================================================================
+   No banner on this page: the menu already says where you are. One tidy
+   row instead: the three tabs on the left, Refresh and the page action on
+   the right, all the same height; the views of a tab sit right below.
+   ====================================================================== */
+.award-page .aw-topbar { margin: 0 0 14px; gap: 12px; }
+.award-page .aw-top-right { padding-bottom: 0; gap: 10px; align-items: center; }
+.award-page .aw-top-right .btn { min-height: 40px; padding: 0 16px; border-radius: 12px; font-size: 13.5px; font-weight: 700; }
+.award-page .aw-top-right .aw-refresh-all {
+  background: var(--surface); border: 1px solid var(--border); color: var(--accent-ink); min-width: 140px;
+  box-shadow: 0 1px 6px rgba(15,23,42,.05);
+}
+.award-page .aw-top-right .aw-refresh-all:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
+.award-page .aw-top-right .aw-refresh-all.is-done { color: var(--good); border-color: var(--good-soft-border); background: var(--good-soft); }
+.award-page .aw-top-right .btn-primary { background: linear-gradient(135deg, var(--accent), #10B197); box-shadow: 0 6px 14px rgba(47,111,228,.28); }
+.award-page .aw-toptabs { padding: 4px; }
+.award-page .aw-toptab { padding: 9px 18px; }
+.award-page .aw-subtabs { margin: 0 0 14px; padding: 0; }
+@media (max-width: 720px) {
+  .award-page .aw-top-right { width: 100%; }
+  .award-page .aw-top-right .btn { flex: 1 1 auto; justify-content: center; }
+}
+
+/* ======================================================================
+   Tab hierarchy, set out properly. Level 1 (Awards, Events, Gifts) is the
+   filled segmented bar. Level 2 (the views inside a tab) is a quiet
+   underlined row beneath it, running the full width, so it clearly belongs
+   to the tab above and never competes with it.
+   ====================================================================== */
+.award-page .aw-topbar { margin: 0 0 6px; padding: 0; }
+.award-page .aw-subtabs, .award-page .aw-utiltabs {
+  display: flex; align-items: flex-end; gap: 6px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+  margin: 0 0 18px; padding: 0 4px; border: 0; border-bottom: 1px solid var(--border);
+}
+.award-page .aw-subtabs::-webkit-scrollbar { display: none; }
+.award-page .aw-subtab, .award-page .aw-utiltab {
+  position: relative; display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto;
+  margin: 0 0 -1px; padding: 12px 14px; border: 0; border-bottom: 2px solid transparent; border-radius: 8px 8px 0 0;
+  background: transparent; box-shadow: none; font-size: 13.5px; font-weight: 700; color: var(--text-soft);
+  transition: color .15s ease, background-color .15s ease, border-color .15s ease;
+}
+.award-page .aw-subtab:hover, .award-page .aw-utiltab:hover { transform: none; box-shadow: none; background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; }
+.award-page .aw-subtab.is-active, .award-page .aw-utiltab.is-active {
+  background: transparent; box-shadow: none; color: var(--accent-ink); border-color: transparent; border-bottom-color: var(--accent);
+}
+.award-page .aw-subtab.is-active .aw-icon, .award-page .aw-utiltab.is-active .aw-icon { color: var(--accent); }
+.award-page .aw-subtab:not(.is-active):hover { transform: none; box-shadow: none; }
+.award-page .aw-subtab.is-active .tab-count { background: var(--accent); color: #fff; }
+.award-page .aw-subtabs .pill { align-self: center; }
+
+/* ======================================================================
+   One navigation card. The tab bar, Refresh and the page action are its
+   top row; the views of the tab you are on are its bottom row. They read
+   as a single piece of the page, with the work underneath.
+   ====================================================================== */
+.award-page .aw-topbar {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 8px 10px 8px 8px;
+  margin: 0 0 16px; box-shadow: 0 2px 10px rgba(15,23,42,.05);
+}
+.award-page:has(#aw-util-bar:not([hidden])) .aw-topbar,
+.award-page:has(#aw-view-stock:not([hidden])) .aw-topbar { border-radius: 18px 18px 0 0; margin-bottom: 0; box-shadow: none; }
+.award-page .aw-toptabs { background: transparent; border: 0; box-shadow: none; padding: 0; }
+.award-page .aw-utiltabs, .award-page #aw-view-stock .aw-body > .aw-subtabs {
+  background: var(--surface); border: 1px solid var(--border); border-top: 0; border-radius: 0 0 18px 18px;
+  padding: 0 14px; margin: 0 0 16px; box-shadow: 0 6px 12px -8px rgba(15,23,42,.10);
+}
+.award-page .aw-utiltabs[hidden] { display: none; }
+.award-page .aw-subtab, .award-page .aw-utiltab { padding: 11px 14px; margin: 0; }
+.award-page .aw-subtabs .pill { margin-right: 4px; }
+@media (max-width: 720px) {
+  .award-page .aw-topbar { padding: 8px; }
+}
+
+
+/* ======================================================================
+   Where the buttons go. One rule for every view: the thing you do most
+   sits next to what it works on, the file tools sit together at the far
+   right, and nothing floats on a line of its own.
+   ====================================================================== */
+
+/* Gift Inventory: Year / State / Division / District, then Fetch; the file tools at the right. */
+.award-page .stock-controls { align-items: flex-end; gap: 12px; }
+.award-page .stock-controls > #stock-fetch { height: 38px; padding: 0 20px; margin-bottom: 0; }
+.award-page .stock-actions { gap: 8px; align-items: flex-end; }
+.award-page .stock-actions .btn { height: 38px; }
+
+/* The "5 items" chip repeated the count already shown over the table. */
+.award-page .aw-subtabs .pill { display: none; }
+
+/* Events: the same toolbar card as Awards, with the export at the far right. */
+.award-page .awe-view .pev-toolbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 12px; margin: 0 0 12px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 1px 6px rgba(15,23,42,.04);
+}
+.award-page .awe-view .pev-toolbar .pom-select { height: 38px; min-width: 150px; padding: 0 12px; border-radius: 10px; font-size: 13.5px; background-color: var(--surface-alt, #f4f6fa); border: 1px solid var(--border); box-shadow: none; }
+.award-page .awe-view .pev-toolbar .pom-select:hover { border-color: var(--accent); }
+.award-page .awe-view .pev-toolbar .pom-select:disabled { opacity: .55; cursor: not-allowed; }
+.award-page .awe-view .pev-hint { margin-left: auto; font-size: 12px; color: var(--text-muted); }
+.award-page .awe-view .pev-export-btn {
+  display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border-radius: 10px; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 700; color: var(--accent-ink); background: var(--surface); border: 1px solid var(--border);
+  transition: border-color .15s ease, background-color .15s ease, transform .15s var(--ease);
+}
+.award-page .awe-view .pev-export-btn:hover { border-color: var(--accent); background: var(--accent-soft); transform: translateY(-1px); }
+
+/* Awards: the admin's "Add records" sits beside the district, the year pill at the far right. */
+.award-page .awm-view .awa-open { height: 38px; padding: 0 14px; border-radius: 10px; font-weight: 700; }
+@media (max-width: 720px) {
+  .award-page .stock-controls > #stock-fetch { flex: 1 1 100%; justify-content: center; }
+  .award-page .awe-view .pev-hint { margin-left: 0; flex: 1 1 100%; }
+}
+
+/* Small grey labels (filter names, card captions, hints) were a shade too pale to read comfortably. */
+.award-page { --text-muted: #6B7280; }
+.award-page .field label, .award-page .pev-hint, .award-page .kpi small, .award-page .kpi em { color: var(--text-soft); }

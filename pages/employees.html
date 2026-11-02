@@ -1,26 +1,51 @@
 <!-- pages/employees.html -->
 <div class="employees-page">
 
-    <div class="page-header-emp">
-        <div>
-            <h1 class="page-title">Employee Directory</h1>
-            <p class="page-subtitle">Browse and manage all staff records.</p>
-        </div>
-        <div class="header-actions">
-        <button class="btn-org" id="orgChartBtn" title="View the reporting structure">
-            🌳 Org Chart
-        </button>
-        <div id="adminToolbar" style="display:none;">
-            <div class="admin-btn-group">
-                <button class="btn-add" id="addEmployeeBtn">+ Add Employee</button>
-                <button class="btn-sample-excel" id="downloadSampleExcelBtn">⬇ Sample Format</button>
-                <label class="btn-upload-excel" id="uploadExcelLabel"
-                       title="Add new employees, or update existing ones, from Excel">
-                    📤 Upload via Excel
-                    <input type="file" id="uploadExcelInput" accept=".xlsx,.xlsm" style="display:none;">
-                </label>
+    <section class="pg-hero">
+        <span class="pg-blob pg-blob--a" aria-hidden="true"></span>
+        <span class="pg-blob pg-blob--b" aria-hidden="true"></span>
+        <div class="pg-hero-lead">
+            <span class="pg-hero-ico" aria-hidden="true"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="21.5" cy="10.5" r="4.3" fill="#FCD9A8"/><path d="M13.5 27c0-5.2 3.4-8.5 8-8.5s8 3.3 8 8.5z" fill="#BFDBFE"/><circle cx="11" cy="12" r="4.8" fill="#FFD3A1"/><path d="M2.5 28.5c0-5.8 3.7-9.5 8.5-9.5s8.5 3.7 8.5 9.5z" fill="#fff"/></svg></span>
+            <div class="pg-hero-main">
+                <h1 class="pg-hero-title">Employee Directory</h1>
+                <p class="pg-hero-sub">Browse and manage all staff records.</p>
             </div>
         </div>
+        <div class="pg-hero-actions header-actions">
+            <button class="pg-btn" id="orgChartBtn" title="View the reporting structure">
+                <svg class="pg-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="5" rx="1.2"/><rect x="3" y="16" width="6" height="5" rx="1.2"/><rect x="15" y="16" width="6" height="5" rx="1.2"/><path d="M12 8v4M6 16v-2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2"/></svg>Org Chart
+            </button>
+            <div id="adminToolbar" style="display:none;">
+                <div class="admin-btn-group">
+                    <button class="pg-btn pg-btn--solid" id="addEmployeeBtn"><svg class="pg-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add Employee</button>
+                    <button class="pg-btn" id="downloadSampleExcelBtn"><svg class="pg-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10m0 0 4-4m-4 4-4-4M5 19h14"/></svg>Sample Format</button>
+                    <label class="pg-btn" id="uploadExcelLabel"
+                           title="Add new employees, or update existing ones, from Excel">
+                        <svg class="pg-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V5m0 0 4 4m-4-4-4 4M5 19h14"/></svg>Upload via Excel
+                        <input type="file" id="uploadExcelInput" accept=".xlsx,.xlsm" style="display:none;">
+                    </label>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- A glance at the directory -->
+    <div class="pg-stats" id="empStats">
+        <div class="pg-stat" style="--tint:#4F8EF7">
+            <div class="pg-stat-icon"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="21.5" cy="10.5" r="4.3" fill="#FCD9A8"/><path d="M13.5 27c0-5.2 3.4-8.5 8-8.5s8 3.3 8 8.5z" fill="#3B82F6"/><circle cx="11" cy="12" r="4.8" fill="#FFD3A1"/><path d="M2.5 28.5c0-5.8 3.7-9.5 8.5-9.5s8.5 3.7 8.5 9.5z" fill="#8B5CF6"/></svg></div>
+            <div class="pg-stat-info"><div class="pg-stat-value" id="empStatTotal">—</div><div class="pg-stat-label">Total Employees</div></div>
+        </div>
+        <div class="pg-stat" style="--tint:#22C55E">
+            <div class="pg-stat-icon"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="12.5" fill="#22C55E"/><path d="m10 16.5 4.2 4.2L22.5 12" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="pg-stat-info"><div class="pg-stat-value" id="empStatActive">—</div><div class="pg-stat-label">Active</div></div>
+        </div>
+        <div class="pg-stat" style="--tint:#94A3B8">
+            <div class="pg-stat-icon"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="12.5" fill="#94A3B8"/><path d="M11 16h10" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg></div>
+            <div class="pg-stat-info"><div class="pg-stat-value" id="empStatInactive">—</div><div class="pg-stat-label">Inactive</div></div>
+        </div>
+        <div class="pg-stat" style="--tint:#10B197">
+            <div class="pg-stat-icon"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="6" y="4" width="14" height="24" rx="2" fill="#14B8A6"/><rect x="18" y="12" width="9" height="16" rx="2" fill="#0F766E"/><g fill="#CCFBF1"><rect x="9" y="8" width="3" height="3" rx=".6"/><rect x="14" y="8" width="3" height="3" rx=".6"/><rect x="9" y="14" width="3" height="3" rx=".6"/><rect x="14" y="14" width="3" height="3" rx=".6"/><rect x="9" y="20" width="3" height="3" rx=".6"/><rect x="14" y="20" width="3" height="3" rx=".6"/><rect x="21" y="16" width="3" height="3" rx=".6"/><rect x="21" y="22" width="3" height="3" rx=".6"/></g></svg></div>
+            <div class="pg-stat-info"><div class="pg-stat-value" id="empStatDepts">—</div><div class="pg-stat-label">Departments</div></div>
         </div>
     </div>
 
@@ -79,19 +104,23 @@
     <div class="card">
         <div class="table-toolbar">
             <div class="toolbar-left">
-                <input
-                    type="text"
-                    id="searchBox"
-                    class="search-input"
-                    placeholder="🔍  Search by name, department, location…">
+                <div class="search-wrap">
+                    <svg class="emp-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
+                    <input
+                        type="text"
+                        id="searchBox"
+                        class="search-input"
+                        placeholder="Search by name, department, location…"
+                        autocomplete="off">
+                </div>
                 <button type="button" class="btn-filters" id="empFiltersBtn" aria-expanded="false">
-                    <span class="btn-filters-ico">⛃</span> Filters
+                    <span class="btn-filters-ico"><svg class="emp-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6 7.5V19l-4 1.500v-8z"/></svg></span> Filters
                     <span class="btn-filters-count" id="empFiltersCount" hidden></span>
                 </button>
             </div>
             <div class="toolbar-right">
                 <div class="table-meta" id="tableMeta"></div>
-                <button class="btn-excel" id="downloadExcelBtn">⬇ Download Excel</button>
+                <button class="btn-excel" id="downloadExcelBtn"><svg class="emp-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10m0 0 4-4m-4 4-4-4M5 19h14"/></svg>Download Excel</button>
             </div>
         </div>
 
@@ -1033,4 +1062,208 @@ tbody tr.row-inactive td.col-actions .btn-delete { opacity: 0.55; }
     .search-input { width: 100%; }
     .table-toolbar { flex-direction: column; align-items: flex-start; }
 }
+
+/* ======================================================================
+   Employees, polished: a proper header, a calmer toolbar, a table that
+   reads easily and rows that respond. Everything below only restyles.
+   ====================================================================== */
+.employees-page {
+    --row-hover: #F2F6FF; --row-line: rgba(15,23,42,.07); --th-bg: #F3F6FB;
+}
+html[data-theme="dark"] .employees-page { --row-hover: #283042; --row-line: rgba(255,255,255,.07); --th-bg: #222934; }
+.employees-page .emp-i { width: 16px; height: 16px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.employees-page .btn-excel, .employees-page .btn-filters { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; border-radius: 12px; font-weight: 700; transition: transform .18s var(--ease, ease), box-shadow .2s ease, background-color .15s ease, border-color .15s ease; }
+.employees-page .btn-excel:hover, .employees-page .btn-filters:hover { transform: translateY(-1px); }
+.employees-page .btn-excel:active, .employees-page .btn-filters:active { transform: scale(.97); }
+.employees-page .btn-filters { background: var(--glass-strong); border: 1px solid var(--hairline); color: var(--text); }
+
+/* the card and its toolbar */
+.employees-page .card { border-radius: 22px; padding: 22px; }
+.employees-page .table-toolbar { margin-bottom: 18px; flex-wrap: wrap; }
+.employees-page .toolbar-left { display: flex; align-items: center; gap: 12px; flex: 1 1 360px; min-width: 0; }
+.employees-page .search-wrap { position: relative; flex: 1 1 280px; max-width: 460px; min-width: 200px; }
+.employees-page .search-wrap .emp-i { position: absolute; left: 14px; top: 50%; width: 17px; height: 17px; margin-top: -8.5px; color: var(--text-faint); pointer-events: none; transition: color .2s ease; }
+.employees-page .search-wrap:focus-within .emp-i { color: var(--brand, #4F8EF7); }
+.employees-page .search-input {
+    width: 100%; height: 44px; padding: 0 16px 0 42px; border-radius: 14px; font-size: 14px; color: var(--text);
+    background: var(--glass-strong); border: 1px solid var(--hairline); box-shadow: inset 0 1px 2px rgba(15,23,42,.05);
+    transition: border-color .2s ease, box-shadow .2s ease;
+}
+.employees-page .search-input::placeholder { color: var(--text-faint); }
+.employees-page .search-input:focus { border-color: var(--brand, #4F8EF7); box-shadow: 0 0 0 4px rgba(79,142,247,.16); }
+.employees-page .btn-filters { height: 44px; padding: 0 16px; }
+.employees-page .btn-filters-ico { display: grid; place-items: center; font-size: 0; }
+.employees-page .btn-filters-ico .emp-i { width: 16px; height: 16px; }
+.employees-page .table-meta {
+    padding: 7px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 700; color: var(--text-soft);
+    background: color-mix(in srgb, var(--brand, #4F8EF7) 10%, transparent); font-variant-numeric: tabular-nums;
+}
+.employees-page .btn-excel { padding: 0 18px; height: 44px; background: linear-gradient(135deg, #22C55E, #15803D); box-shadow: 0 6px 16px rgba(21,128,61,.28); }
+.employees-page .btn-excel:hover { background: linear-gradient(135deg, #22C55E, #15803D); box-shadow: 0 10px 22px rgba(21,128,61,.36); }
+
+/* table */
+.employees-page table { width: 100%; }
+.employees-page .table-wrap { max-height: max(340px, calc(100vh - 480px)); border-radius: 16px; border: 1px solid var(--row-line); }
+.employees-page th {
+    padding: 13px 16px; font-size: 11px; font-weight: 800; letter-spacing: .07em; color: var(--text-soft);
+    background: var(--th-bg); border-bottom: 1px solid var(--row-line);
+}
+.employees-page th.col-actions { background: var(--th-bg); }
+.employees-page th.is-sortable:hover { background: var(--row-hover); color: var(--text); }
+.employees-page th.is-sorted { background: var(--row-hover); }
+.employees-page td { padding: 14px 16px; font-size: 13.5px; color: var(--text); border-bottom: 1px solid var(--row-line); }
+.employees-page tbody tr { transition: background-color .12s ease; }
+.employees-page tbody tr:hover, .employees-page tbody tr:hover td, .employees-page tbody tr:hover td.col-actions { background: var(--row-hover); }
+.employees-page tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--brand, #4F8EF7); }
+.employees-page tbody tr:last-child td { border-bottom: 0; }
+
+.employees-page .emp-person { display: flex; align-items: center; gap: 11px; }
+.employees-page .emp-name { font-weight: 700; letter-spacing: -.1px; }
+.employees-page .emp-av {
+    width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; flex: 0 0 auto; color: #fff;
+    font-size: 12px; font-weight: 800; letter-spacing: .02em; box-shadow: 0 3px 8px rgba(15,23,42,.18), inset 0 1px 0 rgba(255,255,255,.35);
+}
+.employees-page .emp-av.av0 { background: linear-gradient(135deg, #60A5FA, #2563EB); }
+.employees-page .emp-av.av1 { background: linear-gradient(135deg, #A78BFA, #7C3AED); }
+.employees-page .emp-av.av2 { background: linear-gradient(135deg, #2DD4BF, #0F766E); }
+.employees-page .emp-av.av3 { background: linear-gradient(135deg, #FBBF24, #D97706); }
+.employees-page .emp-av.av4 { background: linear-gradient(135deg, #F472B6, #DB2777); }
+.employees-page .emp-av.av5 { background: linear-gradient(135deg, #FB923C, #EA580C); }
+.employees-page .emp-id { display: inline-block; padding: 3px 9px; border-radius: 8px; font-size: 12px; font-weight: 700; color: var(--text-soft); background: color-mix(in srgb, var(--text-faint) 16%, transparent); font-variant-numeric: tabular-nums; }
+.employees-page .emp-mail { color: var(--chrome-accent, #3567d4); text-decoration: none; font-weight: 600; }
+.employees-page .emp-mail:hover { text-decoration: underline; }
+
+.employees-page .badge-status { display: inline-flex; align-items: center; gap: 7px; padding: 4px 11px 4px 9px; font-size: 12px; font-weight: 700; background: rgba(34,197,94,.14); color: #15803D; }
+.employees-page .badge-status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #22C55E; box-shadow: 0 0 0 3px rgba(34,197,94,.22); }
+.employees-page .badge-status.is-inactive { background: rgba(148,163,184,.18); color: var(--text-soft); }
+.employees-page .badge-status.is-inactive::before { background: #94A3B8; box-shadow: none; }
+.employees-page .badge-dept { padding: 4px 11px; border-radius: 999px; font-size: 12px; font-weight: 700; background: color-mix(in srgb, var(--brand, #4F8EF7) 13%, transparent); color: var(--chrome-accent, #3567d4); }
+.employees-page .badge-multi { border-radius: 999px; padding: 3px 11px; }
+
+.employees-page .btn-edit, .employees-page .btn-delete { width: 30px; height: 30px; border-radius: 10px; transition: transform .16s var(--ease, ease), background-color .15s ease; }
+.employees-page .btn-edit .emp-i, .employees-page .btn-delete .emp-i { width: 15px; height: 15px; }
+.employees-page .btn-edit:hover, .employees-page .btn-delete:hover { transform: translateY(-1px) scale(1.08); }
+
+.employees-page .empty-state { padding: 54px 20px; }
+.employees-page .empty-icon {
+    width: 64px; height: 64px; margin: 0 auto 12px; border-radius: 20px; display: grid; place-items: center; color: #fff; font-size: 0;
+    background: linear-gradient(135deg, #60A5FA, #4F8EF7 55%, #10B197); box-shadow: 0 10px 22px rgba(79,142,247,.3), inset 0 1px 0 rgba(255,255,255,.4);
+}
+.employees-page .empty-icon .emp-i { width: 30px; height: 30px; stroke-width: 1.8; }
+.employees-page .empty-state .emp-empty-title { display: block; font-size: 15px; font-weight: 800; color: var(--text); margin-bottom: 3px; }
+.employees-page .emp-spin { display: block; width: 30px; height: 30px; margin: 0 auto 12px; border-radius: 50%; border: 3px solid color-mix(in srgb, var(--brand, #4F8EF7) 22%, transparent); border-top-color: var(--brand, #4F8EF7); animation: emp-spin .8s linear infinite; }
+@keyframes emp-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: no-preference) {
+    .employees-page .card { animation: emp-in .55s cubic-bezier(.22,1,.36,1) .3s backwards; }
+    @keyframes emp-in { from { opacity: 0; transform: translateY(12px); } }
+}
+@media (max-width: 768px) {
+    .employees-page .card { padding: 16px; border-radius: 18px; }
+    .employees-page .search-wrap { max-width: none; }
+}
+
+/* ======================================================================
+   Organisation chart, polished: the same banner header as the pages, cards
+   with a picture and a department colour, softer lines, a calm background.
+   Only the look changes; the data, zoom, expand and details work as before.
+   ====================================================================== */
+#orgModal .modal-header, #orgBranchModal .org-bar {
+    background: linear-gradient(120deg, #2457C5 0%, #2F6FE4 40%, #0B8F7A 100%); border-bottom: 0; color: #fff; padding: 14px 24px;
+}
+#orgModal .modal-header h2 { color: #fff; font-size: 20px; font-weight: 800; letter-spacing: -.4px; margin: 0; }
+#orgModal .org-sub { color: rgba(255,255,255,.9); font-size: 12.5px; font-weight: 500; }
+#orgModal .org-btn-mini, #orgBranchModal .org-btn-mini {
+    background: rgba(255,255,255,.17); border: 1px solid rgba(255,255,255,.36); color: #fff; border-radius: 10px; padding: 6px 12px; font-weight: 700;
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); transition: background-color .15s ease, transform .15s ease;
+}
+#orgModal .org-btn-mini:hover, #orgBranchModal .org-btn-mini:hover { background: rgba(255,255,255,.3); color: #fff; border-color: rgba(255,255,255,.5); transform: translateY(-1px); }
+#orgModal .modal-close, #orgBranchModal .modal-close {
+    width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 15px;
+    background: rgba(255,255,255,.17); border: 1px solid rgba(255,255,255,.36); transition: background-color .15s ease, transform .2s ease;
+}
+#orgModal .modal-close:hover, #orgBranchModal .modal-close:hover { background: rgba(255,255,255,.32); transform: rotate(90deg); }
+#orgBranchModal .org-branch-title { color: #fff; font-size: 15px; }
+#orgBranchModal .org-branch-crumbs { color: rgba(255,255,255,.85); }
+
+.org-body {
+    background:
+        radial-gradient(rgba(79,142,247,.16) 1.2px, transparent 1.4px) 0 0 / 24px 24px,
+        linear-gradient(180deg, #F4F8FF 0%, #EEF4FB 100%);
+    padding: 44px 28px 48px;
+}
+
+/* lines: softer, brand-blue */
+.org-tree ul::before { border-left: 2px solid #A9C0EE; }
+.org-tree li::before, .org-tree li::after { border-top: 2px solid #A9C0EE; }
+.org-tree li::after { border-left: 2px solid #A9C0EE; }
+.org-tree li:last-child::before { border-right: 2px solid #A9C0EE; border-radius: 0 8px 0 0; }
+.org-tree li:first-child::after { border-radius: 8px 0 0 0; }
+.org-vlist li::after { border-left: 2px solid #A9C0EE; }
+.org-vlist li::before { border-top: 2px solid #A9C0EE; }
+
+/* the card: a picture on its top edge, the department as a coloured rule */
+.org-node {
+    --dc: #4F8EF7; width: 208px; padding: 30px 12px 12px; margin-top: 18px; border-radius: 16px; border: 1px solid rgba(15,23,42,.08);
+    border-top: 3px solid var(--dc); background: #fff; box-shadow: 0 2px 6px rgba(15,23,42,.06), 0 10px 22px -12px rgba(15,23,42,.18);
+    transition: transform .2s cubic-bezier(.22,1,.36,1), box-shadow .2s ease, border-color .2s ease;
+}
+.org-node:hover { transform: translateY(-3px); border-color: var(--dc); box-shadow: 0 4px 10px rgba(15,23,42,.08), 0 16px 28px -12px color-mix(in srgb, var(--dc) 55%, transparent); }
+.org-node:focus-visible { outline: 3px solid color-mix(in srgb, var(--dc) 55%, transparent); outline-offset: 2px; }
+.org-av {
+    position: absolute; left: 50%; top: -19px; transform: translateX(-50%); width: 38px; height: 38px; border-radius: 50%;
+    display: grid; place-items: center; color: #fff; font-size: 13px; font-weight: 800; letter-spacing: .02em;
+    box-shadow: 0 0 0 3px #fff, 0 6px 12px rgba(15,23,42,.2); transition: transform .25s cubic-bezier(.34,1.56,.64,1);
+}
+.org-node:hover .org-av { transform: translateX(-50%) scale(1.1); }
+.org-av.av0 { background: linear-gradient(135deg, #60A5FA, #2563EB); }
+.org-av.av1 { background: linear-gradient(135deg, #A78BFA, #7C3AED); }
+.org-av.av2 { background: linear-gradient(135deg, #2DD4BF, #0F766E); }
+.org-av.av3 { background: linear-gradient(135deg, #FBBF24, #D97706); }
+.org-av.av4 { background: linear-gradient(135deg, #F472B6, #DB2777); }
+.org-av.av5 { background: linear-gradient(135deg, #FB923C, #EA580C); }
+.org-node .org-role { font-size: 12.5px; font-weight: 800; color: #1E293B; letter-spacing: -.1px; }
+.org-node .org-name { font-size: 11.5px; font-weight: 600; color: #475569; margin-top: 3px; }
+.org-node .org-dept { display: inline-block; margin-top: 6px; padding: 2px 9px; border-radius: 999px; font-size: 10px; font-weight: 700; color: color-mix(in srgb, var(--dc) 78%, #000); background: color-mix(in srgb, var(--dc) 13%, transparent); }
+
+/* the top of the house */
+.org-node.is-root { background: linear-gradient(135deg, #2F6FE4, #0B8F7A); border: 0; border-top: 0; box-shadow: 0 10px 28px rgba(36,87,197,.38); }
+.org-node.is-root .org-role { color: #fff; font-size: 14px; }
+.org-node.is-root .org-name { color: rgba(255,255,255,.95); }
+.org-node.is-root .org-dept { color: #fff; background: rgba(255,255,255,.2); }
+.org-node.is-root .org-av { background: #fff; color: #2457C5; }
+.org-node.is-orphan { margin-top: 0; padding-top: 12px; border-top-width: 1px; }
+
+/* open / close a team */
+.org-toggle {
+    margin-top: 10px; min-width: 44px; padding: 3px 11px; border: 1.5px solid #A9C0EE; border-radius: 999px; background: #fff; color: #2457C5;
+    font-size: 11px; font-weight: 800; box-shadow: 0 2px 6px rgba(36,87,197,.12); transition: background-color .15s ease, color .15s ease, transform .15s ease, box-shadow .15s ease;
+}
+.org-toggle:hover { background: linear-gradient(135deg, #2F6FE4, #0B8F7A); color: #fff; border-color: transparent; transform: translateY(-1px); box-shadow: 0 6px 14px rgba(36,87,197,.28); }
+
+/* "Not linked": a tinted panel instead of loose text */
+.org-group-title { display: block; width: max-content; margin: 44px auto 6px; padding: 5px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 800; color: #92400E; background: #FEF3C7; border: 1px solid #FDE68A; }
+.org-group-note { color: #64748B; font-size: 12px; margin-bottom: 18px; }
+
+/* the stacked team view */
+.org-vrow .org-node, .org-vhead .org-node { display: flex; align-items: center; gap: 12px; width: 360px; margin-top: 0; padding: 11px 14px; text-align: left; border-top-width: 3px; }
+.org-vrow .org-av, .org-vhead .org-av { position: static; transform: none; flex: 0 0 auto; width: 40px; height: 40px; box-shadow: 0 0 0 2px #fff, 0 4px 10px rgba(15,23,42,.18); }
+.org-vrow .org-node:hover .org-av { transform: scale(1.08); }
+.org-vhead .org-node.is-root .org-av { box-shadow: 0 0 0 2px rgba(255,255,255,.5); }
+.org-txt { min-width: 0; }
+
+/* the person's details */
+.org-person-box { border-radius: 20px; box-shadow: 0 28px 70px rgba(15,23,42,.35); }
+.org-person-head { background: linear-gradient(120deg, #2457C5 0%, #2F6FE4 45%, #0B8F7A 100%); padding: 18px 22px; }
+.org-person-close { border-radius: 50%; width: 32px; height: 32px; display: grid; place-items: center; padding: 0; }
+
+@media (prefers-reduced-motion: no-preference) {
+    .org-node { animation: org-in .45s cubic-bezier(.22,1,.36,1) backwards; }
+    @keyframes org-in { from { opacity: 0; transform: translateY(10px); } }
+}
+@media (prefers-reduced-motion: reduce) { .org-node, .org-node:hover, .org-av, .org-toggle { transition: none; animation: none; } }
 </style>
+
+<!-- Local Live Server adds its reload script at the closing body tag; this gives it a safe place. -->
+</body>

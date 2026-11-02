@@ -128,16 +128,83 @@
 .erd-i-attn { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='22 12 18 12 15 21 9 3 6 12 2 12'/%3E%3C/svg%3E"); }
 .erd-i-field { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='9' cy='7' r='4'/%3E%3Cpath d='M23 21v-2a4 4 0 0 0-3-3.87'/%3E%3Cpath d='M16 3.13a4 4 0 0 1 0 7.75'/%3E%3C/svg%3E"); }
 .erd-i-help { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3'/%3E%3Cline x1='12' y1='17' x2='12.01' y2='17'/%3E%3C/svg%3E"); }
+
+/* ======================================================================
+   ER & Dashboards, polished: a banner, tiles that glow in their own
+   colour and respond to the pointer. Only the look changes here; every
+   link, label and address is as it was. Icons stay CSS masks (no inline svg).
+   ====================================================================== */
+.erd-page .pg-hero { margin-bottom: 0; }
+.erd-page .erd-user {
+}
+.erd-page .erd-user-text small { color: rgba(255,255,255,.8); }
+.erd-page .erd-user-text b { color: #fff; font-weight: 700; }
+
+.erd-page .erd-grid { gap: 18px; }
+.erd-page .erd-tile {
+    border-radius: 20px; padding: 20px 20px 16px; background: var(--glass-strong, #fff); border: 1px solid var(--hairline, #e6ebf2);
+    box-shadow: var(--shadow-sm); transition: transform .24s var(--ease, ease), box-shadow .24s ease, border-color .24s ease;
+}
+.erd-page .erd-tile::before { height: 4px; background: linear-gradient(90deg, var(--c), color-mix(in srgb, var(--c) 45%, #fff)); opacity: 1; }
+.erd-page .erd-tile::after {         /* soft glow in the corner, in the tile's own colour */
+    content: ""; position: absolute; right: -50px; top: -50px; width: 170px; height: 170px; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(circle, color-mix(in srgb, var(--c) 20%, transparent), transparent 70%); transition: transform .4s ease;
+}
+.erd-page .erd-tile:hover { transform: translateY(-5px); border-color: color-mix(in srgb, var(--c) 45%, transparent); box-shadow: var(--shadow-md), 0 14px 30px -12px color-mix(in srgb, var(--c) 45%, transparent); }
+.erd-page .erd-tile:hover::after { transform: scale(1.35); }
+.erd-page .erd-tile > * { position: relative; z-index: 1; }
+.erd-page .erd-icon {
+    width: 48px; height: 48px; border-radius: 15px; box-shadow: 0 10px 20px -8px color-mix(in srgb, var(--c) 70%, #000), inset 0 1px 0 rgba(255,255,255,.4);
+    transition: transform .35s cubic-bezier(.34,1.56,.64,1);
+}
+.erd-page .erd-icon::before { width: 23px; height: 23px; }
+.erd-page .erd-tile:hover .erd-icon { transform: scale(1.1) rotate(-6deg); }
+.erd-page .erd-tag { display: inline-block; align-self: flex-start; padding: 3px 10px; border-radius: 999px; background: color-mix(in srgb, var(--c) 12%, transparent); letter-spacing: .05em; }
+.erd-page .erd-name { color: var(--text, #0f172a); font-size: 15.5px; letter-spacing: -.2px; }
+.erd-page .erd-desc { color: var(--text-soft, #5a6577); }
+.erd-page .erd-host { color: var(--text-soft, #5a6577); font-weight: 500; }
+.erd-page .erd-tag { color: color-mix(in srgb, var(--c) 76%, #000); }
+html[data-theme="dark"] .erd-page .erd-tag { color: color-mix(in srgb, var(--c) 52%, #fff); }
+html[data-theme="dark"] .erd-page .erd-go { color: color-mix(in srgb, var(--c) 52%, #fff); }
+.erd-page .erd-go { background: color-mix(in srgb, var(--c) 11%, transparent); padding: 6px 13px; }
+.erd-page .erd-tile:hover .erd-go { background: var(--c); color: #fff; }
+.erd-page .erd-tile--feature .erd-go { background: var(--c); color: #fff; padding: 7px 16px; box-shadow: 0 6px 14px -6px var(--c); }
+
+.erd-page .erd-tile--feature { background: linear-gradient(135deg, var(--glass-strong, #fff) 50%, color-mix(in srgb, var(--c) 12%, var(--glass-strong, #fff))); padding: 24px 26px 18px; }
+.erd-page .erd-tile--feature .erd-icon { width: 60px; height: 60px; border-radius: 18px; }
+.erd-page .erd-tile--feature .erd-icon::before { width: 29px; height: 29px; }
+.erd-page .erd-tile--feature .erd-name { font-size: 21px; letter-spacing: -.4px; }
+.erd-page .erd-chips span {
+    display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px 5px 9px; color: var(--text, #3a4557);
+    background: var(--glass-strong, #fff); border: 1px solid var(--hairline, #e3e8f0);
+}
+.erd-c::before { content: ""; width: 14px; height: 14px; background: var(--c); -webkit-mask: var(--m) center / contain no-repeat; mask: var(--m) center / contain no-repeat; }
+.erd-c-up    { --m: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 15V5m0 0 4 4m-4-4-4 4M5 19h14'/%3E%3C/svg%3E"); }
+.erd-c-chart { --m: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 20V11M12 20V5M19 20v-7'/%3E%3C/svg%3E"); }
+.erd-c-lock  { --m: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='11' width='14' height='10' rx='2'/%3E%3Cpath d='M8 11V7a4 4 0 0 1 8 0v4'/%3E%3C/svg%3E"); }
+
+@media (prefers-reduced-motion: no-preference) {
+    .erd-page .erd-tile { animation: erd-in .6s cubic-bezier(.22,1,.36,1) backwards; }
+    .erd-page .erd-tile:nth-child(1) { animation-delay: .08s; } .erd-page .erd-tile:nth-child(2) { animation-delay: .14s; }
+    .erd-page .erd-tile:nth-child(3) { animation-delay: .2s; }  .erd-page .erd-tile:nth-child(4) { animation-delay: .26s; }
+    .erd-page .erd-tile:nth-child(5) { animation-delay: .32s; } .erd-page .erd-tile:nth-child(6) { animation-delay: .38s; }
+    .erd-page .erd-tile:nth-child(7) { animation-delay: .44s; }
+    @keyframes erd-in { from { opacity: 0; transform: translateY(14px); } }
+}
+@media (max-width: 640px) {
+}
 </style>
 <div class="erd-page">
 
-    <header class="erd-head">
-        <div>
-            <h1 class="erd-title">ER &amp; <span>Dashboards</span></h1>
-            <p class="erd-sub">OLF apps and program dashboards. Each opens in a new tab &middot; sign in with your OLF Google account.</p>
+    <header class="pg-hero">
+        <span class="pg-blob pg-blob--a" aria-hidden="true"></span>
+        <span class="pg-blob pg-blob--b" aria-hidden="true"></span>
+        <div class="pg-hero-main">
+            <h1 class="pg-hero-title">ER &amp; <span class="pg-accent">Dashboards</span></h1>
+            <p class="pg-hero-sub">OLF apps and program dashboards. Each opens in a new tab &middot; sign in with your OLF Google account.</p>
         </div>
-        <div class="erd-user" title="Use this Google account when an app asks you to sign in">
-            <span class="erd-avatar" id="erdAvatar" aria-hidden="true">?</span>
+        <div class="erd-user pg-glass" title="Use this Google account when an app asks you to sign in">
+            <span class="erd-avatar pg-glass-avatar" id="erdAvatar" aria-hidden="true">?</span>
             <span class="erd-user-text"><small>Signed in as</small><b id="erdUserEmail">—</b></span>
         </div>
     </header>
@@ -153,7 +220,7 @@
                 <span class="erd-name">Expense Report (ER)</span>
                 <span class="erd-desc">Submit travel, operational and program expenses for reimbursement.</span>
                 <span class="erd-chips" aria-hidden="true">
-                    <span>📤 Submit expenses</span><span>📊 Track approval status</span><span>🔐 Google sign-in</span>
+                    <span class="erd-c erd-c-up">Submit expenses</span><span class="erd-c erd-c-chart">Track approval status</span><span class="erd-c erd-c-lock">Google sign-in</span>
                 </span>
             </span>
             <span class="erd-foot"><span class="erd-host">olf-expense-report.web.app</span><span class="erd-go">Open ER <i aria-hidden="true">↗</i></span></span>

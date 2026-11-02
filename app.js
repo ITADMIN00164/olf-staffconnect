@@ -1122,7 +1122,7 @@ async function renderUpcomingEvents() {
             </div>
             <div class="upcoming-body">
                 <div class="upcoming-title" title="${escHtml(e.eventName || e.type || "Event")}">${escHtml(e.eventName || e.type || "Event")}</div>
-                <div class="upcoming-meta">\u{1F4CD} ${escHtml(e.district || "\u2014")} &nbsp;\u00B7&nbsp; \u{1F551} ${escHtml(time)}</div>
+                <div class="upcoming-meta"><span class="hm-mi">${hmIcon("pin")}${escHtml(e.district || "\u2014")}</span><span class="hm-mi">${hmIcon("clock")}${escHtml(time)}</span></div>
                 <span class="upcoming-chip upcoming-chip--${tone}">${escHtml(when)}</span>
             </div>
         </div>`;
@@ -1995,12 +1995,63 @@ async function deriveSchema() {
    HOME PAGE
 ==================================== */
 
+/* Home: greeting, live clock and count-up numbers. */
+const HM_ICON_PATHS = {
+    pin:       '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/>',
+    clock:     '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    calendar:  '<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M8.5 3v4M15.5 3v4"/>',
+    megaphone: '<path d="M4 10v4a1 1 0 0 0 1 1h2l5 4V5L7 9H5a1 1 0 0 0-1 1z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/>',
+    trash:     '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+    inbox:     '<path d="M4 13l2.5-7.5A2 2 0 0 1 8.4 4h7.2a2 2 0 0 1 1.9 1.5L20 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M4 13h4.5A1.5 1.5 0 0 1 10 14.5a2 2 0 0 0 4 0 1.5 1.5 0 0 1 1.5-1.5H20"/>'
+};
+function hmIcon(name) {
+    return '<svg class="hm-i" viewBox="0 0 24 24" aria-hidden="true">' + HM_ICON_PATHS[name] + "</svg>";
+}
+
+function homeGreetingFor(date) {
+    const h = date.getHours();
+    return h < 5 ? "Hello" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : h < 22 ? "Good evening" : "Hello";
+}
+
+let homeClockTimer = null;
+function startHomeClock() {
+    if (homeClockTimer) clearInterval(homeClockTimer);
+    const tick = () => {
+        const clock = document.getElementById("homeClock");
+        if (!clock) { clearInterval(homeClockTimer); homeClockTimer = null; return; }
+        const now = new Date();
+        clock.textContent = now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
+        const day = document.getElementById("homeClockDay");
+        if (day) day.textContent = now.toLocaleDateString("en-IN", { weekday: "long" });
+        const date = document.getElementById("homeDate");
+        if (date) date.textContent = now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+        const greet = document.getElementById("homeGreeting");
+        if (greet) greet.textContent = homeGreetingFor(now);
+    };
+    tick();
+    homeClockTimer = setInterval(tick, 1000);
+}
+
+// Counts up to the figure instead of just appearing.
+function animateCount(el, target) {
+    if (!el) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || target < 2) { el.textContent = target; return; }
+    const start = performance.now(), dur = 900;
+    const step = (t) => {
+        const p = Math.min(1, (t - start) / dur);
+        el.textContent = Math.round(target * (1 - Math.pow(1 - p, 3)));
+        if (p < 1 && document.body.contains(el)) requestAnimationFrame(step); else el.textContent = target;
+    };
+    requestAnimationFrame(step);
+}
+
 async function initHomePage() {
     const user  = auth.currentUser;
     const nameEl = document.getElementById("homeUserName");
     if (nameEl && user) {
         nameEl.textContent = user.displayName?.split(" ")[0] || "there";
     }
+    startHomeClock();
 
     // Admin-only: show inline "Add News" button in the news section header
     const addNewsBtn = document.getElementById("addNewsBtn");
@@ -2030,13 +2081,13 @@ async function initHomePage() {
         const data = [];
         snapshot.forEach(d => data.push(d.data()));
 
-        document.getElementById("statTotal").textContent = data.length;
+        animateCount(document.getElementById("statTotal"), data.length);
 
         const depts = [...new Set(data.map(e => e.Dept).filter(Boolean))];
-        document.getElementById("statDepts").textContent = depts.length;
+        animateCount(document.getElementById("statDepts"), depts.length);
 
         const locs = [...new Set(data.map(e => e.Location).filter(Boolean))];
-        document.getElementById("statLocations").textContent = locs.length;
+        animateCount(document.getElementById("statLocations"), locs.length);
 
         const deptCount = {};
         data.forEach(e => { if (e.Dept) deptCount[e.Dept] = (deptCount[e.Dept] || 0) + 1; });
@@ -2095,6 +2146,18 @@ async function initEmployeesPage() {
             if (card) openOrgPerson(card.dataset.emp);
         });
     }
+
+    ["orgBody", "orgBranchBody"].forEach(bodyId => {
+        const host = document.getElementById(bodyId);
+        if (!host) return;
+        host.addEventListener("keydown", (e) => {
+            if (e.key !== "Enter" && e.key !== " ") return;
+            const card = e.target.closest && e.target.closest(".org-node[data-emp]");
+            if (!card || e.target !== card) return;
+            e.preventDefault();
+            openOrgPerson(card.dataset.emp);
+        });
+    });
 
     const zoomIn    = document.getElementById("orgZoomIn");
     const zoomOut   = document.getElementById("orgZoomOut");
@@ -2162,7 +2225,7 @@ async function loadEmployees() {
     employees = [];
 
     const tableEl = document.getElementById("employeeTable");
-    if (tableEl) tableEl.innerHTML = `<tr><td colspan="99" class="empty-state"><div class="empty-icon">⏳</div>Loading…</td></tr>`;
+    if (tableEl) tableEl.innerHTML = `<tr><td colspan="99" class="empty-state"><span class="emp-spin" aria-hidden="true"></span>Loading…</td></tr>`;
 
     try {
         await deriveSchema();
@@ -2409,6 +2472,22 @@ function onEmpFiltersToggle() {
     syncEmpFilterBar();
 }
 
+/* Pictures drawn in the Employees page */
+const EMP_ICON_PATHS = {
+    search: '<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>',
+    edit:   '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
+    trash:  '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>'
+};
+function empIcon(name) {
+    return '<svg class="emp-i" viewBox="0 0 24 24" aria-hidden="true">' + EMP_ICON_PATHS[name] + "</svg>";
+}
+// A steady colour for each person's initials, taken from their name.
+function empAvatarTone(name) {
+    let n = 0;
+    for (const c of String(name)) n = (n + c.charCodeAt(0)) % 6;
+    return n;
+}
+
 function sortableTh(key, label, cls) {
     const on = empSort.key === key;
     const mark = on ? (empSort.dir === 1 ? "▲" : "▼") : "⇅";
@@ -2436,6 +2515,18 @@ function renderEmployees() {
             : `${filtered.length} record${filtered.length !== 1 ? "s" : ""}`;
     }
 
+    // The figures at the top describe the whole directory, whatever the search shows.
+    const empFigures = {
+        empStatTotal:    employees.length,
+        empStatActive:   employees.filter(isActiveEmployee).length,
+        empStatInactive: employees.filter(e => !isActiveEmployee(e)).length,
+        empStatDepts:    new Set(employees.map(e => e.Dept).filter(Boolean)).size
+    };
+    Object.keys(empFigures).forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.dataset.v !== String(empFigures[id])) { el.dataset.v = String(empFigures[id]); animateCount(el, empFigures[id]); }
+    });
+
     const tableCols = getTableColumns();
     const colCount  = tableCols.length + 1 + (currentRole === "Admin" ? 1 : 0);
 
@@ -2454,8 +2545,9 @@ function renderEmployees() {
         tableEl.innerHTML = `
             <tr><td colspan="${colCount}">
                 <div class="empty-state">
-                    <div class="empty-icon">🔍</div>
-                    No employees match your search or filters.
+                    <div class="empty-icon">${empIcon("search")}</div>
+                    <span class="emp-empty-title">No employees found</span>
+                    Nothing matches your search or filters.
                 </div>
             </td></tr>
         `;
@@ -2466,10 +2558,10 @@ function renderEmployees() {
         <tr class="${isActiveEmployee(emp) ? "" : "row-inactive"}">
             ${currentRole === "Admin" ? `
             <td class="col-actions">
-                <button class="btn-edit"   data-action="edit"   data-id="${escHtml(emp.id)}" title="Edit" aria-label="Edit">✏️</button>
-                <button class="btn-delete" data-action="delete" data-id="${escHtml(emp.id)}" title="Delete" aria-label="Delete">🗑️</button>
+                <button class="btn-edit"   data-action="edit"   data-id="${escHtml(emp.id)}" title="Edit" aria-label="Edit">${empIcon("edit")}</button>
+                <button class="btn-delete" data-action="delete" data-id="${escHtml(emp.id)}" title="Delete" aria-label="Delete">${empIcon("trash")}</button>
             </td>` : ""}
-            <td class="col-id"><code style="font-size:12px;color:#6b7280;">${escHtml(emp.id)}</code></td>
+            <td class="col-id"><span class="emp-id">${escHtml(emp.id)}</span></td>
             ${tableCols.map(key => {
                 const val = emp[key] || "";
                 const cls = colClass(key);
@@ -2480,7 +2572,8 @@ function renderEmployees() {
                 }
                 if (MULTI_VALUE_FIELDS[key]) return `<td class="${cls}">${multiCellHtml(val, emp.id, key)}</td>`;
                 if (key === "Dept") return `<td class="${cls}"><span class="badge-dept">${escHtml(val) || "—"}</span></td>`;
-                if (key === "Email" && val) return `<td class="${cls}"><a href="mailto:${escHtml(val)}" style="color:#4f8ef7;text-decoration:none;">${escHtml(val)}</a></td>`;
+                if (key === "Email" && val) return `<td class="${cls}"><a class="emp-mail" href="mailto:${escHtml(val)}">${escHtml(val)}</a></td>`;
+                if (key === "Name" && val) return `<td class="${cls}"><div class="emp-person"><span class="emp-av av${empAvatarTone(val)}" aria-hidden="true">${escHtml(initialsFrom(val))}</span><span class="emp-name">${escHtml(val)}</span></div></td>`;
                 return `<td class="${cls}">${escHtml(val) || "—"}</td>`;
             }).join("")}
         </tr>
@@ -2547,6 +2640,23 @@ function countDescendants(id, childrenOf, seen = new Set()) {
         .reduce((n, kid) => n + 1 + countDescendants(kid, childrenOf, seen), 0);
 }
 
+// Each department keeps one colour wherever it turns up in the chart.
+const ORG_TONES = ["#3B82F6", "#8B5CF6", "#14B8A6", "#F59E0B", "#EC4899", "#F97316"];
+function orgToneOf(emp) {
+    return ORG_TONES[empAvatarTone(String(emp["Dept"] || emp["Name"] || ""))];
+}
+// The picture and the words of one card, shared by the tree and the stacked team view.
+function orgCardInner(emp, id) {
+    const role     = emp["Designation"] || emp["Name"] || id;
+    const showName = emp["Designation"] ? emp["Name"] : "";
+    return `<span class="org-av av${empAvatarTone(emp["Name"] || id)}" aria-hidden="true">${escHtml(initialsFrom(emp["Name"] || id))}</span>
+        <div class="org-txt">
+            <div class="org-role">${escHtml(role)}</div>
+            ${showName ? `<div class="org-name">${escHtml(showName)}</div>` : ""}
+            ${emp["Dept"] ? `<div class="org-dept">${escHtml(emp["Dept"])}</div>` : ""}
+        </div>`;
+}
+
 function orgNodeHtml(id, tree, depth, seen) {
     const { byId, childrenOf } = tree;
     const emp = byId.get(id);
@@ -2563,14 +2673,10 @@ function orgNodeHtml(id, tree, depth, seen) {
 
     const kids      = childrenOf.get(id) || [];
     const collapsed = orgCollapsed.has(id);
-    const role      = emp["Designation"] || emp["Name"] || id;
-    const showName  = emp["Designation"] ? emp["Name"] : "";
 
-    let html = `<li><div class="org-node${depth === 0 ? " is-root" : ""}"
-        data-emp="${escHtml(id)}" title="${escHtml(emp.id)} — click for details">
-        <div class="org-role">${escHtml(role)}</div>
-        ${showName ? `<div class="org-name">${escHtml(showName)}</div>` : ""}
-        ${emp["Dept"] ? `<div class="org-dept">${escHtml(emp["Dept"])}</div>` : ""}
+    let html = `<li><div class="org-node${depth === 0 ? " is-root" : ""}" tabindex="0" role="button"
+        data-emp="${escHtml(id)}" style="--dc:${orgToneOf(emp)}" title="${escHtml(emp.id)} — click for details">
+        ${orgCardInner(emp, id)}
     </div>`;
 
     if (kids.length) {
@@ -2828,15 +2934,11 @@ function orgBranchHtml(id, tree) {
     const card = (eid, isHead) => {
         const e = byId.get(eid);
         if (!e) return "";
-        const role     = e["Designation"] || e["Name"] || eid;
-        const showName = e["Designation"] ? e["Name"] : "";
         const below    = countDescendants(eid, childrenOf);
         const mine     = (childrenOf.get(eid) || []).length;
-        return `<div class="org-node${isHead ? " is-root" : ""}"
-                data-emp="${escHtml(eid)}" title="${escHtml(eid)} \u2014 click for details">
-                <div class="org-role">${escHtml(role)}</div>
-                ${showName ? `<div class="org-name">${escHtml(showName)}</div>` : ""}
-                ${e["Dept"] ? `<div class="org-dept">${escHtml(e["Dept"])}</div>` : ""}
+        return `<div class="org-node${isHead ? " is-root" : ""}" tabindex="0" role="button"
+                data-emp="${escHtml(eid)}" style="--dc:${orgToneOf(e)}" title="${escHtml(eid)} \u2014 click for details">
+                ${orgCardInner(e, eid)}
             </div>
             ${!isHead && mine ? `<button class="org-toggle" data-org-toggle="${escHtml(eid)}"
                     title="Open this team">+${below}</button>` : ""}`;
@@ -3937,9 +4039,9 @@ async function renderNewsCards() {
     if (!grid) return;
 
     grid.innerHTML = `
-        <div class="news-empty-state">
-            <div class="news-empty-icon">⏳</div>
-            Loading announcements…
+        <div class="news-empty-state hm-empty">
+            <span class="hm-spin" aria-hidden="true"></span>
+            <span class="hm-empty-sub">Loading announcements…</span>
         </div>`;
 
     try {
@@ -3968,9 +4070,10 @@ async function renderNewsCards() {
 
         if (allVisible.length === 0) {
             grid.innerHTML = `
-                <div class="news-empty-state">
-                    <div class="news-empty-icon">📭</div>
-                    No announcements right now. Check back later.
+                <div class="news-empty-state hm-empty">
+                    <span class="hm-empty-ico">${hmIcon("inbox")}</span>
+                    <strong class="hm-empty-title">No announcements right now</strong>
+                    <span class="hm-empty-sub">Check back later.</span>
                 </div>`;
             return;
         }
@@ -3985,17 +4088,17 @@ async function renderNewsCards() {
             <div class="news-card${isExpired ? " news-card--expired" : ""}">
                 <div class="news-card-top">
                     <span class="news-card-badge">
-                        📢 ${isExpired ? "Expired" : "Announcement"}
+                        ${hmIcon("megaphone")}${isExpired ? "Expired" : "Announcement"}
                     </span>
                     ${currentRole === "Admin" ? `
-                    <button class="btn-delete-news" data-newsid="${n.id}">🗑 Delete</button>
+                    <button class="btn-delete-news" data-newsid="${n.id}" title="Delete this announcement">${hmIcon("trash")}Delete</button>
                     ` : ""}
                 </div>
                 ${newsBody(n, "news-card-text")}
                 <button class="news-card-more" type="button" data-newsid="${n.id}" hidden>Read more →</button>
                 <div class="news-card-footer">
                     <div class="news-card-dates">
-                        📅 ${formatNewsDateTime(startVal, false)} – ${formatNewsDateTime(endVal, true)}
+                        ${hmIcon("calendar")}${formatNewsDateTime(startVal, false)} – ${formatNewsDateTime(endVal, true)}
                     </div>
                 </div>
             </div>`;

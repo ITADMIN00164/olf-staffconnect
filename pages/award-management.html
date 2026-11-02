@@ -29,6 +29,10 @@
         <button type="button" role="tab" class="aw-toptab is-active" data-aw-top="stock" aria-selected="true"><i class="aw-icon" data-aw-icon="gift" aria-hidden="true"></i>Gifts<span class="act-count" id="top-tab-count" hidden></span></button>
       </nav>
       <div class="aw-top-right">
+        <!-- One Refresh for the whole page: reloads the data of the tab on screen
+             (award.js refreshCurrentView). The separate Refresh buttons each view
+             carries are hidden in award.css. -->
+        <button type="button" id="aw-refresh-all" class="btn btn-ghost btn-sm aw-refresh-all" title="Reload the latest data for the tab you are on"><i class="aw-icon" data-aw-icon="refresh" aria-hidden="true"></i><span class="aw-refresh-label" aria-live="polite">Refresh data</span></button>
         <div class="aw-top-actions" id="aw-stock-actions">
           <button type="button" id="refresh-btn" class="btn btn-ghost btn-sm"><i class="aw-icon" data-aw-icon="refresh" aria-hidden="true"></i>Refresh</button>
           <button type="button" id="new-req-btn" class="btn btn-primary btn-sm">
@@ -36,10 +40,6 @@
             New Requisition
           </button>
         </div>
-        <!-- One Refresh for the whole page: reloads the data of the tab on screen
-             (award.js refreshCurrentView). It replaces the separate Refresh buttons
-             each view used to carry, which are hidden in award.css. -->
-        <button type="button" id="aw-refresh-all" class="btn btn-ghost btn-sm aw-refresh-all" title="Reload the latest data for the tab you are on"><i class="aw-icon" data-aw-icon="refresh" aria-hidden="true"></i><span class="aw-refresh-label" aria-live="polite">Refresh data</span></button>
       </div>
     </div>
 
@@ -234,6 +234,10 @@
               <label for="stock-district">District</label>
               <select id="stock-district"><option value="">All districts</option></select>
             </div>
+            <button type="button" id="stock-fetch" class="btn btn-primary btn-sm">
+                <i class="aw-icon" data-aw-icon="search" aria-hidden="true"></i>
+                Fetch
+              </button>
             <div class="stock-actions">
               <!-- A year of figures at once, for whoever may set them. The
                    file is the sheet as it stands, so what comes back is
@@ -250,10 +254,6 @@
               <button type="button" id="stock-excel" class="btn btn-ghost btn-sm">
                 <i class="aw-icon" data-aw-icon="download" aria-hidden="true"></i>
                 Download Excel
-              </button>
-              <button type="button" id="stock-fetch" class="btn btn-primary btn-sm">
-                <i class="aw-icon" data-aw-icon="search" aria-hidden="true"></i>
-                Fetch
               </button>
             </div>
           </div>

@@ -1,48 +1,62 @@
 <!-- pages/home.html -->
-<div class="home-page">
+<div class="home-page hm">
 
     <!-- News banners placeholder (hidden — kept for app.js compat) -->
     <div id="newsBannerSection" style="display:none;"></div>
 
-    <div class="page-header">
-        <div>
-            <h1 class="page-title">Welcome back, <span id="homeUserName">—</span></h1>
-            <p class="page-subtitle">One Stop Solution for OLF's Data Management</p>
+    <!-- ── Hero: greeting, date and time ── -->
+    <section class="pg-hero hm-hero" aria-label="Welcome">
+        <span class="pg-blob pg-blob--a" aria-hidden="true"></span>
+        <span class="pg-blob pg-blob--b" aria-hidden="true"></span>
+        <span class="pg-blob pg-blob--c" aria-hidden="true"></span>
+        <div class="pg-hero-main">
+            <div class="pg-eyebrow"><span class="pg-live" aria-hidden="true"></span><span id="homeDate">&nbsp;</span></div>
+            <h1 class="pg-hero-title hm-title"><span class="hm-title-text"><span id="homeGreeting">Welcome back</span>, <span class="hm-name" id="homeUserName">—</span></span><span class="hm-hand" aria-hidden="true">👋</span></h1>
+            <p class="pg-hero-sub">One Stop Solution for OLF's Data Management</p>
         </div>
-    </div>
+        <div class="hm-clock pg-glass" aria-hidden="true">
+            <div class="hm-clock-time" id="homeClock">--:--</div>
+            <div class="hm-clock-day" id="homeClockDay">&nbsp;</div>
+        </div>
+    </section>
 
-    <div class="stats-row" id="statsRow">
-        <div class="stat-card">
-            <div class="stat-icon" style="background: rgba(79,142,247,0.12); color:#4f8ef7;">👥</div>
-            <div class="stat-info">
-                <div class="stat-value" id="statTotal">—</div>
-                <div class="stat-label">Total Employees</div>
+    <!-- ── Stats ── -->
+    <div class="pg-stats stats-row" id="statsRow">
+        <div class="pg-stat" style="--tint:#4F8EF7">
+            <div class="pg-stat-icon">
+                <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="21.500" cy="10.500" r="4.300" fill="#FCD9A8"/><path d="M13.500 27c0-5.200 3.400-8.500 8-8.500s8 3.300 8 8.500z" fill="#3B82F6"/><circle cx="11" cy="12" r="4.800" fill="#FFD3A1"/><path d="M2.500 28.500c0-5.800 3.700-9.500 8.500-9.500s8.500 3.700 8.500 9.500z" fill="#8B5CF6"/></svg>
+            </div>
+            <div class="pg-stat-info">
+                <div class="pg-stat-value" id="statTotal">—</div>
+                <div class="pg-stat-label">Total Employees</div>
             </div>
         </div>
-        <div class="stat-card">
-            <div class="stat-icon" style="background: rgba(52,199,89,0.12); color:#34c759;">🏢</div>
-            <div class="stat-info">
-                <div class="stat-value" id="statDepts">—</div>
-                <div class="stat-label">Departments</div>
+        <div class="pg-stat" style="--tint:#10B197">
+            <div class="pg-stat-icon">
+                <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="6" y="4" width="14" height="24" rx="2" fill="#14B8A6"/><rect x="18" y="12" width="9" height="16" rx="2" fill="#0F766E"/><g fill="#CCFBF1"><rect x="9" y="8" width="3" height="3" rx=".6"/><rect x="14" y="8" width="3" height="3" rx=".6"/><rect x="9" y="14" width="3" height="3" rx=".6"/><rect x="14" y="14" width="3" height="3" rx=".6"/><rect x="9" y="20" width="3" height="3" rx=".6"/><rect x="14" y="20" width="3" height="3" rx=".6"/><rect x="21" y="16" width="3" height="3" rx=".6"/><rect x="21" y="22" width="3" height="3" rx=".6"/></g></svg>
+            </div>
+            <div class="pg-stat-info">
+                <div class="pg-stat-value" id="statDepts">—</div>
+                <div class="pg-stat-label">Departments</div>
             </div>
         </div>
-        <div class="stat-card">
-            <div class="stat-icon" style="background: rgba(255,159,10,0.12); color:#ff9f0a;">📍</div>
-            <div class="stat-info">
-                <div class="stat-value" id="statLocations">—</div>
-                <div class="stat-label">Locations</div>
+        <div class="pg-stat" style="--tint:#F43F5E">
+            <div class="pg-stat-icon">
+                <svg viewBox="0 0 32 32" aria-hidden="true"><ellipse cx="16" cy="29" rx="6.500" ry="1.800" fill="#0F172A" opacity=".15"/><path d="M16 28.500s-9.500-9-9.500-16a9.500 9.500 0 0 1 19 0c0 7-9.500 16-9.500 16z" fill="#F43F5E"/><circle cx="16" cy="12.500" r="4" fill="#fff"/></svg>
+            </div>
+            <div class="pg-stat-info">
+                <div class="pg-stat-value" id="statLocations">—</div>
+                <div class="pg-stat-label">Locations</div>
             </div>
         </div>
     </div>
 
     <!-- ── Upcoming events (from Program Calendar) ──
          Hidden until app.js finds something in the today/tomorrow window. -->
-    <div class="upcoming-section" id="upcomingSection" style="display:none;">
-        <div class="news-section-header">
-            <div class="news-section-title">
-                <span class="ns-icon">🗓️</span> Happening next
-            </div>
-            <button class="btn-add-news-inline" id="upcomingViewAll" type="button">
+    <div class="upcoming-section hm-section" id="upcomingSection" style="display:none;">
+        <div class="hm-head">
+            <div class="hm-head-title"><span class="hm-head-ico hm-ico--pink"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2.500"/><path d="M4 10h16M8.500 3v4M15.500 3v4"/></svg></span>Happening next</div>
+            <button class="btn-add-news-inline hm-pill" id="upcomingViewAll" type="button">
                 Open calendar →
             </button>
         </div>
@@ -50,20 +64,18 @@
     </div>
 
     <!-- ── News Section ── -->
-    <div class="news-section">
-        <div class="news-section-header">
-            <div class="news-section-title">
-                <span class="ns-icon">📢</span> Announcements
-            </div>
+    <div class="news-section hm-section">
+        <div class="hm-head">
+            <div class="hm-head-title"><span class="hm-head-ico hm-ico--amber"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4a1 1 0 0 0 1 1h2l5 4V5L7 9H5a1 1 0 0 0-1 1z"/><path d="M16 9a4 4 0 0 1 0 6M18.500 6.500a8 8 0 0 1 0 11"/></svg></span>Announcements</div>
             <!-- Admin only — rendered by app.js -->
-            <button class="btn-add-news-inline" id="addNewsBtn" style="display:none;">
+            <button class="btn-add-news-inline hm-pill" id="addNewsBtn" style="display:none;">
                 + Add News
             </button>
         </div>
         <div class="news-cards-grid" id="newsCardsGrid">
-            <div class="news-empty-state">
-                <div class="news-empty-icon">⏳</div>
-                Loading announcements…
+            <div class="news-empty-state hm-empty">
+                <span class="hm-spin" aria-hidden="true"></span>
+                <span class="hm-empty-sub">Loading announcements…</span>
             </div>
         </div>
     </div>
@@ -73,68 +85,31 @@
 <style>
 .home-page { max-width: var(--page-max, 1680px); margin-left: auto; margin-right: auto; }
 
-.page-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    margin-bottom: 26px;
+/* The shared banner and stat cards live in index.html (pg-*). Only what is Home's own stays here. */
+.hm-title { display: flex; align-items: center; flex-wrap: wrap; gap: 0 12px; }
+.hm-name { color: #FEF3C7; }
+.hm-hand { display: inline-block; flex: 0 0 auto; font-size: 1em; line-height: 1; position: relative; top: -4px; margin-left: -4px; transform-origin: 70% 70%; }
+
+.hm-clock {
+    flex: 0 0 auto; text-align: center; padding: 14px 24px; border-radius: 18px;
 }
+.hm-clock-time { font-size: 34px; font-weight: 800; letter-spacing: -1px; line-height: 1; font-variant-numeric: tabular-nums; }
+.hm-clock-day { margin-top: 6px; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
 
-.page-title {
-    font-size: 22px;
-    font-weight: 700;
-    color: #1a1d23;
-    letter-spacing: -0.4px;
-    margin-bottom: 4px;
-}
-
-.page-title span { color: #4f8ef7; }
-
-.page-subtitle { font-size: 13.5px; color: #6b7280; }
-
-.stats-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-    margin-bottom: 24px;
-}
-
-.stat-card {
-    background: #fff;
-    border-radius: 10px;
-    padding: 20px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.07);
-}
-
-.stat-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 22px;
-    flex-shrink: 0;
-}
-
-.stat-value {
-    font-size: 26px;
-    font-weight: 700;
-    color: #1a1d23;
-    line-height: 1;
-    margin-bottom: 4px;
-}
-
-.stat-label { font-size: 12.5px; color: #6b7280; font-weight: 500; }
+/* ── Section heads ──────────────────────────────────────────── */
+.hm-section { margin: 0 0 26px; }
+.hm-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.hm-head-title { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 800; letter-spacing: -.3px; color: var(--text); }
+.hm-head-ico { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; color: #fff; box-shadow: 0 4px 10px rgba(15,23,42,.16); }
+.hm-head-ico svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.hm-ico--pink  { background: linear-gradient(135deg, #F472B6, #DB2777); }
+.hm-ico--amber { background: linear-gradient(135deg, #FBBF24, #D97706); }
+.hm-pill { border-radius: 999px !important; padding: 7px 16px !important; transition: transform .18s ease, box-shadow .18s ease, background-color .15s ease !important; }
+.hm-pill:hover { transform: translateY(-1px); box-shadow: 0 6px 14px rgba(15,23,42,.12); }
 
 /* ── Happening next ────────────────────────────────────────────
    Uses the shared tokens from index.html so this strip matches the
    glass card system rather than inventing a third look. */
-.upcoming-section { margin-bottom: 24px; }
-
 .upcoming-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -172,20 +147,20 @@
 }
 .upcoming-day {
     font-size: 21px; font-weight: 800; line-height: 1;
-    color: #1a1d23; font-variant-numeric: tabular-nums;
+    color: var(--text, #1a1d23); font-variant-numeric: tabular-nums;
 }
 .upcoming-mon {
     font-size: 10px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: .06em; color: #6b7280; margin-top: 3px;
+    letter-spacing: .06em; color: var(--text-soft, #6b7280); margin-top: 3px;
 }
 .upcoming-body { min-width: 0; flex: 1; }
 .upcoming-title {
-    font-size: 13px; font-weight: 700; color: #1a1d23;
+    font-size: 13px; font-weight: 700; color: var(--text, #1a1d23);
     margin-bottom: 3px; line-height: 1.35;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .upcoming-meta {
-    font-size: 11.5px; color: #6b7280; line-height: 1.45;
+    font-size: 11.5px; color: var(--text-soft, #6b7280); line-height: 1.45;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .upcoming-chip {
@@ -197,9 +172,78 @@
 .upcoming-chip--tomorrow { background: rgba(79,142,247,0.12); color: #2C63C4; }
 .upcoming-chip--later    { background: rgba(15,23,42,0.06);   color: #5A6577; }
 
+/* ── Icons inside cards ─────────────────────────────────────── */
+.hm .hm-i { width: 14px; height: 14px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.hm .hm-mi { display: inline-flex; align-items: center; gap: 5px; }
+.hm .hm-mi + .hm-mi { margin-left: 12px; }
+.hm .hm-mi .hm-i { width: 13px; height: 13px; color: var(--text-faint); }
+
+/* ── Happening next: the date sits in its own soft tile ─────── */
+.hm .upcoming-card { padding: 14px 16px 14px 18px; gap: 14px; border-radius: 16px; }
+.hm .upcoming-when {
+    flex: 0 0 54px; align-self: flex-start; padding: 8px 0 7px; border: 0; border-radius: 13px;
+    background: color-mix(in srgb, var(--brand, #4F8EF7) 11%, transparent);
+}
+.hm .upcoming-day { font-size: 22px; }
+.hm .upcoming-title { font-size: 13.5px; }
+.hm .upcoming-meta { margin-top: 1px; }
+.hm .upcoming-chip { margin-top: 8px; }
+
+/* ── Announcements ──────────────────────────────────────────── */
+.hm .news-cards-grid { gap: 16px; }
+.hm .news-card {
+    position: relative; overflow: hidden; gap: 12px; padding: 20px 22px 18px 24px; border-radius: 18px; border-top: 0;
+    border: 1px solid var(--hairline); background: var(--glass-strong); box-shadow: var(--shadow-sm);
+    transition: transform .22s var(--ease, ease), box-shadow .22s ease;
+}
+.hm .news-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: linear-gradient(180deg, #10B197, #4F8EF7); }
+.hm .news-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+.hm .news-card-badge { gap: 6px; padding: 5px 12px 5px 9px; border-radius: 999px; font-size: 10.5px; }
+.hm .news-card-badge .hm-i { width: 14px; height: 14px; }
+.hm .news-card-text { font-size: 14px; line-height: 1.65; }
+.hm .news-card-footer { padding-top: 12px; border-top: 1px solid var(--hairline); }
+.hm .news-card-dates { gap: 7px; font-size: 11.5px; font-weight: 600; }
+.hm .news-card-dates .hm-i { color: var(--teal, #10B197); }
+.hm .btn-delete-news { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 5px 11px 5px 9px; }
+.hm .btn-delete-news .hm-i { width: 13px; height: 13px; }
+.hm .news-card--expired { opacity: .6; }
+.hm .news-card--expired::before { background: linear-gradient(180deg, #CBD5E1, #94A3B8); }
+
+/* ── Empty and loading states ───────────────────────────────── */
+.hm .hm-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 34px 20px; border-radius: 20px; }
+.hm .hm-empty-ico {
+    width: 64px; height: 64px; margin-bottom: 6px; border-radius: 20px; display: grid; place-items: center; color: #fff;
+    background: linear-gradient(135deg, #FBBF24, #F59E0B 55%, #F97316); box-shadow: 0 10px 22px rgba(245,158,11,.32), inset 0 1px 0 rgba(255,255,255,.4);
+}
+.hm .hm-empty-ico .hm-i { width: 30px; height: 30px; stroke-width: 1.8; }
+.hm .hm-empty-title { font-size: 15px; font-weight: 800; letter-spacing: -.2px; color: var(--text); }
+.hm .hm-empty-sub { font-size: 13px; font-weight: 500; color: var(--text-soft); }
+.hm .hm-spin { width: 30px; height: 30px; border-radius: 50%; border: 3px solid color-mix(in srgb, var(--brand, #4F8EF7) 22%, transparent); border-top-color: var(--brand, #4F8EF7); animation: hm-spin .8s linear infinite; }
+@keyframes hm-spin { to { transform: rotate(360deg); } }
+
+/* Quiet states and cards follow the theme, so the page reads in dark too */
+.hm .news-empty-state { background: var(--glass, #fafafa); color: var(--text-soft, #9ca3af); border-color: var(--hairline, #e5e7eb); }
+html[data-theme="dark"] .hm .upcoming-card { border-color: var(--hairline); box-shadow: var(--shadow-sm); }
+
+/* ── Motion: everything settles in, the hero keeps a slow drift ─ */
+@media (prefers-reduced-motion: no-preference) {
+    .hm-section { animation: hm-in .6s cubic-bezier(.22,1,.36,1) backwards; }
+    #upcomingSection { animation-delay: .3s; } .news-section.hm-section { animation-delay: .36s; }
+    .hm-hand { animation: hm-wave 2.6s ease-in-out 1s infinite; }
+    .hm .hm-empty-ico { animation: hm-bob 3.2s ease-in-out infinite; }
+    @keyframes hm-in { from { opacity: 0; transform: translateY(14px); } }
+    @keyframes hm-wave { 0%, 60%, 100% { transform: rotate(0); } 10%, 30% { transform: rotate(16deg); } 20%, 40% { transform: rotate(-10deg); } 50% { transform: rotate(8deg); } }
+    @keyframes hm-bob { 50% { transform: translateY(-4px); } }
+}
+
+@media (max-width: 900px) {
+    .hm-clock { display: none; }
+}
 @media (max-width: 768px) {
-    .stats-row { grid-template-columns: 1fr; }
     .news-cards-grid { grid-template-columns: 1fr; }
     .upcoming-grid { grid-template-columns: 1fr; }
 }
 </style>
+
+<!-- Local Live Server adds its reload script at the closing body tag; this gives it a safe place. -->
+</body>

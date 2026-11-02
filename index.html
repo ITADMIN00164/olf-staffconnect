@@ -1697,7 +1697,7 @@
             border-bottom: 1px solid var(--hairline-dk);
             box-shadow: 0 1px 24px rgba(11,18,32,0.28);
         }
-        /* The name: letters that pop in one by one; Staff Connect in flowing brand colours with a passing shine. All of it keeps moving on its own. */
+        /* The name: it is simply there when the page opens; Staff Connect in flowing brand colours with a passing shine. All of it keeps moving on its own. */
         .topbar-logo { position: relative; display: flex; align-items: baseline; gap: 9px; font-size: 24px; line-height: 1; cursor: default; user-select: none; }
         .topbar-logo .logo-olf { display: inline-flex; font-weight: 900; letter-spacing: -1px; }
         .topbar-logo .logo-olf i { font-style: normal; display: inline-block; }
@@ -1713,10 +1713,8 @@
             -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
         }
         @media (prefers-reduced-motion: no-preference) {
-            .topbar-logo .logo-olf i, .topbar-logo .logo-sc i { animation: logo-rise .7s cubic-bezier(.34,1.56,.64,1) backwards; animation-delay: calc(var(--i) * 70ms + 100ms); }
-            .topbar-logo .logo-sc i { animation: logo-rise .7s cubic-bezier(.34,1.56,.64,1) backwards, logo-sheen 9s linear infinite; animation-delay: calc(var(--i) * 70ms + 100ms), 1.2s; }
+            .topbar-logo .logo-sc i { animation: logo-sheen 9s linear infinite; }
             .topbar-logo .logo-olf { animation: logo-glow 2.6s ease-in-out infinite alternate; }
-            @keyframes logo-rise { from { opacity: 0; transform: translateY(70%) scale(.7); } }
             @keyframes logo-glow { from { filter: drop-shadow(0 0 0 rgba(79,142,247,0)); } to { filter: drop-shadow(0 0 7px rgba(79,142,247,.55)); } }
             /* the colours flow without stopping; every so often a shine passes over them */
             @keyframes logo-sheen { 0% { background-position: -400px 0, 0 0; } 70% { background-position: -400px 0, 182px 0; } 100% { background-position: 360px 0, 260px 0; } }
@@ -2770,6 +2768,153 @@
     .theme-switch button:focus-visible { outline: 2px solid var(--chrome-accent); outline-offset: 1px; }
     @media (max-width: 520px) { .theme-switch button { width: 26px; } }
 
+    /* ── Header, polished: a flowing accent line, a sliding theme pill, a livelier profile chip ── */
+    html[data-theme] .topbar::after {
+        content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; pointer-events: none; opacity: .75;
+        background: linear-gradient(90deg, transparent 0%, var(--brand) 25%, var(--teal) 50%, var(--brand) 75%, transparent 100%);
+        background-size: 200% 100%;
+    }
+    html[data-theme] .topbar { padding-top: 2px; }
+
+    /* theme switch: one raised pill slides to the chosen option */
+    .theme-switch { --ts-w: 30px; position: relative; isolation: isolate; }
+    .theme-switch::before {
+        content: ""; position: absolute; z-index: -1; left: 3px; top: 3px; bottom: 3px; width: var(--ts-w); border-radius: 999px;
+        background: var(--chrome-bg); box-shadow: -2px -2px 5px var(--chrome-hi), 2px 2px 5px var(--chrome-lo);
+        transform: translateX(calc(var(--ts-i, 0) * (var(--ts-w) + 2px)));
+        transition: transform .38s cubic-bezier(.34,1.45,.64,1);
+    }
+    .theme-switch:has(button:nth-child(2)[aria-checked="true"]) { --ts-i: 1; }
+    .theme-switch:has(button:nth-child(3)[aria-checked="true"]) { --ts-i: 2; }
+    .theme-switch button[aria-checked="true"] { background: transparent; box-shadow: none; }
+    .theme-switch button svg { transition: transform .45s cubic-bezier(.34,1.56,.64,1); }
+    .theme-switch button:hover svg { transform: rotate(25deg) scale(1.15); }
+    .theme-switch button[aria-checked="true"] svg { transform: scale(1.1); }
+    @media (max-width: 520px) { .theme-switch { --ts-w: 26px; } }
+
+    /* a taller bar with a soft lit top edge */
+    html[data-theme] .topbar { height: 58px; background-image: linear-gradient(180deg, var(--chrome-hi), transparent 70%); }
+    html[data-theme] .topbar-logo { font-size: 25px; }
+
+    /* ======================================================================
+       Shared page look for Home, Employees and ER & Dashboards: the same
+       banner, the same buttons, the same stat cards, the same entrance.
+       ====================================================================== */
+    .pg-hero {
+        position: relative; overflow: hidden; isolation: isolate; display: flex; align-items: center; justify-content: space-between;
+        gap: 20px 28px; flex-wrap: wrap; padding: 28px 32px; margin-bottom: 22px; border-radius: 22px; color: #fff;
+        background: linear-gradient(120deg, #2457C5 0%, #2F6FE4 40%, #0B8F7A 100%);
+        box-shadow: 0 18px 40px rgba(36,87,197,.30), inset 0 1px 0 rgba(255,255,255,.35);
+    }
+    .pg-hero::before {
+        content: ""; position: absolute; inset: 0; z-index: -1; opacity: .5;
+        background-image: radial-gradient(rgba(255,255,255,.28) 1.2px, transparent 1.4px); background-size: 22px 22px;
+        -webkit-mask-image: linear-gradient(100deg, #000 0%, transparent 70%); mask-image: linear-gradient(100deg, #000 0%, transparent 70%);
+    }
+    .pg-blob { position: absolute; z-index: -1; border-radius: 50%; filter: blur(34px); pointer-events: none; }
+    .pg-blob--a { width: 260px; height: 260px; right: -60px; top: -90px; background: rgba(255,255,255,.28); }
+    .pg-blob--b { width: 220px; height: 220px; right: 22%; bottom: -120px; background: rgba(253,230,138,.34); }
+    .pg-blob--c { width: 200px; height: 200px; left: -70px; bottom: -110px; background: rgba(6,95,70,.30); }
+    .pg-hero-main { min-width: 0; }
+    .pg-hero-lead { display: flex; align-items: center; gap: 18px; min-width: 0; }
+    .pg-hero-ico {
+        width: 60px; height: 60px; flex: 0 0 auto; border-radius: 19px; display: grid; place-items: center;
+        background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.36); box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 8px 18px rgba(15,23,42,.14);
+        -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    }
+    .pg-hero-ico svg { width: 36px; height: 36px; filter: drop-shadow(0 2px 2px rgba(15,23,42,.2)); }
+    .pg-eyebrow {
+        display: inline-flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 5px 13px 5px 11px; border-radius: 999px;
+        font-size: 12px; font-weight: 700; letter-spacing: .02em; background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.3);
+        -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    }
+    .pg-live { width: 8px; height: 8px; border-radius: 50%; background: #86EFAC; box-shadow: 0 0 0 0 rgba(134,239,172,.7); }
+    .pg-hero-title { font-size: 32px; font-weight: 800; letter-spacing: -1px; line-height: 1.12; margin: 0 0 7px; color: #fff; }
+    .pg-hero-sub { margin: 0; font-size: 14.5px; font-weight: 500; line-height: 1.5; color: #fff; max-width: 64ch; }
+    .pg-accent { color: #FEF3C7; }
+    .pg-hero-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .pg-hero .pg-btn {
+        display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 18px; border-radius: 13px; cursor: pointer;
+        font: inherit; font-size: 13.5px; font-weight: 700; white-space: nowrap; color: #fff; text-decoration: none;
+        background: rgba(255,255,255,.17); border: 1px solid rgba(255,255,255,.36); box-shadow: inset 0 1px 0 rgba(255,255,255,.3);
+        -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+        transition: transform .18s var(--ease, ease), background-color .15s ease, box-shadow .2s ease;
+    }
+    .pg-hero .pg-btn:hover { transform: translateY(-1px); background: rgba(255,255,255,.28); box-shadow: 0 8px 18px rgba(15,23,42,.16), inset 0 1px 0 rgba(255,255,255,.3); }
+    .pg-hero .pg-btn:active { transform: scale(.97); }
+    .pg-hero .pg-btn:focus-visible { outline: 3px solid rgba(255,255,255,.7); outline-offset: 2px; }
+    .pg-hero .pg-btn--solid { background: #fff; color: #2457C5; border-color: #fff; box-shadow: 0 8px 18px rgba(15,23,42,.18); }
+    .pg-hero .pg-btn--solid:hover { background: #fff; box-shadow: 0 12px 24px rgba(15,23,42,.24); }
+    .pg-btn .pg-i { width: 16px; height: 16px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* frosted chip on the banner (kept here so the dark-mode adapter leaves it alone) */
+    .pg-hero .pg-glass {
+        background: rgba(255,255,255,.17); border: 1px solid rgba(255,255,255,.34); box-shadow: inset 0 1px 0 rgba(255,255,255,.3);
+        -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    }
+    .pg-hero .pg-glass-avatar { background: rgba(255,255,255,.92); color: #2457C5; }
+    .pg-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; margin-bottom: 26px; }
+    .pg-stat {
+        position: relative; overflow: hidden; display: flex; align-items: center; gap: 16px; padding: 20px 22px; border-radius: 18px;
+        background: var(--glass-strong, rgba(255,255,255,.88)); border: 1px solid var(--hairline, rgba(15,23,42,.08));
+        box-shadow: var(--shadow-sm); transition: transform .22s var(--ease, ease), box-shadow .22s ease;
+    }
+    .pg-stat::after {
+        content: ""; position: absolute; right: -40px; top: -40px; width: 130px; height: 130px; border-radius: 50%; pointer-events: none;
+        background: radial-gradient(circle, color-mix(in srgb, var(--tint, #4F8EF7) 24%, transparent), transparent 70%);
+    }
+    .pg-stat:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+    .pg-stat-icon {
+        width: 58px; height: 58px; border-radius: 17px; display: grid; place-items: center; flex: 0 0 auto;
+        background: color-mix(in srgb, var(--tint, #4F8EF7) 13%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tint, #4F8EF7) 22%, transparent);
+        transition: transform .3s cubic-bezier(.34,1.56,.64,1);
+    }
+    .pg-stat-icon svg { width: 36px; height: 36px; filter: drop-shadow(0 2px 2px rgba(15,23,42,.18)); }
+    .pg-stat:hover .pg-stat-icon { transform: scale(1.1) rotate(-5deg); }
+    .pg-stat-value { font-size: 34px; font-weight: 800; letter-spacing: -1px; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
+    .pg-stat-label { margin-top: 6px; font-size: 13px; font-weight: 600; color: var(--text-soft); }
+
+    @media (prefers-reduced-motion: no-preference) {
+        .pg-hero, .pg-stat { animation: pg-in .6s cubic-bezier(.22,1,.36,1) backwards; }
+        .pg-hero { animation-delay: .02s; }
+        .pg-stat:nth-child(1) { animation-delay: .12s; } .pg-stat:nth-child(2) { animation-delay: .18s; }
+        .pg-stat:nth-child(3) { animation-delay: .24s; } .pg-stat:nth-child(4) { animation-delay: .3s; }
+        .pg-blob--a { animation: pg-drift 14s ease-in-out infinite alternate; }
+        .pg-blob--b { animation: pg-drift 18s ease-in-out -6s infinite alternate-reverse; }
+        .pg-blob--c { animation: pg-drift 16s ease-in-out -3s infinite alternate; }
+        .pg-live { animation: pg-ping 2.2s ease-out infinite; }
+        @keyframes pg-in { from { opacity: 0; transform: translateY(14px); } }
+        @keyframes pg-drift { to { transform: translate(34px, 22px) scale(1.12); } }
+        @keyframes pg-ping { 0% { box-shadow: 0 0 0 0 rgba(134,239,172,.7); } 100% { box-shadow: 0 0 0 9px rgba(134,239,172,0); } }
+    }
+    @media (max-width: 900px) { .pg-hero { padding: 24px 22px; } .pg-hero-title { font-size: 26px; } }
+    @media (max-width: 640px) {
+        .pg-hero-lead, .pg-hero-actions { width: 100%; }
+        .pg-hero-actions > div, .pg-hero-actions .admin-btn-group { flex: 1 1 100%; width: 100%; }
+        .pg-hero-actions .admin-btn-group { display: flex; flex-wrap: wrap; gap: 10px; }
+        .pg-hero .pg-btn { flex: 1 1 auto; justify-content: center; }
+    }
+    @media (max-width: 640px) { .pg-stats { grid-template-columns: 1fr; } .pg-hero-ico { width: 48px; height: 48px; border-radius: 16px; } .pg-hero-ico svg { width: 30px; height: 30px; } }
+
+    /* profile chip */
+    .tp-avatar { position: relative; width: 32px; height: 32px; font-size: 12px; box-shadow: 0 0 0 2px var(--chrome-bg, #fff), 0 0 0 3.5px rgba(79,142,247,.55), 0 4px 10px rgba(79,142,247,.35); }
+    .tp-avatar::after {
+        content: ""; position: absolute; right: -2px; bottom: -2px; width: 10px; height: 10px; border-radius: 50%;
+        background: #22C55E; box-shadow: 0 0 0 2px var(--chrome-bg, #fff);
+    }
+    .topbar-profile { gap: 10px; padding: 4px 12px 4px 5px; }
+    .tp-name { font-size: 13px; font-weight: 700; letter-spacing: -.1px; }
+    .tp-caret { width: 13px; height: 13px; transition: transform .25s cubic-bezier(.34,1.56,.64,1); }
+    .topbar-profile[aria-expanded="true"] .tp-caret { transform: rotate(180deg); }
+    .topbar-profile:hover .tp-caret { transform: translateY(1px); }
+    .topbar-profile[aria-expanded="true"]:hover .tp-caret { transform: rotate(180deg); }
+    @media (prefers-reduced-motion: no-preference) {
+        html[data-theme] .topbar::after { animation: tb-flow 9s linear infinite; }
+        @keyframes tb-flow { to { background-position: 200% 0; } }
+        .tp-avatar::after { animation: tb-online 2.6s ease-out infinite; }
+        @keyframes tb-online { 0% { box-shadow: 0 0 0 2px var(--chrome-bg, #fff), 0 0 0 2px rgba(34,197,94,.7); } 100% { box-shadow: 0 0 0 2px var(--chrome-bg, #fff), 0 0 0 8px rgba(34,197,94,0); } }
+    }
+
     /* ── Sidebar: the soft-UI skin, re-pointed at the shared tokens ── */
     html[data-theme] #appSidebar {
         --sb-bg: var(--chrome-bg);
@@ -2985,7 +3130,7 @@
 <!-- The ?v= is bumped whenever award.css or award.js changes: without it
      a browser keeps the copy it already has, and the tab carries on
      behaving as it did before the change. -->
-<link rel="stylesheet" href="award.css?v=2026-11-02b">
+<link rel="stylesheet" href="award.css?v=2026-11-02k">
 <link rel="stylesheet" href="award-manage.css?v=2026-10-26g">
 <link rel="stylesheet" href="award-dash.css?v=2026-10-29a">
 <link rel="stylesheet" href="award-event.css?v=2026-10-26e">
@@ -3052,7 +3197,7 @@
                     <span class="tp-name" id="topbarName">—</span>
                     <span class="tp-dept" id="topbarDept">—</span>
                 </span>
-                <span class="tp-caret" aria-hidden="true">▾</span>
+                <svg class="tp-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
                 <span id="topbarRole" hidden>—</span>
             </button>
         </div>
@@ -3294,7 +3439,7 @@
     </div>
 </div>
 
-<script type="module" src="app.js?v=2026-11-02a"></script>
+<script type="module" src="app.js?v=2026-11-02o"></script>
 <script src="profile.js"></script>
 <script src="pom.js"></script>
 <script src="calendar.js"></script>
@@ -3308,7 +3453,7 @@
 <script src="pos.js"></script>
 <script src="pos-review.js"></script>
 <script src="award.js?v=2026-11-02c"></script>
-<script src="award-manage.js?v=2026-11-02b"></script>
+<script src="award-manage.js?v=2026-11-02c"></script>
 <script src="award-dash.js?v=2026-10-31a"></script>
 <script src="award-event.js?v=2026-10-30f"></script>
 <script src="award-append.js?v=2026-10-27b"></script>

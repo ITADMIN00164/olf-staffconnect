@@ -926,7 +926,7 @@ function openFilterPop(key, btn) {
 /* Where a record stands: verified, rejected, awarded and waiting to be verified,
    or not awarded yet. Counted for the chips above the table and used for each
    row's coloured edge. */
-function recStatus(r) {
+function recState(r) {
   if (r.verified === "Yes") return "verified";
   if (r.verified === "Rejected") return "rejected";
   if (r._dirty) return "unsaved";
@@ -935,7 +935,7 @@ function recStatus(r) {
 
 function statusChips() {
   const n = { verified: 0, rejected: 0, unsaved: 0, saved: 0, pending: 0 };
-  currentRecords.forEach(r => { n[recStatus(r)] += 1; });
+  currentRecords.forEach(r => { n[recState(r)] += 1; });
   const chip = (cls, count, label) => count ? '<span class="awm-chip is-' + cls + '">' + count + " " + label + "</span>" : "";
   return chip("verified", n.verified, "verified") + chip("saved", n.saved + n.unsaved, "to verify") +
          chip("pending", n.pending, "not awarded") + chip("rejected", n.rejected, "rejected");
@@ -1016,7 +1016,7 @@ function renderTable() {
     const dis = viewOnly ? "disabled" : "";
     const lt  = locked ? `title="${LOCK_MSG}"` : (isVerifier ? `title="View only — verifier access"` : "");
     return `
-    <tr class="${[locked ? "locked-row" : "", "rec-" + recStatus(r)].filter(Boolean).join(" ")}" ${lt}>
+    <tr class="${[locked ? "locked-row" : "", "rec-" + recState(r)].filter(Boolean).join(" ")}" ${lt}>
       <td class="name-cell">
         <div class="nc-name">${r.fullName || ""}</div>
         <div class="nc-sub">${r.mobile || ""}${r.mobile && r.schoolName ? " · " : ""}${r.schoolName || ""}</div>
