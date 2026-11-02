@@ -3016,6 +3016,10 @@
         .app-body.sb-auto.sb-open #appSidebar .nav-item .label { opacity: 1; }
     }
 
+    /* nothing to pin any more: the menu is always a rail that opens on hover */
+    #appSidebar .sidebar-pin-btn { display: none; }
+    @media (min-width: 769px) { .app-body.sb-auto:not(.sb-open) #appSidebar .sidebar-toggle-row { display: none; } }
+
     /* the top bar tucks away while you read */
     html[data-theme] .topbar { transition: margin-top .3s cubic-bezier(.2,.8,.2,1), opacity .22s ease; }
     body.tb-hidden .topbar { margin-top: calc(var(--tb-h, 58px) * -1); opacity: 0; pointer-events: none; }
@@ -3325,7 +3329,7 @@
         </button>
     </div>
 
-    <div class="app-body">
+    <div class="app-body sb-auto">
 
         <!-- Hover strip on the left edge: brings the auto-hidden menu back. -->
         <div class="sidebar-edge" id="sidebarEdge" role="button" tabindex="0"
@@ -3481,7 +3485,7 @@
     </div>
 </div>
 
-<script type="module" src="app.js?v=2026-11-02r"></script>
+<script type="module" src="app.js?v=2026-11-02s"></script>
 <script src="profile.js"></script>
 <script src="pom.js"></script>
 <script src="calendar.js"></script>

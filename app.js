@@ -213,8 +213,11 @@ if (sidebarToggleBtn && appSidebar && appBody) {
     appSidebar.classList.remove("collapsed");          // old icon-rail mode is retired
     try { localStorage.removeItem("olf_sidebar_collapsed"); } catch (e) {}
 
-    let pinned = false;
-    try { pinned = localStorage.getItem("olf_sidebar_pinned") === "1"; } catch (e) {}
+    // The menu always rests as a slim rail and opens when pointed at, so there
+    // is nothing left to pin. An old saved "pinned" choice is forgotten.
+    const pinned = false;
+    try { localStorage.removeItem("olf_sidebar_pinned"); } catch (e) {}
+    appBody.classList.add("sb-auto");
     let openTimer = null, closeTimer = null;
 
     const isAuto = () => appBody.classList.contains("sb-auto");
@@ -254,13 +257,7 @@ if (sidebarToggleBtn && appSidebar && appBody) {
     };
     paintPin();
 
-    sidebarToggleBtn.addEventListener("click", () => {
-        pinned = !pinned;
-        try { localStorage.setItem("olf_sidebar_pinned", pinned ? "1" : "0"); } catch (e) {}
-        paintPin();
-        if (pinned) appBody.classList.remove("sb-auto", "sb-open");   // dock it
-        else autoHide();
-    });
+    sidebarToggleBtn.addEventListener("click", () => setOpen(!appBody.classList.contains("sb-open")));
 
     // Choosing a page tucks the menu away.
     appSidebar.addEventListener("click", (e) => {
