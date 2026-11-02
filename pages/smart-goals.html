@@ -199,8 +199,8 @@
 /* compact date chip in the plan table */
 #sg-app .sg-date-btn { background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius); padding: 3px 8px; font-size: 11px; font-family: inherit; color: var(--text2); cursor: pointer; white-space: nowrap; }
 #sg-app .sg-date-btn:hover { background: var(--brand-lt); color: var(--brand); border-color: var(--brand); }
-#sg-app .plan-tbl .col-hd .h-plan { background: #2E5FA3; color: #DCE7F5; }
-#sg-app .plan-tbl .col-hd .h-status { background: #7FA6F0; color: #EEF4FF; }
+#sg-app .plan-tbl .col-hd .h-plan { background: #3A6FD1; color: #E4EDFF; }
+#sg-app .plan-tbl .col-hd .h-status { background: #0B8F7A; color: #E6F7F3; }
 #sg-app .plan-tbl .col-hd .h-act { background: #33404D; color: #F4F7FA; }
 #sg-app .plan-tbl .col-hd .h-mgr { background: #7E5FB0; color: #F0EAF9; }
 
@@ -685,16 +685,16 @@
   --bg:       #EAF4F1;
 }
 
-/* ── 3. Column bands: navy / violet -> one green scale ────
+/* ── 3. Column bands: one blue scale with a teal accent ────
    These tokens are read by smartgoal.js when it builds the
    grouped table headers, so retinting them here retints every
    band without touching the table code.                     */
 #sg-app {
-  --col-a-hd:  #12544D;  --col-a-hdt: #DDF0EC;  --col-a-bg: #EDF6F4;
-  --col-b-hd:  #2F6FE4;  --col-b-hdt: #EEF4FF;  --col-b-bg: #F1FAF8;
-  --col-c-hd:  #7FA6F0;  --col-c-hdt: #EAF7F5;  --col-c-bg: #F3FBF9;
-  --col-d-hd:  #4E7A2E;  --col-d-hdt: #F0F7E9;  --col-d-bg: #F5FAF1;
-  --col-e-hd:  #274B45;  --col-e-hdt: #EAF2F0;  --col-e-bg: #F4F8F7;
+  --col-a-hd:  #2457C5;  --col-a-hdt: #E4EDFF;  --col-a-bg: #F1F6FF;
+  --col-b-hd:  #2F6FE4;  --col-b-hdt: #EEF4FF;  --col-b-bg: #F3F7FF;
+  --col-c-hd:  #0B8F7A;  --col-c-hdt: #E6F7F3;  --col-c-bg: #F1FAF8;
+  --col-d-hd:  #B7791F;  --col-d-hdt: #FFF6E3;  --col-d-bg: #FFFAF0;
+  --col-e-hd:  #334155;  --col-e-hdt: #EEF2F7;  --col-e-bg: #F5F7FA;
 }
 /* The grouped review table hard-codes two band tints; re-declare
    them here so they join the same green scale. */
@@ -702,7 +702,7 @@
 #sg-app .tbl.tbl-grouped tbody td:nth-child(4),
 #sg-app .tbl.tbl-grouped tbody td:nth-child(5),
 #sg-app .tbl.tbl-grouped tbody td:nth-child(6),
-#sg-app .tbl.tbl-grouped tbody td:nth-child(7) { background: #EDF6F4; }
+#sg-app .tbl.tbl-grouped tbody td:nth-child(7) { background: #F1F6FF; }
 #sg-app .tbl.tbl-grouped tbody td:nth-child(8) { background: #E4F3EF; }
 
 /* ── 4. Dropdowns that belong to the page ────────────────
@@ -974,6 +974,21 @@
 #sg-app .btn .sg-i, #sg-app .tf-chip .sg-i, #sg-app .sg-date-btn .sg-i { vertical-align: -3px; }
 #sg-app .tf-chip .sg-i { width: 12px; height: 12px; }
 
+
+/* ---- final pass: coloured KPI cards, stronger page titles ---- */
+#sg-app .metric-card { position: relative; overflow: hidden; border-radius: 16px; box-shadow: 0 2px 6px rgba(15,23,42,.04), 0 10px 22px -16px rgba(15,23,42,.2); }
+#sg-app .metric-card::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 4px; background: var(--mc, linear-gradient(90deg, #4F8EF7, #10B197)); }
+#sg-app .metrics-row .metric-card:nth-child(2) { --mc: var(--green); }
+#sg-app .metrics-row .metric-card:nth-child(3) { --mc: var(--amber); }
+#sg-app .metrics-row .metric-card:nth-child(4) { --mc: var(--red); }
+#sg-app .metrics-row .metric-card:nth-child(5) { --mc: var(--blue); }
+#sg-app .metrics-row .metric-card:nth-child(6) { --mc: var(--red); }
+#sg-app .metrics-row .metric-card:nth-child(7) { --mc: #7C3AED; }
+#sg-app .metrics-row .metric-card:nth-child(8) { --mc: #0B8F7A; }
+#sg-app .metric-label { color: var(--text2); }
+#sg-app .page > div:first-child > h1 { font-size: 24px !important; font-weight: 800 !important; letter-spacing: -.6px !important; }
+#sg-app .tbl th { background: linear-gradient(180deg, #3A6FD1, #2457C5); }
+
 @media (max-width: 900px) {
   #sg-app .app-nav { height: auto; flex-wrap: wrap; padding: 10px 14px; }
   #sg-app .nav-tabs { order: 3; width: 100%; overflow-x: auto; }
@@ -1175,7 +1190,7 @@
 
   <div class="col-legend">
     <div class="col-legend-item"><div class="col-legend-dot" style="background:#2E5FA3"></div>Plan</div>
-    <div class="col-legend-item"><div class="col-legend-dot" style="background:#7FA6F0"></div>Status Update</div>
+    <div class="col-legend-item"><div class="col-legend-dot" style="background:#0B8F7A"></div>Status Update</div>
     <div class="col-legend-item"><div class="col-legend-dot" style="background:#33404D"></div>Actions</div>
   </div>
 
