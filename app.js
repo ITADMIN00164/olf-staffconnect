@@ -498,6 +498,14 @@ window.showAppConfirm = showAppConfirm;
 
 onAuthStateChanged(auth, async (user) => {
     if (user) {
+        // A sign-in lasts for the day it was made on: yesterday's is not resumed
+        if (signedInBeforeToday(user)) {
+            await signOut(auth);
+            hideLoading();
+            showSignin();
+            showNewDayNote();
+            return;
+        }
         const email   = user.email.toLowerCase();
         const isAdmin    = await isEmailAdmin(email);
         const isEmployee = isAdmin || await isEmailInDirectory(email);
@@ -515,6 +523,7 @@ onAuthStateChanged(auth, async (user) => {
         applyPageAccessNav();          // POM locked by default until the switches are read
         watchPageAccess();             // live: follows IT Admin's on/off switch
         showApp();
+        startDayWatch();               // signs out once the day changes
         loadMyEmployeeRecord(email);   // fills the profile chip / ID card
         prefetchPages();               // warm page fragments while idle
         maybeShowNewsPopup();          // once-per-session announcement nudge
@@ -524,6 +533,7 @@ onAuthStateChanged(auth, async (user) => {
     } else {
         currentRole = "User";
         stopWatchingPageAccess();
+        stopDayWatch();
         showSignin();
     }
     hideLoading();
@@ -534,6 +544,7 @@ onAuthStateChanged(auth, async (user) => {
 ==================================== */
 
 async function login() {
+    freshSignIn = true;                // the sign-in starting now is today's
     try {
         await signInWithPopup(auth, provider);
     } catch (err) {
@@ -544,11 +555,72 @@ async function login() {
 
 async function logout() {
     try {
+        forgetSignIn();
         await signOut(auth);
     } catch (err) {
         console.error(err);
         await showAppAlert({ title: "Sign-out failed", message: err.message, type: "error" });
     }
+}
+
+/* ====================================
+   ONE SIGN-IN PER DAY
+   A sign-in lasts for the calendar day it was made on, with no idle
+   timeout. The first time the app is opened (or the tab comes back, or the
+   computer wakes) on a later day, it signs out and asks for today's
+   sign-in. The time of the sign-in on this device is kept in localStorage
+   (Firebase's own last-sign-in time is the fallback for a session that
+   began before this was added) and Home shows how long ago it was.
+==================================== */
+
+const SIGNIN_KEY = "olf_signin_at";
+let signInAt = null, freshSignIn = false, dayTimer = null;
+
+function signDay(d) { return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); }
+function noteSignIn(t) {
+    signInAt = new Date(t || Date.now());
+    try { localStorage.setItem(SIGNIN_KEY, String(signInAt.getTime())); } catch (e) {}
+}
+function forgetSignIn() {
+    signInAt = null;
+    try { localStorage.removeItem(SIGNIN_KEY); } catch (e) {}
+}
+function signedInBeforeToday(user) {
+    if (freshSignIn) { freshSignIn = false; noteSignIn(); return false; }   // just signed in
+    let t = 0;
+    try { t = Number(localStorage.getItem(SIGNIN_KEY)) || 0; } catch (e) {}
+    if (!t && user && user.metadata && user.metadata.lastSignInTime) t = Date.parse(user.metadata.lastSignInTime) || 0;
+    if (!t) { noteSignIn(); return false; }
+    signInAt = new Date(t);
+    if (signDay(signInAt) !== signDay(new Date())) { forgetSignIn(); return true; }
+    noteSignIn(t);                                   // keep it on this device
+    return false;
+}
+
+function startDayWatch() { stopDayWatch(); dayTimer = setInterval(dayCheck, 60 * 1000); }
+function stopDayWatch() { if (dayTimer) { clearInterval(dayTimer); dayTimer = null; } }
+async function dayCheck() {
+    if (!dayTimer || !auth.currentUser || !signInAt) return;
+    if (signDay(signInAt) === signDay(new Date())) return;
+    stopDayWatch();
+    forgetSignIn();
+    try { await signOut(auth); } catch (e) { console.error("New-day sign-out failed:", e); return; }
+    showNewDayNote();
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) dayCheck(); });
+
+function showNewDayNote() {
+    showAppAlert({ title: "New day, new sign-in", type: "info",
+        message: "A sign-in lasts for the day it was made on. Please sign in again for today." });
+}
+
+// "7h 39m 12s since login" (Home, under the clock; the clock's 1-second tick keeps it live)
+function sinceSignInText() {
+    if (!signInAt) return "";
+    const secs = Math.max(0, Math.floor((Date.now() - signInAt.getTime()) / 1000));
+    const h = Math.floor(secs / 3600), m = Math.floor(secs / 60) % 60, s = secs % 60;
+    const pad = (n) => String(n).padStart(2, "0");
+    return (h ? h + "h " + pad(m) + "m " : m ? m + "m " : "") + (h || m ? pad(s) : s) + "s since login";
 }
 
 /* ====================================
@@ -2471,7 +2543,15 @@ function startHomeClock() {
         }
         if (lastDay !== null && lastDay !== now.getDate()) showLineOfDay();   // a new day, a new line
         lastDay = now.getDate();
-        clock.textContent = now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
+        // 12-hour time: "4:22" with a small "PM"
+        const hh = now.getHours() % 12 || 12, mm = String(now.getMinutes()).padStart(2, "0");
+        const hm = hh + ":" + mm, ap = now.getHours() < 12 ? "AM" : "PM";
+        if (clock.dataset.hm !== hm + ap) {
+            clock.dataset.hm = hm + ap;
+            clock.innerHTML = hm + '<span class="hm-clock-ap">' + ap + "</span>";
+        }
+        const since = document.getElementById("homeClockSince");
+        if (since) { const txt = sinceSignInText(); if (since.textContent !== txt) since.textContent = txt; }
         const day = document.getElementById("homeClockDay");
         if (day) day.textContent = now.toLocaleDateString("en-IN", { weekday: "long" });
         const date = document.getElementById("homeDate");
@@ -2521,12 +2601,23 @@ async function initHomePage() {
     // Next events from the Program Calendar (cache-backed, no extra request)
     renderUpcomingEvents();
 
+    // Field snapshot: headline numbers from the Field Review System
+    renderHomeFacts();
+
+    // Local weather: the banner's sky follows it (refreshed every 30 minutes while Home is open)
+    renderHomeWeather();
+    clearInterval(homeWxTimer);
+    homeWxTimer = setInterval(() => { if (currentPage === "home") renderHomeWeather(); }, WX_TTL);
+
     // Auto-refresh so expired news disappears without a page reload
     if (newsRefreshInterval) clearInterval(newsRefreshInterval);
     newsRefreshInterval = setInterval(() => {
         if (currentPage === "home") renderNewsCards();
     }, 30000); // every 30 seconds
 
+    // The Employees / Departments / Locations tiles are no longer on Home;
+    // only read the staff list if a page still shows those figures.
+    if (!document.getElementById("statTotal") && !document.getElementById("deptList")) return;
     try {
         const snapshot = await getDocs(collection(db, "Employees"));
         const data = [];
@@ -2561,6 +2652,173 @@ async function initHomePage() {
     } catch (err) {
         console.error(err);
     }
+}
+
+/* ── Home: local weather in the banner ─────────────────────────────────
+   Where the person is: the browser asks once for their location; if they
+   say no (or it can't tell), their office Location from the staff list is
+   used. The current weather there comes from Open-Meteo (free, no key) and
+   the banner's sky follows it - sun or moon, clouds, rain, storm, fog, snow.
+   Picture only: no temperature or place is shown. Only the weather code is
+   kept (30 minutes, this device); the position itself is never stored. If
+   nothing can be read, the banner simply keeps its time-of-day sky. */
+const WX_KEY = "olf_wx", WX_TTL = 30 * 60 * 1000;
+let homeWxTimer = null;
+function wxKind(c) {
+    if (c === 0 || c === 1) return "clear";
+    if (c === 2) return "partly";
+    if (c === 3) return "cloudy";
+    if (c === 45 || c === 48) return "fog";
+    if (c >= 95) return "storm";
+    if ((c >= 71 && c <= 77) || c === 85 || c === 86) return "snow";
+    if (c >= 51) return "rain";
+    return "clear";
+}
+function wxCached() {
+    try {
+        const w = JSON.parse(localStorage.getItem(WX_KEY) || "null");
+        return w && Date.now() - w.at < WX_TTL ? w : null;
+    } catch (e) { return null; }
+}
+async function wxHere() {
+    if (!navigator.geolocation) return null;
+    try {
+        if (navigator.permissions) {
+            const st = await navigator.permissions.query({ name: "geolocation" });
+            if (st.state === "denied") return null;             // asked before and said no: don't ask again
+        }
+    } catch (e) {}
+    return new Promise(res => navigator.geolocation.getCurrentPosition(
+        p => res({ lat: p.coords.latitude, lon: p.coords.longitude, src: "here" }),
+        () => res(null),
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: WX_TTL }));
+}
+async function wxOffice() {
+    let emp = window.__olfEmployee;
+    if (!window.__olfEmployeeLoaded) {
+        emp = await new Promise(res => {
+            const t = setTimeout(() => res(window.__olfEmployee || null), 6000);
+            document.addEventListener("olf:profile-ready", e => { clearTimeout(t); res(e.detail || null); }, { once: true });
+        });
+    }
+    const raw = String((emp && emp.Location) || "").trim();
+    if (!raw) return null;
+    const names = [raw, raw.split(/[-,(/]/)[0].trim()].filter((v, i, a) => v && a.indexOf(v) === i);
+    for (const name of names) {
+        try {
+            const r = await fetch("https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&format=json&countryCode=IN&name=" + encodeURIComponent(name));
+            const j = r.ok ? await r.json() : null;
+            const g = j && j.results && j.results[0];
+            if (g) return { lat: g.latitude, lon: g.longitude, src: "office" };
+        } catch (e) {}
+    }
+    return null;
+}
+async function loadHomeWeather() {
+    const cached = wxCached();
+    if (cached) return cached;
+    const pos = (await wxHere()) || (await wxOffice());
+    if (!pos) return null;
+    const lat = pos.lat.toFixed(2), lon = pos.lon.toFixed(2);       // about 1 km is plenty for weather
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=weather_code&timezone=auto`);
+    if (!r.ok) throw new Error("Weather HTTP " + r.status);
+    const c = (await r.json()).current || {};
+    const w = { at: Date.now(), code: Number(c.weather_code) };
+    if (c.weather_code == null || !Number.isFinite(w.code)) return null;
+    try { localStorage.setItem(WX_KEY, JSON.stringify(w)); } catch (e) {}
+    return w;
+}
+async function renderHomeWeather() {
+    const hero = document.querySelector(".hm-hero");
+    if (!hero) return;
+    let w = null;
+    try { w = await loadHomeWeather(); } catch (err) { console.warn("Weather not loaded:", err); }
+    if (!w || !document.body.contains(hero)) return;
+    hero.dataset.wx = wxKind(w.code);          // the sky picture follows the weather
+}
+
+/* ── Home: Field snapshot ───────────────────────────────────────────────
+   The Field Review System's headline numbers on one slim strip that rolls
+   past one after another (pauses under the mouse). Read from its Supabase
+   project: the Vinoba report's latest "All Month" upload (week 0), summed
+   over every block. Cached for 10 minutes so
+   going back to Home doesn't re-read. Hidden if nothing can be read. */
+let homeFactsCache = null;
+const HOME_FACT_ICONS = {
+    school:   '<path d="M3 10 12 5l9 5-9 5z"/><path d="M7 12.2V17c0 1.2 2.2 2.5 5 2.5s5-1.3 5-2.5v-4.8"/>',
+    teacher:  '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c.6-3.8 3.4-6 7-6s6.4 2.2 7 6"/>',
+    active:   '<circle cx="9" cy="8" r="3"/><path d="M3.5 19c.5-3.2 2.8-5 5.5-5s5 1.8 5.5 5"/><path d="m15.5 11 2 2 3.5-4"/>',
+    post:     '<path d="M5 5h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-4 3.5V6a1 1 0 0 1 1-1z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/>',
+    star:     '<path d="m12 3.8 2.5 5.1 5.6.8-4 3.9 1 5.6-5.1-2.7-5 2.7 1-5.6-4.1-3.9 5.6-.8z"/>',
+    spark:    '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/>'
+};
+async function loadHomeFacts(sb) {
+    const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const pages = async (build) => {                  // more than 1,000 rows -> page through
+        let out = [], from = 0;
+        for (;;) {
+            const { data, error } = await build().range(from, from + 999);
+            if (error) throw error;
+            out = out.concat(data || []);
+            if (!data || data.length < 1000) return out;
+            from += 1000;
+        }
+    };
+    // Programme reach only (no state / district / block counts or field-team numbers on Home)
+    const periods = await sb.from("data_periods").select("year,month").eq("week", 0)
+        .order("year", { ascending: false }).order("month", { ascending: false }).limit(1);
+    const facts = [];
+    const add = (icon, color, value, label) => { if (value > 0) facts.push({ icon, color, value, label }); };
+
+    let when = "";
+    const p = periods && !periods.error && periods.data && periods.data[0];
+    if (p) {
+        const rows = await pages(() => sb.from("vinoba_v")            // the same view the Field Review dashboard reads
+            .select("total_schools,total_teachers,unique_schools_posting,unique_teachers_posting,total_posts,total_lifeskills,star_teachers")
+            .eq("year", p.year).eq("month", p.month).eq("week", 0));
+        const sum = (k) => rows.reduce((t, r) => t + (Number(r[k]) || 0), 0);
+        const mon = MON[p.month - 1];
+        when = mon + " " + p.year;
+        add("school", "#0EA5E9", sum("total_schools"), "Schools");
+        add("teacher", "#8B5CF6", sum("total_teachers"), "Teachers");
+        add("active", "#10B981", sum("unique_teachers_posting"), "Teachers posted in " + mon);
+        add("school", "#14B8A6", sum("unique_schools_posting"), "Schools posted in " + mon);
+        add("post", "#2F6FE4", sum("total_posts"), "Posts in " + mon);
+        add("spark", "#EC4899", sum("total_lifeskills"), "Life-skill posts");
+        add("star", "#EAB308", sum("star_teachers"), "Star teachers");
+    }
+    return { facts, when };
+}
+async function renderHomeFacts() {
+    const box = document.getElementById("homeFacts"), run = document.getElementById("homeFactsRun");
+    if (!box || !run || !window.posSupabase) return;
+    try {
+        if (!homeFactsCache || Date.now() - homeFactsCache.at > 10 * 60 * 1000) {
+            homeFactsCache = { at: Date.now(), data: await loadHomeFacts(window.posSupabase) };
+        }
+    } catch (err) {
+        console.warn("Field snapshot not loaded:", err);
+        return;
+    }
+    const { facts, when } = homeFactsCache.data;
+    if (!facts.length || !document.body.contains(run)) return;
+    const fmt = (v) => Number(v).toLocaleString("en-IN");
+    const one = facts.map(f =>
+        `<span class="hm-fact" style="--c:${f.color}"><span class="hm-fact-ico" aria-hidden="true"><svg viewBox="0 0 24 24">${HOME_FACT_ICONS[f.icon] || ""}</svg></span>`
+        + (f.text ? `<b>${f.text}</b>` : `<b>${fmt(f.value)}</b><span>${f.label}</span>`) + "</span>").join("");
+    run.innerHTML = one;
+    const when_ = document.getElementById("homeFactsWhen");
+    if (when_) when_.textContent = when ? "Vinoba · " + when : "";
+    box.hidden = false;
+    // Roll only if the figures don't all fit; the run is doubled so the loop has no seam.
+    requestAnimationFrame(() => {
+        const track = run.parentElement;
+        if (!track || run.scrollWidth <= track.clientWidth) return;
+        run.innerHTML = one + one.replace(/class="hm-fact"/g, 'class="hm-fact" aria-hidden="true"');
+        const half = run.scrollWidth / 2;
+        run.style.setProperty("--roll", Math.max(20, Math.round(half / 45)) + "s");   // ~45px a second
+        box.classList.add("is-rolling");
+    });
 }
 
 /* ====================================

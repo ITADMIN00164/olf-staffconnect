@@ -2832,7 +2832,7 @@ function tgtRefreshMonthLabels() {
     const y = Number(document.getElementById("posTgtYear")?.value);
     [...sel.options].forEach(o => {
         const m = Number(o.value), info = tgtMonthInfo(y, m);
-        o.textContent = MONTH_NAMES[m] + (info ? "  ✓" : "");
+        o.textContent = MONTH_NAMES[m] + (info ? "  •" : "");   // dot = has targets (a tick in the list means "selected")
         o.title = info ? `${info.n} PO rows uploaded` : "No targets yet";
     });
 }

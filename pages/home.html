@@ -4,7 +4,7 @@
     <!-- News banners placeholder (hidden — kept for app.js compat) -->
     <div id="newsBannerSection" style="display:none;"></div>
 
-    <!-- ── Hero: greeting, date and time ── -->
+    <!-- ── Hero: greeting and time (kept slim so the page's content fits on one screen) ── -->
     <section class="pg-hero hm-hero" aria-label="Welcome">
         <span class="pg-blob pg-blob--a" aria-hidden="true"></span>
         <span class="pg-blob pg-blob--b" aria-hidden="true"></span>
@@ -14,52 +14,33 @@
             <svg class="hm-sun" viewBox="0 0 120 120"><g class="hm-sun-rays" stroke="#FDE68A" stroke-width="5" stroke-linecap="round"><path d="M60 6v14M60 100v14M6 60h14M100 60h14M21.8 21.8l9.9 9.9M88.3 88.3l9.9 9.9M21.8 98.2l9.9-9.9M88.3 31.7l9.9-9.9"/></g><circle cx="60" cy="60" r="26" fill="#FCD34D"/><circle cx="60" cy="60" r="26" fill="url(#hmSunGlow)"/><defs><radialGradient id="hmSunGlow" cx=".38" cy=".35" r=".7"><stop offset="0" stop-color="#FFF7D6"/><stop offset="1" stop-color="#F59E0B" stop-opacity=".9"/></radialGradient></defs></svg>
             <svg class="hm-moon" viewBox="0 0 120 120"><path d="M78 20a42 42 0 1 0 24 70A36 36 0 1 1 78 20z" fill="#FEF3C7"/><circle cx="58" cy="58" r="4" fill="#FDE68A" opacity=".7"/><circle cx="70" cy="78" r="6" fill="#FDE68A" opacity=".6"/></svg>
             <svg class="hm-stars" viewBox="0 0 240 120"><g fill="#fff"><circle class="s1" cx="20" cy="22" r="2"/><circle class="s2" cx="70" cy="58" r="1.6"/><circle class="s3" cx="118" cy="16" r="2.2"/><circle class="s1" cx="168" cy="44" r="1.5"/><circle class="s2" cx="214" cy="20" r="2"/><circle class="s3" cx="40" cy="92" r="1.4"/><circle class="s1" cx="150" cy="96" r="1.8"/><circle class="s2" cx="226" cy="84" r="1.5"/></g></svg>
+            <!-- Weather layers (app.js sets data-wx on the banner from the local weather) -->
+            <svg class="hm-cloud hm-cloud--b" viewBox="0 0 100 60"><path d="M24 54h52a16 16 0 0 0 2-31.9A22 22 0 0 0 36.6 16 18 18 0 0 0 24 54z"/></svg>
+            <svg class="hm-cloud hm-cloud--a" viewBox="0 0 100 60"><path d="M24 54h52a16 16 0 0 0 2-31.9A22 22 0 0 0 36.6 16 18 18 0 0 0 24 54z"/></svg>
+            <svg class="hm-rain" viewBox="0 0 80 26"><g stroke="#BFDBFE" stroke-width="2.6" stroke-linecap="round"><path class="d1" d="M14 2l-3 8"/><path class="d2" d="M30 4l-3 8"/><path class="d3" d="M46 2l-3 8"/><path class="d1" d="M62 4l-3 8"/><path class="d2" d="M22 14l-3 8"/><path class="d3" d="M54 14l-3 8"/></g></svg>
+            <svg class="hm-snow" viewBox="0 0 80 26"><g fill="#fff"><circle class="d1" cx="14" cy="5" r="2.2"/><circle class="d2" cx="32" cy="8" r="2"/><circle class="d3" cx="50" cy="4" r="2.2"/><circle class="d1" cx="66" cy="9" r="1.8"/><circle class="d2" cx="24" cy="17" r="2"/><circle class="d3" cx="56" cy="18" r="2"/></g></svg>
+            <svg class="hm-bolt" viewBox="0 0 24 40"><path d="M14 0 3 22h8l-3 18 13-25h-8z" fill="#FDE047"/></svg>
+            <svg class="hm-fog" viewBox="0 0 160 40"><g stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none"><path class="f1" d="M10 10h90M112 10h30"/><path class="f2" d="M30 22h60M100 22h50"/><path class="f3" d="M4 34h70M86 34h44"/></g></svg>
         </span>
         <div class="pg-hero-main">
-            <div class="pg-eyebrow"><span class="pg-live" aria-hidden="true"></span><span id="homeDate">&nbsp;</span></div>
             <h1 class="pg-hero-title hm-title"><span class="hm-title-text" id="homeGreetText">Welcome back</span><button type="button" class="hm-hand" id="homeHand" title="Say hi!" aria-label="Get a new greeting"><span class="hm-hand-ico" aria-hidden="true">👋</span></button></h1>
-            <p class="pg-hero-sub">One Stop Solution for OLF's Data Management</p>
-            <p class="hm-line" id="homeLine" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 7H6a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h3v1a3 3 0 0 1-3 3M20 7h-4a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h3v1a3 3 0 0 1-3 3"/></svg><span id="homeLineText"></span></p>
         </div>
-        <div class="hm-clock pg-glass" aria-hidden="true">
+        <div class="hm-clock pg-glass">
             <div class="hm-clock-time" id="homeClock">--:--</div>
-            <div class="hm-clock-day" id="homeClockDay">&nbsp;</div>
+            <div class="hm-clock-since" id="homeClockSince"></div>
         </div>
     </section>
 
-    <!-- ── Stats ── -->
-    <div class="pg-stats stats-row" id="statsRow">
-        <div class="pg-stat" style="--tint:#4F8EF7">
-            <div class="pg-stat-icon">
-                <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="21.500" cy="10.500" r="4.300" fill="#FCD9A8"/><path d="M13.500 27c0-5.200 3.400-8.500 8-8.500s8 3.300 8 8.500z" fill="#3B82F6"/><circle cx="11" cy="12" r="4.800" fill="#FFD3A1"/><path d="M2.500 28.500c0-5.800 3.700-9.500 8.500-9.500s8.500 3.700 8.500 9.500z" fill="#8B5CF6"/></svg>
-            </div>
-            <div class="pg-stat-info">
-                <div class="pg-stat-value" id="statTotal">—</div>
-                <div class="pg-stat-label">Total Employees</div>
-                <div class="pg-stat-note">On the staff list</div>
-            </div>
+    <!-- ── Field snapshot: the Field Review System's headline numbers, rolling past one after another (app.js) ── -->
+    <section class="hm-facts" id="homeFacts" aria-label="OLF Important Insights" hidden>
+        <div class="hm-facts-lead">
+            <span class="hm-facts-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/></svg></span>
+            <span class="hm-facts-title">OLF Important Insights<small id="homeFactsWhen"></small></span>
         </div>
-        <div class="pg-stat" style="--tint:#10B197">
-            <div class="pg-stat-icon">
-                <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="6" y="4" width="14" height="24" rx="2" fill="#14B8A6"/><rect x="18" y="12" width="9" height="16" rx="2" fill="#0F766E"/><g fill="#CCFBF1"><rect x="9" y="8" width="3" height="3" rx=".6"/><rect x="14" y="8" width="3" height="3" rx=".6"/><rect x="9" y="14" width="3" height="3" rx=".6"/><rect x="14" y="14" width="3" height="3" rx=".6"/><rect x="9" y="20" width="3" height="3" rx=".6"/><rect x="14" y="20" width="3" height="3" rx=".6"/><rect x="21" y="16" width="3" height="3" rx=".6"/><rect x="21" y="22" width="3" height="3" rx=".6"/></g></svg>
-            </div>
-            <div class="pg-stat-info">
-                <div class="pg-stat-value" id="statDepts">—</div>
-                <div class="pg-stat-label">Departments</div>
-                <div class="pg-stat-note">Teams across OLF</div>
-            </div>
+        <div class="hm-facts-track" tabindex="0" aria-label="Field Review figures">
+            <div class="hm-facts-run" id="homeFactsRun"></div>
         </div>
-        <div class="pg-stat" style="--tint:#F43F5E">
-            <div class="pg-stat-icon">
-                <svg viewBox="0 0 32 32" aria-hidden="true"><ellipse cx="16" cy="29" rx="6.500" ry="1.800" fill="#0F172A" opacity=".15"/><path d="M16 28.500s-9.500-9-9.500-16a9.500 9.500 0 0 1 19 0c0 7-9.500 16-9.500 16z" fill="#F43F5E"/><circle cx="16" cy="12.500" r="4" fill="#fff"/></svg>
-            </div>
-            <div class="pg-stat-info">
-                <div class="pg-stat-value" id="statLocations">—</div>
-                <div class="pg-stat-label">Locations</div>
-                <div class="pg-stat-note">Offices and districts</div>
-            </div>
-        </div>
-    </div>
+    </section>
 
     <!-- ── Upcoming events (from Program Calendar) ──
          Hidden until app.js finds something in the today/tomorrow window. -->
@@ -361,6 +342,111 @@ html[data-theme="dark"] .hm .upcoming-card { border-color: var(--hairline); box-
 @media (max-width: 768px) {
     .news-cards-grid { grid-template-columns: 1fr; }
     .upcoming-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Slim banner ────────────────────────────────────────────────
+   Greeting and time only: no date chip, strap line or line of the day,
+   so the rest of Home fits on one screen. */
+.hm-hero { padding: 18px 30px; margin-bottom: 16px; min-height: 0; }
+.hm-hero .pg-hero-title { margin: 0; font-size: 29px; }
+.hm-clock { padding: 10px 18px; border-radius: 16px; }
+.hm-clock-time { font-size: 28px; letter-spacing: -.6px; white-space: nowrap; }
+.hm-clock-ap { margin-left: 5px; font-size: 13px; font-weight: 800; letter-spacing: .06em; opacity: .85; }
+.hm-clock-since { margin-top: 4px; font-size: 11.5px; font-weight: 600; letter-spacing: .01em; white-space: nowrap; opacity: .88; font-variant-numeric: tabular-nums; }   /* digits keep their width as the seconds tick */
+.hm-clock-since:empty { display: none; }
+.hm-sky { right: 190px; }
+.hm-sun  { width: 64px; height: 64px; right: 40px; }
+.hm-moon { width: 52px; height: 52px; top: 10px; }
+.hm-stars { height: 80px; top: 2px; }
+.hm-hero[data-tod="morning"] .hm-sun   { top: 16px; }
+.hm-hero[data-tod="afternoon"] .hm-sun { top: 6px; }
+.hm-hero[data-tod="evening"] .hm-sun   { top: 22px; }
+
+/* ── Field snapshot ticker ─────────────────────────────────────── */
+.hm-facts {
+    display: flex; align-items: center; gap: 0; margin: 0 0 22px; min-height: 58px; overflow: hidden;
+    background: var(--surface, #fff); border: 1px solid rgba(15,23,42,.07); border-radius: 18px;
+    box-shadow: 0 2px 10px rgba(15,23,42,.05);
+}
+.hm-facts[hidden] { display: none; }
+.hm-facts-lead {
+    flex: none; display: flex; align-items: center; gap: 10px; align-self: stretch; padding: 0 18px 0 14px;
+    border-right: 1px solid rgba(15,23,42,.07); background: linear-gradient(90deg, rgba(47,111,228,.07), rgba(11,143,122,.04));
+}
+.hm-facts-ico { width: 32px; height: 32px; flex: none; border-radius: 10px; display: grid; place-items: center; color: #fff;
+    background: linear-gradient(135deg, #F43F5E, #E11D48); box-shadow: 0 4px 10px rgba(225,29,72,.28); }
+.hm-facts-ico svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.hm-facts-title { display: flex; flex-direction: column; font-size: 13.5px; font-weight: 800; letter-spacing: -.2px; color: var(--text, #0F172A); line-height: 1.2; white-space: nowrap; }
+.hm-facts-title small { font-size: 11px; font-weight: 600; letter-spacing: .02em; color: var(--text-faint, #7A8599); }
+.hm-facts-track {
+    position: relative; flex: 1; min-width: 0; overflow: hidden; outline: none; padding-left: 16px;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 36px), transparent 100%);
+            mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 36px), transparent 100%);
+}
+.hm-facts-run { display: inline-flex; align-items: center; white-space: nowrap; will-change: transform; }
+.hm-fact { display: inline-flex; align-items: center; gap: 9px; font-size: 13.5px; font-weight: 600; color: var(--text-soft, #475467); }
+.hm-fact b { font-size: 19px; font-weight: 800; letter-spacing: -.4px; color: var(--text, #0F172A); font-variant-numeric: tabular-nums; }
+.hm-fact-ico { width: 28px; height: 28px; flex: none; border-radius: 9px; display: grid; place-items: center;
+    color: var(--c); background: color-mix(in srgb, var(--c) 13%, transparent); }
+.hm-fact-ico svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* a dot after every figure, so the doubled run used for rolling has no seam */
+.hm-fact::after { content: ""; width: 5px; height: 5px; margin: 0 20px 0 11px; border-radius: 50%; background: rgba(15,23,42,.16); }
+.hm-facts:not(.is-rolling) .hm-fact:last-child::after { display: none; }
+@media (prefers-reduced-motion: no-preference) {
+    .hm-facts.is-rolling .hm-facts-run { animation: hm-facts-roll var(--roll, 40s) linear infinite; }
+    .hm-facts.is-rolling .hm-facts-track:hover .hm-facts-run,
+    .hm-facts.is-rolling .hm-facts-track:focus-visible .hm-facts-run { animation-play-state: paused; }
+    @keyframes hm-facts-roll { to { transform: translateX(-50%); } }
+}
+@media (prefers-reduced-motion: reduce) {   /* no motion: the figures sit in a row you can scroll */
+    .hm-facts-track { overflow-x: auto; -webkit-mask-image: none; mask-image: none; }
+}
+@media (max-width: 640px) {
+    .hm-facts-lead { padding: 0 12px 0 10px; }
+    .hm-facts-title small { display: none; }
+    .hm-hero .pg-hero-title { font-size: 24px; }
+}
+
+/* ── Weather in the banner (picture only, no text) ──────────────────
+   data-wx on the banner: clear | partly | cloudy | fog | rain | storm | snow.
+   The sun / moon still follow the time of day; weather adds or hides layers. */
+
+.hm-cloud { width: 82px; height: 50px; right: 12px; top: 24px; filter: drop-shadow(0 4px 8px rgba(15,23,42,.18)); }
+.hm-cloud path { fill: #F8FAFC; }
+.hm-cloud--b { width: 60px; height: 37px; right: 86px; top: 8px; opacity: .85; }
+.hm-rain, .hm-snow { width: 72px; height: 24px; right: 18px; top: 58px; }
+.hm-bolt { width: 15px; height: 25px; right: 52px; top: 50px; filter: drop-shadow(0 0 8px rgba(253,224,71,.9)); }
+.hm-fog { width: 150px; height: 38px; right: 0; top: 30px; opacity: .55; }
+
+.hm-hero[data-wx="partly"] .hm-cloud--a,
+.hm-hero[data-wx="cloudy"] .hm-cloud, .hm-hero[data-wx="rain"] .hm-cloud,
+.hm-hero[data-wx="storm"] .hm-cloud, .hm-hero[data-wx="snow"] .hm-cloud { display: block; }
+.hm-hero[data-wx="rain"] .hm-rain, .hm-hero[data-wx="storm"] .hm-rain,
+.hm-hero[data-wx="snow"] .hm-snow, .hm-hero[data-wx="storm"] .hm-bolt, .hm-hero[data-wx="fog"] .hm-fog { display: block; }
+/* clouds over the whole sky: no sun, moon or stars */
+.hm-hero[data-wx="cloudy"] .hm-sun, .hm-hero[data-wx="rain"] .hm-sun, .hm-hero[data-wx="storm"] .hm-sun, .hm-hero[data-wx="snow"] .hm-sun,
+.hm-hero[data-wx="cloudy"] .hm-moon, .hm-hero[data-wx="rain"] .hm-moon, .hm-hero[data-wx="storm"] .hm-moon, .hm-hero[data-wx="snow"] .hm-moon,
+.hm-hero[data-wx="cloudy"] .hm-stars, .hm-hero[data-wx="rain"] .hm-stars, .hm-hero[data-wx="storm"] .hm-stars, .hm-hero[data-wx="snow"] .hm-stars { display: none; }
+.hm-hero[data-wx="fog"] .hm-sun, .hm-hero[data-wx="fog"] .hm-moon { opacity: .6; }
+.hm-hero[data-wx="partly"] .hm-sun, .hm-hero[data-wx="partly"] .hm-moon { right: 44px; top: 2px; }
+.hm-hero[data-wx="rain"] .hm-cloud path { fill: #DCE3EC; }
+.hm-hero[data-wx="storm"] .hm-cloud path { fill: #A8B4C4; }
+
+@media (prefers-reduced-motion: no-preference) {
+    .hm-cloud--a { animation: hm-drift 7s ease-in-out infinite alternate; }
+    .hm-cloud--b { animation: hm-drift 9s ease-in-out infinite alternate-reverse; }
+    @keyframes hm-drift { to { transform: translateX(-10px); } }
+    .hm-rain .d1, .hm-rain .d2, .hm-rain .d3 { animation: hm-fall .9s linear infinite; }
+    .hm-snow .d1, .hm-snow .d2, .hm-snow .d3 { animation: hm-fall 2.4s linear infinite; }
+    .hm-rain .d2, .hm-snow .d2 { animation-delay: -.3s; } .hm-rain .d3, .hm-snow .d3 { animation-delay: -.6s; }
+    .hm-snow .d2 { animation-delay: -.8s; } .hm-snow .d3 { animation-delay: -1.6s; }
+    @keyframes hm-fall { from { transform: translateY(-6px); opacity: 0; } 30% { opacity: 1; } to { transform: translateY(8px); opacity: 0; } }
+    .hm-bolt { animation: hm-flash 4.5s steps(1) infinite; }
+    @keyframes hm-flash { 0%, 100% { opacity: 0; } 62% { opacity: 1; } 64% { opacity: 0; } 67% { opacity: 1; } 71% { opacity: 0; } }
+    .hm-fog .f1 { animation: hm-fog 8s ease-in-out infinite alternate; }
+    .hm-fog .f2 { animation: hm-fog 10s ease-in-out infinite alternate-reverse; }
+    .hm-fog .f3 { animation: hm-fog 12s ease-in-out infinite alternate; }
+    @keyframes hm-fog { to { transform: translateX(-14px); } }
 }
 </style>
 

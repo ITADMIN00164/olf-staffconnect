@@ -690,6 +690,23 @@ function applyFilterDefaults() {
   const rvDept = (document.getElementById('rv-dept') || {}).value || '';
   if (document.getElementById('rv-member')) populateSelect('rv-member', reviewScopedMemberNames(rvDept), 'Select Member…');
   refreshMpDeptScopedDropdowns();
+  // Monthly Plan opens on the signed-in person's own plan. Done once per visit to the
+  // page (marked on the dropdown itself), so choosing "All Members" afterwards is never
+  // undone by Refresh or the background reload.
+  const mpMem = document.getElementById('mp-member');
+  if (mpMem && !isAdmin && !mpMem.dataset.selfDefault && !mpMem.value &&
+      [...mpMem.options].some(function(o){ return o.value === currentUser.name; })) {
+    mpMem.value = currentUser.name;
+    mpMem.dataset.selfDefault = '1';
+  }
+  // ...and on the current week of the month (Week 1 = days 1-7, ... Week 5 = 29-31),
+  // once per visit like the member above, so "All Weeks" stays picked after a Refresh.
+  const mpWeek = document.getElementById('mp-week');
+  if (mpWeek && !mpWeek.dataset.weekDefault && !mpWeek.value &&
+      (document.getElementById('mp-month') || {}).value === nowMonth) {
+    mpWeek.value = 'Week ' + Math.min(5, Math.ceil(new Date().getDate() / 7));
+    mpWeek.dataset.weekDefault = '1';
+  }
 }
 
 function populateTaskMemberDropdown() {
@@ -2078,12 +2095,29 @@ function sgSyncDate(input) {
   if (btn) btn.style.display = '';
 }
 
+// Set a select only when it has that option (a stale filter value must not blank the field).
+function sgPickOption(id, val) {
+  const el = document.getElementById(id);
+  if (!el || !val || ![...el.options].some(o => o.value === val)) return false;
+  el.value = val;
+  return true;
+}
+
+// Add Task starts from what the Monthly Plan is showing: its Academic Year, Month and
+// Week (and Member / SMART Goal when one is picked), so a task added while Week 2 is
+// selected is a Week 2 task. A filter left on "All…" falls back to today.
 function openAddTask() {
   editingTaskId=null;
   document.getElementById('task-modal-title').textContent='Add Task';
-  document.getElementById('tf-year').value = currentAcademicYearGuess();
-  document.getElementById('tf-month').value = MONTHS[new Date().getMonth()];
-  document.getElementById('tf-week').value = 'Week ' + Math.min(5, Math.ceil(new Date().getDate()/7));
+  const mp = id => (document.getElementById(id) || {}).value || '';
+  const now = new Date(), thisMonth = MONTHS[now.getMonth()];
+  if (!sgPickOption('tf-year', mp('mp-year'))) document.getElementById('tf-year').value = currentAcademicYearGuess();
+  if (!sgPickOption('tf-month', mp('mp-month'))) document.getElementById('tf-month').value = thisMonth;
+  if (!sgPickOption('tf-week', mp('mp-week'))) {
+    // no week picked: this week when planning the current month, otherwise Week 1
+    document.getElementById('tf-week').value = document.getElementById('tf-month').value === thisMonth
+      ? 'Week ' + Math.min(5, Math.ceil(now.getDate()/7)) : 'Week 1';
+  }
   document.getElementById('tf-subcat').value='';
   document.getElementById('tf-action').value='';
   document.getElementById('tf-planneditems').value='';
@@ -2094,7 +2128,10 @@ function openAddTask() {
   deptEl.value = (currentUser.role === ROLES.MEMBER || currentUser.role === ROLES.DEPT_HEAD) ? (currentUser.dept || currentDept || '') : (currentDept || '');
   populateTaskMemberDropdown();
   document.getElementById('tf-member').value = (currentUser.role === ROLES.MEMBER) ? currentUser.name : '';
+  if (currentUser.role !== ROLES.MEMBER) sgPickOption('tf-member', mp('mp-member'));
+  document.getElementById('tf-goal').value = '';
   populateTaskGoalDropdown();
+  if (sgPickOption('tf-goal', mp('mp-goal'))) populateCatDropdown();
   openModal('task-modal');
 }
 

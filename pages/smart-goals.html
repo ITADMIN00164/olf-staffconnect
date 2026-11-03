@@ -360,6 +360,25 @@
 #sg-app .modal-close { background: none; border: none; cursor: pointer; font-size: 20px; color: var(--text3); line-height: 1; padding: 2px 6px; border-radius: 4px; }
 #sg-app .modal-close:hover { background: var(--border); }
 #sg-app .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+/* Add / Edit Task: wide window, one line per group so the form fits without scrolling */
+#sg-app .modal.sg-task-modal { max-width: 1080px; max-height: calc(100vh - 32px); }
+#sg-app .sg-task-modal .modal-body { padding: 20px 24px; flex: 1 1 auto; min-height: 0; max-height: none; }   /* grow with the form (the app-wide 60vh cap is lifted here); scroll only at full height */
+#sg-app .sg-tf-row { display: grid; gap: 14px; margin-bottom: 14px; }
+#sg-app .sg-tf-row > .field { min-width: 0; }
+#sg-app .sg-tf-row select, #sg-app .sg-tf-row input { width: 100%; min-width: 0; }
+#sg-app .sg-tf-5 { grid-template-columns: 1.15fr 1fr .8fr 1.2fr 1.2fr; }
+#sg-app .sg-tf-goal { grid-template-columns: 1.4fr 1fr 1fr; }
+#sg-app .sg-tf-4 { grid-template-columns: repeat(4, 1fr); }
+#sg-app .sg-task-modal #tf-action { min-height: 96px; }
+@media (max-width: 960px) {
+  #sg-app .sg-tf-5 { grid-template-columns: repeat(3, 1fr); }
+  #sg-app .sg-tf-goal { grid-template-columns: 1fr 1fr; }
+  #sg-app .sg-tf-goal > .field:first-child { grid-column: 1 / -1; }
+  #sg-app .sg-tf-4 { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 600px) {
+  #sg-app .sg-tf-5, #sg-app .sg-tf-goal, #sg-app .sg-tf-4 { grid-template-columns: 1fr; }
+}
 #sg-app .modal-foot { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; background: var(--surface2); border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
 
 #sg-app .section-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--text3); margin-bottom: 10px; margin-top: 18px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
@@ -1119,6 +1138,20 @@
 #sg-app #smart-goals-list .empty:only-child, #sg-app #review-list .empty:only-child {
   margin: 0; padding: 44px 24px; border: 1.5px dashed rgba(15,23,42,.14); border-radius: 16px; background: var(--surface);
 }
+/* Page titles: the banner tab already names the page, so the title cards are
+   gone and each page opens on its filters. Titles stay for screen readers. */
+#sg-app .sg-vh, #sg-app #page-settings > h1.sg-vh {
+  position: absolute !important; width: 1px !important; height: 1px !important; margin: -1px !important;
+  padding: 0 !important; border: 0 !important; overflow: hidden !important; clip: rect(0 0 0 0) !important;
+  white-space: nowrap !important; box-shadow: none !important; background: none !important;
+}
+/* The page's buttons sit at the right end of its filter bar */
+#sg-app .filter-bar .sg-fb-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+#sg-app .filter-bar .sg-fb-actions .btn { white-space: nowrap; }
+/* ...and the Columns panel's tick boxes must not pick up the filter bar's input look */
+#sg-app .filter-bar .cols-panel input[type="checkbox"] {
+  background: none; border: 0; border-radius: 0; padding: 0; box-shadow: none; transition: none; width: auto; min-width: 0;
+}
 @media (max-width: 640px) {
   #sg-app { --sg-gap: 12px; }
   #sg-app .page { padding: 12px; }
@@ -1174,10 +1207,9 @@
 
 <!-- ══════════ DASHBOARD ══════════ -->
 <div id="page-dashboard" class="page active">
-  <div style="margin-bottom:16px">
-    <h1 style="font-size:20px;font-weight:800;letter-spacing:-.02em">Dashboard</h1>
-    <p style="font-size:12px;color:var(--text3);margin-top:3px" id="dash-dept-label">Overview of all SMART Goals and task progress</p>
-  </div>
+  <!-- The banner tab already names this page: title kept for screen readers only -->
+  <h1 class="sg-vh">Dashboard</h1>
+  <p class="sg-vh" id="dash-dept-label">Overview of all SMART Goals and task progress</p>
   <div class="filter-bar" id="dash-filter-bar">
     <select id="dash-year-filter" onchange="renderDashboard()"><option value="">All Academic Years</option></select>
     <select id="dash-month-filter" onchange="renderDashboard()"><option value="">All Months</option></select>
@@ -1304,44 +1336,24 @@
 
 <!-- ══════════ SMART GOALS ══════════ -->
 <div id="page-smart-goals" class="page">
-  <div class="page-header">
-    <div>
-      <h1 style="font-size:20px;font-weight:800;letter-spacing:-.02em">SMART Goals</h1>
-      <p style="font-size:12px;color:var(--text3);margin-top:3px" id="sg-dept-label">Define goals → activities, specific to each member</p>
-    </div>
-    <button class="btn btn-primary" onclick="openGoalModal()">+ Add SMART Goal</button>
-  </div>
+  <h1 class="sg-vh">SMART Goals</h1>
+  <p class="sg-vh" id="sg-dept-label">Define goals → activities, specific to each member</p>
   <div class="filter-bar">
     <select id="sg-year-filter" onchange="renderSmartGoals()"><option value="">All Academic Years</option></select>
     <select id="sg-dept-filter" onchange="onSgDeptChange()"><option value="">Select Department…</option></select>
     <select id="sg-member-filter" onchange="renderSmartGoals()"><option value="">Select Department first…</option></select>
+    <div class="sg-fb-actions">
+      <button class="btn btn-primary" onclick="openGoalModal()">+ Add SMART Goal</button>
+    </div>
   </div>
   <div id="smart-goals-list"></div>
 </div>
 
 <!-- ══════════ MONTHLY PLAN ══════════ -->
 <div id="page-monthly-plan" class="page">
-  <div class="page-header">
-    <div>
-      <h1 style="font-size:20px;font-weight:800;letter-spacing:-.02em">Monthly Plan</h1>
-      <p style="font-size:12px;color:var(--text3);margin-top:3px" id="mp-dept-label">Week-wise task tracking linked to SMART Goals</p>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <div class="cols-panel-wrap">
-        <button class="btn btn-secondary" onclick="toggleColsPanel()"><svg class="sg-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.500" y="4" width="17" height="16" rx="2"/><path d="M9.500 4v16M15 4v16"/></svg> Columns</button>
-        <div class="cols-panel" id="cols-panel"></div>
-      </div>
-      <button class="btn btn-secondary" onclick="exportPlanExcel()" title="Download the current view as Excel"><svg class="sg-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10m0 0 4-4m-4 4-4-4M5 19h14"/></svg> Excel</button>
-      <button class="btn btn-primary" onclick="openAddTask()">+ Add Task</button>
-    </div>
-  </div>
-
-  <div class="col-legend">
-    <div class="col-legend-item"><div class="col-legend-dot" style="background:#2E5FA3"></div>Plan</div>
-    <div class="col-legend-item"><div class="col-legend-dot" style="background:#0B8F7A"></div>Status Update</div>
-    <div class="col-legend-item"><div class="col-legend-dot" style="background:#33404D"></div>Actions</div>
-  </div>
-
+  <h1 class="sg-vh">Monthly Plan</h1>
+  <p class="sg-vh" id="mp-dept-label">Week-wise task tracking linked to SMART Goals</p>
+  <!-- (The Plan / Status Update / Actions colour legend is gone: the table's own group header says the same.) -->
   <div class="filter-bar">
     <select id="mp-year" onchange="renderPlan()"><option value="">Academic Year…</option></select>
     <select id="mp-month" onchange="renderPlan()"><option value="">Month…</option></select>
@@ -1354,6 +1366,14 @@
       <option>Planned</option><option>Completed</option><option>In Process</option><option>Pending</option><option>On Hold</option><option>Cancelled</option>
     </select>
     <input id="mp-search" type="text" placeholder="Search tasks…" oninput="renderPlan()" style="min-width:160px">
+    <div class="sg-fb-actions">
+      <div class="cols-panel-wrap">
+        <button class="btn btn-secondary" onclick="toggleColsPanel()"><svg class="sg-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.500" y="4" width="17" height="16" rx="2"/><path d="M9.500 4v16M15 4v16"/></svg> Columns</button>
+        <div class="cols-panel" id="cols-panel"></div>
+      </div>
+      <button class="btn btn-secondary" onclick="exportPlanExcel()" title="Download the current view as Excel"><svg class="sg-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10m0 0 4-4m-4 4-4-4M5 19h14"/></svg> Excel</button>
+      <button class="btn btn-primary" onclick="openAddTask()">+ Add Task</button>
+    </div>
   </div>
 
   <div class="plan-tbl-wrap">
@@ -1366,25 +1386,23 @@
 
 <!-- ══════════ REVIEWS ══════════ -->
 <div id="page-reviews" class="page">
-  <div class="page-header">
-    <div>
-      <h1 style="font-size:20px;font-weight:800;letter-spacing:-.02em">Monthly Reviews</h1>
-      <p style="font-size:12px;color:var(--text3);margin-top:3px" id="rv-dept-label">Self-review by member · Manager score by Dept Head, Admin, or the assigned reporting manager</p>
-    </div>
-    <button class="btn btn-primary" id="rv-add-btn" onclick="openReviewModal()">+ New Review</button>
-  </div>
+  <h1 class="sg-vh">Monthly Reviews</h1>
+  <p class="sg-vh" id="rv-dept-label">Self-review by member · Manager score by Dept Head, Admin, or the assigned reporting manager</p>
   <div class="filter-bar" id="rv-filter-bar">
     <select id="rv-year" onchange="renderReviews()"><option value="">All Academic Years</option></select>
     <select id="rv-month" onchange="renderReviews()"><option value="">All Months</option></select>
     <select id="rv-dept" onchange="onRvDeptChange()"><option value="">All Depts</option></select>
     <select id="rv-member" onchange="renderReviews()"><option value="">Select Member…</option></select>
+    <div class="sg-fb-actions">
+      <button class="btn btn-primary" id="rv-add-btn" onclick="openReviewModal()">+ New Review</button>
+    </div>
   </div>
   <div id="review-list"></div>
 </div>
 
 <!-- ══════════ SETTINGS ══════════ -->
 <div id="page-settings" class="page">
-  <h1 style="font-size:20px;font-weight:800;letter-spacing:-.02em;margin-bottom:20px">Settings</h1>
+  <h1 class="sg-vh">Settings</h1>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:900px">
     <div class="card"><div class="card-header"><span class="card-title">Departments</span><button class="btn btn-secondary btn-sm" onclick="addSetting('depts','Department')">+ Add</button></div><div class="card-body" id="settings-depts"></div></div>
     <div class="card"><div class="card-header"><span class="card-title">Team Members</span><button class="btn btn-secondary btn-sm" onclick="openAddMemberModal()">+ Add Member</button></div><div class="card-body" id="settings-members"></div></div>
@@ -1408,7 +1426,7 @@
 
 <!-- ══════════ MODALS ══════════ -->
 <div class="modal-backdrop" id="task-modal">
-  <div class="modal" style="max-width:760px">
+  <div class="modal sg-task-modal">
     <div class="modal-head">
       <span class="modal-title" id="task-modal-title">Add Task</span>
       <button class="modal-close" onclick="closeModal('task-modal')">×</button>
@@ -1416,15 +1434,11 @@
     <div class="modal-body">
       <p style="font-size:12px;color:var(--text3);margin-bottom:16px">Fields marked <span style="color:var(--red)">*</span> are mandatory.</p>
 
-      <!-- Line 1: Year / Month / Week -->
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px">
+      <!-- Line 1: Year / Month / Week / Dept / Member -->
+      <div class="sg-tf-row sg-tf-5">
         <div class="field"><label>Academic Year <span class="req">*</span></label><select id="tf-year"></select></div>
         <div class="field"><label>Month <span class="req">*</span></label><select id="tf-month"></select></div>
         <div class="field"><label>Week <span class="req">*</span></label><select id="tf-week"></select></div>
-      </div>
-
-      <!-- Line 2: Dept / Member -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
         <div class="field">
           <label>Department <span class="req">*</span></label>
           <select id="tf-dept" onchange="populateTaskMemberDropdown();populateTaskGoalDropdown()"><option value="">Select Department…</option></select>
@@ -1437,13 +1451,10 @@
 
       <div style="height:1px;background:var(--border);margin-bottom:14px"></div>
 
-      <!-- SMART Goal + Activity -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <!-- Line 2: SMART Goal / Activity / Sub-Activity -->
+      <div class="sg-tf-row sg-tf-goal">
         <div class="field"><label>SMART Goal <span class="req">*</span></label><select id="tf-goal" onchange="populateCatDropdown()"><option value="">Select…</option></select></div>
         <div class="field"><label>Activity <span class="req">*</span></label><select id="tf-cat"><option value="">Select…</option></select></div>
-      </div>
-
-      <div style="margin-bottom:14px">
         <div class="field"><label>Sub-Activity</label><input id="tf-subcat" placeholder="(optional)"></div>
       </div>
 
@@ -1451,12 +1462,10 @@
         <div class="field"><label>Action Point <span class="req">*</span></label><textarea id="tf-action" placeholder="Describe the task / action to be done…"></textarea></div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <!-- Line 4: Planned Status / Planned Items / Est. Hrs / Target Date -->
+      <div class="sg-tf-row sg-tf-4" style="margin-bottom:0">
         <div class="field"><label>Planned Status <span class="req">*</span></label><select id="tf-planned"><option value="Yes">Yes</option><option value="No">No</option></select></div>
         <div class="field"><label>Planned Items</label><input id="tf-planneditems" type="number" min="0" placeholder="(optional)"></div>
-      </div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
         <div class="field"><label>Est. Hrs <span class="req">*</span></label><input id="tf-est" type="number" step="0.5" min="0" placeholder="0"></div>
         <div class="field"><label>Target Date <span class="req">*</span></label><input id="tf-tgtdate" type="date"></div>
       </div>
