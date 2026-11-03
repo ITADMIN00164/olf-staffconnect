@@ -797,7 +797,7 @@ function renderDistrictOptions() {
   if (!aweDistricts.length) {
     const msg = aweDistrictsState === "failed" ? "Couldn't load districts — click Refresh"
       : aweDistrictsState === "ready" ? "No districts yet"
-      : "⏳ Loading districts…";
+      : "Loading districts…";
     dd.innerHTML = '<option value="">' + msg + "</option>";
     dd.disabled = true;
     return;
@@ -978,7 +978,7 @@ window.aweSaveRow = async function (index) {
 
   aweSaving = true;
   const cell = el("awesave-" + index);
-  if (cell) cell.innerHTML = '<span class="img-status">⏳ Saving…</span>';
+  if (cell) cell.innerHTML = '<span class="img-status">Saving…</span>';
 
   const sent = payloadFor(r);
   const out = await postRecords([sent]);
@@ -1061,7 +1061,7 @@ async function saveAll() {
   });
 
   aweSaving = false;
-  if (btn) { btn.disabled = false; btn.innerText = "💾 Save All Changes"; }
+  if (btn) { btn.disabled = false; btn.innerText = "Save All Changes"; }
   hideLoader();
   render();
 

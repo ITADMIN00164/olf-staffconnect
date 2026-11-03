@@ -54,7 +54,7 @@
       { id: "H2", label: "Manager status", type: "status" },
       { id: "H3", label: "Manager's remark", type: "text" } ] }
   ];
-  var MOODS = [["G", "🟢 Good"], ["Y", "🟡 Mixed"], ["R", "🔴 Struggling"]];
+  var MOODS = [["G", '<i class="pr-mood-dot g"></i>Good'], ["Y", '<i class="pr-mood-dot y"></i>Mixed'], ["R", '<i class="pr-mood-dot r"></i>Struggling']];
   var PM_STATUS = ["On track", "Needs support", "Off track"];
   var B_STATUS = ["Done", "Partial", "Not"];
 
@@ -1208,7 +1208,7 @@
     CELL_VALS[wc + "|" + fid] = tv;
     var hasVal = !!(tv && String(tv).trim());
     var canEdit = !ro;
-    return '<button type="button" class="pr-iconbtn' + (hasVal ? " has-val" : "") + (canEdit ? " editable" : "") + '" data-wc="' + wc + '" data-fid="' + fid + '" data-ed="' + (canEdit ? "1" : "0") + '" data-label="' + esc(r.label) + '" title="' + (canEdit ? "Edit" : "View") + '">' + (canEdit ? "\u270E" : "\uD83D\uDC41") + '</button>';
+    return '<button type="button" class="pr-iconbtn' + (hasVal ? " has-val" : "") + (canEdit ? " editable" : "") + '" data-wc="' + wc + '" data-fid="' + fid + '" data-ed="' + (canEdit ? "1" : "0") + '" data-label="' + esc(r.label) + '" title="' + (canEdit ? "Edit" : "View") + '">' + '' + '</button>';
   }
   function seg(wc, fid, opts, val, carryText) {
     return '<div class="pr-seg" data-wc="' + wc + '" data-fid="' + fid + '"' + (carryText != null ? ' data-carry="' + carryText + '"' : "") + '">'
@@ -1262,7 +1262,7 @@
       btn.disabled = false; btn.textContent = "Save review";
       if (failed) {
         var hint = document.querySelector("#prBody .pr-savehint");
-        if (hint) { hint.textContent = "\u26A0 Save failed for " + failed + " week(s) \u2014 click Save again to retry. Your changes are NOT lost."; hint.classList.add("is-fail"); }
+        if (hint) { hint.textContent = "Save failed for " + failed + " week(s) \u2014 click Save again to retry. Your changes are NOT lost."; hint.classList.add("is-fail"); }
         toast("Save failed \u2014 please click Save again to retry.");
       } else {
         toast("Saved."); DIRTY = {}; loadWeeklyView();
@@ -1967,7 +1967,7 @@
       btn.disabled = false; btn.textContent = "Save monthly review";
       if (failed) {
         var hint = document.querySelector("#prMoBody .pr-savehint");
-        if (hint) { hint.textContent = "\u26A0 Save failed \u2014 click Save again to retry. Your changes are NOT lost."; hint.classList.add("is-fail"); }
+        if (hint) { hint.textContent = "Save failed — click Save again to retry. Your changes are NOT lost."; hint.classList.add("is-fail"); }
         toast("Save failed \u2014 please click Save again to retry.");
       } else { toast("Saved."); MDIRTY = {}; MSUM.cache = {}; MSUM.data = null; loadMonthlyView(); }
     });

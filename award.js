@@ -4798,8 +4798,8 @@ window.AWARD_CONFIG = {
         merges.push("A" + out.length + ":" + col(lastCol) + out.length);
       }
       var opening = r.monthKey === "";
-      var text = opening ? 12 : 11;
-      var line = [{ s: text, v: r.month }, { s: text, v: r.district }, { s: text, v: r.state }, { s: text, v: r.pm || "" }];
+      var cellStyle = opening ? 12 : 11;
+      var line = [{ s: cellStyle, v: r.month }, { s: cellStyle, v: r.district }, { s: cellStyle, v: r.state }, { s: cellStyle, v: r.pm || "" }];
       GROUPS.forEach(function (g) {
         var map = r[g.column] || {};
         types.concat([null]).forEach(function (t) {

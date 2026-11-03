@@ -306,7 +306,7 @@ async function loadFilters() {
   // Re-query by id each time: initAwardManageUI replaces the <select> (to rebind its
   // change handler), so a cached reference would point at a detached element.
   const dd0 = document.getElementById("awmDistrict");
-  if (dd0) { dd0.disabled = true; dd0.innerHTML = '<option>⏳ Loading districts…</option>'; }
+  if (dd0) { dd0.disabled = true; dd0.innerHTML = '<option>Loading districts…</option>'; }
   try {
     // One small read: every district and month that has records.
     const rows = await sbGet("award_month_summary?select=district_name,month_label");
@@ -926,7 +926,7 @@ function openFilterPop(key, btn) {
 /* Where a record stands: verified, rejected, awarded and waiting to be verified,
    or not awarded yet. Counted for the chips above the table and used for each
    row's coloured edge. */
-function recStatus(r) {
+function recState(r) {
   if (r.verified === "Yes") return "verified";
   if (r.verified === "Rejected") return "rejected";
   if (r._dirty) return "unsaved";
@@ -935,7 +935,7 @@ function recStatus(r) {
 
 function statusChips() {
   const n = { verified: 0, rejected: 0, unsaved: 0, saved: 0, pending: 0 };
-  currentRecords.forEach(r => { n[recStatus(r)] += 1; });
+  currentRecords.forEach(r => { n[recState(r)] += 1; });
   const chip = (cls, count, label) => count ? '<span class="awm-chip is-' + cls + '">' + count + " " + label + "</span>" : "";
   return chip("verified", n.verified, "verified") + chip("saved", n.saved + n.unsaved, "to verify") +
          chip("pending", n.pending, "not awarded") + chip("rejected", n.rejected, "rejected");
@@ -1016,7 +1016,7 @@ function renderTable() {
     const dis = viewOnly ? "disabled" : "";
     const lt  = locked ? `title="${LOCK_MSG}"` : (isVerifier ? `title="View only — verifier access"` : "");
     return `
-    <tr class="${[locked ? "locked-row" : "", "rec-" + recStatus(r)].filter(Boolean).join(" ")}" ${lt}>
+    <tr class="${[locked ? "locked-row" : "", "rec-" + recState(r)].filter(Boolean).join(" ")}" ${lt}>
       <td class="name-cell">
         <div class="nc-name">${r.fullName || ""}</div>
         <div class="nc-sub">${r.mobile || ""}${r.mobile && r.schoolName ? " · " : ""}${r.schoolName || ""}</div>
@@ -1085,7 +1085,7 @@ window.awmUploadImage = async function (index, file) {
   // Guard: this record may have been verified (locked) since the page loaded.
   // Check Awarded Data BEFORE uploading anything, so a stale page can't push a new
   // image to Drive for a locked record (which could never be saved anyway).
-  cell.innerHTML = '<span class="img-status">⏳ Checking…</span>';
+  cell.innerHTML = '<span class="img-status">Checking…</span>';
   let savedImg = "";                                  // the image the database holds for this record now
   try {
     const fresh = await getFreshRecords();
@@ -1116,7 +1116,7 @@ window.awmUploadImage = async function (index, file) {
     if (!ok) { cell.innerHTML = renderImageCell(index); return; } // Cancel → keep old image
   }
 
-  cell.innerHTML = '<span class="img-status">⏳ Uploading…</span>';
+  cell.innerHTML = '<span class="img-status">Uploading…</span>';
   try {
     const dataUrl = await fileToBase64(file);
     const ext = (file.name.match(/\.[a-z0-9]+$/i) || [".jpg"])[0];
@@ -1308,7 +1308,7 @@ async function decideRecord(index, decision) {   // decision: "Yes" (verify) | "
   const done = decision === "Yes" ? "verified" : "rejected";
 
   const cell = document.getElementById("verify-" + index);
-  if (cell) cell.innerHTML = `<span class="img-status">⏳ ${verb}…</span>`;
+  if (cell) cell.innerHTML = `<span class="img-status">${verb}…</span>`;
 
   const rec = currentRecords[index];
   const me  = currentUser();
@@ -1373,7 +1373,7 @@ window.awmUnlockRecord = async function (index) {
   if (!isVerifier) { showToast("Only a verifier can unlock a record.", "error"); return; }
 
   const cell = document.getElementById("verify-" + index);
-  if (cell) cell.innerHTML = '<span class="img-status">⏳ Unlocking…</span>';
+  if (cell) cell.innerHTML = '<span class="img-status">Unlocking…</span>';
 
   const rec = currentRecords[index];
 
@@ -1482,7 +1482,7 @@ window.awmSaveSingleRecord = async function (index) {
     if (choice !== "yes") return;
 
     const eCell = document.getElementById("rowsave-" + index);
-    if (eCell) eCell.innerHTML = '<span class="img-status">⏳ Erasing…</span>';
+    if (eCell) eCell.innerHTML = '<span class="img-status">Erasing…</span>';
     try {
       const out = await dbErase(r);
 
@@ -1510,7 +1510,7 @@ window.awmSaveSingleRecord = async function (index) {
   }
 
   const cell = document.getElementById("rowsave-" + index);
-  if (cell) cell.innerHTML = '<span class="img-status">⏳ Saving…</span>';
+  if (cell) cell.innerHTML = '<span class="img-status">Saving…</span>';
 
   try {
     // Stale check: did this record get verified underneath us?
@@ -1688,7 +1688,7 @@ async function saveRecords() {
     return false;
   } finally {
     btn.disabled = false;
-    btn.innerText = "💾 Save All Changes";
+    btn.innerText = "Save All Changes";
     hideLoader();
   }
 }

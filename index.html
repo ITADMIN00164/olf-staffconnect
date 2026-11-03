@@ -78,7 +78,6 @@
             letter-spacing: -0.3px;
         }
 
-        .topbar-logo span { color: #4f8ef7; }
 
         .topbar-right {
             display: flex;
@@ -1698,12 +1697,27 @@
             border-bottom: 1px solid var(--hairline-dk);
             box-shadow: 0 1px 24px rgba(11,18,32,0.28);
         }
-        .topbar-logo { letter-spacing: -0.4px; }
-        .topbar-logo span {
-            background: linear-gradient(92deg, var(--brand), var(--teal));
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
+        /* The name: it is simply there when the page opens; Staff Connect in flowing brand colours with a passing shine. All of it keeps moving on its own. */
+        .topbar-logo { position: relative; display: flex; align-items: baseline; gap: 9px; font-size: 24px; line-height: 1; cursor: default; user-select: none; }
+        .topbar-logo .logo-olf { display: inline-flex; font-weight: 900; letter-spacing: -1px; }
+        .topbar-logo .logo-olf i { font-style: normal; display: inline-block; }
+        .topbar-logo .logo-sc { display: inline-flex; gap: .26em; font-weight: 800; letter-spacing: -0.6px; padding-right: 2px; }
+        .topbar-logo .lw { display: inline-flex; }
+        .topbar-logo .logo-sc i {
+            font-style: normal; display: inline-block;
+            background:
+                linear-gradient(105deg, transparent 38%, rgba(255,255,255,.95) 50%, transparent 62%),
+                linear-gradient(92deg, var(--brand) 0%, var(--teal) 50%, var(--brand) 100%);
+            background-attachment: fixed; background-repeat: no-repeat, repeat-x;
+            background-size: 360px 100%, 260px 100%; background-position: -400px 0, 0 0;
+            -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        @media (prefers-reduced-motion: no-preference) {
+            .topbar-logo .logo-sc i { animation: logo-sheen 9s linear infinite; }
+            .topbar-logo .logo-olf { animation: logo-glow 2.6s ease-in-out infinite alternate; }
+            @keyframes logo-glow { from { filter: drop-shadow(0 0 0 rgba(79,142,247,0)); } to { filter: drop-shadow(0 0 7px rgba(79,142,247,.55)); } }
+            /* the colours flow without stopping; every so often a shine passes over them */
+            @keyframes logo-sheen { 0% { background-position: -400px 0, 0 0; } 70% { background-position: -400px 0, 182px 0; } 100% { background-position: 360px 0, 260px 0; } }
         }
 
         /* ── Sidebar: dark glass panel ────────────────────────── */
@@ -1741,6 +1755,45 @@
             transition: opacity 0.16s var(--ease);
         }
         .nav-item:hover .icon, .nav-item.active .icon { opacity: 1; }
+        /* Each menu item has its own little picture in its own colours. */
+        .nav-item .icon:has(svg) { width: 22px; height: 22px; display: grid; place-items: center; opacity: 1; }
+        .nav-item .icon svg { width: 22px; height: 22px; margin: 0; filter: drop-shadow(0 2px 2px rgba(15,23,42,.18)); transition: transform .22s cubic-bezier(.34,1.56,.64,1), filter .2s ease; }
+        .nav-item:hover .icon svg { transform: translateY(-2px) scale(1.14) rotate(-4deg); filter: drop-shadow(0 5px 5px rgba(15,23,42,.25)); }
+        .nav-item.active .icon svg { transform: scale(1.1); filter: drop-shadow(0 3px 4px rgba(15,23,42,.28)); }
+        /* Hover: each picture does its own small thing. Click: it squeezes and a ring pops out. */
+        .nav-item .icon { position: relative; }
+        .nav-item .icon svg * { transform-box: fill-box; transform-origin: center; }
+        .nav-item .icon::after { content: ""; position: absolute; inset: 2px; border-radius: 50%; border: 2px solid currentColor; opacity: 0; pointer-events: none; }
+        .nav-item:active .icon svg { transform: scale(.82); transition-duration: .08s; }
+        .nav-item:active .icon::after { animation: nav-ring .5s ease-out; }
+        @keyframes nav-ring { from { opacity: .55; transform: scale(.6); } to { opacity: 0; transform: scale(1.7); } }
+        @keyframes nav-wiggle { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-9deg); } 75% { transform: rotate(9deg); } }
+        @keyframes nav-hop { 0%,100% { transform: translateY(0); } 40% { transform: translateY(-5px); } 70% { transform: translateY(1px); } }
+        @keyframes nav-grow { 0% { transform: scaleY(.35); } 60% { transform: scaleY(1.12); } 100% { transform: scaleY(1); } }
+        @keyframes nav-swing { 0%,100% { transform: rotate(0); } 30% { transform: rotate(12deg); } 60% { transform: rotate(-8deg); } }
+        @keyframes nav-spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+        @keyframes nav-write { 0%,100% { transform: translate(0,0); } 25% { transform: translate(-2px,1px); } 50% { transform: translate(1px,-1px); } 75% { transform: translate(-1px,0); } }
+        @keyframes nav-pop { 0%,100% { transform: scale(1); } 50% { transform: scale(1.35); } }
+        @keyframes nav-bubble { 0% { transform: translateY(2px); opacity: .4; } 100% { transform: translateY(-5px); opacity: 1; } }
+        @media (prefers-reduced-motion: no-preference) {
+            .nav-item[data-page="home"]:hover .icon svg { animation: nav-wiggle .55s ease-in-out; }
+            .nav-item[data-page="employees"]:hover .icon svg { animation: nav-hop .55s ease; }
+            .nav-item[data-page="er-dashboards"]:hover .icon svg rect:nth-child(n+3) { animation: nav-grow .6s cubic-bezier(.34,1.56,.64,1) backwards; transform-origin: bottom; }
+            .nav-item[data-page="er-dashboards"]:hover .icon svg rect:nth-child(4) { animation-delay: .08s; }
+            .nav-item[data-page="er-dashboards"]:hover .icon svg rect:nth-child(5) { animation-delay: .16s; }
+            .nav-item[data-page="award-management"]:hover .icon svg { animation: nav-wiggle .5s ease-in-out 2; }
+            .nav-item[data-page="calendar"]:hover .icon svg { animation: nav-hop .55s ease; }
+            .nav-item[data-page="calendar"]:hover .icon svg circle { animation: nav-pop .6s ease 1; }
+            .nav-item[data-page="smart-goals"]:hover .icon svg circle:nth-child(1) { animation: nav-pop .6s ease; }
+            .nav-item[data-page="smart-goals"]:hover .icon svg path { animation: nav-write .5s ease 2; }
+            .nav-item[data-page="pos"]:hover .icon svg path { animation: nav-hop .6s ease 2; }
+            .nav-item[data-page="gr"]:hover .icon svg { animation: nav-swing .6s ease-in-out; transform-origin: top center; }
+            .nav-item[data-page="forms"]:hover .icon svg path:nth-child(n+4) { animation: nav-write .45s ease-in-out 3; }
+            .nav-item[data-page="pom"]:hover .icon svg { animation: nav-swing .7s ease-in-out; transform-origin: top center; }
+            .nav-item[data-page="team-performance"]:hover .icon svg { animation: nav-wiggle .6s ease-in-out; }
+            .nav-item[data-page="team-performance"]:hover .icon svg circle { animation: nav-bubble .7s ease-out infinite alternate; }
+            .nav-item.nav-item--locked .icon svg, .nav-item.nav-item--locked .icon svg * { animation: none !important; }
+        }
 
         /* Active page: a lit rail on the leading edge. This is the
            one place in the chrome allowed to glow. */
@@ -2125,7 +2178,7 @@
             .tp-text, .tp-caret { display: none; }
             .topbar-profile { padding: 4px; max-width: none; }
             .olf-id-card { left: 10px; right: 10px; width: auto; }
-            .topbar-logo { font-size: 15px; }
+            .topbar-logo { font-size: 18px; gap: 6px; }
         }
 
         /* ==========================================================
@@ -2454,6 +2507,8 @@
         .sidebar .sidebar-section { display: none; }
         .sidebar .nav-item { padding: 7px 10px; font-size: 13px; gap: 9px; }
         .sidebar .nav-item .icon { font-size: 14.5px; width: 18px; }
+        #appSidebar .nav-item { gap: 7px; padding-left: 8px; padding-right: 8px; }
+        #appSidebar .nav-item .icon:has(svg) { width: 22px; flex: 0 0 22px; }
         .sidebar .nav-item .label { overflow: hidden; text-overflow: ellipsis; }
 
         .sidebar-toggle-row {
@@ -2464,10 +2519,23 @@
             font-size: 10.5px; font-weight: 700; letter-spacing: .9px;
             text-transform: uppercase; color: var(--text-faint, #5c6070);
         }
-        .sidebar-pin-btn { width: 28px; height: 28px; font-size: 12px; }
+        .sidebar-pin-btn { width: 34px; height: 34px; font-size: 12px; }
         .sidebar-pin-btn .pin { display: inline-block; transform: rotate(45deg); opacity: .55; transition: transform .2s, opacity .2s; }
         .sidebar-pin-btn[aria-pressed="true"] { background: rgba(79,142,247,0.28); border-color: rgba(79,142,247,0.7); }
         .sidebar-pin-btn[aria-pressed="true"] .pin { transform: none; opacity: 1; }
+        /* The pin: a small blue push-pin lying at an angle while the menu is free; it turns red and stands up when the menu is kept open. */
+        .sidebar-pin-btn .pin { display: grid; place-items: center; opacity: 1; transform: rotate(38deg); transition: transform .4s cubic-bezier(.34,1.56,.64,1); --pin: #60A5FA; --pin-dark: #2563EB; }
+        .sidebar-pin-btn .pin svg { width: 22px; height: 22px; display: block; filter: drop-shadow(0 2px 2px rgba(15,23,42,.25)); }
+        .sidebar-pin-btn .pn-head { fill: var(--pin); transition: fill .25s ease; }
+        .sidebar-pin-btn .pn-band { fill: var(--pin-dark); transition: fill .25s ease; }
+        .sidebar-pin-btn .pn-shine { fill: rgba(255,255,255,.5); }
+        .sidebar-pin-btn .pn-needle { stroke: #94A3B8; stroke-width: 2.200; stroke-linecap: round; fill: none; }
+        .sidebar-pin-btn:hover .pin { transform: rotate(20deg) scale(1.15); }
+        .sidebar-pin-btn:active .pin { transform: rotate(38deg) scale(.82); transition-duration: .1s; }
+        .sidebar-pin-btn[aria-pressed="true"] .pin { --pin: #F87171; --pin-dark: #DC2626; transform: rotate(0); animation: pin-drop .5s cubic-bezier(.34,1.56,.64,1); }
+        .sidebar-pin-btn[aria-pressed="true"]:hover .pin { transform: rotate(-8deg) scale(1.15); }
+        @keyframes pin-drop { 0% { transform: rotate(38deg) translateY(-7px) scale(1.25); } 100% { transform: rotate(0) translateY(0) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .sidebar-pin-btn .pin { animation: none !important; transition: none; } }
 
         /* Auto-hide: the sidebar floats over the page instead of taking space */
         .app-body.sb-auto .sidebar {
@@ -2700,6 +2768,161 @@
     .theme-switch button:focus-visible { outline: 2px solid var(--chrome-accent); outline-offset: 1px; }
     @media (max-width: 520px) { .theme-switch button { width: 26px; } }
 
+    /* ── Header, polished: a flowing accent line, a sliding theme pill, a livelier profile chip ── */
+    html[data-theme] .topbar::after {
+        content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; pointer-events: none; opacity: .75;
+        background: linear-gradient(90deg, transparent 0%, var(--brand) 25%, var(--teal) 50%, var(--brand) 75%, transparent 100%);
+        background-size: 200% 100%;
+    }
+    html[data-theme] .topbar { padding-top: 2px; }
+
+    /* theme switch: one raised pill slides to the chosen option */
+    .theme-switch { --ts-w: 30px; position: relative; isolation: isolate; }
+    .theme-switch::before {
+        content: ""; position: absolute; z-index: -1; left: 3px; top: 3px; bottom: 3px; width: var(--ts-w); border-radius: 999px;
+        background: var(--chrome-bg); box-shadow: -2px -2px 5px var(--chrome-hi), 2px 2px 5px var(--chrome-lo);
+        transform: translateX(calc(var(--ts-i, 0) * (var(--ts-w) + 2px)));
+        transition: transform .38s cubic-bezier(.34,1.45,.64,1);
+    }
+    .theme-switch:has(button:nth-child(2)[aria-checked="true"]) { --ts-i: 1; }
+    .theme-switch:has(button:nth-child(3)[aria-checked="true"]) { --ts-i: 2; }
+    .theme-switch button[aria-checked="true"] { background: transparent; box-shadow: none; }
+    .theme-switch button svg { transition: transform .45s cubic-bezier(.34,1.56,.64,1); }
+    .theme-switch button:hover svg { transform: rotate(25deg) scale(1.15); }
+    .theme-switch button[aria-checked="true"] svg { transform: scale(1.1); }
+    @media (max-width: 520px) { .theme-switch { --ts-w: 26px; } }
+
+    /* a taller bar with a soft lit top edge */
+    html[data-theme] .topbar { height: 58px; background-image: linear-gradient(180deg, var(--chrome-hi), transparent 70%); }
+    html[data-theme] .topbar-logo { font-size: 25px; }
+
+    /* ======================================================================
+       Shared page look for Home, Employees and ER & Dashboards: the same
+       banner, the same buttons, the same stat cards, the same entrance.
+       ====================================================================== */
+    .pg-hero {
+        position: relative; overflow: hidden; isolation: isolate; display: flex; align-items: center; justify-content: space-between;
+        gap: 20px 28px; flex-wrap: wrap; padding: 28px 32px; margin-bottom: 22px; border-radius: 22px; color: #fff;
+        background: linear-gradient(120deg, #2457C5 0%, #2F6FE4 40%, #0B8F7A 100%);
+        box-shadow: 0 18px 40px rgba(36,87,197,.30), inset 0 1px 0 rgba(255,255,255,.35);
+    }
+    .pg-hero::before {
+        content: ""; position: absolute; inset: 0; z-index: -1; opacity: .5;
+        background-image: radial-gradient(rgba(255,255,255,.28) 1.2px, transparent 1.4px); background-size: 22px 22px;
+        -webkit-mask-image: linear-gradient(100deg, #000 0%, transparent 70%); mask-image: linear-gradient(100deg, #000 0%, transparent 70%);
+    }
+    .pg-blob { position: absolute; z-index: -1; border-radius: 50%; filter: blur(34px); pointer-events: none; }
+    .pg-blob--a { width: 260px; height: 260px; right: -60px; top: -90px; background: rgba(255,255,255,.28); }
+    .pg-blob--b { width: 220px; height: 220px; right: 22%; bottom: -120px; background: rgba(253,230,138,.34); }
+    .pg-blob--c { width: 200px; height: 200px; left: -70px; bottom: -110px; background: rgba(6,95,70,.30); }
+    .pg-hero-main { min-width: 0; }
+    .pg-hero-lead { display: flex; align-items: center; gap: 18px; min-width: 0; }
+    .pg-hero-ico {
+        width: 60px; height: 60px; flex: 0 0 auto; border-radius: 19px; display: grid; place-items: center;
+        background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.36); box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 8px 18px rgba(15,23,42,.14);
+        -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    }
+    .pg-hero-ico svg { width: 36px; height: 36px; filter: drop-shadow(0 2px 2px rgba(15,23,42,.2)); }
+    .pg-eyebrow {
+        display: inline-flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 5px 13px 5px 11px; border-radius: 999px;
+        font-size: 12px; font-weight: 700; letter-spacing: .02em; background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.3);
+        -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    }
+    .pg-live { width: 8px; height: 8px; border-radius: 50%; background: #86EFAC; box-shadow: 0 0 0 0 rgba(134,239,172,.7); }
+    .pg-hero-title { font-size: 32px; font-weight: 800; letter-spacing: -1px; line-height: 1.12; margin: 0 0 7px; color: #fff; }
+    .pg-hero-sub { margin: 0; font-size: 14.5px; font-weight: 500; line-height: 1.5; color: #fff; max-width: 64ch; }
+    .pg-accent { color: #FEF3C7; }
+    .pg-hero-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .pg-hero .pg-btn {
+        display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 18px; border-radius: 13px; cursor: pointer;
+        font: inherit; font-size: 13.5px; font-weight: 700; white-space: nowrap; color: #fff; text-decoration: none;
+        background: rgba(255,255,255,.17); border: 1px solid rgba(255,255,255,.36); box-shadow: inset 0 1px 0 rgba(255,255,255,.3);
+        -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+        transition: transform .18s var(--ease, ease), background-color .15s ease, box-shadow .2s ease;
+    }
+    .pg-hero .pg-btn:hover { transform: translateY(-1px); background: rgba(255,255,255,.28); box-shadow: 0 8px 18px rgba(15,23,42,.16), inset 0 1px 0 rgba(255,255,255,.3); }
+    .pg-hero .pg-btn:active { transform: scale(.97); }
+    .pg-hero .pg-btn:focus-visible { outline: 3px solid rgba(255,255,255,.7); outline-offset: 2px; }
+    .pg-hero .pg-btn--solid { background: #fff; color: #2457C5; border-color: #fff; box-shadow: 0 8px 18px rgba(15,23,42,.18); }
+    .pg-hero .pg-btn--solid:hover { background: #fff; box-shadow: 0 12px 24px rgba(15,23,42,.24); }
+    .pg-btn .pg-i { width: 16px; height: 16px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* frosted chip on the banner (kept here so the dark-mode adapter leaves it alone) */
+    .pg-hero .pg-glass {
+        background: rgba(255,255,255,.17); border: 1px solid rgba(255,255,255,.34); box-shadow: inset 0 1px 0 rgba(255,255,255,.3);
+        -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    }
+    .pg-hero .pg-glass-avatar { background: rgba(255,255,255,.92); color: #2457C5; }
+    .pg-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; margin-bottom: 26px; }
+    .pg-stat {
+        position: relative; overflow: hidden; display: flex; align-items: center; gap: 16px; padding: 20px 22px; border-radius: 18px;
+        background: var(--glass-strong, rgba(255,255,255,.88)); border: 1px solid var(--hairline, rgba(15,23,42,.08));
+        box-shadow: var(--shadow-sm); transition: transform .22s var(--ease, ease), box-shadow .22s ease;
+    }
+    .pg-stat::after {
+        content: ""; position: absolute; right: -40px; top: -40px; width: 130px; height: 130px; border-radius: 50%; pointer-events: none;
+        background: radial-gradient(circle, color-mix(in srgb, var(--tint, #4F8EF7) 24%, transparent), transparent 70%);
+    }
+    .pg-stat:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+    .pg-stat-icon {
+        width: 58px; height: 58px; border-radius: 17px; display: grid; place-items: center; flex: 0 0 auto;
+        background: color-mix(in srgb, var(--tint, #4F8EF7) 13%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tint, #4F8EF7) 22%, transparent);
+        transition: transform .3s cubic-bezier(.34,1.56,.64,1);
+    }
+    .pg-stat-icon svg { width: 36px; height: 36px; filter: drop-shadow(0 2px 2px rgba(15,23,42,.18)); }
+    .pg-stat:hover .pg-stat-icon { transform: scale(1.1) rotate(-5deg); }
+    .pg-stat-value { font-size: 34px; font-weight: 800; letter-spacing: -1px; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
+    .pg-stat-label { margin-top: 6px; font-size: 13px; font-weight: 600; color: var(--text-soft); }
+
+    @media (prefers-reduced-motion: no-preference) {
+        .pg-hero, .pg-stat { animation: pg-in .6s cubic-bezier(.22,1,.36,1) backwards; }
+        .pg-hero { animation-delay: .02s; }
+        .pg-stat:nth-child(1) { animation-delay: .12s; } .pg-stat:nth-child(2) { animation-delay: .18s; }
+        .pg-stat:nth-child(3) { animation-delay: .24s; } .pg-stat:nth-child(4) { animation-delay: .3s; }
+        .pg-blob--a { animation: pg-drift 14s ease-in-out infinite alternate; }
+        .pg-blob--b { animation: pg-drift 18s ease-in-out -6s infinite alternate-reverse; }
+        .pg-blob--c { animation: pg-drift 16s ease-in-out -3s infinite alternate; }
+        .pg-live { animation: pg-ping 2.2s ease-out infinite; }
+        @keyframes pg-in { from { opacity: 0; transform: translateY(14px); } }
+        @keyframes pg-drift { to { transform: translate(34px, 22px) scale(1.12); } }
+        @keyframes pg-ping { 0% { box-shadow: 0 0 0 0 rgba(134,239,172,.7); } 100% { box-shadow: 0 0 0 9px rgba(134,239,172,0); } }
+    }
+    @media (max-width: 900px) { .pg-hero { padding: 24px 22px; } .pg-hero-title { font-size: 26px; } }
+    @media (max-width: 640px) {
+        .pg-hero-lead, .pg-hero-actions { width: 100%; }
+        .pg-hero-actions > div, .pg-hero-actions .admin-btn-group { flex: 1 1 100%; width: 100%; }
+        .pg-hero-actions .admin-btn-group { display: flex; flex-wrap: wrap; gap: 10px; }
+        .pg-hero .pg-btn { flex: 1 1 auto; justify-content: center; }
+    }
+    @media (max-width: 640px) { .pg-stats { grid-template-columns: 1fr; } .pg-hero-ico { width: 48px; height: 48px; border-radius: 16px; } .pg-hero-ico svg { width: 30px; height: 30px; } }
+
+    /* drawn status pictures in toasts, message windows and the menu lock */
+    .app-toast-icon svg { width: 18px; height: 18px; display: block; margin-top: 1px; }
+    .app-msg-icon svg { width: 30px; height: 30px; display: block; }
+    .nav-item .nav-lock svg { width: 13px; height: 13px; display: block; }
+
+    /* a page IT Admin has closed is not in a user's menu at all */
+    #appSidebar .nav-item.nav-item--locked-hidden { display: none !important; }
+
+    /* profile chip */
+    .tp-avatar { position: relative; width: 32px; height: 32px; font-size: 12px; box-shadow: 0 0 0 2px var(--chrome-bg, #fff), 0 0 0 3.5px rgba(79,142,247,.55), 0 4px 10px rgba(79,142,247,.35); }
+    .tp-avatar::after {
+        content: ""; position: absolute; right: -2px; bottom: -2px; width: 10px; height: 10px; border-radius: 50%;
+        background: #22C55E; box-shadow: 0 0 0 2px var(--chrome-bg, #fff);
+    }
+    .topbar-profile { gap: 10px; padding: 4px 12px 4px 5px; }
+    .tp-name { font-size: 13px; font-weight: 700; letter-spacing: -.1px; }
+    .tp-caret { width: 13px; height: 13px; transition: transform .25s cubic-bezier(.34,1.56,.64,1); }
+    .topbar-profile[aria-expanded="true"] .tp-caret { transform: rotate(180deg); }
+    .topbar-profile:hover .tp-caret { transform: translateY(1px); }
+    .topbar-profile[aria-expanded="true"]:hover .tp-caret { transform: rotate(180deg); }
+    @media (prefers-reduced-motion: no-preference) {
+        html[data-theme] .topbar::after { animation: tb-flow 9s linear infinite; }
+        @keyframes tb-flow { to { background-position: 200% 0; } }
+        .tp-avatar::after { animation: tb-online 2.6s ease-out infinite; }
+        @keyframes tb-online { 0% { box-shadow: 0 0 0 2px var(--chrome-bg, #fff), 0 0 0 2px rgba(34,197,94,.7); } 100% { box-shadow: 0 0 0 2px var(--chrome-bg, #fff), 0 0 0 8px rgba(34,197,94,0); } }
+    }
+
     /* ── Sidebar: the soft-UI skin, re-pointed at the shared tokens ── */
     html[data-theme] #appSidebar {
         --sb-bg: var(--chrome-bg);
@@ -2763,6 +2986,44 @@
         .app-body:not(.sb-auto) #appSidebar.sb-admin .nav-row > .nav-item { padding-right: 10px; }
         .app-body.sb-auto #appSidebar.sb-admin { width: 232px; }
     }
+
+    /* ======================================================================
+       Using the space: the menu rests as a slim icon rail (the pages get
+       almost the full width) and opens over the page when you point at it;
+       the top bar slides away when you scroll down and comes back when you
+       scroll up or touch the top edge. Docked (pinned) menus are unchanged.
+       ====================================================================== */
+    @media (min-width: 769px) {
+        html[data-theme] .app-body.sb-auto #appSidebar {
+            transform: none; width: 72px; padding: 12px 8px 10px; overflow: hidden;
+            transition: width .26s cubic-bezier(.2,.8,.2,1), box-shadow .26s ease;
+        }
+        html[data-theme] .app-body.sb-auto #appSidebar.sb-admin { width: 72px; }
+        html[data-theme] .app-body.sb-auto.sb-open #appSidebar,
+        html[data-theme] .app-body.sb-auto.sb-open #appSidebar.sb-admin { width: 232px; }
+        html[data-theme] .app-body.sb-auto > .content-area { margin-left: 72px; }
+        html[data-theme] .app-body.sb-auto .sidebar-edge { display: none; }
+
+        /* the words and extras appear only while it is open */
+        #appSidebar .nav-item .label, #appSidebar .sidebar-menu-title { white-space: nowrap; transition: opacity .18s ease; }
+        .app-body.sb-auto:not(.sb-open) #appSidebar .nav-item .label,
+        .app-body.sb-auto:not(.sb-open) #appSidebar .sidebar-menu-title,
+        .app-body.sb-auto:not(.sb-open) #appSidebar .nav-access-toggle,
+        .app-body.sb-auto:not(.sb-open) #appSidebar .nav-lock { opacity: 0; width: 0; overflow: hidden; display: none; }
+        .app-body.sb-auto:not(.sb-open) #appSidebar .nav-item { justify-content: center; gap: 0; padding-left: 0; padding-right: 0; }
+        .app-body.sb-auto:not(.sb-open) #appSidebar .nav-row > .nav-item { padding-right: 0; }
+        .app-body.sb-auto:not(.sb-open) #appSidebar .sidebar-toggle-row { justify-content: center; padding: 0; }
+        .app-body.sb-auto.sb-open #appSidebar .nav-item .label { opacity: 1; }
+    }
+
+    /* nothing to pin any more: the menu is always a rail that opens on hover */
+    #appSidebar .sidebar-pin-btn { display: none; }
+    @media (min-width: 769px) { .app-body.sb-auto:not(.sb-open) #appSidebar .sidebar-toggle-row { display: none; } }
+
+    /* the top bar tucks away while you read */
+    html[data-theme] .topbar { transition: margin-top .3s cubic-bezier(.2,.8,.2,1), opacity .22s ease; }
+    body.tb-hidden .topbar { margin-top: calc(var(--tb-h, 58px) * -1); opacity: 0; pointer-events: none; }
+    @media (prefers-reduced-motion: reduce) { html[data-theme] .topbar, html[data-theme] .app-body.sb-auto #appSidebar { transition: none; } }
 
     /* ── Layer order for the floating menu ──
        page content (sticky bars, dropdowns…)  <  edge tab (450)
@@ -2904,6 +3165,508 @@
     html[data-theme="dark"] body #grPage .gr-sx {
         --sx-line: var(--nm-line); --sx-ink: var(--nm-ink); --sx-mute: var(--nm-mute); --sx-faint: var(--nm-faint);
     }
+
+    /* ======================================================================
+       One finish for every page. Written with :where() so it weighs nothing:
+       any page that already styles a thing keeps its own look, and the rest
+       pick up the same focus rings, press feedback, scrollbars and motion.
+       ====================================================================== */
+    #pageContent ::selection { background: rgba(47,111,228,.22); }
+    :where(#pageContent), :where(#pageContent) * { scrollbar-width: thin; scrollbar-color: rgba(100,116,139,.38) transparent; }
+    :where(#pageContent)::-webkit-scrollbar, :where(#pageContent) *::-webkit-scrollbar { width: 9px; height: 9px; }
+    :where(#pageContent)::-webkit-scrollbar-thumb, :where(#pageContent) *::-webkit-scrollbar-thumb { background: rgba(100,116,139,.32); border-radius: 9px; border: 2px solid transparent; background-clip: padding-box; }
+    :where(#pageContent)::-webkit-scrollbar-thumb:hover, :where(#pageContent) *::-webkit-scrollbar-thumb:hover { background-color: rgba(100,116,139,.55); }
+    :where(#pageContent)::-webkit-scrollbar-track, :where(#pageContent) *::-webkit-scrollbar-track { background: transparent; }
+
+    :where(#pageContent) :where(button, a, summary, [role="button"], [role="tab"], [tabindex]:not([tabindex="-1"])):focus-visible {
+        outline: 2px solid #2F6FE4; outline-offset: 2px;
+    }
+    :where(#pageContent) :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea):focus-visible {
+        outline: none; border-color: #2F6FE4; box-shadow: 0 0 0 4px rgba(47,111,228,.16);
+    }
+    :where(#pageContent) :where(button:not(:disabled), [role="button"]):active { transform: translateY(1px) scale(.985); }
+    :where(#pageContent) :where(button:disabled, input:disabled, select:disabled, textarea:disabled) { cursor: not-allowed; }
+    :where(#pageContent) :where(td, th) { font-variant-numeric: tabular-nums; }
+    :where(#pageContent) :where(img) { max-width: 100%; }
+
+    /* a placeholder that shimmers while data is on its way */
+    .pg-skel {
+        display: block; height: 14px; border-radius: 8px;
+        background: linear-gradient(90deg, rgba(148,163,184,.16) 0%, rgba(148,163,184,.32) 50%, rgba(148,163,184,.16) 100%);
+        background-size: 200% 100%;
+    }
+
+    /* opening a page: a thin bar runs along the top while it loads, then
+       the page fades in (opacity only, so pop-ups inside keep their place) */
+    .olf-route-bar {
+        position: fixed; z-index: 3000; top: 0; left: 0; right: 0; height: 3px; pointer-events: none;
+        background: linear-gradient(90deg, #2457C5, #2F6FE4 45%, #0B8F7A); transform-origin: left; transform: scaleX(0); opacity: 0;
+        transition: transform .5s cubic-bezier(.22,1,.36,1), opacity .3s ease .15s;
+    }
+    .olf-route-bar.is-on { opacity: 1; transform: scaleX(.72); transition: transform 2.4s cubic-bezier(.1,.7,.2,1), opacity .1s; }
+    .olf-route-bar.is-done { opacity: 0; transform: scaleX(1); }
+
+    @media (prefers-reduced-motion: no-preference) {
+        :where(#pageContent) :where(button, [role="button"]) { transition-timing-function: cubic-bezier(.22,1,.36,1); }
+        #pageContent.pc-enter > * { animation: pc-fade .42s cubic-bezier(.22,1,.36,1) both; }
+        /* the page's own blocks rise in one after another (the banner and
+           figures already have their own entrance) */
+        #pageContent.pc-enter > * > :not(.pg-hero):not(.pg-stats):not(style):not(script):not(link):not([class*="modal"]):not([class*="overlay"]):not([class*="backdrop"]):not([class*="drawer"]):not([hidden]) {
+            animation: pc-rise .55s cubic-bezier(.22,1,.36,1) backwards; animation-delay: var(--pc-d, .1s);
+        }
+        #pageContent > * > :nth-child(3) { --pc-d: .16s; }
+        #pageContent > * > :nth-child(4) { --pc-d: .22s; }
+        #pageContent > * > :nth-child(n+5) { --pc-d: .28s; }
+        @keyframes pc-fade { from { opacity: 0; } }
+        @keyframes pc-rise { from { opacity: 0; transform: translateY(12px); } }
+        .pg-skel { animation: pg-shimmer 1.3s linear infinite; }
+        @keyframes pg-shimmer { to { background-position: -200% 0; } }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        :where(#pageContent) :where(button, [role="button"]):active { transform: none; }
+        .olf-route-bar { display: none; }
+    }
+
+    /* ── Announcements bell in the top bar ── */
+    .tb-bell {
+        position: relative; display: grid; place-items: center; width: 38px; height: 38px; padding: 0; flex: none; cursor: pointer;
+        border-radius: 12px; border: 1px solid var(--hairline, rgba(15,23,42,.08)); background: var(--glass-strong, #fff); color: var(--text-soft, #475467);
+        box-shadow: var(--shadow-sm); transition: color .15s ease, border-color .15s ease, transform .18s ease, box-shadow .18s ease;
+    }
+    .tb-bell svg { width: 19px; height: 19px; transform-origin: 50% 12%; }
+    .tb-bell:hover { color: #2457C5; border-color: rgba(47,111,228,.35); transform: translateY(-1px); box-shadow: 0 6px 14px -6px rgba(36,87,197,.4); }
+    .tb-bell:focus-visible { outline: 2px solid #2F6FE4; outline-offset: 2px; }
+    .tb-bell.has-news { color: #2457C5; }
+    .tb-bell-n {
+        position: absolute; top: -5px; right: -5px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+        display: grid; place-items: center; font-size: 10.5px; font-weight: 800; line-height: 1; color: #fff;
+        background: linear-gradient(135deg, #F04438, #E04F6B); box-shadow: 0 0 0 2px var(--chrome-bg, #fff), 0 3px 8px rgba(240,68,56,.4);
+    }
+    .tb-bell-n[hidden] { display: none; }
+    @media (max-width: 480px) {
+        .topbar-logo .logo-sc { display: none; }        /* just "OLF" on a phone, so the buttons fit */
+        .tp-group { gap: 8px; }
+        .tb-bell { width: 34px; height: 34px; }
+    }
+    @media (prefers-reduced-motion: no-preference) {
+        .tb-bell.has-news svg { animation: tb-ring 7s ease-in-out 2s infinite; }
+        .tb-bell:hover svg { animation: tb-ring-once .8s ease-in-out; }
+        .tb-bell-n:not([hidden]) { animation: tb-pop .45s cubic-bezier(.34,1.56,.64,1); }
+        @keyframes tb-ring { 0%, 88%, 100% { transform: rotate(0); } 90% { transform: rotate(14deg); } 92% { transform: rotate(-12deg); } 94% { transform: rotate(8deg); } 96% { transform: rotate(-5deg); } }
+        @keyframes tb-ring-once { 0%, 100% { transform: rotate(0); } 20% { transform: rotate(14deg); } 40% { transform: rotate(-12deg); } 60% { transform: rotate(7deg); } 80% { transform: rotate(-4deg); } }
+        @keyframes tb-pop { from { transform: scale(0); } }
+    }
+
+    /* drawn icons in the announcement pop-ups (no emoji) */
+    .nd-title { display: flex; align-items: center; gap: 10px; }
+    .nd-title-ico {
+        width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; flex: none; color: #fff;
+        background: linear-gradient(135deg, #FBBF24, #D97706); box-shadow: 0 4px 10px rgba(217,119,6,.3);
+    }
+    .nd-title-ico svg { width: 17px; height: 17px; }
+    .news-popup-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 11px; color: #fff; background: linear-gradient(135deg, #FBBF24, #D97706); box-shadow: 0 4px 10px rgba(217,119,6,.3); }
+    .news-popup-icon svg { width: 18px; height: 18px; }
+    .nd-dates { display: flex; align-items: center; gap: 6px; }
+    .nd-dates .hm-i { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* ── Menu items: hover and the page you are on ──
+       The page you are on is a clean white card lifted off the menu, with a
+       blue-to-teal bar on its left edge and its name in bold blue. Hover is a
+       soft white wash with a fine edge; a click gives a small press. */
+    html[data-theme] #appSidebar .nav-item {
+        position: relative; border: 1px solid transparent;
+        transition: background-color .2s ease, border-color .2s ease, box-shadow .25s ease, color .15s ease, transform .15s ease;
+    }
+    html[data-theme] #appSidebar .nav-item:not(.active):hover {
+        background: rgba(255,255,255,.62); border-color: rgba(255,255,255,.9); color: var(--chrome-ink);
+        box-shadow: 0 2px 8px -2px rgba(36,87,197,.14);
+    }
+    html[data-theme] #appSidebar .nav-item .label { transition: transform .22s cubic-bezier(.22,1,.36,1); }
+    html[data-theme] #appSidebar .nav-item:not(.active):hover .label { transform: translateX(3px); }
+    html[data-theme] #appSidebar .nav-item.active {
+        background: #fff; border-color: rgba(47,111,228,.16); color: #2457C5; font-weight: 700;
+        box-shadow: 0 6px 16px -6px rgba(36,87,197,.38), 0 1px 2px rgba(15,23,42,.06);
+    }
+    /* the marker: a short rounded bar just inside the card's left edge,
+       centred on the item - the same place in the slim rail and the open
+       menu (outside the card it would be cut off by the scrolling list) */
+    html[data-theme] #appSidebar .nav-item.active::before {
+        content: ""; position: absolute; left: 4px; top: 50%; bottom: auto; width: 4px; height: 18px; margin: -9px 0 0;
+        border-radius: 4px; background: linear-gradient(180deg, #2F6FE4, #0B8F7A); box-shadow: 0 0 8px rgba(47,111,228,.45);
+        transform: none;   /* an older rule also shifted it up by half its height */
+    }
+    html[data-theme] #appSidebar .nav-item.active .icon svg { transform: scale(1.1); }
+    /* a click is just a click: no shrinking, squeezing or ring */
+    html[data-theme] #appSidebar .nav-item:active { transform: none; }
+    html[data-theme] #appSidebar .nav-item:not(.active):active .icon svg { transform: none; }
+    html[data-theme] #appSidebar .nav-item:active .icon::after { animation: none; }
+    html[data-theme="dark"] #appSidebar .nav-item:not(.active):hover {
+        background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.08); box-shadow: none;
+    }
+    html[data-theme="dark"] #appSidebar .nav-item.active {
+        background: #2A3242; border-color: rgba(122,168,255,.28); color: #9DBEFF;
+        box-shadow: 0 6px 16px -6px rgba(0,0,0,.6);
+    }
+    @media (prefers-reduced-motion: no-preference) {
+        html[data-theme] #appSidebar .nav-item.active::before { animation: nav-bar-in .35s cubic-bezier(.22,1,.36,1); }
+        @keyframes nav-bar-in { from { transform: scaleY(0); opacity: 0; } }
+    }
+
+    /* ======================================================================
+       MENU: one gliding card, each page in its own colour
+       The white card behind the open page is a single piece (app.js moves
+       it) that springs to the page you choose. Each page carries its own
+       colour (--pg): the marker bar, the name and the card's glow take it,
+       and hovering a page gives a hint of it.
+       ====================================================================== */
+    #appSidebar .nav-item[data-page="home"]             { --pg: #F97316; }
+    #appSidebar .nav-item[data-page="employees"]        { --pg: #8B5CF6; }
+    #appSidebar .nav-item[data-page="er-dashboards"]    { --pg: #0EA5A4; }
+    #appSidebar .nav-item[data-page="award-management"] { --pg: #F59E0B; }
+    #appSidebar .nav-item[data-page="calendar"]         { --pg: #EC4899; }
+    #appSidebar .nav-item[data-page="smart-goals"]      { --pg: #EF4444; }
+    #appSidebar .nav-item[data-page="pos"]              { --pg: #F43F5E; }
+    #appSidebar .nav-item[data-page="gr"]               { --pg: #D97706; }
+    #appSidebar .nav-item[data-page="forms"]            { --pg: #6366F1; }
+    #appSidebar .nav-item[data-page="pom"]              { --pg: #64748B; }
+    #appSidebar .nav-item[data-page="team-performance"] { --pg: #10B981; }
+
+    #appSidebar .sidebar-nav.has-glider { position: relative; }
+    .nav-glider {
+        --pg: #2F6FE4;
+        position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; border-radius: 12px;
+        background: #fff; border: 1px solid color-mix(in srgb, var(--pg) 24%, transparent);
+        box-shadow: 0 8px 18px -8px color-mix(in srgb, var(--pg) 55%, transparent), 0 1px 2px rgba(15,23,42,.06);
+        transition: transform .55s cubic-bezier(.34,1.3,.64,1), width .25s ease, height .25s ease,
+                    border-color .35s ease, box-shadow .35s ease, opacity .2s ease;
+    }
+    .nav-glider::after {   /* a faint wash of the page's colour on the card */
+        content: ""; position: absolute; inset: 0; border-radius: inherit;
+        background: linear-gradient(90deg, color-mix(in srgb, var(--pg) 12%, transparent), transparent 70%);
+    }
+    .nav-glider.no-anim { transition: none; }
+    .nav-glider.is-hidden { opacity: 0; }
+    html[data-theme="dark"] .nav-glider { background: #2A3242; }
+
+    html[data-theme] #appSidebar .sidebar-nav.has-glider .nav-item { position: relative; z-index: 1; }
+    html[data-theme] #appSidebar .sidebar-nav.has-glider .nav-item.active {
+        background: transparent; border-color: transparent; box-shadow: none;
+        color: color-mix(in srgb, var(--pg, #2F6FE4) 72%, #0F172A);
+    }
+    html[data-theme="dark"] #appSidebar .sidebar-nav.has-glider .nav-item.active { color: color-mix(in srgb, var(--pg, #7AA8FF) 55%, #fff); }
+    html[data-theme] #appSidebar .sidebar-nav.has-glider .nav-item.active::before {
+        background: linear-gradient(180deg, var(--pg, #2F6FE4), color-mix(in srgb, var(--pg, #2F6FE4) 55%, #fff));
+        box-shadow: 0 0 8px color-mix(in srgb, var(--pg, #2F6FE4) 55%, transparent);
+    }
+    html[data-theme] #appSidebar .sidebar-nav.has-glider .nav-item:not(.active):hover {
+        background: color-mix(in srgb, var(--pg, #2F6FE4) 9%, rgba(255,255,255,.55));
+        border-color: color-mix(in srgb, var(--pg, #2F6FE4) 18%, transparent);
+    }
+    html[data-theme="dark"] #appSidebar .sidebar-nav.has-glider .nav-item:not(.active):hover {
+        background: color-mix(in srgb, var(--pg, #7AA8FF) 12%, transparent);
+    }
+    @media (prefers-reduced-motion: reduce) { .nav-glider { transition: opacity .2s ease; } }
+
+    /* ======================================================================
+       GLIDING TAB SELECTION (app.js: moveTabGlider)
+       In every tab row the chosen tab's pill / card / underline is one piece
+       that glides between tabs. The tabs keep their own text colours; only
+       their own fill steps aside while the piece is there.
+       ====================================================================== */
+    .tab-glider {
+        position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none;
+        transition: transform .45s cubic-bezier(.34,1.25,.64,1), width .32s cubic-bezier(.22,1,.36,1),
+                    height .32s cubic-bezier(.22,1,.36,1), opacity .2s ease, background-color .3s ease;
+    }
+    .tab-glider.no-anim { transition: none; }
+    .tab-glider.is-hidden { opacity: 0; }
+    .has-tab-glider :is(button, [role="tab"]) { position: relative; z-index: 1; }
+    .has-tab-glider :is(.is-active, .active, .is-on):not(.tab-glider) { background: transparent !important; box-shadow: none !important; }
+    .has-tab-glider.tg-line :is(.is-active, .active, .is-on)::after { opacity: 0 !important; }
+    .tg-measure :is(button, [role="tab"]), .tg-measure :is(button, [role="tab"])::after { transition: none !important; animation: none !important; }
+
+    /* ======================================================================
+       COLOURFUL ICONS
+       Every icon carries its own colour: --icl, a bright tint that reads on
+       the blue banner, and --icd, the deeper shade for white surfaces (the
+       chosen tab, white buttons, tab cards). The page picture on each
+       banner is the same full-colour one the menu uses.
+       ====================================================================== */
+    .pg-hero-ico .hero-color-ico, #sgHero .sg-hero-ico .hero-color-ico { width: 32px; height: 32px; filter: drop-shadow(0 2px 2px rgba(15,23,42,.2)); }
+    .award-page #awHero .pg-hero-ico .hero-color-ico { width: 30px; height: 30px; }
+
+    /* the page picture on a banner lives a little: its tile floats, a shine
+       sweeps the glass now and then, the picture gives a small tilt, and it
+       springs up when you point at the banner */
+    .pg-hero-ico, #sgHero .sg-hero-ico { position: relative; overflow: hidden; }
+    .pg-hero-ico::after, #sgHero .sg-hero-ico::after {
+        content: ""; position: absolute; inset: -40%; pointer-events: none; transform: translateX(-120%) rotate(20deg);
+        background: linear-gradient(90deg, transparent 40%, rgba(255,255,255,.55) 50%, transparent 60%);
+    }
+    .pg-hero-ico svg, #sgHero .sg-hero-ico svg { transform-origin: 50% 65%; transition: transform .45s cubic-bezier(.34,1.56,.64,1); }
+    .pg-hero:hover .pg-hero-ico svg, #sgHero:hover .sg-hero-ico svg { transform: scale(1.14) rotate(-6deg); }
+    @media (prefers-reduced-motion: no-preference) {
+        .pg-hero-ico, #sgHero .sg-hero-ico { animation: hero-ico-float 4.8s ease-in-out infinite; }
+        .pg-hero-ico::after, #sgHero .sg-hero-ico::after { animation: hero-ico-shine 6s ease-in-out 1.4s infinite; }
+        .pg-hero-ico .hero-color-ico, .pg-hero-ico > svg, #sgHero .sg-hero-ico .hero-color-ico { animation: hero-ico-tilt 6s ease-in-out 2s infinite; }
+        .pg-hero:hover .pg-hero-ico > svg, .pg-hero:hover .pg-hero-ico .hero-color-ico, #sgHero:hover .sg-hero-ico .hero-color-ico { animation: none; }
+        @keyframes hero-ico-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+        @keyframes hero-ico-shine { 0%, 62% { transform: translateX(-120%) rotate(20deg); } 82%, 100% { transform: translateX(120%) rotate(20deg); } }
+        @keyframes hero-ico-tilt { 0%, 78%, 100% { transform: rotate(0); } 84% { transform: rotate(-9deg) scale(1.06); } 90% { transform: rotate(7deg) scale(1.06); } 95% { transform: rotate(-3deg); } }
+    }
+
+    /* Awards & Gifts: section switch, views, buttons */
+    .award-page #awHero [data-aw-icon="medal"]     { --icl: #FCD34D; --icd: #D97706; }
+    .award-page #awHero [data-aw-icon="event"]     { --icl: #F9A8D4; --icd: #DB2777; }
+    .award-page #awHero [data-aw-icon="gift"]      { --icl: #FDA4AF; --icd: #E11D48; }
+    .award-page #awHero [data-aw-icon="utilise"]   { --icl: #6EE7B7; --icd: #059669; }
+    .award-page #awHero [data-aw-icon="dashboard"] { --icl: #93C5FD; --icd: #2563EB; }
+    .award-page #awHero [data-aw-icon="clipboard"] { --icl: #FDE68A; --icd: #D97706; }
+    .award-page #awHero [data-aw-icon="truck"]     { --icl: #FDBA74; --icd: #EA580C; }
+    .award-page #awHero [data-aw-icon="boxes"]     { --icl: #C4B5FD; --icd: #7C3AED; }
+    .award-page #awHero [data-aw-icon="tote"]      { --icl: #BEF264; --icd: #65A30D; }
+    .award-page #awHero [data-aw-icon="sliders"]   { --icl: #E2E8F0; --icd: #475569; }
+    .award-page #awHero [data-aw-icon="refresh"]   { --icl: #A5F3FC; --icd: #0891B2; }
+    .award-page #awHero [data-aw-icon="plus"]      { --icl: #6EE7B7; --icd: #059669; }
+    body .award-page #awHero .aw-toptab .aw-icon,
+    body .award-page #awHero .aw-hero-nav .aw-subtab .aw-icon,
+    body .award-page #awHero .aw-hero-nav .aw-utiltab .aw-icon,
+    body .award-page #awHero .aw-top-right .aw-icon { color: var(--icl, currentColor); opacity: 1; }
+    body .award-page #awHero .aw-toptabs .aw-toptab.is-active .aw-icon,
+    body .award-page #awHero .aw-top-right .btn-primary .aw-icon { color: var(--icd, currentColor); }
+
+    /* buttons on the other banners */
+    #orgChartBtn             { --icl: #C4B5FD; }
+    #addEmployeeBtn          { --icd: #059669; }
+    #downloadSampleExcelBtn  { --icl: #86EFAC; }
+    #pcal-past-btn           { --icl: #FDE68A; }
+    #pcal-add-btn            { --icd: #059669; }
+    #grRefreshAll, #page-forms .pg-hero .pg-btn, #sg-refresh-btn { --icl: #A5F3FC; }
+    .pg-hero .pg-btn:not(.pg-btn--solid) svg, #sg-app #sgHero #sg-refresh-btn .sg-i { color: var(--icl, currentColor); }
+    .pg-hero .pg-btn--solid svg { color: var(--icd, currentColor); }
+
+    /* Field Review System: Dashboard / Admin on its banner */
+    #posPage .pg-hero .pos-top-tab .fr-i-dash  { --icl: #93C5FD; --icd: #2563EB; }
+    #posPage .pg-hero .pos-top-tab .fr-i-admin { --icl: #FDE68A; --icd: #D97706; }
+    #posPage .pg-hero .pos-top-tabs--header .pos-top-tab .fr-ico { color: var(--icl, currentColor); }
+    #posPage .pg-hero .pos-top-tabs--header .pos-top-tab.active .fr-ico { color: var(--icd, currentColor); }
+
+    /* Program Calendar: its views (on a white card) */
+    #pcal-app .pcal-nav-item[data-pcal-tab="calendar"] .pcal-i { color: #2563EB; }
+    #pcal-app .pcal-nav-item[data-pcal-tab="settings"] .pcal-i { color: #64748B; }
+    #pcal-app .pcal-nav-item[data-pcal-tab="past"]     .pcal-i { color: #D97706; }
+    #pcal-app .pcal-nav-item[data-pcal-tab="bulk"]     .pcal-i { color: #059669; }
+
+    /* GRs & Circulars: its views (on a white card) */
+    #grPage .gr-tab[data-tab="upload"]    .gr-i { color: #2563EB; }
+    #grPage .gr-tab[data-tab="detailed"]  .gr-i { color: #7C3AED; }
+    #grPage .gr-tab[data-tab="summary"]   .gr-i { color: #0E9384; }
+    #grPage .gr-tab[data-tab="analytics"] .gr-i { color: #E11D48; }
+
+    /* ======================================================================
+       THE HEADER
+       A frosted white bar with a fine edge. On the left the wordmark: "OLF"
+       heavy, in the brand's blue-to-teal with a soft sheen passing now and
+       then; a hairline; "Staff Connect" in crisp dark type. On the right one
+       matching set of controls - same height, same white card, same hover -
+       the theme switch (a white thumb slides to your choice), the bell, a
+       divider, and you.
+       ====================================================================== */
+    html[data-theme] #appShell .topbar {
+        --tb-ctl: 40px;
+        --tb-card: #FFFFFF; --tb-line: rgba(15,23,42,.09); --tb-track: #EEF2F8; --tb-ink: #101828; --tb-soft: #475467; --tb-faint: #667085;
+        --tb-ctl-shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.04);
+        height: 62px; padding: 0 20px 0 18px; gap: 16px;
+        background: rgba(255,255,255,.82); background-image: none;
+        -webkit-backdrop-filter: blur(14px) saturate(160%); backdrop-filter: blur(14px) saturate(160%);
+        border-bottom: 1px solid var(--tb-line);
+        box-shadow: 0 4px 18px -10px rgba(36,87,197,.22);
+    }
+    html[data-theme="dark"] #appShell .topbar {
+        --tb-card: #1D2430; --tb-line: rgba(255,255,255,.08); --tb-track: #141922; --tb-ink: #E8ECF2; --tb-soft: #A9B2C0; --tb-faint: #8691A3;
+        --tb-ctl-shadow: 0 1px 2px rgba(0,0,0,.4);
+        background: rgba(21,26,34,.86); box-shadow: 0 4px 18px -10px rgba(0,0,0,.6);
+    }
+    html[data-theme] #appShell .topbar::after { height: 1.5px; opacity: .55; }
+
+    /* wordmark */
+    #appShell .topbar-logo { align-items: center; gap: 12px; font-size: 27px; line-height: 1; }
+    #appShell .topbar-logo .logo-olf {
+        font-weight: 900; letter-spacing: -1.2px; animation: none; filter: none;
+        background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,.85) 50%, transparent 60%) no-repeat,
+                    linear-gradient(120deg, #2457C5 0%, #2F6FE4 45%, #0B8F7A 100%);
+        background-size: 250% 100%, 100% 100%; background-position: 160% 0, 0 0;
+        -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
+    }
+    #appShell .topbar-logo .logo-olf i { -webkit-text-fill-color: inherit; }
+    #appShell .topbar-logo .logo-sc {
+        position: relative; padding-left: 13px; gap: .25em; font-size: .86em; font-weight: 700; letter-spacing: -.4px;
+    }
+    #appShell .topbar-logo .logo-sc::before {
+        content: ""; position: absolute; left: 0; top: 50%; width: 1.5px; height: 20px; margin-top: -10px; border-radius: 2px;
+        background: linear-gradient(180deg, transparent, rgba(47,111,228,.45), transparent);
+    }
+    #appShell .topbar-logo .logo-sc i {
+        background: none; -webkit-background-clip: border-box; background-clip: border-box;
+        -webkit-text-fill-color: currentColor; color: var(--tb-ink); animation: none;
+    }
+    @media (prefers-reduced-motion: no-preference) {
+        #appShell .topbar-logo .logo-olf { animation: tb-olf-sheen 7s ease-in-out 1.5s infinite; }
+        @keyframes tb-olf-sheen { 0%, 70% { background-position: 160% 0, 0 0; } 100% { background-position: -60% 0, 0 0; } }
+    }
+
+    /* the controls: one family */
+    html[data-theme] #appShell .tp-group { gap: 10px; }
+    html[data-theme] #appShell .theme-switch {
+        --ts-w: 34px; height: var(--tb-ctl); padding: 3px; gap: 2px; border-radius: 12px;
+        background: var(--tb-track); border: 1px solid var(--tb-line); box-shadow: inset 0 1px 2px rgba(16,24,40,.05);
+    }
+    html[data-theme] #appShell .theme-switch::before {
+        top: 3px; bottom: 3px; left: 3px; width: var(--ts-w); border-radius: 9px;
+        background: var(--tb-card); box-shadow: 0 1px 3px rgba(16,24,40,.14), 0 0 0 1px var(--tb-line);
+    }
+    html[data-theme] #appShell .theme-switch button { width: var(--ts-w); height: 100%; border-radius: 9px; color: var(--tb-faint); }
+    html[data-theme] #appShell .theme-switch button:hover { color: var(--tb-ink); }
+    html[data-theme] #appShell .theme-switch button[aria-checked="true"] { color: #2F6FE4; }
+    html[data-theme] #appShell .theme-switch button svg { width: 16px; height: 16px; }
+
+    html[data-theme] #appShell .tb-bell {
+        width: var(--tb-ctl); height: var(--tb-ctl); border-radius: 12px; color: var(--tb-soft);
+        background: var(--tb-card); border: 1px solid var(--tb-line); box-shadow: var(--tb-ctl-shadow);
+    }
+    html[data-theme] #appShell .tb-bell.has-news { color: #2457C5; }
+    html[data-theme] #appShell .tb-bell .tb-bell-n { box-shadow: 0 0 0 2px var(--tb-card), 0 3px 8px rgba(240,68,56,.4); }
+
+    html[data-theme] #appShell .topbar-profile {
+        position: relative; height: var(--tb-ctl); gap: 10px; padding: 0 12px 0 4px; margin-left: 7px; border-radius: 12px;
+        background: var(--tb-card); border: 1px solid var(--tb-line); box-shadow: var(--tb-ctl-shadow);
+        transition: border-color .18s ease, box-shadow .2s ease, transform .18s ease;
+    }
+    /* a thin divider between the tools and you */
+    html[data-theme] #appShell .topbar-profile::before {
+        content: ""; position: absolute; left: -10px; top: 9px; bottom: 9px; width: 1px; background: var(--tb-line);
+    }
+    html[data-theme] #appShell .tb-bell:hover, html[data-theme] #appShell .topbar-profile:hover,
+    html[data-theme] #appShell .topbar-profile[aria-expanded="true"] {
+        border-color: rgba(47,111,228,.35); box-shadow: 0 6px 14px -6px rgba(36,87,197,.35); transform: translateY(-1px);
+    }
+    html[data-theme] #appShell .topbar-profile:active { transform: none; box-shadow: var(--tb-ctl-shadow); }
+    html[data-theme] #appShell .tp-avatar {
+        width: 32px; height: 32px; font-size: 11.5px; font-weight: 800; color: #fff;
+        background: linear-gradient(135deg, #2F6FE4, #0B8F7A);
+        box-shadow: 0 0 0 2px var(--tb-card), 0 0 0 3.5px rgba(47,111,228,.35);
+    }
+    html[data-theme] #appShell .tp-avatar::after { box-shadow: 0 0 0 2px var(--tb-card); width: 9px; height: 9px; right: -1px; bottom: -1px; animation: none; }
+    html[data-theme] #appShell .tp-name { color: var(--tb-ink); font-size: 13.5px; font-weight: 700; letter-spacing: -.1px; }
+    html[data-theme] #appShell .tp-dept { color: var(--tb-faint); font-size: 11.5px; font-weight: 600; }
+    html[data-theme] #appShell .tp-caret { color: var(--tb-faint); }
+
+    @media (max-width: 768px) {
+        html[data-theme] #appShell .topbar { height: 58px; padding: 0 12px; gap: 10px; }
+        html[data-theme] #appShell .topbar { --tb-ctl: 36px; }
+        html[data-theme] #appShell .theme-switch { --ts-w: 28px; }
+        html[data-theme] #appShell .topbar-profile { padding: 0 3px; margin-left: 0; }
+        html[data-theme] #appShell .topbar-profile::before { display: none; }
+        #appShell .topbar-logo { font-size: 21px; }
+    }
+
+    /* ======================================================================
+       HEADER, TWO-TONE: a slanted blue-to-teal brand block on the left with
+       the wordmark in white (a soft shine crosses it now and then, a few
+       light dots drift in it), then "where you are" - the open page's own
+       picture and name - and the tools and you on the right.
+       ====================================================================== */
+    html[data-theme] #appShell .topbar { padding-left: 0; gap: 18px; overflow: hidden; }
+    #appShell .topbar-logo {
+        position: relative; isolation: isolate; align-self: stretch; display: flex; align-items: center; gap: 12px; flex: none;
+        padding: 0 58px 0 24px; margin-right: -6px; font-size: 25px; color: #fff;
+        background: linear-gradient(115deg, #2457C5 0%, #2F6FE4 48%, #0B8F7A 100%);
+        clip-path: polygon(0 0, 100% 0, calc(100% - 30px) 100%, 0 100%);
+    }
+    /* a thin teal sliver along the slant, for depth */
+    #appShell .topbar-logo::before {
+        content: ""; position: absolute; z-index: -1; inset: 0;
+        background: radial-gradient(circle at 18% 120%, rgba(253,224,71,.35), transparent 38%),
+                    radial-gradient(circle at 82% -20%, rgba(255,255,255,.35), transparent 40%),
+                    radial-gradient(rgba(255,255,255,.22) 1px, transparent 1.3px) 0 0 / 14px 14px;
+    }
+    #appShell .topbar-logo::after {
+        content: ""; position: absolute; z-index: -1; inset: 0; transform: translateX(-110%);
+        background: linear-gradient(100deg, transparent 35%, rgba(255,255,255,.35) 50%, transparent 65%);
+    }
+    #appShell .topbar-logo .logo-olf {
+        background: none; -webkit-text-fill-color: #fff; color: #fff; animation: none;
+        font-weight: 900; letter-spacing: -1px; text-shadow: 0 2px 8px rgba(15,23,42,.25);
+    }
+    #appShell .topbar-logo .logo-sc { font-size: .8em; font-weight: 700; padding-left: 13px; }
+    #appShell .topbar-logo .logo-sc::before { background: rgba(255,255,255,.55); height: 22px; margin-top: -11px; }
+    #appShell .topbar-logo .logo-sc i { color: #fff; -webkit-text-fill-color: #fff; }
+
+    /* where you are */
+    .tb-crumb { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: 14px; }
+    .tb-crumb-root { font-weight: 600; color: var(--tb-faint, #667085); white-space: nowrap; }
+    .tb-crumb-sep { width: 16px; height: 16px; flex: none; fill: none; stroke: var(--tb-faint, #98A2B3); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    .tb-crumb-page {
+        display: inline-flex; align-items: center; gap: 9px; min-width: 0; padding: 5px 14px 5px 6px; border-radius: 999px;
+        font-weight: 700; color: var(--tb-ink, #101828); white-space: nowrap;
+        background: linear-gradient(90deg, rgba(47,111,228,.10), rgba(11,143,122,.08)); border: 1px solid rgba(47,111,228,.18);
+    }
+    .tb-crumb-page > span:last-child { overflow: hidden; text-overflow: ellipsis; }
+    .tb-crumb-ico { width: 28px; height: 28px; flex: none; display: grid; place-items: center; border-radius: 50%; background: var(--tb-card, #fff); box-shadow: 0 2px 6px rgba(36,87,197,.18); }
+    .tb-crumb-ico svg { width: 19px; height: 19px; }
+    html[data-theme="dark"] .tb-crumb-page { background: linear-gradient(90deg, rgba(110,155,255,.14), rgba(45,212,191,.10)); border-color: rgba(110,155,255,.25); }
+
+    /* you: name with the department under it */
+    html[data-theme] #appShell .topbar-profile { height: 44px; padding: 0 14px 0 5px; }
+    html[data-theme] #appShell .tp-text { gap: 2px; }
+    html[data-theme] #appShell .tp-dept {
+        display: inline-flex; align-items: center; gap: 5px; max-width: 190px; overflow: hidden; text-overflow: ellipsis;
+        color: #0B8F7A; font-weight: 700; font-size: 11px; letter-spacing: .02em;
+    }
+    html[data-theme] #appShell .tp-dept::before { content: ""; width: 6px; height: 6px; flex: none; border-radius: 50%; background: linear-gradient(135deg, #2F6FE4, #0B8F7A); }
+    html[data-theme="dark"] #appShell .tp-dept { color: #5EEAD4; }
+
+    @media (prefers-reduced-motion: no-preference) {
+        #appShell .topbar-logo::after { animation: tb-brand-shine 8s ease-in-out 2s infinite; }
+        @keyframes tb-brand-shine { 0%, 75% { transform: translateX(-110%); } 100% { transform: translateX(110%); } }
+        #appShell .topbar-logo::before { animation: tb-brand-drift 14s linear infinite; }
+        @keyframes tb-brand-drift { to { background-position: 0 0, 0 0, 28px 14px; } }
+        .tb-crumb-page.is-new { animation: tb-crumb-in .45s cubic-bezier(.22,1,.36,1); }
+        .tb-crumb-page.is-new .tb-crumb-ico { animation: tb-crumb-pop .55s cubic-bezier(.34,1.56,.64,1); }
+        @keyframes tb-crumb-in { from { opacity: 0; transform: translateX(-10px); } }
+        @keyframes tb-crumb-pop { from { transform: scale(.4) rotate(-20deg); } }
+    }
+    @media (max-width: 1100px) { .tb-crumb-root, .tb-crumb-sep { display: none; } }
+    @media (max-width: 768px) {
+        #appShell .topbar-logo { order: -1; padding: 0 34px 0 14px; font-size: 21px; margin: 0; clip-path: polygon(0 0, 100% 0, calc(100% - 18px) 100%, 0 100%); }
+        .tb-crumb { display: none; }
+        html[data-theme] #appShell .topbar-profile { height: 38px; padding: 0 3px; }
+    }
+
+    /* phones: a proper menu button in the top bar (its three lines fold into
+       a cross while the menu is open) instead of the thin strip on the edge */
+    .tb-menu-btn { display: none; }
+    @media (max-width: 768px) {
+        .tb-menu-btn {
+            display: inline-flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px; flex: none;
+            width: 38px; height: 38px; margin-right: 10px; padding: 0; border-radius: 12px; cursor: pointer;
+            border: 1px solid var(--hairline, rgba(15,23,42,.1)); background: var(--glass-strong, #fff); color: var(--text, #1c2b3a);
+            box-shadow: var(--shadow-sm, 0 1px 3px rgba(15,23,42,.08));
+        }
+        .tb-menu-btn span { display: block; width: 17px; height: 2px; border-radius: 2px; background: currentColor; transition: transform .28s cubic-bezier(.22,1,.36,1), opacity .18s ease; }
+        .tb-menu-btn[aria-expanded="true"] span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+        .tb-menu-btn[aria-expanded="true"] span:nth-child(2) { opacity: 0; transform: scaleX(.3); }
+        .tb-menu-btn[aria-expanded="true"] span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+        .tb-menu-btn:active { transform: scale(.94); }
+        .tb-menu-btn:focus-visible { outline: 2px solid #2F6FE4; outline-offset: 2px; }
+        html[data-theme] .app-body.sb-auto .sidebar-edge, .app-body.sb-auto .sidebar-edge { display: none; }
+        /* the page dims behind the open menu; a tap on it closes the menu */
+        .app-body.sb-auto::after {
+            content: ""; position: absolute; inset: 0; z-index: 1040; pointer-events: none; opacity: 0;
+            background: rgba(15,23,42,.32); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); transition: opacity .25s ease;
+        }
+        .app-body.sb-auto.sb-open::after { opacity: 1; pointer-events: auto; }
+    }
     </style>
 
 <!-- Award Management's styles. They live in a file rather than inside
@@ -2915,8 +3678,8 @@
 <!-- The ?v= is bumped whenever award.css or award.js changes: without it
      a browser keeps the copy it already has, and the tab carries on
      behaving as it did before the change. -->
-<link rel="stylesheet" href="award.css?v=2026-11-02b">
-<link rel="stylesheet" href="award-manage.css?v=2026-10-26g">
+<link rel="stylesheet" href="award.css?v=2026-11-02r">
+<link rel="stylesheet" href="award-manage.css?v=2026-11-02b">
 <link rel="stylesheet" href="award-dash.css?v=2026-10-29a">
 <link rel="stylesheet" href="award-event.css?v=2026-10-26e">
 <link rel="stylesheet" href="award-append.css?v=2026-10-26f">
@@ -2960,7 +3723,18 @@
 
     <!-- Top Bar -->
     <div class="topbar">
-        <div class="topbar-logo">OLF <span>Staff Connect</span></div>
+        <button class="tb-menu-btn" id="tbMenuBtn" type="button" aria-label="Open menu" aria-controls="appSidebar" aria-expanded="false">
+            <span></span><span></span><span></span>
+        </button>
+        <div class="topbar-logo" role="img" aria-label="OLF Staff Connect">
+            <span class="logo-olf" aria-hidden="true"><i style="--i:0">O</i><i style="--i:1">L</i><i style="--i:2">F</i></span><span class="logo-sc" aria-hidden="true"><span class="lw"><i style="--i:3">S</i><i style="--i:4">t</i><i style="--i:5">a</i><i style="--i:6">f</i><i style="--i:7">f</i></span><span class="lw"><i style="--i:8">C</i><i style="--i:9">o</i><i style="--i:10">n</i><i style="--i:11">n</i><i style="--i:12">e</i><i style="--i:13">c</i><i style="--i:14">t</i></span></span>
+        </div>
+        <!-- Where you are: the open page's own picture and name (app.js) -->
+        <nav class="tb-crumb" id="tbCrumb" aria-label="You are here">
+            <span class="tb-crumb-root">Staff Connect</span>
+            <svg class="tb-crumb-sep" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+            <span class="tb-crumb-page" id="tbCrumbPage"><span class="tb-crumb-ico" id="tbCrumbIco" aria-hidden="true"></span><span id="tbCrumbName">Home</span></span>
+        </nav>
         <div class="tp-group">
             <div class="theme-switch" id="olfThemeSwitch" role="radiogroup" aria-label="Colour theme">
                 <button type="button" role="radio" data-theme-choice="light" aria-checked="false" title="Light theme" aria-label="Light theme">
@@ -2973,6 +3747,10 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12.5" rx="2"/><path d="M8.5 20.5h7M12 16.5v4"/></svg>
                 </button>
             </div>
+            <button class="tb-bell" id="tbBellBtn" type="button" aria-label="Announcements" title="Announcements">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9.5a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15.5 6 9.5z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg>
+                <span class="tb-bell-n" hidden>0</span>
+            </button>
             <button class="topbar-profile" id="olfProfileBtn" type="button"
                     aria-haspopup="dialog" aria-expanded="false" title="View your ID card">
                 <span class="tp-avatar" id="topbarAvatar">?</span>
@@ -2980,7 +3758,7 @@
                     <span class="tp-name" id="topbarName">—</span>
                     <span class="tp-dept" id="topbarDept">—</span>
                 </span>
-                <span class="tp-caret" aria-hidden="true">▾</span>
+                <svg class="tp-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
                 <span id="topbarRole" hidden>—</span>
             </button>
         </div>
@@ -3028,7 +3806,7 @@
     <div id="newsDetailModal" class="modal-overlay">
         <div class="modal-box" style="width:560px;">
             <div class="modal-header">
-                <h2>📢 Announcements</h2>
+                <h2 class="nd-title"><span class="nd-title-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4a1 1 0 0 0 1 1h2l5 4V5L7 9H5a1 1 0 0 0-1 1z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg></span>Announcements</h2>
                 <button class="modal-close" id="closeNewsDetailBtn" type="button">✕</button>
             </div>
             <div class="modal-body" id="newsDetailBody"></div>
@@ -3041,7 +3819,7 @@
     <!-- ── Session popup: shown once per session on any page ── -->
     <div class="news-popup" id="newsPopup" hidden>
         <button class="news-popup-x" id="newsPopupClose" type="button" aria-label="Dismiss">✕</button>
-        <div class="news-popup-icon">📢</div>
+        <div class="news-popup-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4a1 1 0 0 0 1 1h2l5 4V5L7 9H5a1 1 0 0 0-1 1z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg></div>
         <div class="news-popup-body">
             <div class="news-popup-label" id="newsPopupLabel">New announcement</div>
             <div class="news-popup-text" id="newsPopupText"></div>
@@ -3066,7 +3844,7 @@
         </button>
     </div>
 
-    <div class="app-body">
+    <div class="app-body sb-auto">
 
         <!-- Hover strip on the left edge: brings the auto-hidden menu back. -->
         <div class="sidebar-edge" id="sidebarEdge" role="button" tabindex="0"
@@ -3078,51 +3856,51 @@
                 <span class="sidebar-menu-title">Menu</span>
                 <button class="sidebar-toggle-btn sidebar-pin-btn" id="sidebarToggleBtn" type="button"
                         title="Keep the menu open" aria-label="Keep the menu open" aria-pressed="false">
-                    <span class="pin" aria-hidden="true">📌</span>
+                    <span class="pin" aria-hidden="true"><svg viewBox="0 0 32 32"><path class="pn-needle" d="M16 21v9.500"/><path class="pn-head" d="M11 2.500h10l-1.500 8.500c3 1.200 5 3.300 5 6H7.500c0-2.700 2-4.800 5-6z"/><rect class="pn-band" x="7" y="16.500" width="18" height="4" rx="2"/><path class="pn-shine" d="M13.500 4.500h2l-.8 6c-1.500.6-2.600 1.400-3.300 2.400z"/></svg></span>
                 </button>
             </div>
 
             <div class="sidebar-nav">
             <div class="sidebar-section">Main</div>
             <button class="nav-item active" data-page="home" onclick="navigate('home')" title="Home">
-                <span class="icon">🏠</span><span class="label">Home</span>
+                <span class="icon"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="22" y="6" width="3.5" height="7" rx="1" fill="#9A3412"/><rect x="6.5" y="14" width="19" height="14" rx="1.5" fill="#FCD34D"/><path d="M2.5 16.5 16 4.5l13.5 12z" fill="#EF4444"/><rect x="13" y="19" width="6" height="9" rx="1.2" fill="#B45309"/><rect x="8.5" y="17.5" width="3.5" height="3.5" rx=".8" fill="#fff"/><rect x="20" y="17.5" width="3.5" height="3.5" rx=".8" fill="#fff"/></svg></span><span class="label">Home</span>
             </button>
             <button class="nav-item" data-page="employees" onclick="navigate('employees')" title="Employees">
-                <span class="icon">👥</span><span class="label">Employees</span>
+                <span class="icon"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="21.5" cy="10.5" r="4.3" fill="#FCD9A8"/><path d="M13.5 27c0-5.2 3.4-8.5 8-8.5s8 3.3 8 8.5z" fill="#3B82F6"/><circle cx="11" cy="12" r="4.8" fill="#FFD3A1"/><path d="M2.5 28.5c0-5.8 3.7-9.5 8.5-9.5s8.5 3.7 8.5 9.5z" fill="#8B5CF6"/></svg></span><span class="label">Employees</span>
             </button>
             <!-- Expense Report + Data Dashboards merged into one links page (2026-10-28) -->
             <button class="nav-item" data-page="er-dashboards" onclick="navigate('er-dashboards')" title="ER & Dashboards">
-                <span class="icon">🔗</span><span class="label">ER &amp; Dashboards</span>
+                <span class="icon"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="4.5" width="26" height="23" rx="3.5" fill="#fff" stroke="#0EA5A4" stroke-width="2"/><path d="M3 8a3.5 3.5 0 0 1 3.5-3.5h19A3.5 3.5 0 0 1 29 8v3H3z" fill="#0EA5A4"/><rect x="7.5" y="17" width="4" height="7" rx="1" fill="#F59E0B"/><rect x="14" y="13.5" width="4" height="10.5" rx="1" fill="#0EA5A4"/><rect x="20.5" y="15.5" width="4" height="8.5" rx="1" fill="#8B5CF6"/></svg></span><span class="label">ER &amp; Dashboards</span>
             </button>
             <!-- Award Management took the old POM page's place in the menu (2026-10-30). -->
             <button class="nav-item" data-page="award-management" onclick="navigate('award-management')" title="Awards &amp; Gifts">
-                <span class="icon">🏆</span><span class="label">Awards &amp; Gifts</span>
+                <span class="icon"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="5" y="14.5" width="22" height="13.5" rx="2.2" fill="#EF4444"/><rect x="3" y="10" width="26" height="6" rx="2" fill="#F97316"/><rect x="14" y="10" width="4" height="18" fill="#FDE047"/><path d="M16 10c-4.5 1-8.5-.5-8-3.7.5-3 4.5-2.7 6.2-.6.9 1.1 1.5 2.600 1.800 4.300zM16 10c4.5 1 8.500-.5 8-3.700-.5-3-4.500-2.700-6.200-.6-.9 1.100-1.500 2.600-1.800 4.300z" fill="#FDE047"/></svg></span><span class="label">Awards &amp; Gifts</span>
             </button>
             <button class="nav-item" data-page="calendar" onclick="navigate('calendar')" title="Program Calendar">
-                <span class="icon">📅</span><span class="label">Program Calendar</span>
+                <span class="icon"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3.5" y="6" width="25" height="22" rx="3.5" fill="#fff" stroke="#CBD5E1" stroke-width="1.5"/><path d="M3.5 9.5A3.500 3.500 0 0 1 7 6h18a3.500 3.500 0 0 1 3.500 3.500V14h-25z" fill="#EC4899"/><rect x="9.500" y="3" width="3" height="6.500" rx="1.500" fill="#6B7280"/><rect x="19.500" y="3" width="3" height="6.500" rx="1.500" fill="#6B7280"/><g fill="#3B82F6"><circle cx="10" cy="18.500" r="1.700"/><circle cx="16" cy="18.500" r="1.700"/><circle cx="10" cy="23.500" r="1.700"/></g><circle cx="22" cy="18.500" r="1.700" fill="#F59E0B"/><circle cx="16" cy="23.500" r="1.700" fill="#10B981"/></svg></span><span class="label">Program Calendar</span>
             </button>
             <button class="nav-item" data-page="smart-goals" onclick="navigate('smart-goals')" title="HO Plan & Review">
-                <span class="icon">🎯</span><span class="label">HO Plan & Review</span>
+                <span class="icon"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="15" cy="17" r="12" fill="#EF4444"/><circle cx="15" cy="17" r="8.500" fill="#fff"/><circle cx="15" cy="17" r="5.200" fill="#EF4444"/><circle cx="15" cy="17" r="2" fill="#fff"/><path d="M15 17 26 6" stroke="#92400E" stroke-width="2" stroke-linecap="round"/><path d="m22.500 9.500.8-5.500 4.600 1.200 1.200 4.600-5.500.8z" fill="#3B82F6"/></svg></span><span class="label">HO Plan & Review</span>
             </button>
             <!-- ARCHIVED 2026-10-07: the old PO Review page (pages/po.html + po.js) is
                  retired. Its files are still in the repo for reference but nothing links
                  to them any more - the Field Review System replaces it. -->
             <button class="nav-item" data-page="pos" id="posNavBtn" onclick="navigate('pos')" title="Field Review System" hidden>
-                <span class="icon">📍</span><span class="label">Field Review System</span>
+                <span class="icon"><svg viewBox="0 0 32 32" aria-hidden="true"><ellipse cx="16" cy="29" rx="6.500" ry="1.800" fill="#0F172A" opacity=".15"/><path d="M16 28.500s-9.500-9-9.500-16a9.500 9.500 0 0 1 19 0c0 7-9.500 16-9.500 16z" fill="#F43F5E"/><circle cx="16" cy="12.500" r="4" fill="#fff"/></svg></span><span class="label">Field Review System</span>
             </button>
             <button class="nav-item" data-page="gr" onclick="navigate('gr')" title="GRs & Circulars">
-                <span class="icon">📜</span><span class="label">GRs & Circulars</span>
+                <span class="icon"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 3h13l6 6v20H7z" fill="#FEF3C7" stroke="#D97706" stroke-width="1.800" stroke-linejoin="round"/><path d="M20 3v6h6z" fill="#FCD34D" stroke="#D97706" stroke-width="1.500" stroke-linejoin="round"/><path d="M11 15h10M11 19.500h10M11 24h6" stroke="#D97706" stroke-width="1.800" stroke-linecap="round"/></svg></span><span class="label">GRs & Circulars</span>
             </button>
             <button class="nav-item" data-page="forms" onclick="navigate('forms')" title="OLF Forms">
-                <span class="icon">📝</span><span class="label">OLF Forms</span>
+                <span class="icon"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="5" y="5.500" width="20" height="23" rx="3" fill="#6366F1"/><rect x="8" y="10" width="14" height="15.500" rx="1.500" fill="#fff"/><rect x="10.500" y="3" width="9" height="5.500" rx="2" fill="#4338CA"/><path d="M11 15h8M11 19h5" stroke="#A5B4FC" stroke-width="1.800" stroke-linecap="round"/><path d="m15 28 1.300-4.800 9.500-9.500 3.500 3.500-9.500 9.500z" fill="#F59E0B"/><path d="m15 28 1.300-4.800 3.500 3.500z" fill="#FDE68A"/><path d="m25.800 13.700 1.700-1.700 3.500 3.500-1.700 1.700z" fill="#F43F5E"/></svg></span><span class="label">OLF Forms</span>
             </button>
             <!-- The old POM page sits here now, renamed and switched off (2026-10-30). -->
             <button class="nav-item" data-page="pom" onclick="navigate('pom')" title="Old POM page">
-                <span class="icon">📋</span><span class="label">Old POM page</span>
+                <span class="icon"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="6" y="5.500" width="20" height="23" rx="3" fill="#94A3B8"/><rect x="9" y="10" width="14" height="15.500" rx="1.500" fill="#F1F5F9"/><rect x="11" y="3" width="10" height="5.500" rx="2" fill="#64748B"/><path d="M12 15h8M12 19.500h8" stroke="#94A3B8" stroke-width="1.800" stroke-linecap="round"/></svg></span><span class="label">Old POM page</span>
             </button>
             <!-- "Test 2" is the Program Team: Goals, Plan and Review page (moved here, renamed 2026-10-28). -->
             <button class="nav-item" data-page="team-performance" onclick="navigate('team-performance')" title="Test 2">
-                <span class="icon">🧪</span><span class="label">Test 2</span>
+                <span class="icon"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M12 3.500h8M13.500 3.500v9L5.500 25.500a3.200 3.200 0 0 0 2.800 4.800h15.400a3.200 3.200 0 0 0 2.800-4.800L18.500 12.500v-9" fill="#E0F2FE" stroke="#0F766E" stroke-width="1.800" stroke-linejoin="round" stroke-linecap="round"/><path d="M8.800 21h14.400l3.200 5.500a2.200 2.200 0 0 1-1.900 3.300H7.500a2.200 2.200 0 0 1-1.900-3.300z" fill="#10B981"/><circle cx="13" cy="25" r="1.400" fill="#A7F3D0"/><circle cx="19" cy="26.500" r="1" fill="#A7F3D0"/><circle cx="17" cy="8" r="1.100" fill="#38BDF8"/></svg></span><span class="label">Test 2</span>
             </button>
             </div><!-- /.sidebar-nav -->
 
@@ -3211,7 +3989,7 @@
 <!-- Generic in-app message / confirm modal (replaces native alert()/confirm()) -->
 <div id="appMsgModal" class="modal-overlay">
     <div class="modal-box app-msg-box">
-        <div class="app-msg-icon" id="appMsgIcon">ℹ️</div>
+        <div class="app-msg-icon" id="appMsgIcon"></div>
         <div class="app-msg-title" id="appMsgTitle">Notice</div>
         <div class="app-msg-text" id="appMsgText"></div>
         <ul class="app-msg-list" id="appMsgList" style="display:none;"></ul>
@@ -3222,24 +4000,24 @@
     </div>
 </div>
 
-<script type="module" src="app.js?v=2026-11-02a"></script>
+<script type="module" src="app.js?v=2026-11-03k"></script>
 <script src="profile.js"></script>
 <script src="pom.js"></script>
-<script src="calendar.js"></script>
+<script src="calendar.js?v=2026-11-02a"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="sg-supabase.js"></script>
-<script src="smartgoal.js"></script>
-<script src="gr.js?v=2026-10-28b"></script>
+<script src="smartgoal.js?v=2026-11-03a"></script>
+<script src="gr.js?v=2026-11-02f"></script>
 <script src="forms.js"></script>
 <!-- ARCHIVED 2026-10-07: <script src="po.js"></script> - old PO Review page, no longer loaded. -->
 <script src="pos-supabase.js"></script>
-<script src="pos.js"></script>
-<script src="pos-review.js"></script>
+<script src="pos.js?v=2026-11-02f"></script>
+<script src="pos-review.js?v=2026-11-02f"></script>
 <script src="award.js?v=2026-11-02c"></script>
-<script src="award-manage.js?v=2026-11-02b"></script>
+<script src="award-manage.js?v=2026-11-02d"></script>
 <script src="award-dash.js?v=2026-10-31a"></script>
-<script src="award-event.js?v=2026-10-30f"></script>
-<script src="award-append.js?v=2026-10-27b"></script>
+<script src="award-event.js?v=2026-11-02a"></script>
+<script src="award-append.js?v=2026-11-02a"></script>
 <script src="award-admin.js?v=2026-10-26e"></script>
 <script src="team-performance-data.js?v=20261023e"></script>
 <script src="team-performance.js?v=20261023e"></script>

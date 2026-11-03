@@ -213,8 +213,11 @@ if (sidebarToggleBtn && appSidebar && appBody) {
     appSidebar.classList.remove("collapsed");          // old icon-rail mode is retired
     try { localStorage.removeItem("olf_sidebar_collapsed"); } catch (e) {}
 
-    let pinned = false;
-    try { pinned = localStorage.getItem("olf_sidebar_pinned") === "1"; } catch (e) {}
+    // The menu always rests as a slim rail and opens when pointed at, so there
+    // is nothing left to pin. An old saved "pinned" choice is forgotten.
+    const pinned = false;
+    try { localStorage.removeItem("olf_sidebar_pinned"); } catch (e) {}
+    appBody.classList.add("sb-auto");
     let openTimer = null, closeTimer = null;
 
     const isAuto = () => appBody.classList.contains("sb-auto");
@@ -235,7 +238,14 @@ if (sidebarToggleBtn && appSidebar && appBody) {
         clearTimeout(openTimer); clearTimeout(closeTimer);
         appBody.classList.toggle("sb-open", open);
         if (sidebarEdge) sidebarEdge.setAttribute("aria-expanded", open ? "true" : "false");
+        if (tbMenuBtn) {
+            tbMenuBtn.setAttribute("aria-expanded", open ? "true" : "false");
+            tbMenuBtn.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+        }
     };
+    // Phones: the menu button in the top bar.
+    const tbMenuBtn = document.getElementById("tbMenuBtn");
+    if (tbMenuBtn) tbMenuBtn.addEventListener("click", () => setOpen(!appBody.classList.contains("sb-open")));
     const autoHide = () => {
         if (pinned) return;
         if (!isAuto()) {
@@ -254,16 +264,13 @@ if (sidebarToggleBtn && appSidebar && appBody) {
     };
     paintPin();
 
-    sidebarToggleBtn.addEventListener("click", () => {
-        pinned = !pinned;
-        try { localStorage.setItem("olf_sidebar_pinned", pinned ? "1" : "0"); } catch (e) {}
-        paintPin();
-        if (pinned) appBody.classList.remove("sb-auto", "sb-open");   // dock it
-        else autoHide();
-    });
+    sidebarToggleBtn.addEventListener("click", () => setOpen(!appBody.classList.contains("sb-open")));
 
-    // Choosing a page tucks the menu away.
+    // On a phone, choosing a page tucks the drawer away. On a computer the menu
+    // stays put under the pointer and closes when the pointer leaves it, so it
+    // never snaps shut mid-click.
     appSidebar.addEventListener("click", (e) => {
+        if (window.innerWidth > 768) return;
         if (e.target.closest(".nav-item") && !e.target.closest('[aria-disabled="true"]')) autoHide();
     });
 
@@ -285,8 +292,15 @@ if (sidebarToggleBtn && appSidebar && appBody) {
             }
         });
     }
-    appSidebar.addEventListener("mouseenter", () => clearTimeout(closeTimer));
+    // Resting as a slim rail, the menu opens when you point at it.
+    appSidebar.addEventListener("mouseenter", () => {
+        clearTimeout(closeTimer);
+        if (!isAuto() || appBody.classList.contains("sb-open")) return;
+        clearTimeout(openTimer);
+        openTimer = setTimeout(() => { if (!dialogOpen()) setOpen(true); }, 140);
+    });
     appSidebar.addEventListener("mouseleave", () => {
+        clearTimeout(openTimer);
         if (!isAuto()) return;
         closeTimer = setTimeout(() => setOpen(false), 280);
     });
@@ -298,12 +312,62 @@ if (sidebarToggleBtn && appSidebar && appBody) {
     // Tap outside / Esc closes the floating menu.
     document.addEventListener("pointerdown", (e) => {
         if (isAuto() && appBody.classList.contains("sb-open") &&
-            !appSidebar.contains(e.target) && e.target !== sidebarEdge) setOpen(false);
+            !appSidebar.contains(e.target) && e.target !== sidebarEdge && !e.target.closest("#tbMenuBtn")) setOpen(false);
     });
     document.addEventListener("keydown", (e) => {
         if (e.key === "Escape" && isAuto() && appBody.classList.contains("sb-open")) setOpen(false);
     });
 }
+
+/* ====================================
+   TOP BAR THAT GETS OUT OF THE WAY
+   Scrolling down tucks it away so the page gets the height; scrolling up,
+   or moving the pointer to the very top edge, brings it back. It is always
+   shown at the top of a page and whenever a page is opened.
+==================================== */
+(function () {
+    const bar  = document.querySelector(".topbar");
+    const area = document.getElementById("pageContent");
+    if (!bar || !area) return;
+
+    // Where each scrolling box was when it last turned direction. The bar only
+    // moves after a real stretch of scrolling one way (STEP px), never on a
+    // nudge - and showing or hiding it changes the page's height, which moves
+    // the scroll position by itself, so scroll events during that slide are
+    // ignored. Without both, the page shook near the bottom (HO Plan most).
+    const STEP = 48, SETTLE_MS = 450;
+    const anchor = new WeakMap(), last = new WeakMap();
+    let hidden = false, settleUntil = 0;
+    const show = (on) => {
+        if (on === !hidden) return;
+        hidden = !on;
+        settleUntil = performance.now() + SETTLE_MS;
+        document.body.style.setProperty("--tb-h", bar.offsetHeight + "px");
+        document.body.classList.toggle("tb-hidden", hidden);
+    };
+    window.olfTopbarShow = () => show(true);
+
+    // scroll does not bubble, but it can be caught on the way down, so a page
+    // that scrolls inside itself (like HO Plan) is covered too
+    area.addEventListener("scroll", (e) => {
+        const el = e.target;
+        if (!el || el === document || !el.scrollHeight) return;
+        const y = el.scrollTop || 0;
+        const before = last.has(el) ? last.get(el) : y;
+        last.set(el, y);
+        if (performance.now() < settleUntil) { anchor.set(el, y); return; }
+        if (y < 24) { anchor.set(el, y); show(true); return; }
+        // a scroller with too little room to hide the bar for keeps it shown
+        if (el.scrollHeight - el.clientHeight < 160) return;
+        if ((y - before) * ((anchor.get(el) ?? y) - before) > 0) anchor.set(el, before);   // turned round
+        const from = anchor.has(el) ? anchor.get(el) : y;
+        if (y - from > STEP) { anchor.set(el, y); show(false); }
+        else if (from - y > STEP) { anchor.set(el, y); show(true); }
+    }, true);
+
+    document.addEventListener("mousemove", (e) => { if (hidden && e.clientY <= 8) show(true); });
+    document.addEventListener("focusin", (e) => { if (hidden && bar.contains(e.target)) show(true); });
+})();
 
 /* ====================================
    IN-APP NOTIFICATIONS
@@ -312,7 +376,13 @@ if (sidebarToggleBtn && appSidebar && appBody) {
    users never see a browser popup.
 ==================================== */
 
-const NOTIFY_ICONS = { success: "✅", error: "⛔", warning: "⚠️", info: "ℹ️" };
+// Drawn, not emoji: a filled disc or triangle with a white mark.
+const NOTIFY_ICONS = {
+    success: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#22C55E"/><path d="m7.5 12.5 3 3 6-6.500" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    error:   '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#EF4444"/><path d="m8.500 8.500 7 7M15.500 8.500l-7 7" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>',
+    warning: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 1.800 20.500h20.400z" fill="#F59E0B" stroke="#F59E0B" stroke-width="1.600" stroke-linejoin="round"/><path d="M12 9.500v5M12 17.500v.01" stroke="#fff" stroke-width="2.400" stroke-linecap="round"/></svg>',
+    info:    '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#4F8EF7"/><path d="M12 11v6M12 7.500v.01" stroke="#fff" stroke-width="2.400" stroke-linecap="round"/></svg>'
+};
 
 // Lightweight toast for quick, non-blocking feedback (auto-dismisses).
 function notify(message, type = "info", duration = 4500) {
@@ -343,7 +413,7 @@ function showAppAlert({ title = "Notice", message = "", type = "info", list = nu
         const modal = document.getElementById("appMsgModal");
         if (!modal) { console.log(`[${type}] ${title}: ${message}`); resolve(true); return; }
 
-        document.getElementById("appMsgIcon").textContent  = NOTIFY_ICONS[type] || NOTIFY_ICONS.info;
+        document.getElementById("appMsgIcon").innerHTML  = NOTIFY_ICONS[type] || NOTIFY_ICONS.info;
         document.getElementById("appMsgIcon").className    = `app-msg-icon app-msg-icon--${type}`;
         document.getElementById("appMsgTitle").textContent = title;
         document.getElementById("appMsgText").innerHTML    = escHtml(message).replace(/\n/g, "<br>");
@@ -377,7 +447,7 @@ function showAppConfirm({ title = "Please confirm", message = "", type = "warnin
         const modal = document.getElementById("appMsgModal");
         if (!modal) { resolve(window.confirm(message)); return; }
 
-        document.getElementById("appMsgIcon").textContent  = NOTIFY_ICONS[type] || NOTIFY_ICONS.warning;
+        document.getElementById("appMsgIcon").innerHTML  = NOTIFY_ICONS[type] || NOTIFY_ICONS.warning;
         document.getElementById("appMsgIcon").className    = `app-msg-icon app-msg-icon--${type}`;
         document.getElementById("appMsgTitle").textContent = title;
         document.getElementById("appMsgText").innerHTML    = escHtml(message).replace(/\n/g, "<br>");
@@ -448,6 +518,7 @@ onAuthStateChanged(auth, async (user) => {
         loadMyEmployeeRecord(email);   // fills the profile chip / ID card
         prefetchPages();               // warm page fragments while idle
         maybeShowNewsPopup();          // once-per-session announcement nudge
+        refreshNewsBell();             // live announcements count on the bell
 
         await navigate("home");
     } else {
@@ -978,13 +1049,37 @@ function openNewsDetail(items) {
             const endVal   = n.endDateTime   || n.endDate;
             return `<div class="nd-item">
                         ${newsBody(n, "nd-text")}
-                        <div class="nd-dates">\u{1F4C5} ${formatNewsDateTime(startVal, false)} \u2013 ${formatNewsDateTime(endVal, true)}</div>
+                        <div class="nd-dates">${hmIcon("calendar")} ${formatNewsDateTime(startVal, false)} \u2013 ${formatNewsDateTime(endVal, true)}</div>
                     </div>`;
         }).join("")
         : `<div class="nd-empty">No active announcements right now.</div>`;
 
     modal.classList.add("open");
 }
+
+/* The bell in the top bar: how many announcements are live right now, and
+   a click opens them. Refreshed at sign-in and whenever one is added or
+   deleted. */
+async function refreshNewsBell(items) {
+    const btn = document.getElementById("tbBellBtn");
+    if (!btn) return;
+    if (!items) {
+        try { items = await getActiveNews(); } catch (err) { return; }
+    }
+    const n = items.length;
+    const badge = btn.querySelector(".tb-bell-n");
+    if (badge) { badge.textContent = n > 9 ? "9+" : String(n); badge.hidden = n === 0; }
+    btn.classList.toggle("has-news", n > 0);
+    const label = n ? `${n} active announcement${n === 1 ? "" : "s"}` : "No active announcements";
+    btn.setAttribute("aria-label", label);
+    btn.title = label;
+}
+document.getElementById("tbBellBtn")?.addEventListener("click", async () => {
+    let items = [];
+    try { items = await getActiveNews(); } catch (err) { console.error("Announcements load failed:", err); }
+    refreshNewsBell(items);
+    openNewsDetail(items);
+});
 
 /* Shown once per session, on whatever page the person happens to be on. */
 const NEWS_POPUP_FLAG = "olf_news_popup_seen";
@@ -1122,7 +1217,7 @@ async function renderUpcomingEvents() {
             </div>
             <div class="upcoming-body">
                 <div class="upcoming-title" title="${escHtml(e.eventName || e.type || "Event")}">${escHtml(e.eventName || e.type || "Event")}</div>
-                <div class="upcoming-meta">\u{1F4CD} ${escHtml(e.district || "\u2014")} &nbsp;\u00B7&nbsp; \u{1F551} ${escHtml(time)}</div>
+                <div class="upcoming-meta"><span class="hm-mi">${hmIcon("pin")}${escHtml(e.district || "\u2014")}</span><span class="hm-mi">${hmIcon("clock")}${escHtml(time)}</span></div>
                 <span class="upcoming-chip upcoming-chip--${tone}">${escHtml(when)}</span>
             </div>
         </div>`;
@@ -1575,8 +1670,8 @@ function stopWatchingPageAccess() {
     applyPageAccessNav();
 }
 
-// Paint every menu item: users see switched-off pages greyed out with a
-// lock; IT Admin gets a toggle on each item instead.
+// Paint every menu item: pages IT Admin has switched off are simply not in
+// a user's menu; IT Admin still sees them (greyed) with a toggle on each item.
 function applyPageAccessNav() {
     const sidebar = document.getElementById("appSidebar");
     if (!sidebar) return;
@@ -1590,23 +1685,16 @@ function applyPageAccessNav() {
         const lockedForMe = !on && !admin;
 
         btn.classList.toggle("nav-item--locked", lockedForMe);
+        btn.classList.toggle("nav-item--locked-hidden", lockedForMe);   // a user never sees a closed page
         btn.classList.toggle("nav-item--locked-admin", !on && admin);
         btn.setAttribute("aria-disabled", lockedForMe ? "true" : "false");
         btn.title = on ? label
             : (admin ? `${label} - hidden from users (only IT Admin can open it)`
                      : `${label} - temporarily unavailable`);
 
-        // Lock badge: users only (IT Admin reads the toggle instead).
-        let lock = btn.querySelector(".nav-lock");
-        if (lockedForMe && !lock) {
-            lock = document.createElement("span");
-            lock.className = "nav-lock";
-            lock.setAttribute("aria-hidden", "true");
-            lock.textContent = "🔒";
-            btn.appendChild(lock);
-        } else if (!lockedForMe && lock) {
-            lock.remove();
-        }
+        // No lock badge any more: a closed page is not shown to users at all.
+        const oldLock = btn.querySelector(".nav-lock");
+        if (oldLock) oldLock.remove();
 
         // IT Admin toggle. It sits beside the menu button (never inside it,
         // a button can't hold another control), in a shared row.
@@ -1637,6 +1725,7 @@ function applyPageAccessNav() {
         tgl.title = on ? `${label} is visible to all users - click to hide it from users`
                        : `${label} is hidden from users - click to show it to everyone`;
     });
+    requestAnimationFrame(() => menuGlider.move());      // items may have come or gone
 }
 
 async function setPageEnabled(page, on) {
@@ -1645,7 +1734,7 @@ async function setPageEnabled(page, on) {
     if (!on) {
         const ok = await showAppConfirm({
             title: `Hide ${label} from users?`,
-            message: `Users will see ${label} greyed out in the menu and won't be able to open it. Anyone on it now is sent to Home. You can still open it.`,
+            message: `${label} will disappear from the menu for users and they won't be able to open it. Anyone on it now is sent to Home. You can still open it.`,
             type: "warning",
             confirmText: "Hide from users"
         });
@@ -1821,6 +1910,189 @@ async function setAwardTabLocked(key, locked) {
 // Retired page names still lead somewhere sensible (old links, bookmarks).
 const PAGE_ALIASES = { "expense-report": "er-dashboards", "data-dashboards": "er-dashboards" };
 
+/* The menu's selected card is one piece that glides to the page you open,
+   rather than jumping. It follows the menu as it opens and closes, and hides
+   if the open page isn't in the menu for this person. */
+const menuGlider = (() => {
+    const nav = document.querySelector("#appSidebar .sidebar-nav");
+    if (!nav) return { move() {} };
+    const glider = document.createElement("span");
+    glider.className = "nav-glider";
+    glider.setAttribute("aria-hidden", "true");
+    nav.prepend(glider);
+    nav.classList.add("has-glider");
+    let placed = false;
+    const move = () => {
+        const btn = nav.querySelector(".nav-item.active");
+        const shown = btn && btn.offsetParent && getComputedStyle(btn).display !== "none";
+        glider.classList.toggle("is-hidden", !shown);
+        if (!shown) return;
+        // offsets, not screen boxes: the app is zoomed and these stay in CSS px
+        let top = 0, left = 0;
+        for (let el = btn; el && el !== nav; el = el.offsetParent) { top += el.offsetTop; left += el.offsetLeft; }
+        if (!placed) glider.classList.add("no-anim");
+        glider.style.transform = `translate(${left}px, ${top}px)`;
+        glider.style.width  = btn.offsetWidth + "px";
+        glider.style.height = btn.offsetHeight + "px";
+        glider.style.setProperty("--pg", getComputedStyle(btn).getPropertyValue("--pg") || "#2F6FE4");
+        if (!placed) { void glider.offsetWidth; glider.classList.remove("no-anim"); placed = true; }
+    };
+    // the menu widens and narrows as it opens and closes; keep up with it
+    if (window.ResizeObserver) new ResizeObserver(() => move()).observe(nav);
+    // pages that appear or disappear later (Field Review System, IT Admin's switches) shift the rest
+    new MutationObserver((list) => {
+        if (list.some(m => m.target !== glider)) requestAnimationFrame(move);
+    }).observe(nav, { subtree: true, attributes: true, attributeFilter: ["hidden", "class"] });
+    window.addEventListener("resize", () => requestAnimationFrame(move));
+    document.getElementById("appSidebar")?.addEventListener("transitionend", move);
+    return { move };
+})();
+
+/* ====================================
+   GLIDING TAB SELECTION, everywhere
+   Every row of tabs gets one piece that glides to the chosen tab instead of
+   the selection jumping. The piece copies the chosen tab's own look (a
+   white pill, a frosted pill, a soft card) or, for rows that mark the
+   chosen tab with an underline, becomes a sliding underline. Rows found
+   anywhere in the page area, including ones a page draws later, are picked
+   up by themselves; nothing in the pages' own code changes.
+==================================== */
+const TAB_ROWS = [
+    "#awHero .aw-toptabs", "#awHero .aw-hero-nav .aw-subtabs",
+    "#sgHero .nav-tabs", "#sgHero .dash-subtabs",
+    "#posPage .pos-top-tabs--header", "#posPage .pos-subtabs", "#prNav",
+    "#pcal-app .pcal-navcard", "#grPage .gr-tabs", "#page-forms .frm-tabs"
+];
+const TAB_ACTIVE = ".is-active, .active, .is-on";
+const tabGliderLast = new Map();                    // where each row's piece last was, so a redrawn row still glides
+function tabRowKey(row) { return row.id || TAB_ROWS.find(s => row.matches(s)) || "row"; }
+
+function moveTabGlider(row) {
+    const glider = row.querySelector(":scope > .tab-glider");
+    if (!glider) return;
+    const btn = [...row.querySelectorAll(TAB_ACTIVE)].find(b => b !== glider && b.offsetParent && !b.hidden);
+    glider.classList.toggle("is-hidden", !btn);
+    if (!btn) return;
+    let x = 0, y = 0;                               // offsets, not screen boxes: the app is zoomed
+    for (let el = btn; el && el !== row; el = el.offsetParent) { x += el.offsetLeft; y += el.offsetTop; }
+    let w = btn.offsetWidth, h = btn.offsetHeight;
+
+    // copy the chosen tab's own look, read with the row's override switched off for a moment
+    row.classList.add("tg-measure");             // no fades while reading, or a half-faded colour gets copied
+    row.classList.remove("has-tab-glider");
+    const cs = getComputedStyle(btn), after = getComputedStyle(btn, "::after");
+    const filled = cs.backgroundColor !== "rgba(0, 0, 0, 0)" || cs.backgroundImage !== "none" || cs.boxShadow !== "none";
+    const line = !filled && after.content !== "none" && parseFloat(after.height) <= 6;
+    if (filled) {
+        glider.style.background = cs.backgroundImage !== "none" ? `${cs.backgroundImage}, ${cs.backgroundColor}` : cs.backgroundColor;
+        glider.style.boxShadow = cs.boxShadow;
+        glider.style.borderRadius = cs.borderRadius;
+    } else if (line) {
+        const l = parseFloat(after.left) || 0, r = parseFloat(after.right) || 0, b = parseFloat(after.bottom) || 0;
+        const lh = parseFloat(after.height) || 2;
+        x += l; w = Math.max(0, w - l - r); y += h - b - lh; h = lh;
+        glider.style.background = after.backgroundImage !== "none" ? after.backgroundImage : after.backgroundColor;
+        glider.style.boxShadow = "none";
+        glider.style.borderRadius = after.borderRadius;
+    }
+    row.classList.add("has-tab-glider");
+    row.classList.toggle("tg-line", line);
+    void row.offsetWidth;
+    row.classList.remove("tg-measure");
+    if (!filled && !line) { glider.classList.add("is-hidden"); return; }
+
+    const to = { x, y, w, h };
+    if (!glider.dataset.placed) {                   // a fresh row: start where this row's piece last was
+        const from = tabGliderLast.get(tabRowKey(row)) || to;
+        glider.classList.add("no-anim");
+        Object.assign(glider.style, { transform: `translate(${from.x}px, ${from.y}px)`, width: from.w + "px", height: from.h + "px" });
+        void glider.offsetWidth;
+        glider.classList.remove("no-anim");
+        glider.dataset.placed = "1";
+    }
+    Object.assign(glider.style, { transform: `translate(${x}px, ${y}px)`, width: w + "px", height: h + "px" });
+    tabGliderLast.set(tabRowKey(row), to);
+}
+
+function attachTabGlider(row) {
+    if (row.dataset.tabGlider) return;
+    row.dataset.tabGlider = "1";
+    if (getComputedStyle(row).position === "static") row.style.position = "relative";
+    const glider = document.createElement("span");
+    glider.className = "tab-glider";
+    glider.setAttribute("aria-hidden", "true");
+    row.prepend(glider);
+    const again = () => requestAnimationFrame(() => moveTabGlider(row));
+    new MutationObserver((list) => {
+        if (list.some(m => m.target !== glider && m.target !== row)) again();
+    }).observe(row, { subtree: true, attributes: true, attributeFilter: ["class", "hidden", "style"] });
+    if (window.ResizeObserver) new ResizeObserver(again).observe(row);
+    again();
+}
+
+function scanTabRows() {
+    TAB_ROWS.forEach(sel => document.querySelectorAll(sel).forEach(attachTabGlider));
+}
+(function () {
+    const area = document.getElementById("pageContent");
+    if (!area || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let queued = false;
+    new MutationObserver(() => {
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(() => { queued = false; scanTabRows(); });
+    }).observe(area, { childList: true, subtree: true });
+    // light/dark changes the chosen tab's look; follow it
+    new MutationObserver(() => document.querySelectorAll("[data-tab-glider]").forEach(r => moveTabGlider(r)))
+        .observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+})();
+
+/* "Where you are" in the top bar: the open page's own colourful picture and
+   name, taken from its menu item, sliding in when the page changes. */
+function updateTopbarCrumb(page) {
+    menuGlider.move();
+    const btn  = document.querySelector(`#appSidebar .nav-item[data-page="${page}"]`);
+    const ico  = document.getElementById("tbCrumbIco");
+    const name = document.getElementById("tbCrumbName");
+    const box  = document.getElementById("tbCrumbPage");
+    if (!btn || !ico || !name || !box) return;
+    ico.innerHTML = btn.querySelector(".icon")?.innerHTML || "";
+    name.textContent = (btn.querySelector(".label")?.textContent || btn.title || "").trim();
+    box.classList.remove("is-new");
+    void box.offsetWidth;                           // replay the slide-in
+    box.classList.add("is-new");
+}
+
+/* The thin bar along the top while a page opens. It only shows if loading
+   takes longer than a blink, so cached pages open without a flicker. */
+let routeBarTimer = null;
+function routeBar(on) {
+    let bar = document.getElementById("olfRouteBar");
+    if (!bar) {
+        bar = document.createElement("div");
+        bar.id = "olfRouteBar";
+        bar.className = "olf-route-bar";
+        bar.setAttribute("aria-hidden", "true");
+        document.body.appendChild(bar);
+    }
+    clearTimeout(routeBarTimer);
+    if (on) {
+        bar.classList.remove("is-done");
+        routeBarTimer = setTimeout(() => bar.classList.add("is-on"), 120);
+    } else if (bar.classList.contains("is-on")) {
+        bar.classList.add("is-done");
+        routeBarTimer = setTimeout(() => bar.classList.remove("is-on", "is-done"), 600);
+    }
+}
+let pageEnterTimer = null;
+function playPageEnter() {
+    clearTimeout(pageEnterTimer);
+    pageContent.classList.remove("pc-enter");
+    void pageContent.offsetWidth;                   // restart the motion for the new page
+    pageContent.classList.add("pc-enter");
+    pageEnterTimer = setTimeout(() => pageContent.classList.remove("pc-enter"), 1100);
+}
+
 window.navigate = async function (page) {
     page = PAGE_ALIASES[page] || page;
     // Any page except Home can be switched off for everyone but IT Admin
@@ -1833,6 +2105,7 @@ window.navigate = async function (page) {
         }
     }
     currentPage = page;
+    if (window.olfTopbarShow) window.olfTopbarShow();
 
     // Google Analytics: one page_view per Staff Connect page opened
     trackEvent("page_view", {
@@ -1851,8 +2124,13 @@ window.navigate = async function (page) {
     document.querySelectorAll("#appSidebar .nav-item").forEach(el => {
         el.classList.toggle("active", el.dataset.page === page);
     });
+    updateTopbarCrumb(page);
 
+    routeBar(true);
     pageContent.innerHTML = await getPageHtml(page);
+    pageContent.scrollTop = 0;
+    playPageEnter();
+    routeBar(false);
 
     if (page === "home") {
         initHomePage();
@@ -1995,12 +2273,236 @@ async function deriveSchema() {
    HOME PAGE
 ==================================== */
 
+/* Home: greeting, live clock and count-up numbers. */
+const HM_ICON_PATHS = {
+    pin:       '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/>',
+    clock:     '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    calendar:  '<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M8.5 3v4M15.5 3v4"/>',
+    megaphone: '<path d="M4 10v4a1 1 0 0 0 1 1h2l5 4V5L7 9H5a1 1 0 0 0-1 1z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/>',
+    trash:     '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+    alert:     '<path d="M12 4 2.500 20h19z"/><path d="M12 10v4.500M12 17.500v.01"/>',
+    inbox:     '<path d="M4 13l2.5-7.5A2 2 0 0 1 8.4 4h7.2a2 2 0 0 1 1.9 1.5L20 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M4 13h4.5A1.5 1.5 0 0 1 10 14.5a2 2 0 0 0 4 0 1.5 1.5 0 0 1 1.5-1.5H20"/>'
+};
+function hmIcon(name) {
+    return '<svg class="hm-i" viewBox="0 0 24 24" aria-hidden="true">' + HM_ICON_PATHS[name] + "</svg>";
+}
+
+/* The Home banner follows the day: morning, afternoon, evening and night
+   each have their own colours and their own picture in the sky. */
+function homeTimeOfDay(date) {
+    const h = date.getHours();
+    return h >= 5 && h < 12 ? "morning" : h < 17 && h >= 12 ? "afternoon" : h >= 17 && h < 20 ? "evening" : "night";
+}
+
+/* A different, light-hearted greeting each time Home opens, to raise a smile.
+   The greetings live in greetings.txt, in [morning] / [afternoon] / [evening]
+   / [night] sections plus [monday] [friday] [saturday] [sunday] specials;
+   {name} is the person's first name. Picked from the time of day, with the
+   odd day special; tapping the waving hand picks another. If the file can't
+   be read, the plain greetings below are used. */
+let homeGreetings = {
+    morning: ["Good morning, {name}"], afternoon: ["Good afternoon, {name}"],
+    evening: ["Good evening, {name}"], night: ["Hello, {name}"]
+};
+let homeGreetingsLoaded = false;
+async function loadHomeGreetings() {
+    if (homeGreetingsLoaded) return;
+    try {
+        const res = await fetch("greetings.txt", { cache: "no-cache" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const sets = {};
+        let section = null;
+        (await res.text()).split(/\r?\n/).forEach(raw => {
+            const line = raw.trim();
+            if (!line || line.startsWith("#")) return;
+            const head = line.match(/^\[([a-z]+)\]$/i);
+            if (head) { section = head[1].toLowerCase(); sets[section] = sets[section] || []; return; }
+            if (section) sets[section].push(line);
+        });
+        ["morning", "afternoon", "evening", "night"].forEach(k => { if (sets[k] && sets[k].length) homeGreetings[k] = sets[k]; });
+        ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"].forEach(k => {
+            if (sets[k] && sets[k].length) homeGreetings[k] = sets[k];
+        });
+        homeGreetingsLoaded = true;
+    } catch (err) {
+        console.warn("Greetings not loaded, using the plain ones:", err);
+    }
+}
+const HOME_WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+let homeFirstName = "there";
+let homeGreetingNow = "";
+const homeGreetRecent = [];                         // the last few shown, so none comes round again too soon
+function pickHomeGreeting(now) {
+    let pool = homeGreetings[homeTimeOfDay(now)];
+    const special = homeGreetings[HOME_WEEKDAYS[now.getDay()]];
+    if (special && special.length && Math.random() < 0.25) pool = special;
+    let choices = pool.filter(g => !homeGreetRecent.includes(g));
+    if (!choices.length) choices = pool.filter(g => g !== homeGreetingNow);
+    if (!choices.length) choices = pool;
+    const pick = choices[Math.floor(Math.random() * choices.length)];
+    homeGreetRecent.push(pick);
+    if (homeGreetRecent.length > 8) homeGreetRecent.shift();
+    return pick;
+}
+/* A greeting arrives letter by letter: each word is kept whole (so lines
+   break between words) and each letter rises in a beat after the one before.
+   The name sits in its own golden span. Screen readers get the plain text. */
+function greetingLettersHtml(text) {
+    let i = 0;
+    const letters = (s) => [...s].map(ch => `<span class="hm-ch" style="--d:${(i++) * 26}ms">${escHtml(ch)}</span>`).join("");
+    const words = (s) => s.split(" ").map(w => w ? `<span class="hm-w">${letters(w)}</span>` : "").join(" ");
+    const [before, after = ""] = text.split("{name}");
+    const name = text.includes("{name}") ? `<span class="hm-name" id="homeUserName">${words(homeFirstName)}</span>` : "";
+    return words(before) + name + words(after);
+}
+let homeGreetSwapTimer = null;
+function renderHomeGreeting(now) {
+    const el = document.getElementById("homeGreetText");
+    if (!el) return;
+    homeGreetingNow = pickHomeGreeting(now || new Date());
+    // "Greeting text | 🎉": the emoji (if any) takes the waving hand's place
+    const [text, emoji] = homeGreetingNow.split("|").map(s => s.trim());
+    const plain = text.replace("{name}", homeFirstName);
+    const show = () => {
+        el.setAttribute("aria-label", plain);
+        el.innerHTML = `<span class="hm-greet-letters" aria-hidden="true">${greetingLettersHtml(text)}</span>`;
+        el.classList.remove("hm-greet-out");
+        const ico = document.querySelector("#homeHand .hm-hand-ico");
+        if (ico) {
+            ico.textContent = emoji || "👋";
+            ico.classList.remove("is-new");
+            void ico.offsetWidth;                   // replay the pop
+            ico.classList.add("is-new");
+        }
+    };
+    clearTimeout(homeGreetSwapTimer);
+    // the greeting on screen floats away first, then the new one cascades in
+    if (el.querySelector(".hm-ch") && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        el.classList.add("hm-greet-out");
+        homeGreetSwapTimer = setTimeout(show, 420);
+    } else {
+        show();
+    }
+}
+
+/* While Home is open the greeting changes by itself every few seconds. It
+   holds still while the pointer is on it, while the tab isn't on screen, and
+   for anyone who has asked their computer for less motion. */
+const HOME_GREET_EVERY_MS = 5000;
+let homeGreetRotateTimer = null;
+function startGreetingRotation() {
+    clearInterval(homeGreetRotateTimer);
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    homeGreetRotateTimer = setInterval(() => {
+        const el = document.getElementById("homeGreetText");
+        if (!el) { clearInterval(homeGreetRotateTimer); homeGreetRotateTimer = null; return; }
+        if (document.hidden || el.closest(".hm-title")?.matches(":hover")) return;
+        renderHomeGreeting();
+    }, HOME_GREET_EVERY_MS);
+}
+
+/* The waving hand: a big wave, a little burst of confetti, a new greeting. */
+function wireHomeHand() {
+    const hand = document.getElementById("homeHand");
+    if (!hand || hand.dataset.wired) return;
+    hand.dataset.wired = "1";
+    hand.addEventListener("click", () => {
+        renderHomeGreeting();
+        hand.classList.remove("is-waving");
+        void hand.offsetWidth;
+        hand.classList.add("is-waving");
+        setTimeout(() => hand.classList.remove("is-waving"), 950);   // so the next emoji can pop in
+        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        const colours = ["#FDE68A", "#F9A8D4", "#6EE7B7", "#93C5FD", "#FDBA74", "#C4B5FD"];
+        for (let i = 0; i < 16; i++) {
+            const bit = document.createElement("span");
+            bit.className = "hm-confetti";
+            const angle = (Math.PI * 2 * i) / 16 + Math.random() * 0.4;
+            const dist = 38 + Math.random() * 34;
+            bit.style.setProperty("--dx", Math.cos(angle) * dist + "px");
+            bit.style.setProperty("--dy", Math.sin(angle) * dist - 10 + "px");
+            bit.style.setProperty("--rot", Math.round(Math.random() * 360) + "deg");
+            bit.style.background = colours[i % colours.length];
+            hand.appendChild(bit);
+            setTimeout(() => bit.remove(), 900);
+        }
+    });
+}
+
+/* Line of the day, read from lines-of-the-day.txt (one line per line, # for
+   notes). Everyone sees the same line on a given day; it moves on at
+   midnight. If the file can't be read the line simply stays hidden. */
+let homeLines = null;
+async function showLineOfDay() {
+    const box = document.getElementById("homeLine");
+    const text = document.getElementById("homeLineText");
+    if (!box || !text) return;
+    try {
+        if (!homeLines) {
+            const res = await fetch("lines-of-the-day.txt", { cache: "no-cache" });
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            homeLines = (await res.text()).split(/\r?\n/)
+                .map(l => l.trim())
+                .filter(l => l && !l.startsWith("#"));
+        }
+        if (!homeLines.length) return;
+        const now = new Date();
+        const dayNo = Math.floor(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) / 86400000);
+        text.textContent = homeLines[dayNo % homeLines.length];
+        box.hidden = false;
+    } catch (err) {
+        console.warn("Line of the day not loaded:", err);
+    }
+}
+
+let homeClockTimer = null;
+function startHomeClock() {
+    if (homeClockTimer) clearInterval(homeClockTimer);
+    let lastDay = null;
+    const tick = () => {
+        const clock = document.getElementById("homeClock");
+        if (!clock) { clearInterval(homeClockTimer); homeClockTimer = null; return; }
+        const now = new Date();
+        const hero = clock.closest(".hm-hero");
+        const tod = homeTimeOfDay(now);
+        if (hero && hero.dataset.tod !== tod) {
+            hero.dataset.tod = tod;
+            renderHomeGreeting(now);                    // on opening, and when the day moves on
+        }
+        if (lastDay !== null && lastDay !== now.getDate()) showLineOfDay();   // a new day, a new line
+        lastDay = now.getDate();
+        clock.textContent = now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
+        const day = document.getElementById("homeClockDay");
+        if (day) day.textContent = now.toLocaleDateString("en-IN", { weekday: "long" });
+        const date = document.getElementById("homeDate");
+        if (date) date.textContent = now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    };
+    tick();
+    homeClockTimer = setInterval(tick, 1000);
+}
+
+// Counts up to the figure instead of just appearing.
+function animateCount(el, target) {
+    if (!el) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || target < 2) { el.textContent = target; return; }
+    const start = performance.now(), dur = 900;
+    const step = (t) => {
+        const p = Math.min(1, (t - start) / dur);
+        el.textContent = Math.round(target * (1 - Math.pow(1 - p, 3)));
+        if (p < 1 && document.body.contains(el)) requestAnimationFrame(step); else el.textContent = target;
+    };
+    requestAnimationFrame(step);
+}
+
 async function initHomePage() {
     const user  = auth.currentUser;
-    const nameEl = document.getElementById("homeUserName");
-    if (nameEl && user) {
-        nameEl.textContent = user.displayName?.split(" ")[0] || "there";
-    }
+    homeFirstName = (user && user.displayName?.split(" ")[0]) || "there";
+    // the greetings file is small; wait for it (briefly) so the first greeting is a fun one
+    await Promise.race([loadHomeGreetings(), new Promise(r => setTimeout(r, 1500))]);
+    startHomeClock();                               // also picks the greeting
+    wireHomeHand();
+    startGreetingRotation();
+    showLineOfDay();
 
     // Admin-only: show inline "Add News" button in the news section header
     const addNewsBtn = document.getElementById("addNewsBtn");
@@ -2030,13 +2532,13 @@ async function initHomePage() {
         const data = [];
         snapshot.forEach(d => data.push(d.data()));
 
-        document.getElementById("statTotal").textContent = data.length;
+        animateCount(document.getElementById("statTotal"), data.length);
 
         const depts = [...new Set(data.map(e => e.Dept).filter(Boolean))];
-        document.getElementById("statDepts").textContent = depts.length;
+        animateCount(document.getElementById("statDepts"), depts.length);
 
         const locs = [...new Set(data.map(e => e.Location).filter(Boolean))];
-        document.getElementById("statLocations").textContent = locs.length;
+        animateCount(document.getElementById("statLocations"), locs.length);
 
         const deptCount = {};
         data.forEach(e => { if (e.Dept) deptCount[e.Dept] = (deptCount[e.Dept] || 0) + 1; });
@@ -2095,6 +2597,18 @@ async function initEmployeesPage() {
             if (card) openOrgPerson(card.dataset.emp);
         });
     }
+
+    ["orgBody", "orgBranchBody"].forEach(bodyId => {
+        const host = document.getElementById(bodyId);
+        if (!host) return;
+        host.addEventListener("keydown", (e) => {
+            if (e.key !== "Enter" && e.key !== " ") return;
+            const card = e.target.closest && e.target.closest(".org-node[data-emp]");
+            if (!card || e.target !== card) return;
+            e.preventDefault();
+            openOrgPerson(card.dataset.emp);
+        });
+    });
 
     const zoomIn    = document.getElementById("orgZoomIn");
     const zoomOut   = document.getElementById("orgZoomOut");
@@ -2162,7 +2676,7 @@ async function loadEmployees() {
     employees = [];
 
     const tableEl = document.getElementById("employeeTable");
-    if (tableEl) tableEl.innerHTML = `<tr><td colspan="99" class="empty-state"><div class="empty-icon">⏳</div>Loading…</td></tr>`;
+    if (tableEl) tableEl.innerHTML = `<tr><td colspan="99" class="empty-state"><span class="emp-spin" aria-hidden="true"></span>Loading…</td></tr>`;
 
     try {
         await deriveSchema();
@@ -2354,6 +2868,7 @@ function syncEmpFilterBar() {
         }).join("") + (keys.length > 1
             ? `<button type="button" class="emp-filter-clear" data-clear-filters>Clear all</button>` : "");
     }
+    requestAnimationFrame(() => requestAnimationFrame(fitEmpTable));
 }
 
 function empSortValue(emp, key) {
@@ -2409,6 +2924,22 @@ function onEmpFiltersToggle() {
     syncEmpFilterBar();
 }
 
+/* Pictures drawn in the Employees page */
+const EMP_ICON_PATHS = {
+    search: '<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>',
+    edit:   '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
+    trash:  '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>'
+};
+function empIcon(name) {
+    return '<svg class="emp-i" viewBox="0 0 24 24" aria-hidden="true">' + EMP_ICON_PATHS[name] + "</svg>";
+}
+// A steady colour for each person's initials, taken from their name.
+function empAvatarTone(name) {
+    let n = 0;
+    for (const c of String(name)) n = (n + c.charCodeAt(0)) % 6;
+    return n;
+}
+
 function sortableTh(key, label, cls) {
     const on = empSort.key === key;
     const mark = on ? (empSort.dir === 1 ? "▲" : "▼") : "⇅";
@@ -2416,6 +2947,20 @@ function sortableTh(key, label, cls) {
         aria-sort="${on ? (empSort.dir === 1 ? "ascending" : "descending") : "none"}"
         title="Sort by ${label}">${label}<span class="sort-mark">${mark}</span></th>`;
 }
+
+/* The table takes whatever height the window has left below the banner, the
+   figures and the toolbar, so as many people as fit are on screen without
+   scrolling the page. It is worked out again when the window, the filters or
+   the rows change. */
+function fitEmpTable() {
+    const wrap = document.querySelector(".employees-page .table-wrap");
+    const area = document.getElementById("pageContent");
+    if (!wrap || !area || !wrap.offsetParent) return;
+    const top  = wrap.getBoundingClientRect().top - area.getBoundingClientRect().top + area.scrollTop;
+    const room = area.clientHeight - top - 46;              // the card's own padding and the page's bottom gap
+    wrap.style.maxHeight = Math.max(300, Math.floor(room)) + "px";
+}
+window.addEventListener("resize", () => requestAnimationFrame(fitEmpTable));
 
 function renderEmployees() {
     const searchBox = document.getElementById("searchBox");
@@ -2436,6 +2981,18 @@ function renderEmployees() {
             : `${filtered.length} record${filtered.length !== 1 ? "s" : ""}`;
     }
 
+    // The figures at the top describe the whole directory, whatever the search shows.
+    const empFigures = {
+        empStatTotal:    employees.length,
+        empStatActive:   employees.filter(isActiveEmployee).length,
+        empStatInactive: employees.filter(e => !isActiveEmployee(e)).length,
+        empStatDepts:    new Set(employees.map(e => e.Dept).filter(Boolean)).size
+    };
+    Object.keys(empFigures).forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.dataset.v !== String(empFigures[id])) { el.dataset.v = String(empFigures[id]); animateCount(el, empFigures[id]); }
+    });
+
     const tableCols = getTableColumns();
     const colCount  = tableCols.length + 1 + (currentRole === "Admin" ? 1 : 0);
 
@@ -2450,12 +3007,14 @@ function renderEmployees() {
         </tr>
     `;
 
+    requestAnimationFrame(fitEmpTable);
     if (filtered.length === 0) {
         tableEl.innerHTML = `
             <tr><td colspan="${colCount}">
                 <div class="empty-state">
-                    <div class="empty-icon">🔍</div>
-                    No employees match your search or filters.
+                    <div class="empty-icon">${empIcon("search")}</div>
+                    <span class="emp-empty-title">No employees found</span>
+                    Nothing matches your search or filters.
                 </div>
             </td></tr>
         `;
@@ -2466,10 +3025,10 @@ function renderEmployees() {
         <tr class="${isActiveEmployee(emp) ? "" : "row-inactive"}">
             ${currentRole === "Admin" ? `
             <td class="col-actions">
-                <button class="btn-edit"   data-action="edit"   data-id="${escHtml(emp.id)}" title="Edit" aria-label="Edit">✏️</button>
-                <button class="btn-delete" data-action="delete" data-id="${escHtml(emp.id)}" title="Delete" aria-label="Delete">🗑️</button>
+                <button class="btn-edit"   data-action="edit"   data-id="${escHtml(emp.id)}" title="Edit" aria-label="Edit">${empIcon("edit")}</button>
+                <button class="btn-delete" data-action="delete" data-id="${escHtml(emp.id)}" title="Delete" aria-label="Delete">${empIcon("trash")}</button>
             </td>` : ""}
-            <td class="col-id"><code style="font-size:12px;color:#6b7280;">${escHtml(emp.id)}</code></td>
+            <td class="col-id"><span class="emp-id">${escHtml(emp.id)}</span></td>
             ${tableCols.map(key => {
                 const val = emp[key] || "";
                 const cls = colClass(key);
@@ -2480,7 +3039,8 @@ function renderEmployees() {
                 }
                 if (MULTI_VALUE_FIELDS[key]) return `<td class="${cls}">${multiCellHtml(val, emp.id, key)}</td>`;
                 if (key === "Dept") return `<td class="${cls}"><span class="badge-dept">${escHtml(val) || "—"}</span></td>`;
-                if (key === "Email" && val) return `<td class="${cls}"><a href="mailto:${escHtml(val)}" style="color:#4f8ef7;text-decoration:none;">${escHtml(val)}</a></td>`;
+                if (key === "Email" && val) return `<td class="${cls}"><a class="emp-mail" href="mailto:${escHtml(val)}">${escHtml(val)}</a></td>`;
+                if (key === "Name" && val) return `<td class="${cls}"><div class="emp-person"><span class="emp-av av${empAvatarTone(val)}" aria-hidden="true">${escHtml(initialsFrom(val))}</span><span class="emp-name">${escHtml(val)}</span></div></td>`;
                 return `<td class="${cls}">${escHtml(val) || "—"}</td>`;
             }).join("")}
         </tr>
@@ -2547,6 +3107,23 @@ function countDescendants(id, childrenOf, seen = new Set()) {
         .reduce((n, kid) => n + 1 + countDescendants(kid, childrenOf, seen), 0);
 }
 
+// Each department keeps one colour wherever it turns up in the chart.
+const ORG_TONES = ["#3B82F6", "#8B5CF6", "#14B8A6", "#F59E0B", "#EC4899", "#F97316"];
+function orgToneOf(emp) {
+    return ORG_TONES[empAvatarTone(String(emp["Dept"] || emp["Name"] || ""))];
+}
+// The picture and the words of one card, shared by the tree and the stacked team view.
+function orgCardInner(emp, id) {
+    const role     = emp["Designation"] || emp["Name"] || id;
+    const showName = emp["Designation"] ? emp["Name"] : "";
+    return `<span class="org-av av${empAvatarTone(emp["Name"] || id)}" aria-hidden="true">${escHtml(initialsFrom(emp["Name"] || id))}</span>
+        <div class="org-txt">
+            <div class="org-role">${escHtml(role)}</div>
+            ${showName ? `<div class="org-name">${escHtml(showName)}</div>` : ""}
+            ${emp["Dept"] ? `<div class="org-dept">${escHtml(emp["Dept"])}</div>` : ""}
+        </div>`;
+}
+
 function orgNodeHtml(id, tree, depth, seen) {
     const { byId, childrenOf } = tree;
     const emp = byId.get(id);
@@ -2563,14 +3140,10 @@ function orgNodeHtml(id, tree, depth, seen) {
 
     const kids      = childrenOf.get(id) || [];
     const collapsed = orgCollapsed.has(id);
-    const role      = emp["Designation"] || emp["Name"] || id;
-    const showName  = emp["Designation"] ? emp["Name"] : "";
 
-    let html = `<li><div class="org-node${depth === 0 ? " is-root" : ""}"
-        data-emp="${escHtml(id)}" title="${escHtml(emp.id)} — click for details">
-        <div class="org-role">${escHtml(role)}</div>
-        ${showName ? `<div class="org-name">${escHtml(showName)}</div>` : ""}
-        ${emp["Dept"] ? `<div class="org-dept">${escHtml(emp["Dept"])}</div>` : ""}
+    let html = `<li><div class="org-node${depth === 0 ? " is-root" : ""}" tabindex="0" role="button"
+        data-emp="${escHtml(id)}" style="--dc:${orgToneOf(emp)}" title="${escHtml(emp.id)} — click for details">
+        ${orgCardInner(emp, id)}
     </div>`;
 
     if (kids.length) {
@@ -2828,15 +3401,11 @@ function orgBranchHtml(id, tree) {
     const card = (eid, isHead) => {
         const e = byId.get(eid);
         if (!e) return "";
-        const role     = e["Designation"] || e["Name"] || eid;
-        const showName = e["Designation"] ? e["Name"] : "";
         const below    = countDescendants(eid, childrenOf);
         const mine     = (childrenOf.get(eid) || []).length;
-        return `<div class="org-node${isHead ? " is-root" : ""}"
-                data-emp="${escHtml(eid)}" title="${escHtml(eid)} \u2014 click for details">
-                <div class="org-role">${escHtml(role)}</div>
-                ${showName ? `<div class="org-name">${escHtml(showName)}</div>` : ""}
-                ${e["Dept"] ? `<div class="org-dept">${escHtml(e["Dept"])}</div>` : ""}
+        return `<div class="org-node${isHead ? " is-root" : ""}" tabindex="0" role="button"
+                data-emp="${escHtml(eid)}" style="--dc:${orgToneOf(e)}" title="${escHtml(eid)} \u2014 click for details">
+                ${orgCardInner(e, eid)}
             </div>
             ${!isHead && mine ? `<button class="org-toggle" data-org-toggle="${escHtml(eid)}"
                     title="Open this team">+${below}</button>` : ""}`;
@@ -3877,15 +4446,15 @@ async function renderNewsBanners() {
             const endVal   = n.endDateTime   || n.endDate;
             return `
             <div class="news-banner">
-                <div class="news-banner-icon">📢</div>
+                <div class="news-banner-icon">${hmIcon("megaphone")}</div>
                 <div class="news-banner-body">
                     <div class="news-banner-label">Announcement</div>
                     ${newsBody(n, "news-banner-text")}
-                    <div class="news-banner-dates">📅 ${formatNewsDateTime(startVal, false)} – ${formatNewsDateTime(endVal, true)}</div>
+                    <div class="news-banner-dates">${hmIcon("calendar")} ${formatNewsDateTime(startVal, false)} – ${formatNewsDateTime(endVal, true)}</div>
                 </div>
                 ${currentRole === "Admin" ? `
                 <div class="news-banner-actions">
-                    <button class="btn-delete-news" data-newsid="${n.id}">🗑 Delete</button>
+                    <button class="btn-delete-news" data-newsid="${n.id}">${hmIcon("trash")} Delete</button>
                 </div>` : ""}
             </div>
         `;
@@ -3937,9 +4506,9 @@ async function renderNewsCards() {
     if (!grid) return;
 
     grid.innerHTML = `
-        <div class="news-empty-state">
-            <div class="news-empty-icon">⏳</div>
-            Loading announcements…
+        <div class="news-empty-state hm-empty">
+            <span class="hm-spin" aria-hidden="true"></span>
+            <span class="hm-empty-sub">Loading announcements…</span>
         </div>`;
 
     try {
@@ -3960,6 +4529,7 @@ async function renderNewsCards() {
 
         // Sort: soonest-expiring first
         active.sort((a, b) => getNewsRange(a).end - getNewsRange(b).end);
+        refreshNewsBell(active);
         expired.sort((a, b) => getNewsRange(b).end - getNewsRange(a).end);
 
         const allVisible = currentRole === "Admin"
@@ -3968,9 +4538,10 @@ async function renderNewsCards() {
 
         if (allVisible.length === 0) {
             grid.innerHTML = `
-                <div class="news-empty-state">
-                    <div class="news-empty-icon">📭</div>
-                    No announcements right now. Check back later.
+                <div class="news-empty-state hm-empty">
+                    <span class="hm-empty-ico">${hmIcon("inbox")}</span>
+                    <strong class="hm-empty-title">No announcements right now</strong>
+                    <span class="hm-empty-sub">Check back later.</span>
                 </div>`;
             return;
         }
@@ -3985,17 +4556,17 @@ async function renderNewsCards() {
             <div class="news-card${isExpired ? " news-card--expired" : ""}">
                 <div class="news-card-top">
                     <span class="news-card-badge">
-                        📢 ${isExpired ? "Expired" : "Announcement"}
+                        ${hmIcon("megaphone")}${isExpired ? "Expired" : "Announcement"}
                     </span>
                     ${currentRole === "Admin" ? `
-                    <button class="btn-delete-news" data-newsid="${n.id}">🗑 Delete</button>
+                    <button class="btn-delete-news" data-newsid="${n.id}" title="Delete this announcement">${hmIcon("trash")}Delete</button>
                     ` : ""}
                 </div>
                 ${newsBody(n, "news-card-text")}
                 <button class="news-card-more" type="button" data-newsid="${n.id}" hidden>Read more →</button>
                 <div class="news-card-footer">
                     <div class="news-card-dates">
-                        📅 ${formatNewsDateTime(startVal, false)} – ${formatNewsDateTime(endVal, true)}
+                        ${hmIcon("calendar")}${formatNewsDateTime(startVal, false)} – ${formatNewsDateTime(endVal, true)}
                     </div>
                 </div>
             </div>`;
@@ -4055,7 +4626,7 @@ async function renderNewsCards() {
         console.error("News cards load failed:", err);
         grid.innerHTML = `
             <div class="news-empty-state">
-                <div class="news-empty-icon">⚠️</div>
+                <div class="news-empty-icon">${hmIcon("alert")}</div>
                 Failed to load announcements.
             </div>`;
     }

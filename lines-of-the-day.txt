@@ -1,0 +1,70 @@
+# Line of the day, shown under the greeting on Home.
+#
+# One line per line. Home shows one each day, the same for everyone, and moves
+# to the next at midnight; after the last line it starts again from the top.
+# Lines starting with # (like these) and empty lines are skipped.
+# Keep each line short - one sentence reads best on the banner.
+
+Every child who learns to read opens a door that never closes again.
+Small steps, taken every day, become the biggest journeys.
+A good question in class is worth more than a perfect answer.
+The work we do today shows up in a classroom tomorrow.
+Teaching is the one job that makes every other job possible.
+Curiosity is the best homework a child can carry home.
+Progress, not perfection: one better lesson at a time.
+Behind every number on our dashboards is a child's story.
+When a teacher grows, a whole classroom grows with them.
+Clear plans make busy weeks lighter.
+Listen first; the best ideas often come from the field.
+A child's confidence is built one "well done" at a time.
+Great teams share credit and carry each other's load.
+Data tells us where to look; people tell us what to do.
+Every school visit is a chance to learn something new.
+Patience is a teaching skill too.
+Today's effort is tomorrow's foundation.
+The best lesson plans leave room for wonder.
+Kindness costs nothing and changes everything in a classroom.
+Reading for ten minutes a day adds up to a world of words.
+Help one person today; it is how communities grow.
+Good records today save hours of searching tomorrow.
+Celebrate the small wins: they keep the big goals alive.
+A question asked is half a problem solved.
+Every child can learn; our job is to find the way.
+Be the colleague you would like to work with.
+Consistency beats intensity, in learning and in work.
+Children remember how a lesson made them feel.
+Clear communication is a gift to the whole team.
+A strong start to the week begins with a clear plan.
+Mistakes are proof that someone is trying.
+Learning is not a race; it is a habit.
+The future of a village can start at its school gate.
+Encourage often; correct gently.
+Share what works - a good idea grows when it travels.
+Every form filled carefully helps a decision made wisely.
+Teachers plant seeds that bloom long after the bell rings.
+Focus on what you can improve today.
+A smile in the morning sets the tone for the whole class.
+Good work is quiet; its results speak loudly.
+Learning happens when children feel safe to try.
+Take a moment to thank someone who made your work easier.
+The best teams turn problems into plans.
+Every visit, every review, every report moves us forward.
+Simple tools, used well, beat complex tools left unused.
+Be curious about the reasons behind the numbers.
+One inspired teacher can reach a thousand futures.
+Rest is part of the work; come back stronger.
+A child who asks "why" is a child who is learning.
+Write it down: good notes make good follow-ups.
+Encouragement is the fuel of every learner.
+Ask, listen, act: the field always knows something we don't.
+Today is a good day to finish what was started.
+Education is the most powerful gift a community can give itself.
+Respect every voice in the room, especially the quietest.
+Plan the week, but stay open to the day.
+Each improvement, however small, is worth noticing.
+Help a new colleague today; you were new once too.
+A well-run school day starts long before the first bell.
+The goal is not more work, but better work.
+Children rise to the expectations we set for them.
+Clear goals turn hard days into steady progress.
+Thank you for the work you do - it matters.

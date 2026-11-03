@@ -1,48 +1,72 @@
 <!-- pages/home.html -->
-<div class="home-page">
+<div class="home-page hm">
 
     <!-- News banners placeholder (hidden — kept for app.js compat) -->
     <div id="newsBannerSection" style="display:none;"></div>
 
-    <div class="page-header">
-        <div>
-            <h1 class="page-title">Welcome back, <span id="homeUserName">—</span></h1>
-            <p class="page-subtitle">One Stop Solution for OLF's Data Management</p>
+    <!-- ── Hero: greeting, date and time ── -->
+    <section class="pg-hero hm-hero" aria-label="Welcome">
+        <span class="pg-blob pg-blob--a" aria-hidden="true"></span>
+        <span class="pg-blob pg-blob--b" aria-hidden="true"></span>
+        <span class="pg-blob pg-blob--c" aria-hidden="true"></span>
+        <!-- The sky follows the time of day (app.js sets data-tod on the banner) -->
+        <span class="hm-sky" aria-hidden="true">
+            <svg class="hm-sun" viewBox="0 0 120 120"><g class="hm-sun-rays" stroke="#FDE68A" stroke-width="5" stroke-linecap="round"><path d="M60 6v14M60 100v14M6 60h14M100 60h14M21.8 21.8l9.9 9.9M88.3 88.3l9.9 9.9M21.8 98.2l9.9-9.9M88.3 31.7l9.9-9.9"/></g><circle cx="60" cy="60" r="26" fill="#FCD34D"/><circle cx="60" cy="60" r="26" fill="url(#hmSunGlow)"/><defs><radialGradient id="hmSunGlow" cx=".38" cy=".35" r=".7"><stop offset="0" stop-color="#FFF7D6"/><stop offset="1" stop-color="#F59E0B" stop-opacity=".9"/></radialGradient></defs></svg>
+            <svg class="hm-moon" viewBox="0 0 120 120"><path d="M78 20a42 42 0 1 0 24 70A36 36 0 1 1 78 20z" fill="#FEF3C7"/><circle cx="58" cy="58" r="4" fill="#FDE68A" opacity=".7"/><circle cx="70" cy="78" r="6" fill="#FDE68A" opacity=".6"/></svg>
+            <svg class="hm-stars" viewBox="0 0 240 120"><g fill="#fff"><circle class="s1" cx="20" cy="22" r="2"/><circle class="s2" cx="70" cy="58" r="1.6"/><circle class="s3" cx="118" cy="16" r="2.2"/><circle class="s1" cx="168" cy="44" r="1.5"/><circle class="s2" cx="214" cy="20" r="2"/><circle class="s3" cx="40" cy="92" r="1.4"/><circle class="s1" cx="150" cy="96" r="1.8"/><circle class="s2" cx="226" cy="84" r="1.5"/></g></svg>
+        </span>
+        <div class="pg-hero-main">
+            <div class="pg-eyebrow"><span class="pg-live" aria-hidden="true"></span><span id="homeDate">&nbsp;</span></div>
+            <h1 class="pg-hero-title hm-title"><span class="hm-title-text" id="homeGreetText">Welcome back</span><button type="button" class="hm-hand" id="homeHand" title="Say hi!" aria-label="Get a new greeting"><span class="hm-hand-ico" aria-hidden="true">👋</span></button></h1>
+            <p class="pg-hero-sub">One Stop Solution for OLF's Data Management</p>
+            <p class="hm-line" id="homeLine" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 7H6a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h3v1a3 3 0 0 1-3 3M20 7h-4a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h3v1a3 3 0 0 1-3 3"/></svg><span id="homeLineText"></span></p>
         </div>
-    </div>
+        <div class="hm-clock pg-glass" aria-hidden="true">
+            <div class="hm-clock-time" id="homeClock">--:--</div>
+            <div class="hm-clock-day" id="homeClockDay">&nbsp;</div>
+        </div>
+    </section>
 
-    <div class="stats-row" id="statsRow">
-        <div class="stat-card">
-            <div class="stat-icon" style="background: rgba(79,142,247,0.12); color:#4f8ef7;">👥</div>
-            <div class="stat-info">
-                <div class="stat-value" id="statTotal">—</div>
-                <div class="stat-label">Total Employees</div>
+    <!-- ── Stats ── -->
+    <div class="pg-stats stats-row" id="statsRow">
+        <div class="pg-stat" style="--tint:#4F8EF7">
+            <div class="pg-stat-icon">
+                <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="21.500" cy="10.500" r="4.300" fill="#FCD9A8"/><path d="M13.500 27c0-5.200 3.400-8.500 8-8.500s8 3.300 8 8.500z" fill="#3B82F6"/><circle cx="11" cy="12" r="4.800" fill="#FFD3A1"/><path d="M2.500 28.500c0-5.800 3.700-9.500 8.500-9.500s8.500 3.700 8.500 9.500z" fill="#8B5CF6"/></svg>
+            </div>
+            <div class="pg-stat-info">
+                <div class="pg-stat-value" id="statTotal">—</div>
+                <div class="pg-stat-label">Total Employees</div>
+                <div class="pg-stat-note">On the staff list</div>
             </div>
         </div>
-        <div class="stat-card">
-            <div class="stat-icon" style="background: rgba(52,199,89,0.12); color:#34c759;">🏢</div>
-            <div class="stat-info">
-                <div class="stat-value" id="statDepts">—</div>
-                <div class="stat-label">Departments</div>
+        <div class="pg-stat" style="--tint:#10B197">
+            <div class="pg-stat-icon">
+                <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="6" y="4" width="14" height="24" rx="2" fill="#14B8A6"/><rect x="18" y="12" width="9" height="16" rx="2" fill="#0F766E"/><g fill="#CCFBF1"><rect x="9" y="8" width="3" height="3" rx=".6"/><rect x="14" y="8" width="3" height="3" rx=".6"/><rect x="9" y="14" width="3" height="3" rx=".6"/><rect x="14" y="14" width="3" height="3" rx=".6"/><rect x="9" y="20" width="3" height="3" rx=".6"/><rect x="14" y="20" width="3" height="3" rx=".6"/><rect x="21" y="16" width="3" height="3" rx=".6"/><rect x="21" y="22" width="3" height="3" rx=".6"/></g></svg>
+            </div>
+            <div class="pg-stat-info">
+                <div class="pg-stat-value" id="statDepts">—</div>
+                <div class="pg-stat-label">Departments</div>
+                <div class="pg-stat-note">Teams across OLF</div>
             </div>
         </div>
-        <div class="stat-card">
-            <div class="stat-icon" style="background: rgba(255,159,10,0.12); color:#ff9f0a;">📍</div>
-            <div class="stat-info">
-                <div class="stat-value" id="statLocations">—</div>
-                <div class="stat-label">Locations</div>
+        <div class="pg-stat" style="--tint:#F43F5E">
+            <div class="pg-stat-icon">
+                <svg viewBox="0 0 32 32" aria-hidden="true"><ellipse cx="16" cy="29" rx="6.500" ry="1.800" fill="#0F172A" opacity=".15"/><path d="M16 28.500s-9.500-9-9.500-16a9.500 9.500 0 0 1 19 0c0 7-9.500 16-9.500 16z" fill="#F43F5E"/><circle cx="16" cy="12.500" r="4" fill="#fff"/></svg>
+            </div>
+            <div class="pg-stat-info">
+                <div class="pg-stat-value" id="statLocations">—</div>
+                <div class="pg-stat-label">Locations</div>
+                <div class="pg-stat-note">Offices and districts</div>
             </div>
         </div>
     </div>
 
     <!-- ── Upcoming events (from Program Calendar) ──
          Hidden until app.js finds something in the today/tomorrow window. -->
-    <div class="upcoming-section" id="upcomingSection" style="display:none;">
-        <div class="news-section-header">
-            <div class="news-section-title">
-                <span class="ns-icon">🗓️</span> Happening next
-            </div>
-            <button class="btn-add-news-inline" id="upcomingViewAll" type="button">
+    <div class="upcoming-section hm-section" id="upcomingSection" style="display:none;">
+        <div class="hm-head">
+            <div class="hm-head-title"><span class="hm-head-ico hm-ico--pink"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2.500"/><path d="M4 10h16M8.500 3v4M15.500 3v4"/></svg></span>Happening next</div>
+            <button class="btn-add-news-inline hm-pill" id="upcomingViewAll" type="button">
                 Open calendar →
             </button>
         </div>
@@ -50,20 +74,18 @@
     </div>
 
     <!-- ── News Section ── -->
-    <div class="news-section">
-        <div class="news-section-header">
-            <div class="news-section-title">
-                <span class="ns-icon">📢</span> Announcements
-            </div>
+    <div class="news-section hm-section">
+        <div class="hm-head">
+            <div class="hm-head-title"><span class="hm-head-ico hm-ico--amber"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4a1 1 0 0 0 1 1h2l5 4V5L7 9H5a1 1 0 0 0-1 1z"/><path d="M16 9a4 4 0 0 1 0 6M18.500 6.500a8 8 0 0 1 0 11"/></svg></span>Announcements</div>
             <!-- Admin only — rendered by app.js -->
-            <button class="btn-add-news-inline" id="addNewsBtn" style="display:none;">
+            <button class="btn-add-news-inline hm-pill" id="addNewsBtn" style="display:none;">
                 + Add News
             </button>
         </div>
         <div class="news-cards-grid" id="newsCardsGrid">
-            <div class="news-empty-state">
-                <div class="news-empty-icon">⏳</div>
-                Loading announcements…
+            <div class="news-empty-state hm-empty">
+                <span class="hm-spin" aria-hidden="true"></span>
+                <span class="hm-empty-sub">Loading announcements…</span>
             </div>
         </div>
     </div>
@@ -73,68 +95,46 @@
 <style>
 .home-page { max-width: var(--page-max, 1680px); margin-left: auto; margin-right: auto; }
 
-.page-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    margin-bottom: 26px;
+/* The shared banner and stat cards live in index.html (pg-*). Only what is Home's own stays here. */
+.hm-title { display: flex; align-items: center; flex-wrap: wrap; gap: 0 12px; }
+.hm-name { color: #FEF3C7; }
+.hm-greet-letters { display: inline; }
+.hm-w { display: inline-block; white-space: nowrap; }
+.hm-ch { display: inline-block; }
+.hm-hand { position: relative; display: inline-grid; place-items: center; flex: 0 0 auto; top: -4px; margin-left: -4px; padding: 0; border: 0; background: none; font: inherit; font-size: 1em; line-height: 1; cursor: pointer; border-radius: 50%; }
+.hm-hand-ico { display: inline-block; transform-origin: 70% 70%; transition: transform .25s cubic-bezier(.34,1.56,.64,1); }
+.hm-hand:hover .hm-hand-ico { transform: scale(1.18) rotate(-8deg); }
+.hm-hand:focus-visible { outline: 3px solid rgba(255,255,255,.7); outline-offset: 4px; }
+/* tap the hand: confetti bits fly out from it */
+.hm-confetti {
+    position: absolute; left: 50%; top: 50%; width: 7px; height: 11px; margin: -5px 0 0 -3px; border-radius: 2px; pointer-events: none;
+    animation: hm-confetti .85s cubic-bezier(.15,.7,.3,1) forwards;
+}
+@keyframes hm-confetti {
+    0% { transform: translate(0, 0) rotate(0) scale(.6); opacity: 1; }
+    100% { transform: translate(var(--dx), calc(var(--dy) + 26px)) rotate(var(--rot)) scale(1); opacity: 0; }
 }
 
-.page-title {
-    font-size: 22px;
-    font-weight: 700;
-    color: #1a1d23;
-    letter-spacing: -0.4px;
-    margin-bottom: 4px;
+.hm-clock {
+    flex: 0 0 auto; text-align: center; padding: 14px 24px; border-radius: 18px;
 }
+.hm-clock-time { font-size: 34px; font-weight: 800; letter-spacing: -1px; line-height: 1; font-variant-numeric: tabular-nums; }
+.hm-clock-day { margin-top: 6px; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
 
-.page-title span { color: #4f8ef7; }
-
-.page-subtitle { font-size: 13.5px; color: #6b7280; }
-
-.stats-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-    margin-bottom: 24px;
-}
-
-.stat-card {
-    background: #fff;
-    border-radius: 10px;
-    padding: 20px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.07);
-}
-
-.stat-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 22px;
-    flex-shrink: 0;
-}
-
-.stat-value {
-    font-size: 26px;
-    font-weight: 700;
-    color: #1a1d23;
-    line-height: 1;
-    margin-bottom: 4px;
-}
-
-.stat-label { font-size: 12.5px; color: #6b7280; font-weight: 500; }
+/* ── Section heads ──────────────────────────────────────────── */
+.hm-section { margin: 0 0 26px; }
+.hm-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.hm-head-title { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 800; letter-spacing: -.3px; color: var(--text); }
+.hm-head-ico { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; color: #fff; box-shadow: 0 4px 10px rgba(15,23,42,.16); }
+.hm-head-ico svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.hm-ico--pink  { background: linear-gradient(135deg, #F472B6, #DB2777); }
+.hm-ico--amber { background: linear-gradient(135deg, #FBBF24, #D97706); }
+.hm-pill { border-radius: 999px !important; padding: 7px 16px !important; transition: transform .18s ease, box-shadow .18s ease, background-color .15s ease !important; }
+.hm-pill:hover { transform: translateY(-1px); box-shadow: 0 6px 14px rgba(15,23,42,.12); }
 
 /* ── Happening next ────────────────────────────────────────────
    Uses the shared tokens from index.html so this strip matches the
    glass card system rather than inventing a third look. */
-.upcoming-section { margin-bottom: 24px; }
-
 .upcoming-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -172,20 +172,20 @@
 }
 .upcoming-day {
     font-size: 21px; font-weight: 800; line-height: 1;
-    color: #1a1d23; font-variant-numeric: tabular-nums;
+    color: var(--text, #1a1d23); font-variant-numeric: tabular-nums;
 }
 .upcoming-mon {
     font-size: 10px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: .06em; color: #6b7280; margin-top: 3px;
+    letter-spacing: .06em; color: var(--text-soft, #6b7280); margin-top: 3px;
 }
 .upcoming-body { min-width: 0; flex: 1; }
 .upcoming-title {
-    font-size: 13px; font-weight: 700; color: #1a1d23;
+    font-size: 13px; font-weight: 700; color: var(--text, #1a1d23);
     margin-bottom: 3px; line-height: 1.35;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .upcoming-meta {
-    font-size: 11.5px; color: #6b7280; line-height: 1.45;
+    font-size: 11.5px; color: var(--text-soft, #6b7280); line-height: 1.45;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .upcoming-chip {
@@ -197,9 +197,172 @@
 .upcoming-chip--tomorrow { background: rgba(79,142,247,0.12); color: #2C63C4; }
 .upcoming-chip--later    { background: rgba(15,23,42,0.06);   color: #5A6577; }
 
+/* ── Icons inside cards ─────────────────────────────────────── */
+.hm .hm-i { width: 14px; height: 14px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.hm .hm-mi { display: inline-flex; align-items: center; gap: 5px; }
+.hm .hm-mi + .hm-mi { margin-left: 12px; }
+.hm .hm-mi .hm-i { width: 13px; height: 13px; color: var(--text-faint); }
+
+/* ── Happening next: the date sits in its own soft tile ─────── */
+.hm .upcoming-card { padding: 14px 16px 14px 18px; gap: 14px; border-radius: 16px; }
+.hm .upcoming-when {
+    flex: 0 0 54px; align-self: flex-start; padding: 8px 0 7px; border: 0; border-radius: 13px;
+    background: color-mix(in srgb, var(--brand, #4F8EF7) 11%, transparent);
+}
+.hm .upcoming-day { font-size: 22px; }
+.hm .upcoming-title { font-size: 13.5px; }
+.hm .upcoming-meta { margin-top: 1px; }
+.hm .upcoming-chip { margin-top: 8px; }
+
+/* ── Announcements ──────────────────────────────────────────── */
+.hm .news-cards-grid { gap: 16px; }
+.hm .news-card {
+    position: relative; overflow: hidden; gap: 12px; padding: 20px 22px 18px 24px; border-radius: 18px; border-top: 0;
+    border: 1px solid var(--hairline); background: var(--glass-strong); box-shadow: var(--shadow-sm);
+    transition: transform .22s var(--ease, ease), box-shadow .22s ease;
+}
+.hm .news-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: linear-gradient(180deg, #10B197, #4F8EF7); }
+.hm .news-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+.hm .news-card-badge { gap: 6px; padding: 5px 12px 5px 9px; border-radius: 999px; font-size: 10.5px; }
+.hm .news-card-badge .hm-i { width: 14px; height: 14px; }
+.hm .news-card-text { font-size: 14px; line-height: 1.65; }
+.hm .news-card-footer { padding-top: 12px; border-top: 1px solid var(--hairline); }
+.hm .news-card-dates { gap: 7px; font-size: 11.5px; font-weight: 600; }
+.hm .news-card-dates .hm-i { color: var(--teal, #10B197); }
+.hm .btn-delete-news { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 5px 11px 5px 9px; }
+.hm .btn-delete-news .hm-i { width: 13px; height: 13px; }
+.hm .news-card--expired { opacity: .6; }
+.hm .news-card--expired::before { background: linear-gradient(180deg, #CBD5E1, #94A3B8); }
+
+/* ── Empty and loading states ───────────────────────────────── */
+.hm .hm-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 34px 20px; border-radius: 20px; }
+.hm .hm-empty-ico {
+    width: 64px; height: 64px; margin-bottom: 6px; border-radius: 20px; display: grid; place-items: center; color: #fff;
+    background: linear-gradient(135deg, #FBBF24, #F59E0B 55%, #F97316); box-shadow: 0 10px 22px rgba(245,158,11,.32), inset 0 1px 0 rgba(255,255,255,.4);
+}
+.hm .hm-empty-ico .hm-i { width: 30px; height: 30px; stroke-width: 1.8; }
+.hm .hm-empty-title { font-size: 15px; font-weight: 800; letter-spacing: -.2px; color: var(--text); }
+.hm .hm-empty-sub { font-size: 13px; font-weight: 500; color: var(--text-soft); }
+.hm .hm-spin { width: 30px; height: 30px; border-radius: 50%; border: 3px solid color-mix(in srgb, var(--brand, #4F8EF7) 22%, transparent); border-top-color: var(--brand, #4F8EF7); animation: hm-spin .8s linear infinite; }
+@keyframes hm-spin { to { transform: rotate(360deg); } }
+
+/* Quiet states and cards follow the theme, so the page reads in dark too */
+.hm .news-empty-state { background: var(--glass, #fafafa); color: var(--text-soft, #9ca3af); border-color: var(--hairline, #e5e7eb); }
+html[data-theme="dark"] .hm .upcoming-card { border-color: var(--hairline); box-shadow: var(--shadow-sm); }
+
+/* ── Motion: everything settles in, the hero keeps a slow drift ─ */
+@media (prefers-reduced-motion: no-preference) {
+    .hm-section { animation: hm-in .6s cubic-bezier(.22,1,.36,1) backwards; }
+    #upcomingSection { animation-delay: .3s; } .news-section.hm-section { animation-delay: .36s; }
+    .hm-hand-ico { animation: hm-wave 2.6s ease-in-out 1s infinite; }
+    .hm-hand.is-waving .hm-hand-ico { animation: hm-wave-big .9s ease-in-out; }
+    /* a new greeting brings its own emoji: it pops in, then keeps the gentle wave */
+    .hm-hand-ico.is-new { animation: hm-emoji-pop .6s cubic-bezier(.34,1.56,.64,1), hm-wave 2.6s ease-in-out 1.2s infinite; }
+    @keyframes hm-emoji-pop { 0% { transform: scale(0) rotate(-30deg); opacity: 0; } 70% { transform: scale(1.25) rotate(8deg); opacity: 1; } 100% { transform: scale(1) rotate(0); } }
+    /* the greeting arrives letter by letter and floats away before the next */
+    .hm-ch { animation: hm-ch-in .55s cubic-bezier(.22,1,.36,1) backwards; animation-delay: var(--d, 0ms); }
+    .hm-greet-out .hm-ch { animation: hm-ch-out .38s cubic-bezier(.55,0,.75,.2) forwards; animation-delay: calc(var(--d, 0ms) * .2); }
+    @keyframes hm-ch-in { from { opacity: 0; transform: translateY(16px) rotate(8deg) scale(.9); filter: blur(5px); } }
+    @keyframes hm-ch-out { to { opacity: 0; transform: translateY(-14px) scale(.95); filter: blur(4px); } }
+    /* the name glows softly, like a light coming on and off */
+    .hm-name { animation: hm-name-glow 3.2s ease-in-out 1.2s infinite alternate; }
+    @keyframes hm-name-glow { from { text-shadow: 0 0 0 rgba(253,230,138,0); } to { text-shadow: 0 0 16px rgba(253,230,138,.85), 0 0 2px rgba(255,255,255,.6); } }
+    @keyframes hm-greet { from { opacity: 0; transform: translateY(10px); filter: blur(4px); } }
+    @keyframes hm-wave-big { 0%, 100% { transform: rotate(0) scale(1); } 15% { transform: rotate(24deg) scale(1.3); } 30% { transform: rotate(-16deg) scale(1.3); } 45% { transform: rotate(22deg) scale(1.25); } 60% { transform: rotate(-12deg) scale(1.15); } 80% { transform: rotate(8deg) scale(1.05); } }
+    .hm .hm-empty-ico { animation: hm-bob 3.2s ease-in-out infinite; }
+    @keyframes hm-in { from { opacity: 0; transform: translateY(14px); } }
+    @keyframes hm-wave { 0%, 60%, 100% { transform: rotate(0); } 10%, 30% { transform: rotate(16deg); } 20%, 40% { transform: rotate(-10deg); } 50% { transform: rotate(8deg); } }
+    @keyframes hm-bob { 50% { transform: translateY(-4px); } }
+}
+
+/* ── Finishing touches ─────────────────────────────────────────
+   A faint dot grid on the right of the banner, crisp corner rings on the
+   figures instead of a blurred glow, and Announcements as one panel with
+   its heading inside. */
+.hm-hero::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background-image: radial-gradient(rgba(255,255,255,.28) 1px, transparent 1.4px); background-size: 18px 18px;
+    -webkit-mask-image: linear-gradient(100deg, transparent 38%, #000 88%); mask-image: linear-gradient(100deg, transparent 38%, #000 88%);
+}
+.hm-hero > .pg-hero-main, .hm-hero > .hm-clock { position: relative; z-index: 1; }
+
+.hm .pg-stat::after {
+    right: -34px; top: -34px; width: 104px; height: 104px; background: none;
+    border: 16px solid color-mix(in srgb, var(--tint, #4F8EF7) 9%, transparent);
+    transition: transform .4s cubic-bezier(.22,1,.36,1);
+}
+.hm .pg-stat::before {
+    content: ""; position: absolute; left: 22px; right: 22px; top: 0; height: 3px; border-radius: 0 0 3px 3px;
+    background: linear-gradient(90deg, var(--tint, #4F8EF7), color-mix(in srgb, var(--tint, #4F8EF7) 30%, transparent));
+    opacity: .85;
+}
+.hm .pg-stat:hover::after { transform: scale(1.12); }
+.hm .pg-stat-note { margin-top: 3px; font-size: 12px; font-weight: 500; color: var(--text-faint); }
+.hm .pg-stat-label { color: var(--text); font-weight: 700; }
+
+.hm .news-section {
+    padding: 16px 18px 18px; border-radius: 20px;
+    background: var(--glass-strong); border: 1px solid var(--hairline); box-shadow: var(--shadow-sm);
+}
+.hm .news-section .hm-head { padding-bottom: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--hairline); }
+.hm .news-section .news-empty-state { background: transparent; border: 0; box-shadow: none; padding: 26px 20px 20px; }
+
+/* ── The banner follows the day ────────────────────────────────
+   morning: sunrise blue into warm amber, the sun up on the right
+   afternoon: the usual brand blue-to-teal, the sun high
+   evening: violet into rose, the sun low and orange
+   night: deep navy, a crescent moon and twinkling stars */
+.hm-hero { transition: background .8s ease; }
+.hm-hero[data-tod="morning"]   { background: linear-gradient(120deg, #2457C5 0%, #3B82F6 45%, #F59E0B 115%); }
+.hm-hero[data-tod="afternoon"] { background: linear-gradient(120deg, #2457C5 0%, #2F6FE4 40%, #0B8F7A 100%); }
+.hm-hero[data-tod="evening"]   { background: linear-gradient(120deg, #3730A3 0%, #6D28D9 48%, #BE185D 100%); }
+.hm-hero[data-tod="night"]     { background: linear-gradient(120deg, #0B1530 0%, #1E3A8A 58%, #0B4F6C 100%); }
+
+.hm-sky { position: absolute; z-index: 0; right: 210px; top: 0; bottom: 0; width: 220px; pointer-events: none; }
+.hm-sky svg { position: absolute; display: none; }
+.hm-sun  { width: 96px; height: 96px; right: 40px; top: 10px; filter: drop-shadow(0 0 22px rgba(253,224,71,.55)); }
+.hm-moon { width: 74px; height: 74px; right: 50px; top: 14px; filter: drop-shadow(0 0 18px rgba(254,243,199,.5)); }
+.hm-stars { width: 220px; height: 110px; right: 0; top: 6px; }
+.hm-hero[data-tod="morning"] .hm-sun   { display: block; top: 34px; }
+.hm-hero[data-tod="afternoon"] .hm-sun { display: block; top: 4px; }
+.hm-hero[data-tod="evening"] .hm-sun   { display: block; top: 48px; filter: drop-shadow(0 0 24px rgba(251,146,60,.65)) saturate(1.2) hue-rotate(-18deg); }
+.hm-hero[data-tod="night"] .hm-moon, .hm-hero[data-tod="night"] .hm-stars { display: block; }
+
+/* line of the day */
+.hm-line {
+    display: flex; align-items: flex-start; gap: 9px; width: fit-content; max-width: 68ch; margin: 14px 0 0; padding: 9px 15px 9px 11px;
+    border-radius: 13px; font-size: 13.5px; font-weight: 600; font-style: italic; line-height: 1.5; color: #fff;
+    background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.3); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+.hm-line[hidden] { display: none; }
+.hm-line svg { width: 17px; height: 17px; flex: none; margin-top: 1px; fill: none; stroke: #FDE68A; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+@media (prefers-reduced-motion: no-preference) {
+    .hm-sun-rays { transform-origin: 60px 60px; animation: hm-rays 40s linear infinite; }
+    .hm-sun { animation: hm-sun-glow 4s ease-in-out infinite alternate; }
+    .hm-moon { animation: hm-float 6s ease-in-out infinite; }
+    .hm-stars circle { animation: hm-twinkle 3s ease-in-out infinite; }
+    .hm-stars .s2 { animation-delay: 1s; } .hm-stars .s3 { animation-delay: 2s; }
+    .hm-line:not([hidden]) { animation: hm-in .7s .3s cubic-bezier(.22,1,.36,1) backwards; }
+    @keyframes hm-rays { to { transform: rotate(360deg); } }
+    @keyframes hm-sun-glow { from { transform: scale(1); } to { transform: scale(1.06); } }
+    @keyframes hm-float { 50% { transform: translateY(-5px) rotate(-4deg); } }
+    @keyframes hm-twinkle { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+}
+
+@media (max-width: 900px) {
+    .hm-clock { display: none; }
+    .hm-sky { right: 0; opacity: .55; }
+}
+@media (max-width: 640px) {
+    .hm-sky { width: 140px; transform: scale(.75); transform-origin: top right; }
+    .hm-line { font-size: 12.5px; }
+}
 @media (max-width: 768px) {
-    .stats-row { grid-template-columns: 1fr; }
     .news-cards-grid { grid-template-columns: 1fr; }
     .upcoming-grid { grid-template-columns: 1fr; }
 }
 </style>
+
+<!-- Local Live Server adds its reload script at the closing body tag; this gives it a safe place. -->
+</body>
