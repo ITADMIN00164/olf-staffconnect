@@ -3002,7 +3002,7 @@ function renderTargetsTable() {
     const flags = tgtBlockCheck(tgtRows);
     const rows = tgtRows.filter(r => !q || [r.po_id, r.po_name, r.district, r.pm].some(v => String(v || "").toLowerCase().includes(q)));
     if (!rows.length) {
-        tbody.innerHTML = `<tr><td colspan="${TGT_NUM.length + 5}" class="empty-state"><div class="empty-icon">🎯</div>`
+        tbody.innerHTML = `<tr><td colspan="${TGT_NUM.length + 5}" class="empty-state"><div class="empty-icon"><span class="fr-ico fr-i-target" aria-hidden="true"></span></div>`
             + (tgtRows.length ? "No rows match." : `No targets for ${escHtml(tgtCurLabel() || "this month")} yet. Upload the targets Excel above.`) + "</td></tr>";
     } else {
         tbody.innerHTML = rows.map(r => {
@@ -3019,7 +3019,7 @@ function renderTargetsTable() {
                     const shown = v == null ? "" : (isNaN(Number(v)) ? escHtml(v) : Number(v).toLocaleString("en-IN", { maximumFractionDigits: 4 }));   // display only
                     return `<td class="pos-num${v === 0 ? " pos-zero" : ""}">${v == null ? "" : shown + (c.pct ? "%" : "")}</td>`;
                 }).join("")
-                + `<td class="pos-col-actions"><button class="pos-icon-btn delete" title="Delete" onclick="window.POSAdmin.deleteTgtRow(${r.id})">🗑️</button></td></tr>`;
+                + `<td class="pos-col-actions"><button class="pos-icon-btn delete" title="Delete" onclick="window.POSAdmin.deleteTgtRow(${r.id})"></button></td></tr>`;
         }).join("");
     }
     if (tgtCur) {
