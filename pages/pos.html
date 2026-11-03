@@ -506,6 +506,52 @@
     .pos-tgt-flag.warn { color:#b45309; background:#fef3c7; border:1px solid #fde68a; }
     .pos-tgt-flag.skip { color:#475467; background:#eef1f5; border:1px solid #dde1e7; }
     .pos-tgt-ok { display:inline-flex; align-items:center; gap:5px; font-size:10.5px; font-weight:700; color:#0B7A55; background:#E6F6EE; border-radius:999px; padding:1px 8px; }
+    /* Targets: status strip under the pickers */
+    .pos-tgt-status {
+        display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap;
+        margin-top: 14px; padding: 9px 12px;
+        background: #F8FAFC; border: 1px solid #EEF1F6; border-radius: 10px;
+        font-size: 12.5px; color: #64748B; line-height: 1.45;
+    }
+    .pos-tgt-status.has-data { background: #F0FDF7; border-color: #CBEFDD; color: #24543F; }
+    .pos-tgt-status b { color: #0F172A; font-weight: 600; }
+    .pos-tgt-st-dot { width: 8px; height: 8px; border-radius: 50%; background: #CBD5E1; flex-shrink: 0; }
+    .pos-tgt-st-dot.is-on { background: #10B197; box-shadow: 0 0 0 3px rgba(16,177,151,0.16); }
+    .pos-tgt-st-text { flex: 1 1 320px; min-width: 0; }
+    .pos-tgt-st-chips { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .pos-tgt-st-lbl { font-size: 10.5px; font-weight: 600; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.06em; }
+    .pos-tgt-chip {
+        display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 4px 0 10px;
+        border: 1px solid #E2E8F0; border-radius: 999px; background: #fff; color: #334155;
+        font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+        transition: border-color .15s, color .15s, background .15s;
+    }
+    .pos-tgt-chip span { font-size: 10.5px; font-weight: 700; color: #64748B; background: #EEF1F5; border-radius: 999px; padding: 1px 7px; }
+    .pos-tgt-chip:hover { border-color: #A9C7FB; color: #2C63C4; background: #F3F7FF; }
+    .pos-tgt-chip:focus-visible { outline: 2px solid #4F8EF7; outline-offset: 2px; }
+
+    /* Targets: the PO name opens the edit card */
+    .pos-tgt-name {
+        display: inline-flex; align-items: center; gap: 8px; max-width: 240px;
+        padding: 4px 10px 4px 4px; margin: -4px 0 -4px -4px;
+        border: 1px solid transparent; border-radius: 8px; background: none;
+        font: inherit; color: #1E293B; text-align: left; cursor: pointer;
+        transition: background .14s, border-color .14s, color .14s;
+    }
+    .pos-tgt-pen {
+        width: 26px; height: 26px; flex-shrink: 0; border-radius: 7px;
+        display: inline-flex; align-items: center; justify-content: center;
+        background: #EEF4FF; color: #2C63C4;
+    }
+    .pos-tgt-pen::before {
+        content: ""; width: 14px; height: 14px; background: currentColor;
+        -webkit-mask: var(--fr-edit) center / contain no-repeat;
+                mask: var(--fr-edit) center / contain no-repeat;
+    }
+    .pos-tgt-name-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pos-tgt-name:hover { background: #F3F7FF; border-color: #C5DAFC; color: #2C63C4; }
+    .pos-tgt-name:hover .pos-tgt-pen { background: #DFEAFE; }
+    .pos-tgt-name:focus-visible { outline: 2px solid #4F8EF7; outline-offset: 1px; }
     .pos-tgt-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:0 14px; }
     .pos-tgt-grid label { font-size:11.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .pos-tgt-grid input.is-bad { border-color:#ef4444; background:#fef2f2; }
@@ -1425,8 +1471,8 @@
                     <button type="button" class="pos-btn pos-btn-ghost" onclick="window.POSAdmin.downloadTgtSample()"><span class="pos-ico pos-ico-dl" aria-hidden="true"></span><span>Sample</span></button>
                 </div>
                 <div class="pos-src-controls">
-                    <div class="pos-field"><label>Year</label><select id="posTgtYear" class="pos-sel"></select></div>
-                    <div class="pos-field"><label>Month</label><select id="posTgtMonth" class="pos-sel"><option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option><option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option><option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option><option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option></select></div>
+                    <div class="pos-field"><label>Year</label><select id="posTgtYear" class="pos-sel" onchange="window.POSAdmin.onTgtPeriodChange()"></select></div>
+                    <div class="pos-field"><label>Month</label><select id="posTgtMonth" class="pos-sel" onchange="window.POSAdmin.onTgtPeriodChange()"><option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option><option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option><option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option><option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option></select></div>
                     <div class="pos-field pos-field--grow">
                         <label>Targets Excel for this month</label>
                         <label class="pos-file">
@@ -1437,12 +1483,13 @@
                     </div>
                     <button type="button" class="pos-btn pos-btn-primary" id="posTgtUploadBtn" onclick="window.POSAdmin.uploadTargets()">Upload</button>
                 </div>
-                <div class="pos-last pos-last--empty" style="justify-content:flex-start;">Rules: PM rows are skipped · "Posts per month / per teacher" must be 1 for every PO · a target of 0 means "not set".</div>
+                <!-- What the picked month holds and what Upload will do (pos.js tgtRenderStatus) -->
+                <div class="pos-tgt-status" id="posTgtStatus" aria-live="polite"><span class="pos-tgt-st-text">Loading…</span></div>
+                <div class="pos-last pos-last--empty" style="justify-content:flex-start;">Re-uploading a month replaces all of its rows · Rules: PM rows are skipped · "Posts per month / per teacher" must be 1 for every PO · a target of 0 means "not set".</div>
             </div>
             <div class="table-toolbar">
                 <div class="table-meta" id="posTgtMeta">Loading…</div>
                 <div class="toolbar-right" style="gap:8px;">
-                    <select id="posTgtView" class="pos-sel" onchange="window.POSAdmin.loadTargetRows()"><option value="">No months yet</option></select>
                     <input type="search" id="posTgtSearch" class="pos-acad-search" placeholder="Search PO, district…" oninput="window.POSAdmin.renderTargetsTable()">
                     <button class="btn-add" onclick="window.POSAdmin.openTgtModal()">+ Add PO</button>
                 </div>
@@ -1957,4 +2004,4 @@
             <button class="btn-save" onclick="window.POSAdmin.saveAliasEdit()">Save</button>
         </div>
     </div>
-</div>
+</div>

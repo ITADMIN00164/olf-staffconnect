@@ -68,6 +68,17 @@ function mount() {
     const adminSection = document.getElementById("posAdminSection");
     if (!adminTabBtn || !adminSection) return; // fragment not loaded yet
 
+    // app.js injects a fresh copy of pages/pos.html on every visit while this
+    // script stays loaded. The "already loaded" flags below describe the old
+    // copy's tables, so a revisit used to show empty tabs stuck on "Loading…".
+    if (!adminSection.dataset.posMounted) {
+        adminSection.dataset.posMounted = "1";
+        vinobaLogLoaded = erLogLoaded = kekaLogLoaded = scLogLoaded = nimbleLogLoaded = vaLogLoaded = false;
+        aliasTabLoaded = false;
+        acadLoaded = false;
+        tgtResetState();
+    }
+
     const admin = isOrgAdmin();
     adminTabBtn.hidden = !admin;
 
@@ -2753,10 +2764,13 @@ const TGT_NUM = [
 ];
 const TGT_ALL = TGT_TEXT.concat(TGT_NUM);
 
-let tgtRows = [];              // rows of the month being viewed
-let tgtMonths = [];            // [{year, month}] that have targets
-let tgtInit = false;
+let tgtRows = [];              // rows of the month in tgtCur
+let tgtMonths = [];            // [{year, month, n}] months that have targets, newest first
+let tgtCur = null;             // {year, month} whose rows are in tgtRows (null while loading)
+let tgtLoadSeq = 0;            // ignore a slow load that a newer pick has overtaken
 let tgtEditingId = null;
+
+const TGT_TABLE = "g1_g2_g3_target_sheet";
 
 function tgtNum(v) {           // "1,500" -> 1500, "100%" -> 100, "" -> null, junk -> NaN
     const s = String(v == null ? "" : v).replace(/,/g, "").replace(/%$/, "").trim();
@@ -2765,58 +2779,175 @@ function tgtNum(v) {           // "1,500" -> 1500, "100%" -> 100, "" -> null, ju
     return isNaN(n) ? NaN : n;
 }
 function tgtKey(y, m) { return y + "-" + m; }
+function tgtLabel(y, m) { return `${MONTH_NAMES[m]} ${y}`; }
+function tgtPicked() {
+    const y = Number(document.getElementById("posTgtYear")?.value);
+    const m = Number(document.getElementById("posTgtMonth")?.value);
+    return { year: y, month: m, label: y && m ? tgtLabel(y, m) : "" };
+}
+function tgtCurLabel() { return tgtCur ? tgtLabel(tgtCur.year, tgtCur.month) : ""; }
+function tgtMonthInfo(y, m) { return tgtMonths.find(x => x.year === y && x.month === m) || null; }
 
-function initTargetsTab() {
-    if (tgtInit) return;
-    tgtInit = true;
-    const yearSel = document.getElementById("posTgtYear");
-    if (yearSel && !yearSel.options.length) {
-        const now = new Date().getFullYear();
-        for (let y = now - 1; y <= now + 1; y++) yearSel.add(new Option(y, y, false, y === now));
-    }
-    const monthSel = document.getElementById("posTgtMonth");
-    if (monthSel) monthSel.value = String(new Date().getMonth() + 1);
-    loadTargetMonths();
+function tgtResetState() {
+    tgtRows = []; tgtMonths = []; tgtCur = null; tgtLoadSeq++;
 }
 
-async function loadTargetMonths(selectKey) {
+/* app.js puts a fresh copy of pages/pos.html in the page on every visit while
+   this script stays loaded, so "already set up" is read from the markup
+   (are the Year options there?) — never from a flag that outlives it. */
+function initTargetsTab() {
+    const yearSel = document.getElementById("posTgtYear");
+    const monthSel = document.getElementById("posTgtMonth");
+    const tbody = document.getElementById("posTgtTbody");
+    if (!yearSel || !monthSel || !tbody) return;
+    if (yearSel.options.length) return;           // same markup, already running
+
+    tgtResetState();
+    const now = new Date();
+    tgtFillYears([], now.getFullYear());
+    monthSel.value = String(now.getMonth() + 1);
+
+    document.getElementById("posTgtStatus")?.addEventListener("click", e => {
+        const chip = e.target.closest ? e.target.closest("[data-tgtjump]") : null;
+        if (!chip) return;
+        const [y, m] = chip.dataset.tgtjump.split("-").map(Number);
+        tgtGoTo(y, m);
+    });
+    loadTargetMonths({ pickDefault: true });
+}
+
+// Year list: last year .. next year, plus any year that has targets.
+function tgtFillYears(dataYears, selectYear) {
+    const sel = document.getElementById("posTgtYear"); if (!sel) return;
+    const now = new Date().getFullYear();
+    const keep = selectYear || Number(sel.value) || now;
+    const years = [...new Set([now - 1, now, now + 1, keep].concat(dataYears))].sort((a, b) => a - b);
+    sel.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join("");
+    sel.value = String(keep);
+}
+
+// Months of the chosen year that have targets get a tick.
+function tgtRefreshMonthLabels() {
+    const sel = document.getElementById("posTgtMonth"); if (!sel) return;
+    const y = Number(document.getElementById("posTgtYear")?.value);
+    [...sel.options].forEach(o => {
+        const m = Number(o.value), info = tgtMonthInfo(y, m);
+        o.textContent = MONTH_NAMES[m] + (info ? "  ✓" : "");
+        o.title = info ? `${info.n} PO rows uploaded` : "No targets yet";
+    });
+}
+
+async function loadTargetMonths(opts = {}) {
     setMeta("posTgtMeta", "Loading…");
     try {
-        // which months have targets (one small column pair, paged)
+        // which months have targets, and how many rows each (paged, two small columns)
         let all = [], from = 0;
         for (;;) {
-            const { data, error } = await posSupabase.from("g1_g2_g3_target_sheet").select("year,month").range(from, from + 999);
+            const { data, error } = await posSupabase.from(TGT_TABLE).select("year,month").range(from, from + 999);
             if (error) throw error;
             all = all.concat(data || []);
             if (!data || data.length < 1000) break;
             from += 1000;
         }
-        const seen = {};
-        tgtMonths = all.filter(r => { const k = tgtKey(r.year, r.month); if (seen[k]) return false; seen[k] = 1; return true; })
-                       .sort((a, b) => b.year - a.year || b.month - a.month);
-        const view = document.getElementById("posTgtView");
-        const keep = selectKey || (view && view.value);
-        view.innerHTML = tgtMonths.length
-            ? tgtMonths.map(r => `<option value="${tgtKey(r.year, r.month)}">${MONTH_NAMES[r.month]} ${r.year}</option>`).join("")
-            : '<option value="">No months yet</option>';
-        if (keep && tgtMonths.some(r => tgtKey(r.year, r.month) === keep)) view.value = keep;
+        const byKey = {};
+        all.forEach(r => {
+            const k = tgtKey(r.year, r.month);
+            (byKey[k] = byKey[k] || { year: Number(r.year), month: Number(r.month), n: 0 }).n++;
+        });
+        tgtMonths = Object.values(byKey).sort((a, b) => b.year - a.year || b.month - a.month);
+
+        let pick = opts.select || null;
+        if (!pick && opts.pickDefault) {
+            // open on this month if it has targets, else on the latest month that does
+            const p = tgtPicked();
+            if (!tgtMonthInfo(p.year, p.month) && tgtMonths.length) pick = tgtMonths[0];
+        }
+        tgtFillYears(tgtMonths.map(x => x.year), pick ? pick.year : null);
+        if (pick) document.getElementById("posTgtMonth").value = String(pick.month);
+        tgtRefreshMonthLabels();
         await loadTargetRows();
     } catch (err) {
         console.error("Targets load failed:", err);
         setMeta("posTgtMeta", "Failed to load.");
+        tgtRenderStatus("Could not load targets. Check the connection and open the tab again.");
         window.notify(friendlyDbError(err), "error");
     }
 }
 
+// Year or Month changed: show that month's rows.
+async function onTgtPeriodChange() {
+    tgtRefreshMonthLabels();
+    await loadTargetRows();
+}
+
+function tgtGoTo(y, m) {
+    tgtFillYears(tgtMonths.map(x => x.year), y);
+    document.getElementById("posTgtMonth").value = String(m);
+    onTgtPeriodChange();
+}
+
 async function loadTargetRows() {
-    const v = document.getElementById("posTgtView").value;
-    if (!v) { tgtRows = []; renderTargetsTable(); return; }
-    const [y, m] = v.split("-").map(Number);
-    const { data, error } = await posSupabase.from("g1_g2_g3_target_sheet").select("*")
-        .eq("year", y).eq("month", m).order("po_name").range(0, 999);
-    if (error) { window.notify(friendlyDbError(error), "error"); return; }
-    tgtRows = data || [];
-    renderTargetsTable();
+    const p = tgtPicked();
+    if (!p.year || !p.month) return;
+    const seq = ++tgtLoadSeq;
+    tgtCur = null;
+    setMeta("posTgtMeta", `Loading ${p.label}…`);
+    tgtRenderStatus();
+    const tbody = document.getElementById("posTgtTbody");
+    if (tbody) tbody.innerHTML = `<tr><td colspan="${TGT_NUM.length + 5}" class="empty-state">Loading ${escHtml(p.label)}…</td></tr>`;
+    try {
+        let out = [], from = 0;
+        for (;;) {
+            const { data, error } = await posSupabase.from(TGT_TABLE).select("*")
+                .eq("year", p.year).eq("month", p.month).order("po_name").order("id").range(from, from + 999);
+            if (error) throw error;
+            out = out.concat(data || []);
+            if (!data || data.length < 1000) break;
+            from += 1000;
+        }
+        if (seq !== tgtLoadSeq) return;              // a newer pick is loading
+        tgtRows = out;
+        tgtCur = { year: p.year, month: p.month };
+        // keep the month ticks right even if someone else changed the table
+        const info = tgtMonthInfo(p.year, p.month);
+        if (out.length && !info) { tgtMonths.push({ year: p.year, month: p.month, n: out.length }); tgtMonths.sort((a, b) => b.year - a.year || b.month - a.month); }
+        else if (info) { info.n = out.length; if (!out.length) tgtMonths = tgtMonths.filter(x => x !== info); }
+        tgtRefreshMonthLabels();
+        renderTargetsTable();
+    } catch (err) {
+        if (seq !== tgtLoadSeq) return;
+        console.error("Targets rows load failed:", err);
+        setMeta("posTgtMeta", "Failed to load.");
+        if (tbody) tbody.innerHTML = `<tr><td colspan="${TGT_NUM.length + 5}" class="empty-state">Could not load ${escHtml(p.label)}.</td></tr>`;
+        tgtRenderStatus(`Could not load ${p.label}. Pick the month again to retry.`);
+        window.notify(friendlyDbError(err), "error");
+        return;
+    }
+    tgtRenderStatus();
+}
+
+/* Status strip under the pickers: what the picked month holds, what Upload
+   will do to it, and quick links to the other months that have targets. */
+function tgtRenderStatus(errorText) {
+    const el = document.getElementById("posTgtStatus");
+    const btn = document.getElementById("posTgtUploadBtn");
+    const p = tgtPicked();
+    const loaded = tgtCur && tgtCur.year === p.year && tgtCur.month === p.month;
+    const has = loaded && tgtRows.length > 0;
+    if (btn && !btn.disabled) btn.textContent = has ? "Replace month" : "Upload";
+    if (!el) return;
+    let main;
+    if (errorText) main = `<span class="pos-tgt-st-text">${escHtml(errorText)}</span>`;
+    else if (!loaded) main = `<span class="pos-tgt-st-text">Loading ${escHtml(p.label)}…</span>`;
+    else if (has) main = `<span class="pos-tgt-st-dot is-on" aria-hidden="true"></span><span class="pos-tgt-st-text"><b>${escHtml(p.label)}</b> has ${tgtRows.length} PO row${tgtRows.length === 1 ? "" : "s"}. Click the pencil next to a PO's name to edit their targets, or upload a file to replace the whole month.</span>`;
+    else main = `<span class="pos-tgt-st-dot" aria-hidden="true"></span><span class="pos-tgt-st-text">No targets for <b>${escHtml(p.label)}</b> yet. Upload the Excel, or use <b>+ Add PO</b> to enter rows by hand.</span>`;
+    const others = tgtMonths.filter(x => !(x.year === p.year && x.month === p.month)).slice(0, 6);
+    const chips = others.length
+        ? `<span class="pos-tgt-st-chips"><span class="pos-tgt-st-lbl">Other months:</span>${others.map(x =>
+            `<button type="button" class="pos-tgt-chip" data-tgtjump="${tgtKey(x.year, x.month)}" title="Show ${x.n} PO rows">${escHtml(tgtLabel(x.year, x.month))}<span>${x.n}</span></button>`).join("")}</span>`
+        : "";
+    el.className = "pos-tgt-status" + (has ? " has-data" : "");
+    el.innerHTML = main + chips;
 }
 
 /* Block check — the same rule the dashboard uses when it totals a district.
@@ -2872,25 +3003,29 @@ function renderTargetsTable() {
     const rows = tgtRows.filter(r => !q || [r.po_id, r.po_name, r.district, r.pm].some(v => String(v || "").toLowerCase().includes(q)));
     if (!rows.length) {
         tbody.innerHTML = `<tr><td colspan="${TGT_NUM.length + 5}" class="empty-state"><div class="empty-icon">🎯</div>`
-            + (tgtMonths.length ? "No rows match." : "No targets yet. Pick a month and upload the targets Excel.") + "</td></tr>";
+            + (tgtRows.length ? "No rows match." : `No targets for ${escHtml(tgtCurLabel() || "this month")} yet. Upload the targets Excel above.`) + "</td></tr>";
     } else {
         tbody.innerHTML = rows.map(r => {
             const f = flags[r.id] || [];
             const chk = f.length ? f.map(x => `<span class="pos-tgt-flag ${x.cls}" title="${escHtml(x.text)}">${escHtml(x.text)}</span>`).join("")
                                  : '<span class="pos-tgt-ok" title="Counted in district totals">OK</span>';
-            return `<tr><td class="pos-tgt-check">${chk}</td><td>${escHtml(r.po_id)}</td><td>${escHtml(r.po_name)}</td><td>${escHtml(r.district)}</td>`
+            const who = r.po_name || r.po_id;
+            return `<tr data-row="${r.id}"><td class="pos-tgt-check">${chk}</td><td>${escHtml(r.po_id)}</td>`
+                + `<td><button type="button" class="pos-tgt-name" title="Edit ${escHtml(who)}'s targets" onclick="window.POSAdmin.openTgtModal(${r.id})">`
+                + `<span class="pos-tgt-pen" aria-hidden="true"></span><span class="pos-tgt-name-text">${escHtml(r.po_name || "(no name)")}</span></button></td>`
+                + `<td>${escHtml(r.district)}</td>`
                 + TGT_NUM.map(c => {
                     const v = r[c.db];
                     const shown = v == null ? "" : (isNaN(Number(v)) ? escHtml(v) : Number(v).toLocaleString("en-IN", { maximumFractionDigits: 4 }));   // display only
                     return `<td class="pos-num${v === 0 ? " pos-zero" : ""}">${v == null ? "" : shown + (c.pct ? "%" : "")}</td>`;
                 }).join("")
-                + `<td class="pos-col-actions"><button class="pos-icon-btn edit" title="Edit" onclick="window.POSAdmin.openTgtModal(${r.id})">✏️</button>`
-                + `<button class="pos-icon-btn delete" title="Delete" onclick="window.POSAdmin.deleteTgtRow(${r.id})">🗑️</button></td></tr>`;
+                + `<td class="pos-col-actions"><button class="pos-icon-btn delete" title="Delete" onclick="window.POSAdmin.deleteTgtRow(${r.id})">🗑️</button></td></tr>`;
         }).join("");
     }
-    const flagged = rows.filter(r => (flags[r.id] || []).length).length;
-    const label = document.getElementById("posTgtView").selectedOptions[0]?.text || "";
-    setMeta("posTgtMeta", tgtRows.length ? `${label} · ${tgtRows.length} POs` + (flagged ? ` · ${flagged} with notes` : "") : (tgtMonths.length ? label + " · no rows" : "No targets uploaded yet"));
+    if (tgtCur) {
+        const flagged = rows.filter(r => (flags[r.id] || []).length).length;
+        setMeta("posTgtMeta", (tgtRows.length ? `${tgtCurLabel()} · ${tgtRows.length} POs` : `${tgtCurLabel()} · no rows`) + (flagged ? ` · ${flagged} with notes` : ""));
+    }
 }
 
 /* ---------- Excel ---------- */
@@ -2901,20 +3036,19 @@ async function downloadTgtSample() {
     XLSX.writeFile(wb, "targets_sample.xlsx");
 }
 async function downloadTgtCurrent() {
-    if (!tgtRows.length) { window.notify("Nothing to download for this month.", "warning"); return; }
+    if (!tgtCur || !tgtRows.length) { window.notify(`No targets saved for ${tgtPicked().label || "this month"}.`, "warning"); return; }
     const XLSX = await loadXLSX();
     const aoa = [TGT_ALL.map(c => c.excel)].concat(tgtRows.map(r => TGT_ALL.map(c => r[c.db] == null ? "" : (c.pct ? r[c.db] + "%" : r[c.db]))));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), "Sheet1");
-    const label = (document.getElementById("posTgtView").selectedOptions[0]?.text || "month").replace(/\s+/g, "_");
-    XLSX.writeFile(wb, `Targets_${label}.xlsx`);
+    XLSX.writeFile(wb, `Targets_${tgtCurLabel().replace(/\s+/g, "_")}.xlsx`);
 }
 
 async function uploadTargets() {
-    const year = Number(document.getElementById("posTgtYear").value);
-    const month = Number(document.getElementById("posTgtMonth").value);
+    const { year, month, label } = tgtPicked();
     const fileInput = document.getElementById("posTgtFile");
     const file = fileInput && fileInput.files[0];
+    if (!year || !month) { window.notify("Pick the year and month first.", "warning"); return; }
     if (!file) { window.notify("Select a file first.", "warning"); return; }
     const btn = document.getElementById("posTgtUploadBtn");
     if (btn) { btn.disabled = true; btn.textContent = "Uploading…"; }
@@ -2975,61 +3109,83 @@ async function uploadTargets() {
             return;
         }
 
-        // 4. confirm — and replace only this month
-        const label = `${MONTH_NAMES[month]} ${year}`;
-        const { count, error: cntErr } = await posSupabase.from("g1_g2_g3_target_sheet").select("id", { count: "exact", head: true }).eq("year", year).eq("month", month);
+        // 4. confirm — the whole month is replaced, nothing else is touched
+        const { count, error: cntErr } = await posSupabase.from(TGT_TABLE).select("id", { count: "exact", head: true }).eq("year", year).eq("month", month);
         if (cntErr) throw cntErr;
         const ok = await window.showAppConfirm({
             title: count ? `Replace targets for ${label}?` : `Upload targets for ${label}?`,
-            message: (count ? `${label} already has ${count} PO rows. They will be replaced by ` : "This will save ")
-                + `${rows.length} PO rows for ${label}.` + (skipped.length ? ` ${skipped.length} non-PO row${skipped.length === 1 ? "" : "s"} skipped: ${skipped.join("; ")}.` : "") + " Continue?",
+            message: (count ? `${label} already has ${count} PO rows. All of them will be removed and replaced by the ` : "This will save ")
+                + `${rows.length} PO rows in this file.`
+                + (skipped.length ? ` ${skipped.length} non-PO row${skipped.length === 1 ? "" : "s"} skipped: ${skipped.join("; ")}.` : "")
+                + " Continue?",
             type: "warning", confirmText: count ? "Replace" : "Upload", cancelText: "Cancel"
         });
         if (!ok) return;
         const by = currentAdminEmail(), now = new Date().toISOString();
         await tgtReplaceMonth(year, month, rows.map(o => Object.assign(o, { updated_by: by, updated_at: now })));
-        window.notify(`${rows.length} PO targets saved for ${label}.`, "success");
+        window.notify(count ? `${label} replaced — ${rows.length} PO rows saved (${count} old rows removed).` : `${rows.length} PO targets saved for ${label}.`, "success");
         fileInput.value = ""; refreshFileLabel(fileInput);
-        await loadTargetMonths(tgtKey(year, month));
+        await loadTargetMonths({ select: { year, month } });
     } catch (err) {
         console.error("Targets upload failed:", err);
         window.notify(friendlyDbError(err), "error");
     } finally {
-        if (btn) { btn.disabled = false; btn.textContent = "Upload"; }
+        if (btn) btn.disabled = false;
+        tgtRenderStatus();
     }
 }
 
 // New rows in first; this month's old rows out only after every batch succeeded.
 async function tgtReplaceMonth(year, month, rows) {
-    const T = "g1_g2_g3_target_sheet";
     const forMonth = q => q.eq("year", year).eq("month", month);
-    const { data: last, error: lastErr } = await forMonth(posSupabase.from(T).select("id")).order("id", { ascending: false }).limit(1);
+    const { data: last, error: lastErr } = await forMonth(posSupabase.from(TGT_TABLE).select("id")).order("id", { ascending: false }).limit(1);
     if (lastErr) throw lastErr;
     const maxOldId = last && last.length ? last[0].id : null;
     try {
         for (let i = 0; i < rows.length; i += 200) {
-            const { error } = await posSupabase.from(T).insert(rows.slice(i, i + 200));
+            const { error } = await posSupabase.from(TGT_TABLE).insert(rows.slice(i, i + 200));
             if (error) throw error;
         }
     } catch (err) {
-        let undo = forMonth(posSupabase.from(T).delete());
+        let undo = forMonth(posSupabase.from(TGT_TABLE).delete());
         if (maxOldId != null) undo = undo.gt("id", maxOldId);
         await undo;
+        // A unique (year, month, po_id) key refuses new-next-to-old: swap instead.
+        if (err && err.code === "23505" && maxOldId != null) return tgtSwapMonth(year, month, rows);
         throw err;
     }
     if (maxOldId != null) {
-        const { error } = await forMonth(posSupabase.from(T).delete()).lte("id", maxOldId);
+        const { error } = await forMonth(posSupabase.from(TGT_TABLE).delete()).lte("id", maxOldId);
         if (error) throw error;
+    }
+}
+
+// Copy the old month aside, clear it, insert the file; on any failure put the copy back.
+async function tgtSwapMonth(year, month, rows) {
+    const forMonth = q => q.eq("year", year).eq("month", month);
+    const { data: old, error: readErr } = await forMonth(posSupabase.from(TGT_TABLE).select("*")).range(0, 4999);
+    if (readErr) throw readErr;
+    const { error: delErr } = await forMonth(posSupabase.from(TGT_TABLE).delete());
+    if (delErr) throw delErr;
+    try {
+        for (let i = 0; i < rows.length; i += 200) {
+            const { error } = await posSupabase.from(TGT_TABLE).insert(rows.slice(i, i + 200));
+            if (error) throw error;
+        }
+    } catch (err) {
+        await forMonth(posSupabase.from(TGT_TABLE).delete());
+        const back = (old || []).map(r => { const c = Object.assign({}, r); delete c.id; return c; });
+        for (let i = 0; i < back.length; i += 200) await posSupabase.from(TGT_TABLE).insert(back.slice(i, i + 200));
+        throw err;
     }
 }
 
 /* ---------- single-row edit / add / delete ---------- */
 function openTgtModal(id = null) {
-    const v = document.getElementById("posTgtView").value;
-    if (!id && !v) { window.notify("Upload a month first, then add rows to it.", "warning"); return; }
+    if (!tgtCur) { window.notify("The month is still loading.", "warning"); return; }
     tgtEditingId = id;
     const r = id ? tgtRows.find(x => x.id === id) : null;
-    document.getElementById("posTgtModalTitle").textContent = (r ? "Edit targets · " : "Add PO · ") + (document.getElementById("posTgtView").selectedOptions[0]?.text || "");
+    document.getElementById("posTgtModalTitle").textContent = (r ? "Edit targets · " : "Add PO · ") + tgtCurLabel();
     document.getElementById("posTgtPoList").innerHTML = posData.assignments.filter(a => a.designation === "PO")
         .map(a => `<option value="${escHtml(a.emp_id)}">${escHtml(a.name)}</option>`).join("");
     const dsel = document.getElementById("posTgtDistrict");
@@ -3051,6 +3207,7 @@ function onTgtPoIdChange() {
 function closeTgtModal() { document.getElementById("posTgtModal").classList.remove("open"); tgtEditingId = null; }
 
 async function saveTgtRow() {
+    if (!tgtCur) return;
     const val = id => document.getElementById(id).value.trim();
     const row = { po_id: val("posTgtPoId"), po_name: val("posTgtPoName"), district: val("posTgtDistrict"), pm: val("posTgtPm"),
                   updated_by: currentAdminEmail(), updated_at: new Date().toISOString() };
@@ -3063,28 +3220,29 @@ async function saveTgtRow() {
     });
     if (bad) { window.notify("Fix the highlighted values — numbers of 0 or more only.", "warning"); return; }
     if (row.posts_per_teacher !== 1) { window.notify('"Posts per month / per teacher" must be 1.', "warning"); return; }
-    if (!tgtEditingId && tgtRows.some(r => r.po_id === row.po_id)) { window.notify("This PO already has targets for this month — edit that row instead.", "warning"); return; }
-    let q;
-    if (tgtEditingId) q = posSupabase.from("g1_g2_g3_target_sheet").update(row).eq("id", tgtEditingId);
-    else {
-        const [y, m] = document.getElementById("posTgtView").value.split("-").map(Number);
-        q = posSupabase.from("g1_g2_g3_target_sheet").insert(Object.assign(row, { year: y, month: m }));
-    }
+    if (tgtRows.some(r => r.po_id === row.po_id && r.id !== tgtEditingId)) { window.notify("This PO already has targets for this month — edit that row instead.", "warning"); return; }
+    const cur = tgtCur, wasEdit = !!tgtEditingId;
+    const q = wasEdit
+        ? posSupabase.from(TGT_TABLE).update(row).eq("id", tgtEditingId)
+        : posSupabase.from(TGT_TABLE).insert(Object.assign(row, { year: cur.year, month: cur.month }));
     const { error } = await q;
     if (error) { window.notify(friendlyDbError(error), "error"); return; }
-    window.notify(tgtEditingId ? "Targets updated." : "PO added.", "success");
-    closeTgtModal(); await loadTargetRows();
+    window.notify(wasEdit ? "Targets updated." : "PO added.", "success");
+    closeTgtModal();
+    await loadTargetMonths({ select: cur });
 }
 
 async function deleteTgtRow(id) {
     const r = tgtRows.find(x => x.id === id); if (!r) return;
+    const cur = tgtCur;
     const ok = await window.showAppConfirm({ title: "Delete this PO's targets?",
-        message: `${r.po_name || r.po_id} (${r.district}) for ${document.getElementById("posTgtView").selectedOptions[0]?.text || "this month"}. This cannot be undone.`,
+        message: `${r.po_name || r.po_id} (${r.district}) for ${tgtCurLabel()}. This cannot be undone.`,
         type: "error", confirmText: "Delete", cancelText: "Cancel" });
     if (!ok) return;
-    const { error } = await posSupabase.from("g1_g2_g3_target_sheet").delete().eq("id", id);
+    const { error } = await posSupabase.from(TGT_TABLE).delete().eq("id", id);
     if (error) { window.notify(friendlyDbError(error), "error"); return; }
-    window.notify("Deleted.", "success"); await loadTargetMonths();
+    window.notify("Deleted.", "success");
+    await loadTargetMonths({ select: cur });
 }
 
 /* ====================================
@@ -3194,5 +3352,6 @@ window.POSAdmin = {
     renderAcademicTable, downloadAcadSample, downloadAcadCurrent, uploadAcademic,
     openAcadModal, onAcadPoIdChange, closeAcadModal, saveAcadRow, deleteAcadRow,
     loadTargetRows, renderTargetsTable, downloadTgtSample, downloadTgtCurrent, uploadTargets,
+    onTgtPeriodChange,
     openTgtModal, onTgtPoIdChange, closeTgtModal, saveTgtRow, deleteTgtRow
-};
+};
