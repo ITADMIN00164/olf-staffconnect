@@ -1608,7 +1608,7 @@ async function getPageHtml(page) {
     // which looks like a broken page rather than a cached one. Hosting already
     // sends no-cache for HTML, so in production this costs a 304 and nothing
     // more; locally it is the difference between seeing an edit and not.
-    const res  = await fetch(`pages/${page}.html?v=20261104g`, { cache: "no-cache" });
+    const res  = await fetch(`pages/${page}.html?v=20261104h`, { cache: "no-cache" });
     const html = await res.text();
     pageFragments.set(page, html);
     return html;
