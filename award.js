@@ -3859,8 +3859,8 @@ window.AWARD_CONFIG = {
     return String(text).split(", ").map(function (one) {
       var m = one.match(/^(.*?)\s*\((interim [^)]+)\)$/i);
       return '<span class="pm-one">' + escapeHtml(m ? m[1] : one) +
-        // the badge says just "interim"; hovering it gives the full wording (DM or COO)
-        (m ? ' <em class="pm-interim" title="' + escapeHtml(m[2]) + '">interim</em>' : "") + "</span>";
+        // the badge says just "interim", nothing else
+        (m ? ' <em class="pm-interim">interim</em>' : "") + "</span>";
     }).join("");
   }
 
