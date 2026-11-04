@@ -225,10 +225,13 @@
   function apiRead(action, payload, attempt) {
     attempt = attempt || 0;
     return api(action, payload).catch(function (err) {
-      if (attempt >= 1) throw err;
-      console.warn('[ProgramCalendar] ' + action + ' failed, retrying once:', err && err.message);
-      return new Promise(function (r) { setTimeout(r, 700); })
-        .then(function () { return apiRead(action, payload, attempt + 1); });
+      console.warn('[ProgramCalendar] JSONP ' + action + ' failed (' + (err && err.message) + '), falling back to fetch POST...');
+      return apiPost(action, payload).catch(function (errPost) {
+        if (attempt >= 1) throw errPost;
+        console.warn('[ProgramCalendar] fetch POST ' + action + ' also failed, retrying once in 700ms:', errPost && errPost.message);
+        return new Promise(function (r) { setTimeout(r, 700); })
+          .then(function () { return apiRead(action, payload, attempt + 1); });
+      });
     });
   }
 
