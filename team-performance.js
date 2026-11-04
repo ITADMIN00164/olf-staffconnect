@@ -2926,6 +2926,10 @@
 
     container.innerHTML = html;
     updateCounts();
+    const newRootCard = document.querySelector(".tp-card-root");
+    if (newRootCard && window.__tpResizeObserver) {
+      try { window.__tpResizeObserver.observe(newRootCard); } catch (_) {}
+    }
     scheduleConnectorUpdate();
   }
 
@@ -3255,7 +3259,9 @@
       drawConnectors();
     });
     setTimeout(drawConnectors, 40);
-    setTimeout(drawConnectors, 180);
+    setTimeout(drawConnectors, 150);
+    setTimeout(drawConnectors, 350);
+    setTimeout(drawConnectors, 800);
   }
 
   function drawConnectors() {
@@ -3301,9 +3307,9 @@
       return;
     }
 
-    // Bus level (halfway between root bottom and nearest division top)
+    // Bus level (halfway between root bottom and nearest division top, clamped safely)
     const minDivY = Math.min(...divPoints.map(p => p.dY));
-    const busY = Math.round(rY + Math.max(34, (minDivY - rY) * 0.5));
+    const busY = Math.min(minDivY - 24, Math.max(rY + 34, Math.round(rY + (minDivY - rY) * 0.5)));
 
     let paths = "";
 
@@ -4338,16 +4344,27 @@
       viewport.__scrollAttached = true;
       viewport.addEventListener("scroll", scheduleConnectorUpdate, { passive: true });
     }
+    window.addEventListener("resize", scheduleConnectorUpdate, { passive: true });
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(scheduleConnectorUpdate);
+    }
     if (window.ResizeObserver) {
       const canvas = document.getElementById("tpCanvas");
       const tree = document.getElementById("tpTreeContainer");
+      if (!window.__tpResizeObserver) {
+        window.__tpResizeObserver = new window.ResizeObserver(scheduleConnectorUpdate);
+      }
       if (canvas && !canvas.__roAttached) {
         canvas.__roAttached = true;
-        new window.ResizeObserver(scheduleConnectorUpdate).observe(canvas);
+        window.__tpResizeObserver.observe(canvas);
       }
       if (tree && !tree.__roAttached) {
         tree.__roAttached = true;
-        new window.ResizeObserver(scheduleConnectorUpdate).observe(tree);
+        window.__tpResizeObserver.observe(tree);
+      }
+      const rootCard = document.querySelector(".tp-card-root");
+      if (rootCard) {
+        window.__tpResizeObserver.observe(rootCard);
       }
     }
   }
