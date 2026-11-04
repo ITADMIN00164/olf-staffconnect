@@ -1786,6 +1786,7 @@ function applyPageAccessNav() {
             tgl.setAttribute("role", "switch");
             tgl.innerHTML = '<span class="nat-knob" aria-hidden="true"></span>';
             tgl.addEventListener("click", (e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 setPageEnabled(page, !isPageEnabled(page));
             });
@@ -1816,8 +1817,10 @@ async function setPageEnabled(page, on) {
         ?.parentElement?.querySelector(".nav-access-toggle");
     if (tgl) { tgl.disabled = true; tgl.setAttribute("aria-checked", on ? "true" : "false"); }
     try {
+        const currentPages = (pageAccessData && pageAccessData.pages) ? { ...pageAccessData.pages } : {};
+        currentPages[page] = on;
         const patch = {
-            pages: { [page]: on },
+            pages: currentPages,
             updatedBy: auth.currentUser?.email || "",
             updatedAt: serverTimestamp()
         };

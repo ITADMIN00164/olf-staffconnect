@@ -2956,6 +2956,7 @@
     #appSidebar.sb-admin .nav-row > .nav-item { padding-right: 42px; }
     #appSidebar .nav-access-toggle {
         position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+        z-index: 10;
         width: 30px; height: 17px; padding: 0; border: 0; border-radius: 999px; cursor: pointer;
         background: var(--chrome-bg);
         box-shadow: inset -1.5px -1.5px 3px var(--chrome-hi), inset 1.5px 1.5px 3px var(--chrome-lo);
@@ -2967,6 +2968,7 @@
         background: var(--chrome-faint);
         box-shadow: 0 1px 2px rgba(0,0,0,0.25);
         transition: transform .2s cubic-bezier(.2,.8,.2,1), background .2s ease;
+        pointer-events: none;
     }
     #appSidebar .nav-access-toggle[aria-checked="true"] {
         background: #22c55e;
@@ -4019,7 +4021,7 @@
     </div>
 </div>
 
-<script type="module" src="app.js?v=2026-11-03s"></script>
+<script type="module" src="app.js?v=2026-11-04a"></script>
 <script src="profile.js"></script>
 <script src="pom.js"></script>
 <script src="calendar.js?v=2026-11-02a"></script>
