@@ -3279,7 +3279,6 @@
     svg.style.width = width + "px";
     svg.style.height = height + "px";
 
-    const cRect = container.getBoundingClientRect();
     const rootCard = document.querySelector(".tp-card-root");
     const divCards = document.querySelectorAll(".tp-divisions-row .tp-card-div");
 
@@ -3288,17 +3287,37 @@
       return;
     }
 
+    // Convert screen coordinates to SVG viewBox coordinates (100% immune to html CSS zoom, DPR, scaling)
+    let toSvg;
+    const ctm = typeof svg.getScreenCTM === "function" ? svg.getScreenCTM() : null;
+    if (ctm && typeof svg.createSVGPoint === "function") {
+      const invCtm = ctm.inverse();
+      const pt = svg.createSVGPoint();
+      toSvg = (sx, sy) => {
+        pt.x = sx;
+        pt.y = sy;
+        const res = pt.matrixTransform(invCtm);
+        return { x: Math.round(res.x), y: Math.round(res.y) };
+      };
+    } else {
+      const cRect = container.getBoundingClientRect();
+      toSvg = (sx, sy) => ({
+        x: Math.round(sx - cRect.left),
+        y: Math.round(sy - cRect.top)
+      });
+    }
+
     const rBox = rootCard.getBoundingClientRect();
-    const rX = Math.round(rBox.left - cRect.left + rBox.width / 2);
-    const rY = Math.round(rBox.bottom - cRect.top);
+    const rPt = toSvg(rBox.left + rBox.width / 2, rBox.bottom);
+    const rX = rPt.x;
+    const rY = rPt.y;
 
     const divPoints = [];
     divCards.forEach(dCard => {
       const dBox = dCard.getBoundingClientRect();
       if (dBox.width > 0 && dBox.height > 0) {
-        const dX = Math.round(dBox.left - cRect.left + dBox.width / 2);
-        const dY = Math.round(dBox.top - cRect.top);
-        divPoints.push({ dX, dY, id: dCard.id, el: dCard });
+        const dPt = toSvg(dBox.left + dBox.width / 2, dBox.top);
+        divPoints.push({ dX: dPt.x, dY: dPt.y, id: dCard.id, el: dCard });
       }
     });
 
@@ -3307,9 +3326,9 @@
       return;
     }
 
-    // Bus level (halfway between root bottom and nearest division top, clamped safely)
+    // Bus level: perfectly centered halfway between root bottom and nearest division top
     const minDivY = Math.min(...divPoints.map(p => p.dY));
-    const busY = Math.min(minDivY - 24, Math.max(rY + 34, Math.round(rY + (minDivY - rY) * 0.5)));
+    const busY = Math.round((rY + minDivY) / 2);
 
     let paths = "";
 
