@@ -3853,13 +3853,14 @@ window.AWARD_CONFIG = {
   }
 
   /* Who manages the place, one name to a line. A stand-in is marked so it is
-     not read as the post-holder: the name, then an "interim" badge. */
+     not read as the post-holder: the name, then a small "interim" badge. */
   function pmHtml(text) {
     if (!text) return "—";
     return String(text).split(", ").map(function (one) {
       var m = one.match(/^(.*?)\s*\((interim [^)]+)\)$/i);
       return '<span class="pm-one">' + escapeHtml(m ? m[1] : one) +
-        (m ? ' <em class="pm-interim">' + escapeHtml(m[2]) + "</em>" : "") + "</span>";
+        // the badge says just "interim", nothing else
+        (m ? ' <em class="pm-interim">interim</em>' : "") + "</span>";
     }).join("");
   }
 
