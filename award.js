@@ -4327,15 +4327,17 @@ window.AWARD_CONFIG = {
 
 
     var head = groupHeadHtml(types, { before:
+        '<th rowspan="2" class="col-no" title="Row number">#</th>' +
         '<th rowspan="2" class="col-month">Month</th>' +
         '<th rowspan="2" class="col-district">District</th>' +
         '<th rowspan="2">State</th><th rowspan="2">PM</th>' },
       '<th rowspan="2">Remark</th>' +
       '<th rowspan="2" class="col-act"><span class="sr-only">Record</span></th>');
 
-    var colCount = 4 + GROUPS.length * (types.length + 1) + 2;
+    var colCount = 5 + GROUPS.length * (types.length + 1) + 2;     // the row number, then the four that say which row
     var lastDistrict = null;
     var bandNo = 0;
+    var rowNo = 0;                       // numbers every row of the sheet 1, 2, 3 ...
     var fresh = stockFresh;
     stockFresh = false;
 
@@ -4360,6 +4362,7 @@ window.AWARD_CONFIG = {
              (tellable ? ' data-aw-detail="' + escapeHtml(r.monthKey) +
                          '" data-aw-where="' + escapeHtml(r.district) + '"' : "") +
              ">" +
+        '<td class="col-no">' + (++rowNo) + "</td>" +
         '<td class="col-month">' + escapeHtml(r.month) + "</td>" +
         '<td class="col-district is-district">' + escapeHtml(r.district) + "</td>" +
         "<td>" + escapeHtml(r.state) + "</td>" +
@@ -4928,13 +4931,175 @@ window.AWARD_CONFIG = {
     return out;
   }
 
+  /* Month-by-month figures, from a file laid out like the sheet's own download:
+     Month, State, Division, District, then a column for every gift under
+     Requisition, Delivery and Utilisation (the Balance columns, and the
+     Carry forward rows, are ignored: a balance is worked out, not typed).
+     One row to a district and month. A figure replaces what is recorded for
+     that cell; an empty cell is left alone; a dash or 0 is an answer and
+     takes a figure away. Like the opening balance it lands as unsaved
+     edits, so Save is still the one thing that writes. Any problem turns the
+     whole file away. */
+  var MONTHLY_GROUPS = [
+    { word: "requisition", col: "req", label: "Requisition" },
+    { word: "delivery",    col: "del", label: "Delivery" },
+    { word: "utilisation", col: "use", label: "Utilisation" }
+  ];
+
+  function isMonthlyImport(rows) {
+    if (!rows || !rows.length) return false;
+    var heads = rows[0].map(normalHeader);
+    if (heads.indexOf("balance month") >= 0 || heads.indexOf("month") < 0) return false;
+    return heads.some(function (h) { return /^(requisition|delivery|utilisation) /.test(h); });
+  }
+
+  function readMonthlyImport(rows) {
+    var out = { edits: {}, problems: [], unchanged: 0, cleared: 0,
+                districts: {}, rows: 0, blocked: false, monthly: true, fy: 0 };
+    var types = stockTypes();
+    var heads = rows[0].map(normalHeader);
+    var nameAt = heads.indexOf("district name");
+    if (nameAt < 0) nameAt = heads.indexOf("district");
+    var monthAt = heads.indexOf("month");
+    if (nameAt < 0) {
+      out.problems.push({ line: 1, why: 'Missing the "District" column.' });
+      out.blocked = true; return out;
+    }
+
+    // Where each group's gift columns are; a gift with no column is simply not touched.
+    var cols = [];
+    MONTHLY_GROUPS.forEach(function (g) {
+      types.forEach(function (t) {
+        var at = [shortType(t), t.code, t.name].map(function (n) { return normalHeader(g.word + " " + n); })
+          .reduce(function (found, h) { return found >= 0 ? found : heads.indexOf(h); }, -1);
+        if (at >= 0) cols.push({ g: g, t: t, at: at });
+      });
+    });
+    if (!cols.length) {
+      out.problems.push({ line: 1, why: "No Requisition, Delivery or Utilisation columns for this sheet's gifts were found." });
+      out.blocked = true; return out;
+    }
+
+    var known = {};
+    stockPlaces().forEach(function (p) { known[p.district.trim().toLowerCase()] = p; });
+    var nowKey = monthKeyOf(new Date());
+
+    // The year first: the sheet shows one year at a time, so every month must be in it.
+    var fy = 0;
+    rows.slice(1).forEach(function (row) {
+      var k = parseBalanceMonth(row[monthAt]);
+      if (k && !fy) fy = fyOfDay(k + "-01");
+    });
+    if (!fy) {
+      out.problems.push({ line: 2, why: "no month (like Apr'26) on any line" });
+      out.blocked = true; return out;
+    }
+    out.fy = fy;
+
+    // What each district's sheet reads now, worked out once per district.
+    var recorded = {};
+    var recordedFor = function (place, key, col, typeId) {
+      if (!recorded[place.district]) {
+        recorded[place.district] = {};
+        stockRows(fy, allRequisitions, stockMovements,
+                  [{ state: "", division: "", district: place.district, pm: "" }])
+          .forEach(function (r) { recorded[place.district][r.monthKey] = r; });
+      }
+      var row = recorded[place.district][key];
+      return row ? ((row[EDIT_COLUMNS[col].column] || {})[typeId] || 0) : 0;
+    };
+
+    var seen = {};
+    rows.slice(1).forEach(function (row, index) {
+      var line = index + 2;
+      out.rows += 1;
+      if (row.length !== rows[0].length) {
+        out.problems.push({ line: line, why: "has " + row.length + " fields, expected " + rows[0].length });
+        return;
+      }
+      var monthText = String(row[monthAt] || "").trim();
+      if (/^(carry forward|opening)$/i.test(monthText)) return;     // balance rows: nothing to read
+
+      var name = String(row[nameAt] || "").trim();
+      var place = known[name.toLowerCase()];
+      if (!name) { out.problems.push({ line: line, why: "no district on this line" }); return; }
+      if (!place) { out.problems.push({ line: line, why: '"' + name + '" is not a district in the staff directory (Employees)' }); return; }
+
+      var key = parseBalanceMonth(monthText);
+      if (!key) { out.problems.push({ line: line, why: place.district + ': no month like Apr 2026 (found "' + monthText + '")' }); return; }
+      if (fyOfDay(key + "-01") !== fy) {
+        out.problems.push({ line: line, why: place.district + ": " + monthLabelOf(key) + " is not in " + fyLabel(fy) + " - one year at a time" });
+        return;
+      }
+      if (key > nowKey) { out.problems.push({ line: line, why: place.district + ": " + monthLabelOf(key) + " has not happened yet" }); return; }
+      if (!monthHasHappened(key, fy)) {
+        out.problems.push({ line: line, why: place.district + ": " + monthLabelOf(key) + " is before the go-live month, so its figures are not entered" });
+        return;
+      }
+      var pair = place.district + "|" + key;
+      if (seen[pair]) { out.problems.push({ line: line, why: place.district + " " + monthLabelOf(key) + " is on line " + seen[pair] + " as well" }); return; }
+      seen[pair] = line;
+
+      cols.forEach(function (c) {
+        var cell = parseFigureCell(row[c.at]);
+        if (cell.skip) return;
+        if (cell.error) {
+          out.problems.push({ line: line, why: place.district + " " + monthLabelOf(key) + ": " + cell.error + ", under " + c.g.label + " " + shortType(c.t) });
+          return;
+        }
+        var have = recordedFor(place, key, c.g.col, c.t.id);
+        if (cell.value === have) { out.unchanged += 1; return; }
+        if (!cell.value) out.cleared += 1;
+        out.edits[editKey(place.district, key, c.g.col, c.t.id)] = cell.value;
+        out.districts[place.district] = true;
+      });
+    });
+
+    if (out.problems.length) { out.edits = {}; out.districts = {}; out.blocked = true; }
+    return out;
+  }
+
+  // The figures land in the year the file is for, as unsaved edits.
+  function applyMonthly(result) {
+    refreshStockControls();
+    el.stockYear.value = String(result.fy);
+    pendingEdits = result.edits;
+    var hidden = Object.keys(result.districts).filter(function (d) {
+      return !visibleStockPlaces().some(function (p) { return p.district === d; });
+    });
+    if (hidden.length) {
+      el.stockState.value = ""; el.stockDivision.value = ""; el.stockDistrict.value = "";
+      stockFiltersFor(null);
+      result.opened = hidden.length;
+    }
+    stockShown = true;
+    showStockEditError("");
+    renderStock();
+    showImportResult(result, null);
+  }
+
+  function importMonthlyFile(result) {
+    var count = Object.keys(result.edits).length;
+    if (!count) { showStockEditError(""); renderStock(); showImportResult(result, null); return; }
+    if (countPendingEdits() > 0) {
+      return awConfirm("Replace your unsaved figures?", "The sheet has figures you typed and have not saved. This file will replace them.", "Replace", "warning")
+        .then(function (ok) { if (ok) applyMonthly(result); });
+    }
+    applyMonthly(result);
+  }
+
   function importOpeningFile(file) {
     if (!canSetStock() || !file) return;
     var reader = new FileReader();
     reader.onerror = function () { showImportResult(null, "That file could not be read."); };
     reader.onload = function () {
       var result;
-      try { result = readOpeningImport(String(reader.result || "")); }
+      try {
+        // A file of month-by-month figures goes its own way; anything else is the opening balance.
+        var sheetRows = parseCsv(String(reader.result || ""));
+        if (isMonthlyImport(sheetRows)) { importMonthlyFile(readMonthlyImport(sheetRows)); return; }
+        result = readOpeningImport(String(reader.result || ""));
+      }
       catch (err) { showImportResult(null, "That file could not be read: " + messageOf(err)); return; }
 
       var count = Object.keys(result.edits).length;
