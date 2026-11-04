@@ -3,11 +3,12 @@
 
    Only the IT admin account sees the button. The month and year the records belong to are chosen
    after the sheet is picked, and nothing is sent until they are. Before anything is sent the file is checked
-   row by row, and the sheet is added only if EVERY row passes, so one wrong row stops the whole upload:
-     - the columns are found by their headings, so their order does not matter;
+   row by row, and the sheet is added only if EVERY row passes, so one wrong row stops the whole upload.
+   The ONLY checks are these three, and only on a cell that has something in it:
      - Community, District Name and Award Category must be one of the values in the dropdown lists
-       (public.award_lists), exactly as written;
-     - every column must be filled in, and the mobile number must have 10 digits.
+       (public.award_lists), exactly as written.
+   Nothing else is validated and no column is mandatory: an empty cell is saved empty, a mobile number,
+   email, link or score is saved as typed. The columns are found by their headings, so their order does not matter.
    A row is a DUPLICATE, and is not added, when its Month + Full Name + School name + Award name are the
    same as a record already in that month, or as an earlier row of the same sheet. Those four together are
    the unique key: capitals and extra spaces do not matter, and nothing is updated for a duplicate.
@@ -31,12 +32,6 @@ const COLUMNS = {
   districtname: "district", pmname: "pm", awardname: "awardName", awardcategory: "awardCategory",
   postlinkurl: "postUrl", postscore: "postScore"
 };
-const NEEDED = [
-  ["fullName", "Full Name"], ["mobile", "Mobile number"], ["email", "Email"], ["school", "School name"],
-  ["community", "community"], ["circle", "Circle name"], ["block", "Block Name"],
-  ["district", "District Name"], ["pm", "PM Name"], ["awardName", "Award name"],
-  ["awardCategory", "Award Category"], ["postUrl", "Post link URL"], ["postScore", "Post score"]
-];
 
 let parsed = null;          // what the last file came to: { ok, errors, total, view } - view is { label, fresh, dupes } for the month chosen
 
@@ -172,14 +167,13 @@ function readRows(buffer) {
   const grid = window.XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: "", blankrows: false });
   // The heading row is the first one that has a Full Name heading.
   const headAt = grid.findIndex(r => r.some(c => normHeader(c) === "fullname"));
-  if (headAt < 0) throw new Error('No heading row found. The sheet needs a "Full Name" column and the other Raw Data headings.');
+  if (headAt < 0) throw new Error('No heading row found. The first row of the sheet needs the column headings, with a "Full Name" column.');
   const at = {};
   grid[headAt].forEach((h, i) => {
     const f = COLUMNS[normHeader(h)];
     if (f && at[f] === undefined) at[f] = i;
   });
-  const missing = NEEDED.filter(n => at[n[0]] === undefined).map(n => n[1]);
-  if (missing.length) throw new Error("These columns are missing from the sheet: " + missing.join(", ") + ".");
+  // No column is mandatory: one the sheet does not have is simply left empty.
   const rows = [];
   grid.slice(headAt + 1).forEach((r, i) => {
     if (r.every(c => cellText(c) === "")) return;
@@ -206,37 +200,19 @@ function checkRow(r, lists) {
     postUrl: cellText(r.postUrl), postScore: cellText(r.postScore)
   };
 
-  if (!rec.fullName) problems.push("Full Name is empty");
-  if (!rec.mobile) problems.push("Mobile number is empty");
-  else if (!/^[6-9]\d{9}$/.test(rec.mobile)) problems.push("Mobile number “" + rec.mobile + "” is not a 10-digit number");
-  if (!rec.school) problems.push("School name is empty");
-
-  if (!rec.community) problems.push("community is empty");
-  else if (lists.community.indexOf(rec.community) === -1) {
+  // Only the three dropdown columns are checked, and only when the cell has a value.
+  if (rec.community && lists.community.indexOf(rec.community) === -1) {
     const s = suggest(lists.community, rec.community);
-    problems.push("community “" + rec.community + "” is not in the list" + (s ? " (“" + s + "”?)" : ""));
+    problems.push("Community “" + rec.community + "” is not in the list" + (s ? " (“" + s + "”?)" : ""));
   }
-  if (!rec.district) problems.push("District Name is empty");
-  else if (lists.district.indexOf(rec.district) === -1) {
+  if (rec.district && lists.district.indexOf(rec.district) === -1) {
     const s = suggest(lists.district, rec.district);
     problems.push("District Name “" + rec.district + "” is not in the list" + (s ? " (“" + s + "”?)" : ""));
   }
-
-  if (!rec.awardName) problems.push("Award name is empty");
-  if (!rec.awardCategory) problems.push("Award Category is empty");
-  else if (lists.category.indexOf(rec.awardCategory) === -1) {
+  if (rec.awardCategory && lists.category.indexOf(rec.awardCategory) === -1) {
     const s = suggest(lists.category, rec.awardCategory);
-    problems.push("Award Category \u201c" + rec.awardCategory + "\u201d is not in the list" + (s ? " (\u201c" + s + "\u201d?)" : ""));
+    problems.push("Award Category “" + rec.awardCategory + "” is not in the list" + (s ? " (“" + s + "”?)" : ""));
   }
-  if (!rec.email) problems.push("Email is empty");
-  else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(rec.email)) problems.push("Email \u201c" + rec.email + "\u201d is not valid");
-  if (!rec.circle) problems.push("Circle name is empty");
-  if (!rec.block) problems.push("Block Name is empty");
-  if (!rec.pm) problems.push("PM Name is empty");
-  if (!rec.postUrl) problems.push("Post link URL is empty");
-  else if (!/^https?:\/\/\S+$/i.test(rec.postUrl)) problems.push("Post link URL is not a web address");
-  if (rec.postScore === "") problems.push("Post score is empty");
-  else if (isNaN(Number(rec.postScore))) problems.push("Post score \u201c" + rec.postScore + "\u201d is not a number");
 
   return { rec: rec, problems: problems };
 }
@@ -448,7 +424,7 @@ function openModal() {
   el("awaYearSel").value = "";
   showWhen(false);
   el("awaMonth").textContent = "After you choose the sheet, you choose the month and year its records belong to.";
-  el("awaResult").innerHTML = '<p class="awa-note">Community, District Name and Award Category must come from the dropdown lists; the template has them built in.</p>';
+  el("awaResult").innerHTML = '<p class="awa-note">Only Community, District Name and Award Category are checked: they must come from the dropdown lists, which the template has built in. Nothing else is required. A row already in the month is left out as a duplicate.</p>';
   el("awaGo").disabled = true;
   el("awaGo").textContent = "Add records";
   el("awaModal").classList.add("open");
@@ -503,11 +479,11 @@ async function add() {
       btn.textContent = "Adding… " + added + " of " + p.ok.length;
       const body = p.ok.slice(i, i + CHUNK).map(r => ({
         month_label: month.label, month_start: month.start,
-        full_name: r.fullName, mobile: r.mobile, email: r.email || null,
-        school_name: r.school, community: r.community, circle_name: r.circle || null,
+        full_name: r.fullName, mobile: r.mobile || null, email: r.email || null,
+        school_name: r.school || null, community: r.community || null, circle_name: r.circle || null,
         block_name: r.block || null, district_name: r.district, pm_name: r.pm || null,
-        award_name: r.awardName, award_category: r.awardCategory,
-        post_url: r.postUrl || null, post_score: r.postScore === "" ? null : Number(r.postScore),
+        award_name: r.awardName || null, award_category: r.awardCategory || null,
+        post_url: r.postUrl || null, post_score: r.postScore !== "" && isFinite(Number(r.postScore)) ? Number(r.postScore) : null,
         source_ref: "upload " + stamp + " row " + r.line
       }));
       const res = await fetch(SB_URL + "/rest/v1/award_records", {
