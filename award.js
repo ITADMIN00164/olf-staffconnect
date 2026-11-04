@@ -1928,6 +1928,7 @@ window.AWARD_CONFIG = {
         if (!t) return;
         var what = t.getAttribute("data-golive");
         if (what === "reset") openReset();
+        else if (what === "set") setGoLiveFromBar();
       });
     }
     if (el.importModal) {
@@ -3764,15 +3765,15 @@ window.AWARD_CONFIG = {
       });
     });
 
-    /* Awards verified since go-live come off the stock, on the day they were
-       verified: an April award verified in November is November's use. */
+    /* Verified awards come off the stock in the month they belong to - the month
+       the Utilisations tab shows them under - from the go-live month on. */
     verifiedUse.forEach(function (u) {
-      var t = typeForCategory(u.award_category);
+      var t = typeForGift(u.gift);
       var district = String(u.district_name || "").trim();
       if (!t || !district) return;
       var q = {};
       q[t.id] = Number(u.n) || 0;
-      events.push({ district: district, month: String(u.verified_on).slice(0, 7),
+      events.push({ district: district, month: String(u.month_start).slice(0, 7),
                     column: "utilisation", sign: -1, quantities: q, note: "" });
     });
 
@@ -3891,7 +3892,7 @@ window.AWARD_CONFIG = {
      stock behaves as it always did and verifying moves nothing. Utilisation
      follows the day an award is VERIFIED, not the month it was for. */
   var goLive = "";                 // YYYY-MM-DD, or "" while unset
-  var verifiedUse = [];            // award_verified_use rows from the go-live date on
+  var verifiedUse = [];            // award_use_by_month rows from the go-live month on: { district_name, gift, month_start, n }
   var goLiveProblem = "";          // what is missing, if the SQL has not been run
 
   function loadStock(done) {
@@ -3927,15 +3928,15 @@ window.AWARD_CONFIG = {
     if (!goLive) return done && done();
     var all = [];
     (function page(from) {
-      db.from("award_verified_use")
-        .select("district_name, award_category, verified_on, n")
-        .gte("verified_on", goLive)
-        .order("verified_on").order("district_name").order("award_category")
+      db.from("award_use_by_month")
+        .select("district_name, gift, month_start, n")
+        .gte("month_start", goLive.slice(0, 7) + "-01")
+        .order("month_start").order("district_name").order("gift")
         .range(from, from + 999)
         .then(function (res) {
           if (res.error) {
-            if (/award_verified_use/i.test(res.error.message || "")) {
-              goLiveProblem = "Run sql/award-stock-golive.sql in the Supabase SQL Editor to count verified awards.";
+            if (/award_use_by_month/i.test(res.error.message || "")) {
+              goLiveProblem = "Run sql/award-stock-by-month.sql in the Supabase SQL Editor to count verified awards.";
             } else reportError("load verified awards", res.error);
             verifiedUse = [];
             return done && done();
@@ -3961,15 +3962,12 @@ window.AWARD_CONFIG = {
     return m >= 4 ? y : y - 1;
   }
 
-  /* Which stock column an Award Category comes off. Block and District by
-     level, NS and SU by name, Other by itself; anything else moves no stock. */
-  function typeForCategory(category) {
-    var c = String(category || "").trim();
-    var want = /^block level/i.test(c) ? "Block"
-             : /^district level/i.test(c) ? "District"
-             : /nanhe sitare|\(ns\)/i.test(c) ? "NS"
-             : /shikshan utsav|\(su\)/i.test(c) ? "SU"
-             : /^other$/i.test(c) ? "Other" : "";
+  /* The gift an award uses up is worked out in the database (sql/award-stock-by-month.sql):
+     Block Level -> Block, District Level -> District (Spelling Bee -> NS), a category
+     that names Nanhe Sitare -> NS, Shikshan Utsav -> SU, Other -> Other. Here it is
+     only matched to this sheet's gift. */
+  function typeForGift(gift) {
+    var want = String(gift || "").trim();
     if (!want) return null;
     for (var i = 0; i < awardTypes.length; i++) {
       if (shortType(awardTypes[i]) === want) return awardTypes[i];
@@ -3983,6 +3981,24 @@ window.AWARD_CONFIG = {
   }
   function goLiveText() { return dayText(goLive); }
 
+  // The month chosen in the bar becomes the go-live date (the 1st of it).
+  function setGoLiveFromBar() {
+    if (!canSetStock()) return;
+    var input = document.getElementById("golive-month");
+    var month = input ? input.value : "";
+    if (!/^\d{4}-\d{2}$/.test(month)) { showStockEditError("Choose the month the stock goes live."); return; }
+    var day = month + "-01";
+    if (day === goLive) { showStockEditError(""); return; }
+    awConfirm(goLive ? "Change the go-live date?" : "Make stock live?",
+      (goLive ? "From " + goLiveText() + " to " + dayText(day) + ". " : "Stock goes live on " + dayText(day) + ". ") +
+      "From then on, every verified award comes off stock as Utilisation, in the month it belongs to. " +
+      "Months before it are not counted: the opening balance stands for them.",
+      goLive ? "Change" : "Go live", "warning")
+      .then(function (ok) {
+        if (ok) saveGoLive(day, function () { renderGoLive(); }, true);
+      });
+  }
+
   function renderGoLive() {
     if (!el.goLiveBar) return;
     var admin = canSetStock();
@@ -3991,11 +4007,23 @@ window.AWARD_CONFIG = {
       html = '<span class="golive-note is-bad">' + escapeHtml(goLiveProblem) + "</span>";
     } else if (goLive) {
       html = '<span class="golive-note"><i class="live-dot" aria-hidden="true"></i>Live from <b>' + escapeHtml(goLiveText()) + "</b></span>";
+    } else if (admin) {
+      html = '<span class="golive-note is-off">Stock is not live yet, so verified awards do not come off stock. Choose the month it goes live.</span>';
+    }
+    /* The go-live month: from it on, a verified award is one use of its gift, counted as
+       Utilisation in the month the award belongs to. The months before it are not counted -
+       the opening balance stands for them. */
+    if (admin && !goLiveProblem) {
+      html += ' <label class="golive-set"><span class="sr-only">Go-live month</span>' +
+        '<input type="month" id="golive-month" value="' + escapeHtml(goLive ? goLive.slice(0, 7) : "") + '"></label>' +
+        ' <button type="button" class="btn btn-primary btn-xs" data-golive="set">' + (goLive ? "Change" : "Set go-live") + "</button>";
     }
     if (admin) {
       html += ' <button type="button" class="btn btn-ghost btn-xs golive-reset" data-golive="reset">Reset data\u2026</button>';
     }
-    el.goLiveBar.classList.toggle("has-note", !!(goLiveProblem || goLive));
+    var show = !!(goLiveProblem || goLive || admin);
+    el.goLiveBar.classList.toggle("has-note", show);
+    el.goLiveBar.classList.toggle("is-off", !goLive && !goLiveProblem);
     el.goLiveBar.innerHTML = html;
   }
 
