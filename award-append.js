@@ -9,9 +9,10 @@
        (public.award_lists), exactly as written.
    Nothing else is validated and no column is mandatory: an empty cell is saved empty, a mobile number,
    email, link or score is saved as typed. The columns are found by their headings, so their order does not matter.
-   A row is a DUPLICATE, and is not added, when its Month + Full Name + School name + Award name are the
-   same as a record already in that month, or as an earlier row of the same sheet. Those four together are
-   the unique key: capitals and extra spaces do not matter, and nothing is updated for a duplicate.
+   A row is a DUPLICATE when its Month + Full Name + School name + Award name are the same as a record
+   already in that month, or as an earlier row of the same sheet. Those four together are the unique key:
+   capitals and extra spaces do not matter. Duplicates are shown and NOTHING is added while there are any:
+   the sheet is fixed (the duplicate rows removed) and chosen again.
    A wrong upload is taken out again with "All uploads".
 
    NOTE: the check on who may add is made here in the page, like the other admin-only
@@ -76,8 +77,10 @@ function updateGo() {
   const bad = parsed ? parsed.errors.length : 0;
   const view = parsed && parsed.view;
   const n = view ? view.fresh.length : 0;
-  btn.disabled = bad > 0 || !view || n === 0;
+  const dups = view ? view.dupes.length : 0;
+  btn.disabled = bad > 0 || !view || dups > 0 || n === 0;
   btn.textContent = bad ? "Fix " + bad + " row" + (bad === 1 ? "" : "s") + " first"
+    : dups ? "Remove " + dups + " duplicate" + (dups === 1 ? "" : "s") + " first"
     : !parsed || !parsed.ok.length ? "Add records"
     : !m ? "Choose the month and year"
     : !view ? "Checking for duplicates\u2026"
@@ -87,7 +90,7 @@ function updateGo() {
   if (note) note.textContent = bad ? "Nothing is added while any row has a problem."
     : !m ? "Nothing is added until both are chosen."
     : !view ? "Checking " + m.label + " for rows that are already there."
-    : view.dupes.length ? view.dupes.length + " duplicate row" + (view.dupes.length === 1 ? " is" : "s are") + " left out; the rest will be added to " + m.label + "."
+    : view.dupes.length ? "Nothing is added while the sheet has duplicates. Remove them from the sheet, then choose it again."
     : "The records will be added to " + m.label + ".";
 }
 
@@ -378,9 +381,9 @@ function render(p) {
   const view = p.view;
   parts.push('<div class="awa-stats">' +
     '<div class="awa-stat ok"><b>' + (view ? view.fresh.length : p.ok.length) + "</b><span>" +
-      (view || !p.errors.length ? "to add" : "pass the checks") + "</span></div>" +
+      (view ? (view.dupes.length ? "ready, once fixed" : "to add") : "pass the checks") + "</span></div>" +
     '<div class="awa-stat dup"><b>' + (view ? view.dupes.length : "\u2013") + "</b><span>" +
-      (view ? "duplicates, left out" : "duplicates: choose the month") + "</span></div>" +
+      (view ? "duplicates" : "duplicates: choose the month") + "</span></div>" +
     '<div class="awa-stat bad"><b>' + p.errors.length + "</b><span>with a problem</span></div></div>");
   if (p.errors.length) {
     parts.push('<div class="awa-errs"><div class="awa-errs-head"><b>Nothing is added until these rows are fixed</b>' +
@@ -390,12 +393,13 @@ function render(p) {
       (p.errors.length > 60 ? "<li>\u2026and " + (p.errors.length - 60) + " more (in the download).</li>" : "") + "</ul></div>");
   }
   if (view && view.dupes.length) {
-    parts.push('<div class="awa-dups"><div class="awa-dups-head"><b>Duplicates are not added</b>' +
+    parts.push('<div class="awa-dups"><div class="awa-dups-head"><b>Nothing is added until these duplicates are removed from the sheet</b>' +
       "<span>Same Month, Full Name, School name and Award name</span></div><ul>" +
       view.dupes.slice(0, 60).map(d => "<li><span>Row " + d.line + " \u00b7 " + esc(d.name) + "</span> " +
         esc(d.school) + " \u00b7 " + esc(d.award) + " <em>" + esc(d.where) + "</em></li>").join("") +
       (view.dupes.length > 60 ? "<li>\u2026and " + (view.dupes.length - 60) + " more.</li>" : "") + "</ul></div>");
   }
+  if (view && view.dupes.length && !p.errors.length) parts.push('<p class="awa-note">Remove the duplicate rows from the sheet, then choose it again. The whole sheet is added only when it has no duplicates.</p>');
   if (!p.ok.length) parts.push('<p class="awa-note">' + (p.errors.length ? "Fix the rows above in the sheet, then choose it again. The whole sheet is added only when every row is correct." : "The sheet has no rows to add.") + "</p>");
   el("awaResult").innerHTML = parts.join("");
   el("awaGo").textContent = "Add records";
@@ -469,7 +473,7 @@ async function add() {
     return;
   }
   parsed.view = view;
-  if (!view.fresh.length) { render(parsed); return; }
+  if (view.dupes.length || !view.fresh.length) { render(parsed); return; }   // duplicates stop the whole upload
   const p = { ok: view.fresh };
   el("awaFile").disabled = true;
   const stamp = new Date().toISOString().slice(0, 16).replace("T", " ");
@@ -497,8 +501,9 @@ async function add() {
   } catch (e) {
     console.error("Adding records failed:", e);
     el("awaFile").disabled = false;
+    const upTo = added ? p.ok[added - 1].line : 0;
     el("awaResult").innerHTML = '<p class="awa-note awa-err">Stopped after ' + added + " of " + p.ok.length +
-      " records. Nothing is added twice: choose the same file and month again, and the " + added + " already added are left out as duplicates.</p>";
+      " records." + (added ? " Rows up to row " + upTo + " of the sheet are already added. Remove them from the sheet (they would show as duplicates), then choose it again to add the rest." : " Nothing was added; you can choose the sheet again.") + "</p>";
     btn.textContent = "Add records";
     updateGo();
     return;
