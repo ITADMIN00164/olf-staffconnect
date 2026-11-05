@@ -20,9 +20,9 @@
       --tp-font: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
       font-family: var(--tp-font);
       color: var(--tp-ink);
-      padding: 16px 20px 48px;
+      padding: 0 0 48px;
       min-height: 100%;
-      background: var(--tp-canvas);
+      background: transparent;
     }
     #tpRoot * {
       box-sizing: border-box;
@@ -2750,20 +2750,90 @@
       font-weight: 700;
       box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
     }
+
+    /* ======================================================================
+       OLF Insight in the app's look: the shared banner with the two views on
+       it, the same soft cards and the same blue-to-teal buttons as the other
+       tabs. Only looks - every id and handler above is untouched.
+       ====================================================================== */
+    #tpRoot .tp-hero {
+      padding: 18px 22px; margin: 0 0 14px; border-radius: 20px; gap: 14px 22px; flex-wrap: wrap;
+    }
+    #tpRoot .tp-hero .pg-hero-lead { flex: 1 1 260px; }
+    #tpRoot .tp-hero .pg-hero-ico { width: 48px; height: 48px; border-radius: 15px; }
+    #tpRoot .tp-hero .pg-hero-ico svg { width: 30px; height: 30px; }
+    #tpRoot .tp-hero .pg-hero-title { font-size: 24px; letter-spacing: -.6px; margin: 0 0 3px; }
+    #tpRoot .tp-hero .pg-hero-sub { font-size: 13.5px; color: rgba(255,255,255,.92); }
+
+    /* the switch: a frosted track, the view you are on in solid white */
+    #tpRoot .tp-hero .tp-view-tabs {
+      display: flex; gap: 4px; padding: 4px; border-radius: 15px; flex: 0 0 auto; position: relative;
+      background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.34); box-shadow: inset 0 1px 0 rgba(255,255,255,.28);
+      -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    }
+    #tpRoot .tp-hero .tp-view-tab {
+      height: 38px; padding: 0 16px; gap: 8px; border: 0; border-radius: 11px; background: transparent; box-shadow: none;
+      color: rgba(255,255,255,.95); font-size: 13.5px; font-weight: 700;
+    }
+    #tpRoot .tp-hero .tp-view-tab:hover:not(.active) { background: rgba(255,255,255,.2); color: #fff; }
+    #tpRoot .tp-hero .tp-view-tab.active { background: #fff; color: #2457C5; box-shadow: 0 6px 14px rgba(15,23,42,.18); }
+    #tpRoot .tp-hero .tp-view-tab:focus-visible { outline: 3px solid rgba(255,255,255,.7); outline-offset: 2px; }
+    #tpRoot .tp-hero .tp-vt-ico { width: 18px; height: 18px; flex: 0 0 auto; }
+    @media (prefers-reduced-motion: no-preference) {
+      #tpRoot .tp-hero { animation: pg-in .6s cubic-bezier(.22,1,.36,1) backwards; }
+    }
+    @media (max-width: 640px) {
+      #tpRoot .tp-hero { padding: 16px; }
+      #tpRoot .tp-hero .pg-hero-title { font-size: 21px; }
+      #tpRoot .tp-hero .tp-view-tabs { flex: 1 1 100%; }
+      #tpRoot .tp-hero .tp-view-tab { flex: 1 1 0; justify-content: center; padding: 0 10px; }
+    }
+
+    /* the toolbar card under the banner, like the other tabs' cards */
+    #tpRoot .tp-header {
+      background: var(--surface, #fff); border: 1px solid var(--border, rgba(15,23,42,.08)); border-radius: 18px;
+      box-shadow: 0 2px 10px rgba(15,23,42,.05); padding: 16px 20px; margin-bottom: 14px;
+    }
+    #tpRoot .tp-title { font-size: 18px; font-weight: 800; letter-spacing: -.3px; }
+    #tpRoot .tp-badge { background: color-mix(in srgb, #2F6FE4 12%, transparent); color: #2457C5; font-weight: 700; }
+    #tpRoot .tp-segmented-control { border-radius: 13px; padding: 4px; background: var(--surface-2, #F1F5F9); }
+    #tpRoot .tp-seg-btn { border-radius: 10px; padding: 7px 14px; }
+    #tpRoot .tp-seg-btn.active {
+      background: linear-gradient(135deg, #2F6FE4, #0B8F7A); color: #fff;
+      box-shadow: 0 6px 14px rgba(36,87,197,.28);
+    }
+    #tpRoot .tp-search-box input { height: 38px; border-radius: 12px; }
+    #tpRoot .tp-btn { min-height: 36px; border-radius: 11px; }
+    #tpRoot .tp-btn-primary {
+      background: linear-gradient(135deg, #2F6FE4, #0B8F7A); border-color: transparent; color: #fff;
+      box-shadow: 0 6px 14px rgba(36,87,197,.22);
+    }
+    #tpRoot .tp-btn-primary:hover { background: linear-gradient(135deg, #2457C5, #0B7A69); transform: translateY(-1px); }
+    #tpRoot .tp-viewport { border-radius: 18px; border: 1px solid var(--border, rgba(15,23,42,.08)); box-shadow: 0 2px 10px rgba(15,23,42,.05); }
+    #tpRoot .tp-hist-toolbar-box { border-radius: 18px; border-color: var(--border, rgba(15,23,42,.08)); box-shadow: 0 2px 10px rgba(15,23,42,.05); }
   </style>
-  <!-- Top View Navigation Tabs -->
-  <div class="tp-top-tabs-bar">
-    <div class="tp-view-tabs" role="tablist">
-      <button type="button" class="tp-view-tab active" id="tpViewTabSmartGoals" onclick="window.TeamPerformance.switchView('smart-goals')">
-        <span class="tp-view-tab-icon">🎯</span>
-        <span class="tp-view-tab-text">SMART GOALS</span>
+  <!-- The shared banner, as on the other tabs: the name on the left, the two views on the banner itself. -->
+  <section class="pg-hero tp-hero" id="tpHero" aria-label="OLF Insight">
+    <span class="pg-blob pg-blob--a" aria-hidden="true"></span>
+    <span class="pg-blob pg-blob--b" aria-hidden="true"></span>
+    <div class="pg-hero-lead">
+      <span class="pg-hero-ico" aria-hidden="true"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M12 3.500h8M13.500 3.500v9L5.500 25.500a3.200 3.200 0 0 0 2.800 4.800h15.400a3.200 3.200 0 0 0 2.800-4.800L18.500 12.500v-9" fill="#E0F2FE" stroke="#0F766E" stroke-width="1.800" stroke-linejoin="round" stroke-linecap="round"/><path d="M8.800 21h14.400l3.200 5.500a2.200 2.200 0 0 1-1.900 3.300H7.500a2.200 2.200 0 0 1-1.900-3.300z" fill="#10B981"/><circle cx="13" cy="25" r="1.400" fill="#A7F3D0"/><circle cx="19" cy="26.500" r="1" fill="#A7F3D0"/><circle cx="17" cy="8" r="1.100" fill="#38BDF8"/></svg></span>
+      <div class="pg-hero-main">
+        <h1 class="pg-hero-title">OLF Insight</h1>
+        <p class="pg-hero-sub">SMART goals, scorecards and past performance, from state to district</p>
+      </div>
+    </div>
+    <div class="tp-view-tabs" role="tablist" aria-label="OLF Insight views">
+      <button type="button" role="tab" class="tp-view-tab active" id="tpViewTabSmartGoals" onclick="window.TeamPerformance.switchView('smart-goals')">
+        <svg class="tp-vt-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.500" fill="#FECACA" stroke="#EF4444" stroke-width="1.800"/><circle cx="12" cy="12" r="5.500" fill="#fff" stroke="#EF4444" stroke-width="1.800"/><circle cx="12" cy="12" r="2" fill="#EF4444"/></svg>
+        <span class="tp-view-tab-text">Smart Goals</span>
       </button>
-      <button type="button" class="tp-view-tab" id="tpViewTabHistorical" onclick="window.TeamPerformance.switchView('historical')">
-        <span class="tp-view-tab-icon">📜</span>
+      <button type="button" role="tab" class="tp-view-tab" id="tpViewTabHistorical" onclick="window.TeamPerformance.switchView('historical')">
+        <svg class="tp-vt-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.500" fill="#FEF3C7" stroke="#F59E0B" stroke-width="1.800"/><path d="M12 6.500V12l3.600 2.200" fill="none" stroke="#B45309" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="tp-view-tab-text">Historical Data</span>
       </button>
     </div>
-  </div>
+  </section>
   <!-- 1. SMART GOALS View Container -->
   <div id="tpSmartGoalsView" class="tp-view-section">
     <!-- Top Navigation & Toolbar -->
@@ -2771,7 +2841,7 @@
       <div class="tp-header-top-row">
         <div class="tp-header-left">
           <div class="tp-title-row">
-            <h2 class="tp-title">SMART GOALS</h2>
+            <h2 class="tp-title">Smart Goals</h2>
             <span class="tp-badge" id="tpTotalCountBadge">Loading...</span>
           </div>
           <p class="tp-subtitle">State-to-district operational hierarchy, commitments, and editable scorecards</p>
