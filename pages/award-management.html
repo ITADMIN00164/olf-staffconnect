@@ -780,10 +780,11 @@
         <div class="aw-box-body">
           <div class="review-summary" id="ho-summary"></div>
 
-          <!-- Only when dispatching: what is actually going, which the
-               spreadsheet keeps apart from what was asked for. -->
+          <!-- When approving (entered) and dispatching (shown): how many
+               are going, which the spreadsheet keeps apart from what was
+               asked for. -->
           <div class="field field-wide" id="ho-lines-field" hidden>
-            <label>How many are going</label>
+            <label>Delivered <span class="hint">/ asked for</span></label>
             <div class="award-lines" id="ho-lines"></div>
             <p class="error" id="ho-lines-error" role="alert"></p>
           </div>

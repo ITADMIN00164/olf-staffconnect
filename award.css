@@ -1520,6 +1520,14 @@
 }
 .award-page .stock-line .hint { font-weight: 400; color: var(--text-muted); font-size: 11px; }
 
+/* delivered / asked: the figure on the left, what was asked on the right. */
+.award-page #ho-lines .stock-line { grid-template-columns: 1fr 170px; }
+.award-page .qty-pair { display: flex; align-items: center; gap: 8px; }
+.award-page .qty-pair input { width: 84px; }
+.award-page .qty-pair b { min-width: 84px; font-size: 14px; color: var(--text); }
+.award-page .qty-pair b.is-short { color: var(--warn); }
+.award-page .qty-of { font-size: 13px; color: var(--text-muted); font-family: var(--font-mono); }
+
 
 /* Kept narrow: a long note should not push the numbers off the screen. */
 .award-page #stock-table td.cell-remark-col {

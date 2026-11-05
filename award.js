@@ -1389,7 +1389,7 @@ window.AWARD_CONFIG = {
     };
     var SUBS = {
       acknowledge: "Recorded against your name, and not undone.",
-      approve:     "Recorded against your name. It can be sent once it is approved.",
+      approve:     "Enter how many are being delivered. It can be sent once it is approved.",
       dispatch:    "The requester is asked to confirm it arrives.",
       hold:        "It stays on the list. Nobody is told no - say what is being waited for.",
       resume:      "Back to the queue, ready to go out.",
@@ -1416,21 +1416,32 @@ window.AWARD_CONFIG = {
 
     el.hoSummary.innerHTML = requisitionSummaryHtml(row);
 
-    /* Dispatching asks how many are going, filled in with what was asked
-       for. Changing a figure is the whole point: a district that is sent 60
-       of the 100 it wanted has 60, and the stock has to say so. */
-    var sending = action === "dispatch";
-    el.hoLinesField.hidden = !sending;
-    if (sending) {
+    /* Approving is where Head Office says how many are going, shown as
+       delivered / asked and filled in with what was asked for. Changing a
+       figure is the whole point: a district that is sent 60 of the 100 it
+       wanted has 60, and the stock has to say so. Dispatching then only
+       shows what was approved - it is not asked again. */
+    var entering = action === "approve";
+    var recap = action === "dispatch";
+    el.hoLinesField.hidden = !(entering || recap);
+    if (entering || recap) {
       var asked = quantitiesOf(row, "items");
+      var agreed = quantitiesOf(row, "dispatched");
+      var lead = el.hoLinesField.querySelector("label");
+      if (lead) lead.innerHTML = 'Delivered <span class="hint">/ asked for</span>';
       el.hoLines.innerHTML = allTypes().filter(function (t) {
         return asked[t.id];
       }).map(function (t) {
+        var of = '<span class="qty-of">/ ' + escapeHtml(asked[t.id]) + "</span>";
+        var split = isJuteType(t) ? "" : askedSplit(row, t.id);
         return '<div class="stock-line"><label>' + escapeHtml(typeLabel(t)) +
-               ' <span class="hint">asked for ' + escapeHtml(asked[t.id]) +
-               escapeHtml(isJuteType(t) ? "" : askedSplit(row, t.id)) + '</span></label>' +
-               '<input type="number" class="mono ho-qty" data-type="' + escapeHtml(t.id) +
-               '" min="0" max="1000000" step="1" value="' + escapeHtml(asked[t.id]) + '" /></div>';
+               (split ? ' <span class="hint">' + escapeHtml(split) + "</span>" : "") + "</label>" +
+               (entering
+                 ? '<span class="qty-pair"><input type="number" class="mono ho-qty" data-type="' + escapeHtml(t.id) +
+                   '" min="0" max="1000000" step="1" value="' + escapeHtml(asked[t.id]) + '" />' + of + "</span>"
+                 : '<span class="qty-pair"><b class="mono' + ((agreed[t.id] || 0) < asked[t.id] ? " is-short" : "") + '">' +
+                   escapeHtml(agreed[t.id] || 0) + "</b>" + of + "</span>") +
+               "</div>";
       }).join("");
       if (!el.hoLines.innerHTML) {
         el.hoLines.innerHTML = '<p class="hint">Nothing here can be counted yet, so there is no figure to enter.</p>';
@@ -1446,6 +1457,7 @@ window.AWARD_CONFIG = {
       action === "reject" ? 'Reason <span class="hint">required</span>' :
       action === "hold"   ? 'What is being waited for <span class="hint">required</span>' :
       action === "issue"  ? 'What happened <span class="hint">required</span>' :
+      action === "approve" ? 'Note <span class="hint">required if less than asked</span>' :
       action === "receive" ? 'Note <span class="hint">anything short or damaged?</span>'
                            : 'Note <span class="hint">optional</span>';
     el.hoRemark.dataset.needsReason = NEEDS_REASON[action] ? "1" : "";
@@ -1517,25 +1529,8 @@ window.AWARD_CONFIG = {
 
     } else if (action === "approve") {
       // Head Office's own approval, between acknowledging and sending. It
-      // has no column of its own: the log carries who and when.
-      hoNote();
-      patch.status = "ho_approved";
-      from = "acknowledged";
-
-    } else if (action === "hold") {
-      hoNote();
-      patch.status = "on_hold";
-      patch.held_by = me;
-      patch.held_at = now;
-      from = stageOf(row);                 // acknowledged or approved
-
-    } else if (action === "resume") {
-      hoNote();
-      patch.status = "acknowledged";     // back to the start of Head Office's part
-      // held_by and held_at stay: it was on hold, and the trail should say so.
-      from = "on_hold";
-
-    } else if (action === "dispatch") {
+      // has no column of its own - the log carries who and when - but it
+      // is where the quantities are settled.
       var going = [];
       var short = false;
       var fault = "";
@@ -1580,7 +1575,26 @@ window.AWARD_CONFIG = {
       setFieldError(null, "ho-lines-error", "");
 
       hoNote();
-      patch.dispatched_items = going;
+      patch.dispatched_items = going;       // what will go, which the stock sheet reads on receipt
+      patch.status = "ho_approved";
+      from = "acknowledged";
+
+    } else if (action === "hold") {
+      hoNote();
+      patch.status = "on_hold";
+      patch.held_by = me;
+      patch.held_at = now;
+      from = stageOf(row);                 // acknowledged or approved
+
+    } else if (action === "resume") {
+      hoNote();
+      patch.status = "acknowledged";     // back to the start of Head Office's part
+      // held_by and held_at stay: it was on hold, and the trail should say so.
+      from = "on_hold";
+
+    } else if (action === "dispatch") {
+      // The quantities were settled when it was approved; sending does not ask again.
+      hoNote();
       patch.status = "dispatched";
       patch.dispatched_by = me;
       patch.dispatched_at = now;
@@ -1634,7 +1648,10 @@ window.AWARD_CONFIG = {
         el.hoConfirm.disabled = false;
         if (res.error) {
           setFieldError(el.hoRemark, "ho-remark-error",
-            "Could not save: " + res.error.message);
+            /requisitions_status_known|check constraint/i.test(res.error.message || "")
+              ? "The database does not know the Approve step yet - run " +
+                "sql/award-requisition-ho-approve.sql in Supabase first."
+              : "Could not save: " + res.error.message);
           reportError("save fulfilment", res.error);
           return;
         }
