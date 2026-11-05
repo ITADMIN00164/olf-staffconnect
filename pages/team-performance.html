@@ -2849,6 +2849,92 @@
     #tpRoot .tp-hist-kpi-val { letter-spacing: -.8px; }
     #tpRoot .tp-hist-section-card { border-radius: 18px; border: 1px solid var(--border, rgba(15,23,42,.08)); box-shadow: 0 2px 10px rgba(15,23,42,.05); overflow: hidden; }
 
+    /* ======================================================================
+       The flowchart: a clean, readable org chart. Same cards, lines and
+       colours as before - just calmer lines, clearer type, soft depth, and
+       a legend, so a person can read the structure at a glance.
+       ====================================================================== */
+    #tpRoot .tp-legend {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0 0 12px; padding: 0 4px;
+      font-size: 12px; font-weight: 700; color: var(--text-soft, #475569);
+    }
+    #tpRoot .tp-lg { display: inline-flex; align-items: center; gap: 7px; }
+    #tpRoot .tp-lg i {
+      width: 12px; height: 12px; border-radius: 4px; background: var(--c);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 18%, transparent);
+    }
+    #tpRoot .tp-lg-hint { margin-left: auto; font-weight: 500; color: var(--text-muted, #64748B); }
+    @media (max-width: 760px) { #tpRoot .tp-lg-hint { margin-left: 0; flex-basis: 100%; } }
+
+    /* the canvas: a faint dot grid, like drawing paper */
+    #tpRoot .tp-viewport {
+      background:
+        radial-gradient(rgba(100,116,139,.20) 1px, transparent 1.2px) 0 0 / 22px 22px,
+        linear-gradient(180deg, #F8FAFD 0%, #EEF2F9 100%);
+      scrollbar-width: thin; scrollbar-color: rgba(100,116,139,.45) transparent;
+    }
+    #tpRoot .tp-viewport::-webkit-scrollbar { width: 10px; height: 10px; }
+    #tpRoot .tp-viewport::-webkit-scrollbar-thumb { background: rgba(100,116,139,.4); border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
+    #tpRoot .tp-viewport::-webkit-scrollbar-thumb:hover { background: rgba(71,85,105,.6); background-clip: padding-box; border: 2px solid transparent; }
+
+    /* the lines: solid and quiet, teal and flowing when a card is traced */
+    #tpRoot .tp-connector-trunk, #tpRoot .tp-connector-branch {
+      stroke: #B3BFD6; stroke-width: 2px; stroke-dasharray: none; stroke-linejoin: round; stroke-linecap: round;
+    }
+    #tpRoot .tp-connector-hub, #tpRoot .tp-connector-anchor { fill: #fff; stroke: #94A3B8; stroke-width: 2.4px; }
+    #tpRoot .tp-connector-trunk.highlighted, #tpRoot .tp-connector-branch.highlighted {
+      stroke: #0D9488 !important; stroke-width: 3px !important; stroke-dasharray: 9 6 !important;
+      filter: drop-shadow(0 0 6px rgba(13,148,136,.55)) !important; animation: tp-flow 1.1s linear infinite;
+    }
+    #tpRoot .tp-connector-hub.highlighted, #tpRoot .tp-connector-anchor.highlighted { fill: #0D9488 !important; stroke: #fff !important; }
+    @keyframes tp-flow { to { stroke-dashoffset: -30; } }
+
+    /* the cards */
+    #tpRoot .tp-card {
+      border-radius: 16px; border-color: var(--border, rgba(15,23,42,.09));
+      box-shadow: 0 2px 10px rgba(15,23,42,.06), 0 1px 2px rgba(15,23,42,.04);
+    }
+    #tpRoot .tp-card:hover { transform: translateY(-3px); box-shadow: 0 14px 28px -8px rgba(15,23,42,.16); border-color: #93A4C0; }
+    #tpRoot .tp-card-name { font-size: 15.5px; font-weight: 800; letter-spacing: -.3px; color: var(--text, #0F172A); }
+    #tpRoot .tp-tag { border-radius: 999px; padding: 4px 11px; letter-spacing: .06em; }
+    #tpRoot .tp-card-details-btn {
+      border-radius: 999px; padding: 4px 12px; font-weight: 700;
+      background: color-mix(in srgb, #2F6FE4 9%, transparent); border: 1px solid color-mix(in srgb, #2F6FE4 22%, transparent); color: #2457C5;
+      transition: background-color .15s ease, transform .15s ease;
+    }
+    #tpRoot .tp-card-details-btn:hover { background: color-mix(in srgb, #2F6FE4 18%, transparent); transform: translateX(2px); }
+    #tpRoot .tp-card-mgr-line .tp-mgr-v { font-weight: 700; }
+
+    /* the state lead: the figures read as tiles */
+    #tpRoot .tp-card-root { box-shadow: 0 10px 28px -10px rgba(245,158,11,.38), 0 2px 8px rgba(15,23,42,.06); }
+    #tpRoot .tp-card-stats { border-radius: 14px; }
+
+    /* divisions: a quiet teal wash, the open one a little stronger */
+    #tpRoot .tp-card-div { border-radius: 16px; }
+    #tpRoot .tp-card-div:hover { box-shadow: 0 14px 28px -8px rgba(13,148,136,.28); }
+    #tpRoot .tp-card-div .tp-card-footer-actions button, #tpRoot .tp-card-div .tp-card-footer-actions .tp-btn {
+      border-radius: 12px; font-weight: 700; min-height: 38px;
+    }
+
+    #tpRoot .tp-card-div.tp-expanded-card .tp-card-footer-actions button {
+      background: linear-gradient(135deg, #0D9488, #0B7A69); color: #fff; border-color: transparent;
+      box-shadow: 0 6px 14px rgba(13,148,136,.28);
+    }
+
+    /* the open division's panel */
+    #tpRoot .tp-division-expanded-panel { border-radius: 18px; box-shadow: 0 2px 10px rgba(15,23,42,.05); }
+
+    /* the people under each manager */
+    #tpRoot .tp-po-row { border-radius: 10px; transition: background-color .15s ease, transform .15s ease; }
+    #tpRoot .tp-po-row:hover { transform: translateX(2px); }
+    #tpRoot .tp-po-name { font-weight: 700; }
+
+    /* a soft fade for cards as a division opens */
+    @media (prefers-reduced-motion: no-preference) {
+      #tpRoot .tp-card, #tpRoot .tp-division-expanded-panel { animation: tp-rise .45s cubic-bezier(.22,1,.36,1) backwards; }
+      @keyframes tp-rise { from { opacity: 0; } }   /* opacity only: the lines are measured from where the cards sit */
+    }
+
     /* ---- a gentle entrance for the tiles and cards, like the other tabs ---- */
     @media (prefers-reduced-motion: no-preference) {
       #tpRoot .tp-header, #tpRoot .tp-hist-section-card, #tpRoot .tp-hist-toolbar-box { animation: pg-in .5s cubic-bezier(.22,1,.36,1) backwards; }
@@ -2945,6 +3031,15 @@
   <div class="tp-search-summary" id="tpSearchSummary" style="display:none;">
     <span id="tpSearchSummaryText">Showing matches</span>
     <button type="button" class="tp-link-btn" onclick="window.TeamPerformance.clearSearch()">Clear search</button>
+  </div>
+  <!-- How to read the chart -->
+  <div class="tp-legend" aria-label="How to read the chart">
+    <span class="tp-lg" style="--c:#F59E0B"><i></i>State lead</span>
+    <span class="tp-lg" style="--c:#0D9488"><i></i>Division</span>
+    <span class="tp-lg" style="--c:#8B5CF6"><i></i>Division manager</span>
+    <span class="tp-lg" style="--c:#4F8EF7"><i></i>Programme manager</span>
+    <span class="tp-lg" style="--c:#64748B"><i></i>Project officer</span>
+    <span class="tp-lg-hint">Open a division with View Team. Details opens a person's scorecard. Hover a card to trace its line.</span>
   </div>
   <!-- Flowchart Viewport -->
   <div class="tp-viewport" id="tpViewport">
