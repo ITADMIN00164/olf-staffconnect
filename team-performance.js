@@ -4398,11 +4398,22 @@
 
     if (smartView) smartView.style.display = isSmart ? "block" : "none";
     if (histView) histView.style.display = isSmart ? "none" : "block";
+
     if (smartTabBtn) smartTabBtn.classList.toggle("active", isSmart);
     if (histTabBtn) histTabBtn.classList.toggle("active", !isSmart);
 
     if (isSmart) {
       scheduleConnectorUpdate();
+    } else {
+      const ds = (viewName === 'internal') ? 'internal' : 'external';
+      if (window.HistoricalModule) {
+        if (typeof window.HistoricalModule.init === 'function') {
+          window.HistoricalModule.init();
+        }
+        if (typeof window.HistoricalModule.setDataSource === 'function') {
+          window.HistoricalModule.setDataSource(ds);
+        }
+      }
     }
   }
 

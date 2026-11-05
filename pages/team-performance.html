@@ -24,11 +24,9 @@
       min-height: 100%;
       background: var(--tp-canvas);
     }
-
     #tpRoot * {
       box-sizing: border-box;
     }
-
     /* Top Header Bar */
     .tp-header-top-row {
       display: flex;
@@ -55,13 +53,11 @@
       gap: 16px;
       margin-bottom: 14px;
     }
-
     .tp-title-row {
       display: flex;
       align-items: center;
       gap: 10px;
     }
-
     .tp-title {
       font-size: 20px;
       font-weight: 700;
@@ -69,7 +65,6 @@
       color: var(--tp-ink);
       letter-spacing: -0.02em;
     }
-
     .tp-badge {
       background: rgba(79, 142, 247, 0.12);
       color: var(--tp-brand);
@@ -78,20 +73,17 @@
       padding: 3px 10px;
       border-radius: 20px;
     }
-
     .tp-subtitle {
       font-size: 13px;
       color: var(--tp-ink-muted);
       margin: 3px 0 0;
     }
-
     .tp-header-controls {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       gap: 12px;
     }
-
     /* Segmented State Switcher */
     .tp-segmented-control {
       display: inline-flex;
@@ -100,7 +92,6 @@
       padding: 3px;
       border: 1px solid var(--tp-border-subtle);
     }
-
     .tp-seg-btn {
       border: none;
       background: transparent;
@@ -115,33 +106,28 @@
       gap: 6px;
       transition: all 0.18s ease;
     }
-
     .tp-seg-btn:hover {
       color: var(--tp-ink);
       background: rgba(255, 255, 255, 0.75);
       transform: translateY(-1px);
     }
-
     .tp-seg-btn.active {
       background: var(--tp-surface);
       color: var(--tp-brand-dark);
       box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
     }
-
     /* Quick Search Input */
     .tp-search-box {
       position: relative;
       display: flex;
       align-items: center;
     }
-
     .tp-search-icon {
       position: absolute;
       left: 10px;
       color: var(--tp-ink-muted);
       pointer-events: none;
     }
-
     .tp-search-box input {
       padding: 7px 32px 7px 32px;
       font-size: 13px;
@@ -152,14 +138,12 @@
       width: 220px;
       transition: border-color 0.16s, width 0.2s;
     }
-
     .tp-search-box input:focus {
       outline: none;
       border-color: var(--tp-brand);
       width: 260px;
       box-shadow: 0 0 0 3px rgba(79, 142, 247, 0.16);
     }
-
     .tp-search-clear {
       position: absolute;
       right: 8px;
@@ -170,13 +154,11 @@
       cursor: pointer;
       line-height: 1;
     }
-
     /* Buttons */
     .tp-btn-group {
       display: flex;
       gap: 6px;
     }
-
     .tp-btn {
       display: inline-flex;
       align-items: center;
@@ -190,7 +172,6 @@
       cursor: pointer;
       transition: all 0.16s;
     }
-
     .tp-btn-secondary {
       background: var(--tp-surface);
       color: var(--tp-ink);
@@ -199,7 +180,6 @@
       background: var(--tp-surface-subtle);
       border-color: #94A3B8;
     }
-
     .tp-btn-primary {
       background: var(--tp-brand);
       color: #fff;
@@ -208,7 +188,6 @@
     .tp-btn-primary:hover {
       background: #3B82F6;
     }
-
     .tp-btn-success {
       background: #10B981;
       color: #fff;
@@ -217,7 +196,6 @@
     .tp-btn-success:hover {
       background: #059669;
     }
-
     .tp-btn-cancel {
       background: #F1F5F9;
       color: var(--tp-ink-muted);
@@ -227,7 +205,6 @@
       background: #E2E8F0;
       color: var(--tp-ink);
     }
-
     .tp-btn-subtle {
       background: transparent;
       color: var(--tp-rose);
@@ -236,12 +213,10 @@
     .tp-btn-subtle:hover {
       background: rgba(225, 29, 72, 0.08);
     }
-
     .tp-btn-sm {
       padding: 5px 10px;
       font-size: 12px;
     }
-
     /* Division Filter Bar */
     .tp-division-pills-bar {
       display: flex;
@@ -251,7 +226,6 @@
       overflow-x: auto;
       padding-bottom: 4px;
     }
-
     .tp-filter-label {
       font-size: 12px;
       font-weight: 600;
@@ -260,14 +234,12 @@
       letter-spacing: 0.04em;
       white-space: nowrap;
     }
-
     .tp-pills-wrapper {
       display: flex;
       align-items: center;
       gap: 6px;
       flex-wrap: wrap;
     }
-
     .tp-pill-btn {
       background: var(--tp-surface);
       border: 1px solid var(--tp-border);
@@ -283,33 +255,28 @@
       transition: all 0.15s ease;
       white-space: nowrap;
     }
-
     .tp-pill-btn:hover {
       border-color: var(--tp-brand);
       color: var(--tp-brand);
       transform: translateY(-1px);
       box-shadow: 0 3px 10px rgba(79, 142, 247, 0.18);
     }
-
     .tp-pill-btn.active {
       background: var(--tp-brand);
       color: #fff;
       border-color: var(--tp-brand);
       box-shadow: 0 2px 6px rgba(79, 142, 247, 0.28);
     }
-
     .tp-pill-badge {
       background: rgba(0, 0, 0, 0.08);
       font-size: 10px;
       padding: 1px 6px;
       border-radius: 10px;
     }
-
     .tp-pill-btn.active .tp-pill-badge {
       background: rgba(255, 255, 255, 0.25);
       color: #fff;
     }
-
     /* Search summary */
     .tp-search-summary {
       background: #FEF3C7;
@@ -324,7 +291,6 @@
       align-items: center;
       justify-content: space-between;
     }
-
     .tp-link-btn {
       background: none;
       border: none;
@@ -333,7 +299,6 @@
       text-decoration: underline;
       cursor: pointer;
     }
-
     /* Viewport & Flow Canvas */
     .tp-viewport {
       background: radial-gradient(circle at 50% 0%, #FFFFFF 0%, #F1F5F9 100%);
@@ -345,7 +310,6 @@
       box-shadow: inset 0 2px 6px rgba(15, 23, 42, 0.04);
       scroll-behavior: smooth;
     }
-
     .tp-canvas {
       position: relative;
       min-width: max-content;
@@ -355,7 +319,6 @@
       align-items: center;
       width: 100%;
     }
-
     .tp-connectors-svg {
       position: absolute;
       top: 0;
@@ -364,33 +327,28 @@
       overflow: visible;
       z-index: 1;
     }
-
     .tp-connector-trunk {
       stroke: #94A3B8;
       stroke-width: 2px;
       stroke-dasharray: 4, 3;
       transition: all 0.2s ease;
     }
-
     .tp-connector-trunk.highlighted {
       stroke: #0D9488 !important;
       stroke-width: 3.5px !important;
       stroke-dasharray: none !important;
       filter: drop-shadow(0 0 8px rgba(13, 148, 136, 0.7)) !important;
     }
-
     .tp-connector-hub {
       fill: #94A3B8;
       stroke: #FFFFFF;
       stroke-width: 2px;
       transition: all 0.2s ease;
     }
-
     .tp-connector-hub.highlighted {
       fill: #0D9488 !important;
       filter: drop-shadow(0 2px 6px rgba(13, 148, 136, 0.6)) !important;
     }
-
     .tp-connector-branch {
       stroke: #94A3B8;
       stroke-width: 2px;
@@ -399,34 +357,29 @@
       stroke-linecap: round;
       transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
     }
-
     .tp-connector-branch.highlighted {
       stroke: #0D9488 !important;
       stroke-width: 3.5px !important;
       stroke-dasharray: none !important;
       filter: drop-shadow(0 0 8px rgba(13, 148, 136, 0.7)) !important;
     }
-
     .tp-connector-anchor {
       fill: #94A3B8;
       stroke: #FFFFFF;
       stroke-width: 2px;
       transition: all 0.2s ease;
     }
-
     .tp-connector-anchor.highlighted {
       r: 5px !important;
       fill: #0D9488 !important;
       stroke-width: 2.5px !important;
       filter: drop-shadow(0 0 6px rgba(13, 148, 136, 0.8)) !important;
     }
-
     .tp-connector-root-pip {
       fill: #F59E0B;
       stroke: #FFFFFF;
       stroke-width: 2px;
     }
-
     .tp-tree-container {
       position: relative;
       z-index: 2;
@@ -435,7 +388,6 @@
       align-items: center;
       width: 100%;
     }
-
     /* Node Card Base */
     .tp-card {
       background: #FFFFFF;
@@ -446,13 +398,11 @@
       transition: all 0.24s cubic-bezier(0.34, 1.56, 0.64, 1);
       position: relative;
     }
-
     .tp-card:hover {
       transform: translateY(-4px);
       box-shadow: 0 16px 32px -6px rgba(15, 23, 42, 0.12), 0 4px 12px rgba(15, 23, 42, 0.04);
       border-color: #94A3B8;
     }
-
     .tp-card-header {
       display: flex;
       align-items: center;
@@ -460,7 +410,6 @@
       gap: 8px;
       margin-bottom: 8px;
     }
-
     .tp-tag {
       font-size: 10px;
       font-weight: 800;
@@ -472,26 +421,22 @@
       align-items: center;
       gap: 4px;
     }
-
     .tp-tag-gold {
       background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
       color: #92400E;
       border: 1px solid #FCD34D;
       border-radius: 20px;
     }
-
     .tp-tag-teal {
       background: #CCFBF1;
       color: #0F766E;
       border: 1px solid #99F6E4;
     }
-
     .tp-tag-blue {
       background: #EFF6FF;
       color: #1D4ED8;
       border: 1px solid #BFDBFE;
     }
-
     /* Direct Details Button on Card */
     .tp-card-details-btn {
       background: #EFF6FF;
@@ -507,7 +452,6 @@
       align-items: center;
       gap: 4px;
     }
-
     .tp-card-details-btn:hover {
       background: #2563EB;
       color: #FFFFFF;
@@ -515,7 +459,6 @@
       transform: translateY(-1px) translateX(2px);
       box-shadow: 0 4px 12px rgba(37, 99, 235, 0.32);
     }
-
     .tp-card-name {
       font-size: 16px;
       font-weight: 800;
@@ -523,14 +466,12 @@
       line-height: 1.3;
       letter-spacing: -0.01em;
     }
-
     .tp-card-sub {
       font-size: 12px;
       font-weight: 500;
       color: var(--tp-ink-muted);
       margin-top: 3px;
     }
-
     .tp-card-role-label {
       font-size: 12px;
       font-weight: 700;
@@ -540,7 +481,6 @@
       line-height: 1.3;
       display: inline-block;
     }
-
     .tp-card-mgr-line {
       font-size: 11px;
       color: #475569;
@@ -551,17 +491,14 @@
       gap: 4px;
       flex-wrap: wrap;
     }
-
     .tp-card-mgr-line .tp-mgr-k {
       color: #64748B;
       font-weight: 600;
     }
-
     .tp-card-mgr-line .tp-mgr-v {
       color: #0F172A;
       font-weight: 700;
     }
-
     /* Root Node (State Lead) */
     .tp-row-root {
       margin-bottom: 96px;
@@ -569,7 +506,6 @@
       justify-content: center;
       position: relative;
     }
-
     .tp-card-root {
       width: 420px;
       background: linear-gradient(180deg, #FFFFFF 0%, #FAFCFF 100%);
@@ -580,19 +516,16 @@
       box-shadow: 0 6px 20px -4px rgba(245, 158, 11, 0.12), 0 2px 8px -2px rgba(15, 23, 42, 0.04);
       transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
-
     .tp-card-root:hover {
       transform: translateY(-5px) scale(1.008);
       border-color: #F59E0B;
       box-shadow: 0 20px 40px -8px rgba(245, 158, 11, 0.28), 0 6px 16px rgba(15, 23, 42, 0.06);
     }
-
     .tp-card-root .tp-card-name {
       font-size: 17px;
       font-weight: 800;
       color: #0F172A;
     }
-
     .tp-card-stats {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -603,18 +536,15 @@
       border-radius: 12px;
       border: 1px solid #E2E8F0;
     }
-
     .tp-stat-item {
       text-align: center;
     }
-
     .tp-stat-item strong {
       display: block;
       font-size: 16px;
       font-weight: 800;
       color: #1E40AF;
     }
-
     .tp-stat-item span {
       font-size: 10px;
       font-weight: 700;
@@ -622,7 +552,6 @@
       text-transform: uppercase;
       letter-spacing: 0.04em;
     }
-
     /* Divisions Row (Collapsible Level 1) */
     .tp-divisions-row {
       display: flex;
@@ -632,7 +561,6 @@
       flex-wrap: wrap;
       margin-bottom: 36px;
     }
-
     .tp-card-div {
       width: 256px;
       background: linear-gradient(180deg, #FFFFFF 0%, #FAFCFF 100%);
@@ -646,34 +574,29 @@
       transition: all 0.24s cubic-bezier(0.34, 1.56, 0.64, 1);
       position: relative;
     }
-
     .tp-card-div:hover {
       transform: translateY(-5px) scale(1.015);
       border-color: #0D9488;
       box-shadow: 0 18px 36px -6px rgba(13, 148, 136, 0.25), 0 4px 12px rgba(0, 0, 0, 0.04);
     }
-
     .tp-card-div.tp-expanded-card {
       border: 2px solid #0D9488;
       border-top: 4px solid #0D9488;
       box-shadow: 0 10px 28px -4px rgba(13, 148, 136, 0.25);
       background: linear-gradient(180deg, #F0FDFA 0%, #FFFFFF 100%);
     }
-
     .tp-card-div .tp-card-name {
       font-size: 15px;
       font-weight: 800;
       color: #0F172A;
       margin-top: 4px;
     }
-
     .tp-card-div .tp-card-sub {
       font-size: 12px;
       font-weight: 600;
       color: #475569;
       margin-top: 3px;
     }
-
     .tp-card-meta {
       margin-top: 12px;
       margin-bottom: 12px;
@@ -687,13 +610,11 @@
       align-items: center;
       gap: 4px;
     }
-
     .tp-card-footer-actions {
       margin-top: auto;
       padding-top: 12px;
       border-top: 1px solid var(--tp-border-subtle);
     }
-
     .tp-toggle-team-btn {
       background: #FFFFFF;
       border: 1px solid #CBD5E1;
@@ -710,7 +631,6 @@
       justify-content: center;
       gap: 6px;
     }
-
     .tp-toggle-team-btn:hover {
       background: #0D9488;
       color: #FFFFFF;
@@ -718,13 +638,11 @@
       transform: translateY(-1px);
       box-shadow: 0 4px 14px rgba(13, 148, 136, 0.32);
     }
-
     .tp-toggle-team-btn.active {
       background: #0F766E;
       color: #FFFFFF;
       border-color: #0F766E;
     }
-
     /* Expanded Division Details Panel */
     .tp-expanded-divisions-container {
       display: flex;
@@ -733,7 +651,6 @@
       width: 100%;
       margin-top: 10px;
     }
-
     .tp-division-expanded-panel {
       background: #FFFFFF;
       border: 1px solid var(--tp-border);
@@ -743,7 +660,6 @@
       width: 100%;
       overflow-x: auto;
     }
-
     .tp-panel-banner {
       display: flex;
       align-items: center;
@@ -753,7 +669,6 @@
       padding-bottom: 16px;
       margin-bottom: 24px;
     }
-
     .tp-panel-badge {
       display: inline-block;
       font-size: 10px;
@@ -766,27 +681,23 @@
       border-radius: 4px;
       margin-bottom: 4px;
     }
-
     .tp-panel-title {
       margin: 0;
       font-size: 18px;
       font-weight: 800;
       color: var(--tp-ink);
     }
-
     .tp-panel-lead {
       font-size: 13px;
       color: var(--tp-ink-muted);
       margin-top: 3px;
       display: block;
     }
-
     .tp-panel-banner-right {
       display: flex;
       gap: 8px;
       align-items: center;
     }
-
     /* Tree Tier: Division Manager (Tier 1) */
     .tp-tree-tier-dm {
       display: flex;
@@ -794,7 +705,6 @@
       margin: 8px 0 0 0;
       position: relative;
     }
-
     .tp-card-dm {
       width: 350px;
       background: linear-gradient(180deg, #FFFFFF 0%, #FAF5FF 100%);
@@ -807,46 +717,39 @@
       position: relative;
       text-align: left;
     }
-
     .tp-card-dm:hover {
       transform: translateY(-4px) scale(1.01);
       border-color: #8B5CF6;
       box-shadow: 0 18px 36px -6px rgba(139, 92, 246, 0.26);
     }
-
     .tp-card-dm.tp-card-interim {
       border-top: 5px dashed #94A3B8;
       border-color: #CBD5E1;
       background: #F8FAFC;
       box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
     }
-
     .tp-card-dm .tp-card-name {
       font-size: 16px;
       font-weight: 800;
       color: #0F172A;
       margin-top: 6px;
     }
-
     .tp-card-dm .tp-card-sub {
       font-size: 12px;
       font-weight: 600;
       color: #475569;
       margin-top: 3px;
     }
-
     .tp-tag-purple {
       background: #F3E8FF;
       color: #6B21A8;
       border: 1px solid #D8B4FE;
     }
-
     .tp-tag-gray {
       background: #F1F5F9;
       color: #475569;
       border: 1px dashed #CBD5E1;
     }
-
     .tp-tree-connector-v {
       width: 2px;
       height: 30px;
@@ -854,7 +757,6 @@
       margin: 0 auto;
       position: relative;
     }
-
     .tp-tree-connector-v::after {
       content: '';
       position: absolute;
@@ -865,11 +767,9 @@
       background: #8B5CF6;
       border-radius: 50%;
     }
-
     .tp-tree-tier-pms {
       margin-top: 6px;
     }
-
     /* Program Manager Row & Columns - Full Width Adaptive Grid (Option 1) */
     .tp-pm-row {
       display: flex;
@@ -882,7 +782,6 @@
       box-sizing: border-box;
       flex-wrap: wrap;
     }
-
     .tp-pm-col {
       flex: 1 1 360px;
       min-width: 320px;
@@ -892,13 +791,11 @@
       align-items: stretch;
       gap: 16px;
     }
-
     .tp-card-pm {
       width: 100%;
       border-top: 4px solid var(--tp-brand);
       background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%);
     }
-
     .tp-badge-sm-tag {
       margin-top: 8px;
       display: inline-block;
@@ -909,7 +806,6 @@
       padding: 2px 6px;
       border-radius: 4px;
     }
-
     /* Districts & PO Cards - Adaptive 2-Column Grid */
     .tp-districts-list {
       width: 100%;
@@ -918,7 +814,6 @@
       gap: 14px;
       align-items: start;
     }
-
     .tp-district-card {
       background: var(--tp-surface);
       border-radius: 9px;
@@ -927,13 +822,11 @@
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
       transition: border-color 0.15s, box-shadow 0.15s;
     }
-
     .tp-district-card:hover {
       transform: translateY(-3px);
       border-color: #94A3B8;
       box-shadow: 0 14px 28px -6px rgba(15, 23, 42, 0.1), 0 2px 8px rgba(15, 23, 42, 0.04);
     }
-
     .tp-district-header {
       padding: 8px 12px;
       display: flex;
@@ -942,21 +835,18 @@
       background: #F8FAFC;
       border-bottom: 1px solid var(--tp-border-subtle);
     }
-
     .tp-dist-pip {
       width: 7px;
       height: 7px;
       border-radius: 50%;
       background: var(--tp-brand);
     }
-
     .tp-dist-title {
       font-size: 13px;
       font-weight: 700;
       color: var(--tp-ink);
       flex: 1;
     }
-
     .tp-row-details-btn {
       background: none;
       border: none;
@@ -968,14 +858,12 @@
       border-radius: 4px;
       transition: background 0.12s;
     }
-
     .tp-row-details-btn:hover {
       background: #EFF6FF;
       border-color: #BFDBFE;
       color: #1D4ED8;
       transform: translateX(2px);
     }
-
     .tp-dist-title-box {
       display: flex;
       flex-direction: column;
@@ -984,35 +872,29 @@
       flex: 1;
       min-width: 0;
     }
-
     .tp-dist-title {
       font-size: 13px;
       font-weight: 700;
       color: #0F172A;
       line-height: 1.25;
     }
-
     .tp-dist-mgr {
       font-size: 10.5px;
       color: #64748B;
       line-height: 1.2;
     }
-
     .tp-dist-mgr .tp-mgr-k {
       color: #64748B;
       font-weight: 500;
     }
-
     .tp-dist-mgr .tp-mgr-v {
       color: #1E293B;
       font-weight: 700;
     }
-
     .tp-pos-list {
       display: flex;
       flex-direction: column;
     }
-
     .tp-po-row {
       display: flex;
       align-items: center;
@@ -1026,11 +908,9 @@
       border-radius: 6px;
       transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
     }
-
     .tp-po-row:last-child {
       border-bottom: none;
     }
-
     .tp-po-row:hover {
       background: #F0F9FF;
       border-left-color: #0284C7;
@@ -1038,7 +918,6 @@
       box-shadow: 0 2px 8px rgba(2, 132, 199, 0.08);
       color: var(--tp-brand-dark);
     }
-
     .tp-po-info {
       display: flex;
       align-items: flex-start;
@@ -1046,7 +925,6 @@
       flex: 1;
       min-width: 0;
     }
-
     .tp-po-dot {
       width: 6px;
       height: 6px;
@@ -1055,7 +933,6 @@
       margin-top: 5px;
       flex-shrink: 0;
     }
-
     .tp-po-text-wrap {
       display: flex;
       flex-direction: column;
@@ -1064,7 +941,6 @@
       min-width: 0;
       flex: 1;
     }
-
     .tp-po-name {
       font-size: 12px;
       font-weight: 700;
@@ -1072,31 +948,26 @@
       line-height: 1.25;
       word-break: break-word;
     }
-
     .tp-po-role {
       font-size: 11px;
       font-weight: 600;
       color: #2563EB;
       line-height: 1.2;
     }
-
     .tp-po-mgr {
       font-size: 10.5px;
       color: #64748B;
       line-height: 1.2;
       margin-top: 1px;
     }
-
     .tp-po-mgr .tp-mgr-k {
       color: #64748B;
       font-weight: 500;
     }
-
     .tp-po-mgr .tp-mgr-v {
       color: #1E293B;
       font-weight: 700;
     }
-
     /* Highlight matching search */
     .tp-matched {
       border: 2px solid var(--tp-gold) !important;
@@ -1107,7 +978,6 @@
       font-weight: 700 !important;
       color: #92400E !important;
     }
-
     /* Modal Overlay & Dialog */
     .tp-modal-overlay {
       position: fixed;
@@ -1126,12 +996,10 @@
       pointer-events: none;
       transition: opacity 0.2s ease;
     }
-
     .tp-modal-overlay.open {
       opacity: 1;
       pointer-events: auto;
     }
-
     .tp-modal-dialog {
       box-sizing: border-box;
       background: var(--tp-surface);
@@ -1147,7 +1015,6 @@
       transition: transform 0.2s ease, width 0.2s ease, max-width 0.2s ease, height 0.2s ease;
       overflow: hidden;
     }
-
     .tp-modal-dialog.maximized {
       width: 96vw !important;
       max-width: 96vw !important;
@@ -1155,11 +1022,9 @@
       max-height: 94vh !important;
       border-radius: 12px;
     }
-
     .tp-modal-overlay.open .tp-modal-dialog {
       transform: translateY(0) scale(1);
     }
-
     .tp-modal-header {
       box-sizing: border-box;
       width: 100%;
@@ -1172,7 +1037,6 @@
       gap: 16px;
       background: #FFFFFF;
     }
-
     .tp-modal-title-wrap {
       display: flex;
       flex-direction: column;
@@ -1180,7 +1044,6 @@
       gap: 3px;
       min-width: 0;
     }
-
     .tp-modal-title {
       word-break: break-word;
       font-size: 22px;
@@ -1190,14 +1053,12 @@
       line-height: 1.25;
       letter-spacing: -0.01em;
     }
-
     .tp-modal-role-row {
       display: flex;
       align-items: center;
       gap: 6px;
       margin: 2px 0;
     }
-
     .tp-modal-badge {
       display: inline-block;
       font-size: 11px;
@@ -1211,7 +1072,6 @@
       border-radius: 9999px;
       margin-bottom: 0;
     }
-
     .tp-modal-person {
       word-break: break-word;
       font-size: 13px;
@@ -1222,23 +1082,19 @@
       gap: 6px;
       margin-top: 2px;
     }
-
     .tp-modal-mgr-label {
       color: #64748B;
       font-weight: 600;
     }
-
     .tp-modal-mgr-name {
       color: #0F172A;
       font-weight: 700;
     }
-
     .tp-modal-header-actions {
       display: flex;
       align-items: center;
       gap: 10px;
     }
-
     .tp-modal-btn-icon {
       background: #FFFFFF;
       border: 1px solid var(--tp-border);
@@ -1259,7 +1115,6 @@
       color: var(--tp-ink);
       border-color: #94A3B8;
     }
-
     .tp-modal-close {
       background: none;
       border: none;
@@ -1275,7 +1130,6 @@
       color: #0F172A;
       transform: rotate(90deg) scale(1.06);
     }
-
     /* Modal Tabs - Pinned with zero scrolling/drift */
     .tp-modal-tabs {
       box-sizing: border-box;
@@ -1289,7 +1143,6 @@
       background: #F8FAFC;
       flex-shrink: 0;
     }
-
     .tp-tab-btn {
       background: none;
       border: none;
@@ -1304,18 +1157,15 @@
       white-space: nowrap !important;
       flex-shrink: 0;
     }
-
     .tp-tab-btn:hover {
       color: #0F172A !important;
     }
-
     .tp-tab-btn.active {
       color: #1E40AF !important;
       border-bottom-color: #3B82F6 !important;
       background: #FFFFFF !important;
       font-weight: 700;
     }
-
     /* Modal Body */
     .tp-modal-body {
       padding: 20px 24px;
@@ -1326,7 +1176,6 @@
       width: 100%;
       max-width: 100%;
     }
-
     .tp-tab-pane {
       display: none;
       width: 100%;
@@ -1337,7 +1186,6 @@
     .tp-tab-pane.active {
       display: block;
     }
-
     /* Per-Tab Toolbar */
     .tp-tab-toolbar {
       box-sizing: border-box;
@@ -1351,7 +1199,6 @@
       padding-bottom: 10px;
       border-bottom: 1px dashed var(--tp-border-subtle);
     }
-
     .tp-tab-status-pill {
       font-size: 12px;
       color: var(--tp-ink-muted);
@@ -1359,17 +1206,14 @@
       padding: 5px 12px;
       border-radius: 20px;
     }
-
     .tp-tab-status-pill strong {
       color: var(--tp-teal);
     }
-
     .tp-edit-controls {
       display: flex;
       align-items: center;
       gap: 6px;
     }
-
     /* Table Styles */
     .tp-table {
       width: 100%;
@@ -1383,12 +1227,10 @@
       box-sizing: border-box;
       white-space: normal !important;
     }
-
     .tp-table thead tr {
       background: #1E293B;
       color: #fff;
     }
-
     .tp-table th {
       padding: 10px 14px;
       font-size: 11px;
@@ -1401,15 +1243,12 @@
       word-break: break-word;
       white-space: normal !important;
     }
-
     .tp-table tbody tr {
       border-bottom: 1px solid var(--tp-border-subtle);
     }
-
     .tp-table tbody tr:nth-child(even) {
       background: #F8FAFC;
     }
-
     .tp-table td {
       padding: 10px 14px;
       vertical-align: top;
@@ -1419,43 +1258,36 @@
       word-break: break-word;
       white-space: normal !important;
     }
-
     .tp-table th *,
     .tp-table td * {
       white-space: normal !important;
     }
-
     .tp-table-clean thead {
       display: none;
     }
-
     .tp-measures-cell {
       line-height: 1.5;
       color: #334155;
       overflow-wrap: break-word;
       word-break: break-word;
     }
-
     .tp-empty-table-cell {
       text-align: center;
       padding: 32px 14px;
       color: var(--tp-ink-muted);
     }
-
     /* Edit Lists & Cards */
     .tp-goals-edit-list, .tp-edit-list {
       display: flex;
       flex-direction: column;
       gap: 14px;
     }
-
     .tp-goal-edit-card, .tp-priority-edit-card, .tp-annexure-edit-card {
       background: #F8FAFC;
       border: 1px solid var(--tp-border);
       border-radius: 10px;
       padding: 14px 16px;
     }
-
     .tp-goal-edit-header {
       display: flex;
       align-items: center;
@@ -1463,7 +1295,6 @@
       gap: 12px;
       margin-bottom: 10px;
     }
-
     .tp-goal-idx-badge, .tp-priority-idx-badge, .tp-annex-idx-badge {
       font-size: 12px;
       font-weight: 700;
@@ -1472,7 +1303,6 @@
       padding: 3px 8px;
       border-radius: 6px;
     }
-
     .tp-goal-weight-input-wrap {
       display: flex;
       align-items: center;
@@ -1480,7 +1310,6 @@
       font-size: 12px;
       font-weight: 600;
     }
-
     .tp-input {
       font-family: inherit;
       font-size: 13px;
@@ -1494,12 +1323,10 @@
       border-color: var(--tp-brand);
       box-shadow: 0 0 0 2px rgba(79, 142, 247, 0.16);
     }
-
     .tp-input-weight {
       width: 70px;
       text-align: right;
     }
-
     .tp-btn-icon-del {
       background: none;
       border: none;
@@ -1513,11 +1340,9 @@
     .tp-btn-icon-del:hover {
       background: rgba(225, 29, 72, 0.1);
     }
-
     .tp-form-group {
       margin-bottom: 8px;
     }
-
     .tp-form-group label {
       display: block;
       font-size: 11px;
@@ -1526,7 +1351,6 @@
       text-transform: uppercase;
       margin-bottom: 4px;
     }
-
     .tp-textarea {
       width: 100%;
       font-family: inherit;
@@ -1537,7 +1361,6 @@
       resize: vertical;
       line-height: 1.45;
     }
-
     .tp-edit-row {
       display: flex;
       align-items: flex-start;
@@ -1549,7 +1372,6 @@
       flex: 1;
       min-width: 0;
     }
-
     .tp-row-idx {
       font-size: 12px;
       font-weight: 700;
@@ -1557,7 +1379,6 @@
       padding-top: 8px;
       width: 24px;
     }
-
     .tp-weight-live-bar {
       margin-top: 14px;
       padding: 10px 14px;
@@ -1565,13 +1386,11 @@
       border-radius: 8px;
       font-size: 13px;
     }
-
     .tp-weight-warn {
       margin-left: 8px;
       font-weight: 600;
       color: #C0392B;
     }
-
     /* Role Card & Resp Blocks */
     .tp-role-overview-card {
       background: #F8FAFC;
@@ -1580,7 +1399,6 @@
       padding: 14px 16px;
       margin-bottom: 16px;
     }
-
     .tp-role-card-label {
       font-size: 11px;
       font-weight: 700;
@@ -1589,21 +1407,18 @@
       color: var(--tp-brand);
       margin-bottom: 6px;
     }
-
     /* Annexures View */
     .tp-annexures-list {
       display: flex;
       flex-direction: column;
       gap: 12px;
     }
-
     .tp-annexure-card {
       background: var(--tp-surface);
       border: 1px solid var(--tp-border);
       border-radius: 10px;
       overflow: hidden;
     }
-
     .tp-annexure-header {
       padding: 12px 16px;
       background: #F8FAFC;
@@ -1615,17 +1430,14 @@
       font-size: 13px;
       color: var(--tp-ink);
     }
-
     .tp-annexure-chevron {
       font-size: 11px;
       color: var(--tp-ink-muted);
       transition: transform 0.2s;
     }
-
     .tp-annexure-card.open .tp-annexure-chevron {
       transform: rotate(180deg);
     }
-
     .tp-annexure-body {
       padding: 16px;
       border-top: 1px solid var(--tp-border-subtle);
@@ -1634,11 +1446,9 @@
       font-size: 13px;
       line-height: 1.5;
     }
-
     .tp-annexure-card.open .tp-annexure-body {
       display: block;
     }
-
     /* Original Template Table Classes inside Annexures */
     .annex-table {
       width: 100%;
@@ -1672,7 +1482,6 @@
       background: #E2E8F0;
       font-weight: 700;
     }
-
     /* Visual Table & Spreadsheet Editor in Annexures */
     .tp-annex-visual-editor-box {
       background: #FFFFFF;
@@ -1681,7 +1490,6 @@
       padding: 14px;
       min-height: 120px;
     }
-
     .tp-table-editor-wrapper {
       margin: 10px 0 16px;
       background: #F8FAFC;
@@ -1690,7 +1498,6 @@
       padding: 10px;
       overflow-x: auto;
     }
-
     .tp-table-toolbar {
       display: flex;
       align-items: center;
@@ -1700,7 +1507,6 @@
       border-top: 1px dashed #CBD5E1;
       flex-wrap: wrap;
     }
-
     .tp-tbl-tool-label {
       font-size: 11px;
       font-weight: 700;
@@ -1708,7 +1514,6 @@
       text-transform: uppercase;
       letter-spacing: 0.04em;
     }
-
     .tp-table-btn {
       background: #FFFFFF;
       border: 1px solid #CBD5E1;
@@ -1733,12 +1538,10 @@
       border-color: #EF4444;
       color: #B91C1C;
     }
-
     .tp-editable-annex-table {
       margin: 0 !important;
       background: #FFFFFF;
     }
-
     .tp-editable-cell {
       outline: none;
       border: 1px dashed #94A3B8 !important;
@@ -1752,7 +1555,6 @@
       border: 1px solid #3B82F6 !important;
       box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
     }
-
     .tp-editable-text {
       outline: none;
       border: 1px dashed transparent;
@@ -1769,14 +1571,12 @@
       border: 1px solid #3B82F6;
       background: #EFF6FF;
     }
-
     .tp-empty-msg {
       padding: 32px;
       text-align: center;
       color: var(--tp-ink-muted);
       font-style: italic;
     }
-
     /* Primary Top View Tabs */
     .tp-top-tabs-bar {
       display: flex;
@@ -1786,7 +1586,6 @@
       padding-bottom: 12px;
       border-bottom: 1px solid var(--tp-border-subtle);
     }
-
     .tp-view-tabs {
       display: inline-flex;
       background: #E2E8F0;
@@ -1794,7 +1593,6 @@
       border-radius: 12px;
       gap: 4px;
     }
-
     .tp-view-tab {
       display: inline-flex;
       align-items: center;
@@ -1810,23 +1608,19 @@
       cursor: pointer;
       transition: all 0.18s ease;
     }
-
     .tp-view-tab:hover {
       color: #0F172A;
       background: rgba(255, 255, 255, 0.6);
     }
-
     .tp-view-tab.active {
       background: #FFFFFF;
       color: var(--tp-brand-dark);
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     }
-
     .tp-view-tab-icon {
       font-size: 16px;
       line-height: 1;
     }
-
     .tp-view-tab-pill {
       font-size: 10px;
       font-weight: 700;
@@ -1837,56 +1631,165 @@
       padding: 2px 7px;
       border-radius: 10px;
     }
-
     .tp-view-tab.active .tp-view-tab-pill {
       background: #FEF3C7;
       color: #92400E;
     }
-
-    /* Historical View Card */
-    .tp-historical-content {
-      padding: 24px 0;
-    }
-
-    .tp-historical-placeholder-card {
+    /* Historical Module Styles */
+    .tp-hist-toolbar-box {
       background: #FFFFFF;
-      border: 1px dashed #CBD5E1;
-      border-radius: 16px;
-      padding: 48px 32px;
-      text-align: center;
-      max-width: 720px;
-      margin: 0 auto;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
-    }
-
-    .tp-hist-icon-box {
-      font-size: 42px;
-      margin-bottom: 16px;
-      line-height: 1;
-    }
-
-    .tp-hist-heading {
-      font-size: 20px;
-      font-weight: 800;
-      color: #0F172A;
-      margin-bottom: 10px;
-    }
-
-    .tp-hist-desc {
-      font-size: 14px;
-      color: #64748B;
-      line-height: 1.6;
-      margin-bottom: 24px;
-    }
-
-    .tp-hist-features {
+      border: 1px solid var(--tp-border);
+      border-radius: 14px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
       display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 10px;
+      flex-direction: column;
+      gap: 14px;
     }
-
-    .tp-hist-feature-pill {
+    .tp-hist-toolbar-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+    .tp-hist-mode-switcher {
+      display: inline-flex;
+      background: #F1F5F9;
+      padding: 4px;
+      border-radius: 10px;
+      border: 1px solid #E2E8F0;
+      gap: 4px;
+    }
+    .tp-hist-mode-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #64748B;
+      background: transparent;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .tp-hist-mode-btn:hover {
+      color: #0F172A;
+    }
+    .tp-hist-mode-btn.active {
+      background: #FFFFFF;
+      color: #0284C7;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+    }
+    .tp-hist-state-pills {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .tp-hist-filter-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #64748B;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-right: 4px;
+    }
+    .tp-hist-state-pill {
+      background: #F8FAFC;
+      border: 1px solid #CBD5E1;
+      color: #334155;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .tp-hist-state-pill:hover {
+      border-color: #94A3B8;
+      background: #F1F5F9;
+    }
+    .tp-hist-state-pill.active {
+      background: #0284C7;
+      border-color: #0284C7;
+      color: #FFFFFF;
+      font-weight: 700;
+    }
+    .tp-hist-search-box {
+      position: relative;
+      min-width: 260px;
+      flex: 1;
+      max-width: 340px;
+    }
+    .tp-hist-search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      color: #94A3B8;
+      pointer-events: none;
+    }
+    .tp-hist-search-input {
+      width: 100%;
+      padding: 8px 32px 8px 34px;
+      font-size: 13px;
+      border: 1px solid #CBD5E1;
+      border-radius: 8px;
+      background: #F8FAFC;
+      color: #0F172A;
+      box-sizing: border-box;
+      outline: none;
+      transition: border 0.15s ease;
+    }
+    .tp-hist-search-input:focus {
+      border-color: #0284C7;
+      background: #FFFFFF;
+      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.12);
+    }
+    .tp-hist-search-clear {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      font-size: 16px;
+      color: #94A3B8;
+      cursor: pointer;
+    }
+    .tp-hist-tabs-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding-top: 10px;
+      border-top: 1px solid #F1F5F9;
+    }
+    .tp-hist-tabs-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #64748B;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+    .tp-hist-tabs-scroll {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scrollbar-width: thin;
+    
+      scroll-behavior: smooth;
+    }
+    .tp-hist-sheet-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
       background: #F8FAFC;
       border: 1px solid #E2E8F0;
       color: #334155;
@@ -1894,6 +1797,493 @@
       font-weight: 600;
       padding: 6px 14px;
       border-radius: 20px;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .tp-hist-sheet-tab:hover {
+      background: #ECFDF5;
+      border-color: #A7F3D0;
+      color: #065F46;
+    }
+    .tp-hist-sheet-tab.active {
+      background: #10B981;
+      border-color: #10B981;
+      color: #FFFFFF;
+      font-weight: 700;
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
+    }
+    .tp-hist-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .tp-hist-kpi-card {
+      background: #FFFFFF;
+      border: 1px solid var(--tp-border);
+      border-radius: 14px;
+      padding: 16px 20px;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+    }
+    .tp-hist-kpi-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .tp-hist-kpi-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #64748B;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .tp-hist-kpi-icon {
+      font-size: 18px;
+    }
+    .tp-hist-kpi-val {
+      font-size: 26px;
+      font-weight: 800;
+      color: #0F172A;
+      line-height: 1.2;
+      margin-bottom: 4px;
+    }
+    .tp-hist-kpi-sub {
+      font-size: 13px;
+      font-weight: 500;
+      color: #94A3B8;
+    }
+    .tp-hist-kpi-desc {
+      font-size: 12px;
+      color: #64748B;
+    }
+    .tp-hist-section-card {
+      background: #FFFFFF;
+      border: 1px solid var(--tp-border);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+      margin-bottom: 24px;
+    }
+    .tp-hist-section-header {
+      padding: 16px 20px;
+      background: #F8FAFC;
+      border-bottom: 1px solid var(--tp-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .tp-hist-section-title {
+      font-size: 16px;
+      font-weight: 800;
+      color: #0F172A;
+      margin: 0;
+    }
+    .tp-hist-section-desc {
+      font-size: 12px;
+      color: #64748B;
+      margin: 2px 0 0 0;
+    }
+    .tp-hist-table-wrap {
+      overflow-x: auto;
+      overflow-y: visible;
+      position: relative;
+    }
+    .tp-hist-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 13px;
+    }
+    .tp-hist-table th {
+      background: #F1F5F9;
+      color: #475569;
+      font-weight: 700;
+      padding: 10px 14px;
+      border-bottom: 1px solid #CBD5E1;
+      border-right: 1px solid #E2E8F0;
+      white-space: nowrap;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .tp-hist-table td {
+      padding: 9px 14px;
+      border-bottom: 1px solid #F1F5F9;
+      border-right: 1px solid #F8FAFC;
+      white-space: nowrap;
+      color: #334155;
+    }
+    .tp-hist-row:nth-child(even) td {
+      background: #FAFAFA;
+    }
+    .tp-hist-row:hover td {
+      background: #F0FDF4 !important;
+    }
+    .tp-hist-tr-super th {
+      background: #E2E8F0 !important;
+      color: #0F172A !important;
+      font-weight: 800;
+      font-size: 12px;
+      text-transform: uppercase;
+      text-align: center;
+      border-bottom: 1px solid #CBD5E1;
+    }
+    .tp-hist-th-group {
+      background: #0284C7 !important;
+      color: #FFFFFF !important;
+      letter-spacing: 0.5px;
+    }
+    .tp-hist-th-blank {
+      background: #CBD5E1 !important;
+      color: #334155 !important;
+    }
+    .tp-hist-tr-sub th {
+      top: 36px;
+    }
+    .tp-hist-col-sticky {
+      position: sticky;
+      background: #FFFFFF;
+      z-index: 5;
+    }
+    .tp-hist-table th.tp-hist-col-sticky {
+      z-index: 15;
+    }
+    .sticky-col-1 { left: 0px; }
+    .sticky-col-2 { left: 50px; }
+    .sticky-col-5 { left: 110px; box-shadow: 2px 0 6px rgba(0,0,0,0.04); }
+    .tp-hist-grade-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 800;
+      margin-right: 4px;
+    }
+    .grade-a { background: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; }
+    .grade-b { background: #FEF3C7; color: #D97706; border: 1px solid #FDE68A; }
+    .grade-c { background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA; }
+    .tp-hist-grade-pill {
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      line-height: 22px;
+      text-align: center;
+      border-radius: 50%;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .tp-hist-state-tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .state-mh { background: #E0E7FF; color: #4338CA; }
+    .state-cg { background: #DCFCE7; color: #15803D; }
+    .state-mp { background: #FEF3C7; color: #B45309; }
+    .state-br { background: #FCE7F3; color: #BE185D; }
+    .tp-hist-delta-pill {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 12px;
+    }
+    .tp-hist-delta-pill.pos { background: #DCFCE7; color: #166534; }
+    .tp-hist-delta-pill.neg { background: #FEE2E2; color: #991B1B; }
+    .tp-hist-delta-pill.neutral { background: #F1F5F9; color: #475569; }
+    .tp-hist-verified-pill {
+      background: #D1FAE5;
+      color: #065F46;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 12px;
+    }
+    .tp-hist-category-pill {
+      background: #F1F5F9;
+      color: #475569;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 12px;
+    }
+    .tp-hist-btn-profile {
+      background: #F0FDF4;
+      border: 1px solid #BBF7D0;
+      color: #166534;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .tp-hist-btn-profile:hover {
+      background: #DCFCE7;
+      border-color: #86EFAC;
+    }
+    .tp-hist-btn-sheets-link {
+      background: #FFFFFF;
+      border: 1px solid #CBD5E1;
+      color: #0284C7;
+      font-size: 12px;
+      font-weight: 700;
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .tp-hist-btn-sheets-link:hover {
+      background: #F0F9FF;
+      border-color: #0284C7;
+    }
+    .tp-hist-modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .tp-hist-modal-card {
+      background: #FFFFFF;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 820px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+    }
+    .tp-hist-modal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid #E2E8F0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .tp-hist-modal-title {
+      font-size: 20px;
+      font-weight: 800;
+      color: #0F172A;
+      margin: 0;
+    }
+    .tp-hist-modal-sub {
+      font-size: 13px;
+      color: #64748B;
+      margin: 4px 0 0 0;
+    }
+    .tp-hist-modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: #94A3B8;
+      cursor: pointer;
+    }
+    .tp-hist-modal-meta-bar {
+      background: #F8FAFC;
+      border-bottom: 1px solid #E2E8F0;
+      padding: 12px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+    .tp-hist-modal-meta-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+    }
+    .tp-hist-modal-meta-label {
+      color: #64748B;
+      font-weight: 600;
+    }
+    .tp-hist-modal-meta-val {
+      color: #0F172A;
+      font-weight: 700;
+    }
+    .tp-hist-modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid #E2E8F0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #F8FAFC;
+    }
+    .tp-hist-btn-secondary {
+      background: #FFFFFF;
+      border: 1px solid #CBD5E1;
+      color: #475569;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 8px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .tp-hist-btn-secondary:hover {
+      background: #F1F5F9;
+    }
+    /* Source Switcher (External vs Internal Data) */
+    .tp-hist-source-switcher {
+      display: inline-flex;
+      background: #E2E8F0;
+      padding: 4px;
+      border-radius: 12px;
+      gap: 4px;
+    }
+    .tp-hist-source-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #475569;
+      background: transparent;
+      border: none;
+      border-radius: 9px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .tp-hist-source-btn:hover {
+      color: #0F172A;
+    }
+    .tp-hist-source-btn.active {
+      background: #FFFFFF;
+      color: #0F172A;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+    }
+    .tp-hist-source-btn.active .tp-hist-source-badge {
+      background: #0284C7;
+      color: #FFFFFF;
+    }
+    .tp-hist-source-badge {
+      font-size: 11px;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 10px;
+      background: #CBD5E1;
+      color: #475569;
+    }
+    /* IT Admin Edit Button */
+    .tp-hist-btn-edit {
+      background: #F3E8FF;
+      border: 1px solid #D8B4FE;
+      color: #7E22CE;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+    }
+    .tp-hist-btn-edit:hover {
+      background: #7E22CE;
+      color: #FFFFFF;
+      border-color: #7E22CE;
+      box-shadow: 0 2px 8px rgba(126, 34, 206, 0.3);
+    }
+    .tp-hist-btn-primary {
+      background: #0284C7;
+      border: 1px solid #0284C7;
+      color: #FFFFFF;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 8px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .tp-hist-btn-primary:hover {
+      background: #0369A1;
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+    }
+    /* IT Admin Edit Form Fields */
+    .tp-hist-edit-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .tp-hist-form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .tp-hist-form-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .tp-hist-form-input {
+      padding: 8px 12px;
+      border: 1px solid #CBD5E1;
+      border-radius: 8px;
+      font-size: 13px;
+      background: #FFFFFF;
+      color: #0F172A;
+      outline: none;
+      box-sizing: border-box;
+      width: 100%;
+    }
+    .tp-hist-form-input:focus {
+      border-color: #7E22CE;
+      box-shadow: 0 0 0 3px rgba(126, 34, 206, 0.15);
+    }
+    .tp-hist-form-select {
+      padding: 8px 12px;
+      border: 1px solid #CBD5E1;
+      border-radius: 8px;
+      font-size: 13px;
+      background: #FFFFFF;
+      color: #0F172A;
+      outline: none;
+      box-sizing: border-box;
+      width: 100%;
+      cursor: pointer;
+    }
+    /* District Modal KPI Cards */
+    .tp-hist-modal-kpis {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .tp-hist-modal-kpi {
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .tp-hist-modal-kpi-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      color: #64748B;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .tp-hist-modal-kpi-val {
+      display: block;
+      font-size: 18px;
+      font-weight: 800;
+      font-family: monospace;
+      color: #0F172A;
     }
 
     /* Admin Manage Editors Styles */
@@ -2007,8 +2397,360 @@
       border: 1px dashed var(--tp-border);
       border-radius: 10px;
     }
+  
+    /* New Controls: Dropdowns & Action Buttons */
+    .tp-hist-dropdown-box {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tp-hist-filter-select {
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #334155;
+      background: #FFFFFF;
+      border: 1px solid #CBD5E1;
+      border-radius: 8px;
+      outline: none;
+      cursor: pointer;
+      max-width: 170px;
+      transition: border-color 0.15s ease;
+    }
+    .tp-hist-filter-select:focus {
+      border-color: #0284C7;
+      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.12);
+    }
+    .tp-hist-actions-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+    .tp-hist-btn-export-xlsx {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #059669;
+      color: #FFFFFF;
+      border: 1px solid #059669;
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      box-shadow: 0 1px 3px rgba(5, 150, 105, 0.2);
+    }
+    .tp-hist-btn-export-xlsx:hover {
+      background: #047857;
+      border-color: #047857;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(5, 150, 105, 0.3);
+    }
+    .tp-hist-btn-export-pdf {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #E11D48;
+      color: #FFFFFF;
+      border: 1px solid #E11D48;
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      box-shadow: 0 1px 3px rgba(225, 29, 72, 0.2);
+    }
+    .tp-hist-btn-export-pdf:hover {
+      background: #BE123C;
+      border-color: #BE123C;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(225, 29, 72, 0.3);
+    }
+  
+    /* ========================================================
+       REDESIGNED CONTROLS TOOLBAR (Clean, Modern, Structured)
+       ======================================================== */
+    .tp-hist-toolbar-box {
+      background: #FFFFFF;
+      border: 1px solid var(--tp-border);
+      border-radius: 14px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    /* Tier 1: View Modes & Export Actions */
+    .tp-hist-tier-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .tp-hist-mode-switcher {
+      display: inline-flex;
+      background: #F1F5F9;
+      padding: 3px;
+      border-radius: 10px;
+      border: 1px solid #E2E8F0;
+      gap: 3px;
+    }
+    .tp-hist-mode-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 15px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #64748B;
+      background: transparent;
+      border: none;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .tp-hist-mode-btn:hover {
+      color: #0F172A;
+    }
+    .tp-hist-mode-btn.active {
+      background: #FFFFFF;
+      color: #0284C7;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+    }
+    .tp-hist-export-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .tp-hist-btn-export {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      line-height: 1.2;
+    }
+    .tp-hist-btn-xlsx {
+      background: #ECFDF5;
+      color: #059669;
+      border: 1px solid #A7F3D0;
+    }
+    .tp-hist-btn-xlsx:hover {
+      background: #059669;
+      color: #FFFFFF;
+      border-color: #059669;
+      box-shadow: 0 4px 10px rgba(5, 150, 105, 0.25);
+      transform: translateY(-1px);
+    }
+    .tp-hist-btn-pdf {
+      background: #FFF1F2;
+      color: #E11D48;
+      border: 1px solid #FECDD3;
+    }
+    .tp-hist-btn-pdf:hover {
+      background: #E11D48;
+      color: #FFFFFF;
+      border-color: #E11D48;
+      box-shadow: 0 4px 10px rgba(225, 29, 72, 0.25);
+      transform: translateY(-1px);
+    }
+    /* Tier 2: Unified Filter & Search Bar */
+    .tp-hist-filter-strip {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      border-radius: 10px;
+      padding: 8px 12px;
+    }
+    .tp-hist-pill-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .tp-hist-filter-title {
+      font-size: 11px;
+      font-weight: 800;
+      color: #64748B;
+      letter-spacing: 0.5px;
+      margin-right: 2px;
+    }
+    .tp-hist-pill-opt {
+      background: #FFFFFF;
+      border: 1px solid #CBD5E1;
+      color: #475569;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 9px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .tp-hist-pill-opt:hover {
+      background: #F1F5F9;
+      color: #0F172A;
+    }
+    .tp-hist-pill-opt.active {
+      background: #0284C7;
+      border-color: #0284C7;
+      color: #FFFFFF;
+      box-shadow: 0 1px 4px rgba(2, 132, 199, 0.25);
+    }
+    .tp-hist-filter-divider {
+      width: 1px;
+      height: 22px;
+      background: #CBD5E1;
+      margin: 0 4px;
+    }
+    .tp-hist-select-wrap {
+      display: inline-flex;
+      align-items: center;
+      background: #FFFFFF;
+      border: 1px solid #CBD5E1;
+      border-radius: 8px;
+      padding: 0 8px;
+      transition: border-color 0.15s ease;
+    }
+    .tp-hist-select-wrap:focus-within {
+      border-color: #0284C7;
+      box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
+    }
+    .tp-hist-select-icon {
+      font-size: 13px;
+      margin-right: 4px;
+    }
+    .tp-hist-select-input {
+      border: none;
+      background: transparent;
+      padding: 6px 4px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #334155;
+      outline: none;
+      cursor: pointer;
+      max-width: 160px;
+    }
+    .tp-hist-search-wrap {
+      display: inline-flex;
+      align-items: center;
+      background: #FFFFFF;
+      border: 1px solid #CBD5E1;
+      border-radius: 8px;
+      padding: 0 10px;
+      flex: 1;
+      min-width: 180px;
+      transition: border-color 0.15s ease;
+    }
+    .tp-hist-search-wrap:focus-within {
+      border-color: #0284C7;
+      box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
+    }
+    .tp-hist-search-svg {
+      color: #94A3B8;
+      margin-right: 6px;
+      flex-shrink: 0;
+    }
+    .tp-hist-search-field {
+      border: none;
+      background: transparent;
+      padding: 6px 0;
+      font-size: 12px;
+      color: #0F172A;
+      outline: none;
+      width: 100%;
+    }
+    .tp-hist-search-reset {
+      background: none;
+      border: none;
+      font-size: 16px;
+      color: #94A3B8;
+      cursor: pointer;
+      padding: 0 2px;
+    }
+    .tp-hist-btn-reset-all {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #F1F5F9;
+      border: 1px solid #CBD5E1;
+      color: #475569;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 5px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .tp-hist-btn-reset-all:hover {
+      background: #E2E8F0;
+      color: #0F172A;
+    }
+    /* Tier 3: Sheet Selector Strip */
+    .tp-hist-tabs-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding-top: 10px;
+      border-top: 1px solid #F1F5F9;
+    }
+    .tp-hist-tabs-badge {
+      font-size: 10px;
+      font-weight: 800;
+      color: #64748B;
+      letter-spacing: 0.6px;
+      background: #F1F5F9;
+      padding: 3px 8px;
+      border-radius: 4px;
+      border: 1px solid #E2E8F0;
+      white-space: nowrap;
+    }
+    .tp-hist-tabs-scroll {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scrollbar-width: thin;
+      scroll-behavior: smooth;
+    }
+    .tp-hist-sheet-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      color: #334155;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 20px;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .tp-hist-sheet-tab:hover {
+      background: #ECFDF5;
+      border-color: #A7F3D0;
+      color: #065F46;
+    }
+    .tp-hist-sheet-tab.active {
+      background: #10B981;
+      border-color: #10B981;
+      color: #FFFFFF;
+      font-weight: 700;
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
+    }
   </style>
-
   <!-- Top View Navigation Tabs -->
   <div class="tp-top-tabs-bar">
     <div class="tp-view-tabs" role="tablist">
@@ -2019,11 +2761,9 @@
       <button type="button" class="tp-view-tab" id="tpViewTabHistorical" onclick="window.TeamPerformance.switchView('historical')">
         <span class="tp-view-tab-icon">📜</span>
         <span class="tp-view-tab-text">Historical Data</span>
-        <span class="tp-view-tab-pill">Upcoming</span>
       </button>
     </div>
   </div>
-
   <!-- 1. SMART GOALS View Container -->
   <div id="tpSmartGoalsView" class="tp-view-section">
     <!-- Top Navigation & Toolbar -->
@@ -2042,7 +2782,6 @@
           </button>
         </div>
       </div>
-
     <div class="tp-header-controls">
       <!-- Segmented State Switcher -->
       <div class="tp-segmented-control" role="tablist">
@@ -2059,7 +2798,6 @@
           <span class="tp-seg-icon">🌾</span> Bihar
         </button>
       </div>
-
       <!-- Quick Search Input -->
       <div class="tp-search-box">
         <svg class="tp-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -2069,7 +2807,6 @@
         <input type="text" id="tpSearchInput" placeholder="Search person, district, role..." oninput="window.TeamPerformance.onSearch(this.value)" autocomplete="off">
         <button type="button" id="tpSearchClear" class="tp-search-clear" onclick="window.TeamPerformance.clearSearch()" style="display:none;">&times;</button>
       </div>
-
       <!-- Action Buttons -->
       <div class="tp-btn-group">
         <button type="button" class="tp-btn tp-btn-secondary" onclick="window.TeamPerformance.expandAll()" title="Expand all divisions">
@@ -2081,7 +2818,6 @@
       </div>
     </div>
   </div>
-
   <!-- Division Toggle Pills Bar -->
   <div class="tp-division-pills-bar" id="tpDivisionBar">
     <span class="tp-filter-label">Quick Toggle:</span>
@@ -2089,13 +2825,11 @@
       <!-- Injected dynamically -->
     </div>
   </div>
-
   <!-- Search Summary -->
   <div class="tp-search-summary" id="tpSearchSummary" style="display:none;">
     <span id="tpSearchSummaryText">Showing matches</span>
     <button type="button" class="tp-link-btn" onclick="window.TeamPerformance.clearSearch()">Clear search</button>
   </div>
-
   <!-- Flowchart Viewport -->
   <div class="tp-viewport" id="tpViewport">
     <div class="tp-canvas" id="tpCanvas">
@@ -2106,36 +2840,13 @@
     </div>
   </div>
   </div> <!-- End #tpSmartGoalsView -->
-
   <!-- 2. Historical Data View Container -->
   <div id="tpHistoricalView" class="tp-view-section" style="display:none;">
-    <div class="tp-header">
-      <div class="tp-header-left">
-        <div class="tp-title-row">
-          <h2 class="tp-title">Historical Data</h2>
-          <span class="tp-badge">Archival Module</span>
-        </div>
-        <p class="tp-subtitle">Quarterly evaluations, historical performance records, and longitudinal trend archives</p>
-      </div>
-    </div>
-
-    <div class="tp-historical-content">
-      <div class="tp-historical-placeholder-card">
-        <div class="tp-hist-icon-box">📜</div>
-        <h3 class="tp-hist-heading">Historical Performance Archive</h3>
-        <p class="tp-hist-desc">
-          This tab will house historical performance snapshots, past quarter evaluations, and previous academic year reviews.
-          Data integration and archival records setup will be configured here.
-        </p>
-        <div class="tp-hist-features">
-          <div class="tp-hist-feature-pill">📅 Prior Quarterly Reviews (Q1 &middot; Q2 &middot; Q3)</div>
-          <div class="tp-hist-feature-pill">📊 State &amp; Division Trends</div>
-          <div class="tp-hist-feature-pill">🎯 Scorecard Progression History</div>
-        </div>
-      </div>
-    </div>
+    <div id="tpHistoricalHeaderArea"></div>
+    <div id="tpHistoricalControls"></div>
+    <div id="tpHistoricalMain"></div>
+    <div id="tpHistoricalModalContainer"></div>
   </div> <!-- End #tpHistoricalView -->
-
   <!-- Role Detail & Full Editor Modal -->
   <div id="tpModal" class="tp-modal-overlay" onclick="if(event.target===this)window.TeamPerformance.closeModal()">
     <div class="tp-modal-dialog" role="dialog" aria-modal="true">
@@ -2161,7 +2872,6 @@
           <button type="button" class="tp-modal-close" onclick="window.TeamPerformance.closeModal()" title="Close">&times;</button>
         </div>
       </div>
-
       <!-- Modal Tabs -->
       <div class="tp-modal-tabs">
         <button type="button" class="tp-tab-btn active" id="tpTabBtnGoals" onclick="window.TeamPerformance.switchTab('goals')">Goals &amp; Measures</button>
@@ -2169,7 +2879,6 @@
         <button type="button" class="tp-tab-btn" id="tpTabBtnPriority" onclick="window.TeamPerformance.switchTab('priority')">3 Months Priority</button>
         <button type="button" class="tp-tab-btn" id="tpTabBtnAnnexures" onclick="window.TeamPerformance.switchTab('annexures')">Annexures</button>
       </div>
-
       <!-- Modal Content Body -->
       <div class="tp-modal-body">
         <!-- 1. Goals & Measures Tab -->
@@ -2189,7 +2898,6 @@
               </div>
             </div>
           </div>
-
           <!-- View Mode -->
           <div id="tpGoalsViewContainer" style="width: 100%; max-width: 100%; box-sizing: border-box; overflow-x: hidden;">
             <table class="tp-table">
@@ -2204,7 +2912,6 @@
               <tbody id="tpGoalsTableBody"></tbody>
             </table>
           </div>
-
           <!-- Edit Mode -->
           <div id="tpGoalsEditContainer" style="display:none;">
             <div id="tpGoalsEditList" class="tp-goals-edit-list"></div>
@@ -2214,7 +2921,6 @@
             </div>
           </div>
         </div>
-
         <!-- 2. Role & Responsibilities Tab -->
         <div id="tpTabPaneRole" class="tp-tab-pane">
           <div class="tp-tab-toolbar">
@@ -2230,10 +2936,8 @@
               </div>
             </div>
           </div>
-
           <!-- View Mode -->
           <div id="tpRoleViewContainer"></div>
-
           <!-- Edit Mode -->
           <div id="tpRoleEditContainer" style="display:none;">
             <div class="tp-form-group">
@@ -2246,7 +2950,6 @@
             </div>
           </div>
         </div>
-
         <!-- 3. 3 Months Priority Tab -->
         <div id="tpTabPanePriority" class="tp-tab-pane">
           <div class="tp-tab-toolbar">
@@ -2262,16 +2965,13 @@
               </div>
             </div>
           </div>
-
           <!-- View Mode -->
           <div id="tpPriorityViewContainer"></div>
-
           <!-- Edit Mode -->
           <div id="tpPriorityEditContainer" style="display:none;">
             <div id="tpPriorityEditList" class="tp-edit-list"></div>
           </div>
         </div>
-
         <!-- 4. Annexures Tab -->
         <div id="tpTabPaneAnnexures" class="tp-tab-pane">
           <div class="tp-tab-toolbar">
@@ -2287,10 +2987,8 @@
               </div>
             </div>
           </div>
-
           <!-- View Mode -->
           <div id="tpAnnexuresViewContainer"></div>
-
           <!-- Edit Mode -->
           <div id="tpAnnexuresEditContainer" style="display:none;">
             <div id="tpAnnexuresEditList" class="tp-edit-list"></div>
@@ -2299,7 +2997,6 @@
       </div>
     </div>
   </div>
-
   <!-- Manage Editors Modal (Admin Only) -->
   <div id="tpEditorsModal" class="tp-modal-overlay" onclick="if(event.target===this)window.TeamPerformance.closeEditorsModal()" style="display:none;">
     <div class="tp-modal-dialog tp-modal-dialog-sm" role="dialog" aria-modal="true">
@@ -2326,7 +3023,6 @@
             🔒 <strong>STRICTLY Admin Only by Default:</strong> IT Admins have edit access automatically. Adding an employee here grants them permission to edit SMART Goals scorecards, priorities, and annexures.
           </p>
         </div>
-
         <!-- Active Editors Section -->
         <div>
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
