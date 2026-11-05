@@ -1400,39 +1400,17 @@ window.olfGetEmployees = async function () {
    staff are skipped: a district nobody is posted to any more should stop
    being offered.
 
-   A spelling in the directory that does not match the district it means is
-   mapped here rather than corrected in Firestore, so nothing is rewritten
-   in production and the fix stays in one visible place. (Bid is Beed, in
-   Chhatrapati Sambhajinagar. "Raigarh MH" is shown as it is written: it is
-   not renamed, so it can never be mistaken for Raigarh in Chhattisgarh.)
+   District names are taken exactly as they are written in Employees.
+   Nothing here renames, merges or tidies them, so there is no list in the
+   code to keep up to date: to change a district's name, change it in the
+   Employees tab, and every page that reads the directory follows. (Only
+   capitals and spacing are ignored, so "Pune" and "pune " are one place.)
 
    A state with no districts is left out: it cannot carry a requisition, so
    offering it only strands whoever picks it. Delhi is the live example.
 
    Fetched once per page load and cached, like the directory above.
 ==================================== */
-
-const DISTRICT_RENAMES = {
-    "bid":        "Beed"
-};
-
-/* Districts as the award form should offer them.
-
-   A municipal corporation is part of its district, not a district of its
-   own, so "Sangli - MC" and "Pune - MC" are both filed under the district
-   they sit in. That is a rule rather than a list because the directory
-   gains these as it grows - Pune - MC appeared after the first three were
-   written down, and a list would have missed it.
-
-   It stays a rule about "- MC" specifically, not about suffixes generally:
-   "Janjgir - Champa" is a real district name, and dropping what follows the
-   dash would rename it. "Raigarh MH" is left exactly as written for the same
-   reason - taking off the MH leaves Raigarh, which is a different district
-   in a different state. */
-function tidyDistrict(name) {
-    const trimmed = String(name || "").trim().replace(/(?:\s*[-–]\s*|\s+)MC$/i, "").trim();
-    return DISTRICT_RENAMES[trimmed.toLowerCase()] || trimmed;
-}
 
 let orgGeography = null;
 let orgGeographyAt = 0;
@@ -1471,7 +1449,7 @@ window.olfGeography = async function () {
                            .test(String(r["Dept"] || "").trim().toLowerCase().replace(/\s+/g, " ")),
             states:    keys(splitMulti(r["State"])),
             divisions: keys(splitMulti(r["Division"])),
-            districts: keys(splitMulti(r["District"]).map(tidyDistrict))
+            districts: keys(splitMulti(r["District"]))
         });
     });
 
