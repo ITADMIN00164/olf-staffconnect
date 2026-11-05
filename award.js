@@ -153,18 +153,23 @@ window.AWARD_CONFIG = {
 
   /* Where a requisition has got to.
 
-       raised ─> approved ─> acknowledged ─> dispatched ─> received
-          │          │             │
-          │          └── rejected ─┘
+       raised ─> verified ─> acknowledged ─> approved ─> dispatched ─> received
+          │          │             │             │
+          │          └──────── rejected ────────┘
           └── declined
+
+     The approver's step is called "verified" and is stored as "approved", as
+     it always was, so nothing already filed has to change. The step Head
+     Office takes after acknowledging is "approved", stored as "ho_approved".
 
      declined is the approver turning it down; rejected is Head Office unable
      to fulfil it. Dispatch and receipt are likewise two events: Head Office
      knows it sent the award, only the requester knows it arrived. */
   var STAGES = {
     submitted:    { label: "Pending",      tone: "pending",  open: true  },
-    approved:     { label: "Approved",     tone: "approved", open: true  },
+    approved:     { label: "Verified",     tone: "approved", open: true  },
     acknowledged: { label: "Acknowledged", tone: "progress", open: true  },
+    ho_approved:  { label: "Approved",     tone: "approved", open: true  },
     on_hold:      { label: "On hold",      tone: "held",     open: true  },
     dispatched:   { label: "Dispatched",   tone: "progress", open: true,
                     hoLabel: "Awaiting confirmation" },
@@ -214,7 +219,8 @@ window.AWARD_CONFIG = {
         return who + (div ? " in " + div : "");
 
       case "approved":     return "Head Office, to acknowledge it";
-      case "acknowledged": return "Head Office, to send it";
+      case "acknowledged": return "Head Office, to approve it";
+      case "ho_approved":  return "Head Office, to send it";
       case "on_hold":      return "Head Office, who are waiting on stock";
       case "dispatched":
         var name = String(row.requester_name || "").trim();
@@ -230,7 +236,8 @@ window.AWARD_CONFIG = {
      Rows filed before the log column existed fall back to their columns. */
   var STEP_WORDS = {
     raised:       { label: "Raised",         tone: "start" },
-    approved:     { label: "Approved",       tone: "good"  },
+    approved:     { label: "Verified",       tone: "good"  },
+    ho_approved:  { label: "Approved",       tone: "good"  },
     declined:     { label: "Declined",       tone: "bad"   },
     acknowledged: { label: "Acknowledged",   tone: "move"  },
     held:         { label: "Put on hold",    tone: "warn"  },
@@ -479,13 +486,14 @@ window.AWARD_CONFIG = {
   function canManageAdmins() { return isAppAdmin(); }
 
   /* What HO may do to a requisition at its current stage. Nothing before it
-     has been approved - an unapproved requisition is not HO's business
+     has been verified - an unverified requisition is not HO's business
      yet. */
   function hoActions(row) {
     if (!isHoAdmin()) return [];
     switch (stageOf(row)) {
       case "approved":     return ["acknowledge", "reject"];
-      case "acknowledged": return ["dispatch", "hold", "reject"];
+      case "acknowledged": return ["approve", "hold", "reject"];
+      case "ho_approved":  return ["dispatch", "hold", "reject"];
       // On hold is waiting, not refusing. Nothing is sent from here: the
       // hold is lifted first, so the row says the blocker was settled.
       case "on_hold":      return ["resume", "reject"];
@@ -1121,7 +1129,7 @@ window.AWARD_CONFIG = {
   }
 
   /* Review. A decision cannot be taken back, so it gets a dialog rather
-     than a button in the row. Declining asks for a reason; approving may
+     than a button in the row. Declining asks for a reason; verifying may
      carry one. */
   var reviewing = null;          // the requisition under review
 
@@ -1253,7 +1261,7 @@ window.AWARD_CONFIG = {
         el.reviewApprove.disabled = el.reviewDecline.disabled = false;
         if (res.error) {
           setReviewStatus(/decided_|decision_remark|status/i.test(res.error.message || "")
-            ? "Approvals are not set up in the database yet - run " +
+            ? "Verification is not set up in the database yet - run " +
               "sql/award-management-setup.sql."
             : "Could not save: " + res.error.message, "bad");
           reportError("save decision", res.error);
@@ -1266,7 +1274,7 @@ window.AWARD_CONFIG = {
         }
         // Read before closing: closeReview clears what is being reviewed, and
         // the message is about it.
-        var what = decision === "approved" ? "Approved" : "Declined";
+        var what = decision === "approved" ? "Verified" : "Declined";
         var whose = String((reviewing && reviewing.requester_name) || "").trim();
         var where = String((reviewing && reviewing.district_name) || "").trim();
 
@@ -1334,7 +1342,7 @@ window.AWARD_CONFIG = {
   }
 
   /* Said under the heading, because the alternative is someone who can
-     approve seeing no Review buttons and concluding the page is broken. */
+     verify seeing no Review buttons and concluding the page is broken. */
   function decidingNote(standing) {
     if (!standing || standing.level < 2) return "";
     if (standing.level >= 4) return " You decide on any division.";
@@ -1342,7 +1350,7 @@ window.AWARD_CONFIG = {
     var divs = standing.divisions || [];
     if (!divs.length) {
       return " No division is recorded against you, so there is nothing you " +
-             "can approve yet — ask for it to be filled in on the Employees tab.";
+             "can verify yet — ask for it to be filled in on the Employees tab.";
     }
     return " You decide on " + divs.join(" and ") + ".";
   }
@@ -1371,6 +1379,7 @@ window.AWARD_CONFIG = {
     var p = placeOf(row);
     var HEADINGS = {
       acknowledge: "Acknowledge requisition",
+      approve:     "Approve requisition",
       dispatch:    "Mark as dispatched",
       hold:        "Put on hold",
       resume:      "Take off hold",
@@ -1380,6 +1389,7 @@ window.AWARD_CONFIG = {
     };
     var SUBS = {
       acknowledge: "Recorded against your name, and not undone.",
+      approve:     "Recorded against your name. It can be sent once it is approved.",
       dispatch:    "The requester is asked to confirm it arrives.",
       hold:        "It stays on the list. Nobody is told no - say what is being waited for.",
       resume:      "Back to the queue, ready to go out.",
@@ -1505,16 +1515,23 @@ window.AWARD_CONFIG = {
       patch.acknowledged_at = now;
       from = "approved";
 
+    } else if (action === "approve") {
+      // Head Office's own approval, between acknowledging and sending. It
+      // has no column of its own: the log carries who and when.
+      hoNote();
+      patch.status = "ho_approved";
+      from = "acknowledged";
+
     } else if (action === "hold") {
       hoNote();
       patch.status = "on_hold";
       patch.held_by = me;
       patch.held_at = now;
-      from = "acknowledged";
+      from = stageOf(row);                 // acknowledged or approved
 
     } else if (action === "resume") {
       hoNote();
-      patch.status = "acknowledged";
+      patch.status = "acknowledged";     // back to the start of Head Office's part
       // held_by and held_at stay: it was on hold, and the trail should say so.
       from = "on_hold";
 
@@ -1571,7 +1588,7 @@ window.AWARD_CONFIG = {
       patch.issue_by = null;
       patch.issue_at = null;
       patch.issue_note = null;
-      from = "acknowledged";               // never straight out of a hold
+      from = "ho_approved";                // never straight out of a hold
 
     } else if (action === "receive") {
       patch.receipt_note = remark || null;
@@ -1585,7 +1602,7 @@ window.AWARD_CONFIG = {
       patch.issue_note = remark || null;
       patch.issue_by = me;
       patch.issue_at = now;
-      patch.status = "acknowledged";
+      patch.status = "ho_approved";        // already approved: it only has to be sent again
       from = "dispatched";
 
     } else {
@@ -1604,7 +1621,7 @@ window.AWARD_CONFIG = {
        no column of its own, so before this there was nothing anywhere to say
        a requisition had ever come back off hold. */
     patch = withLog(row, {
-      acknowledge: "acknowledged", hold: "held", resume: "resumed",
+      acknowledge: "acknowledged", approve: "ho_approved", hold: "held", resume: "resumed",
       dispatch: "dispatched", receive: "received", issue: "not_received",
       reject: "rejected"
     }[action], remark, patch);
@@ -1629,7 +1646,7 @@ window.AWARD_CONFIG = {
         }
         var whose = String(row.requester_name || "").trim();
         var DONE = {
-          acknowledge: "Acknowledged", dispatch: "Dispatched",
+          acknowledge: "Acknowledged", approve: "Approved", dispatch: "Dispatched",
           hold: "Put on hold", resume: "Back in the queue",
           receive: "Receipt confirmed", issue: "Reported as not arrived",
           reject: "Rejected"
@@ -2779,10 +2796,10 @@ window.AWARD_CONFIG = {
               /(requester_role|requester_level|decided_|decision_remark)/i.test(msg)) {
             hasApproval = false;      // the approvals migration is not run yet
             showSetupBanner(
-              "Approvals need one more migration - run " +
+              "Verification needs one more migration - run " +
               "<code>sql/award-management-setup.sql</code> in the Supabase " +
               "SQL Editor. Until then every requisition shows as pending.",
-              "Approvals are not set up yet."
+              "Verification is not set up yet."
             );
             loadRequisitions();
             return;
@@ -2995,7 +3012,7 @@ window.AWARD_CONFIG = {
 
   var PIPE = [
     { key: "pending",  label: "Pending",    cls: "pipe-pending",  stages: ["submitted"] },
-    { key: "moving",   label: "In progress", cls: "pipe-moving",   stages: ["approved", "acknowledged", "dispatched"] },
+    { key: "moving",   label: "In progress", cls: "pipe-moving",   stages: ["approved", "acknowledged", "ho_approved", "dispatched"] },
     { key: "held",     label: "On hold",    cls: "pipe-held",     stages: ["on_hold"] },
     { key: "done",     label: "Received",   cls: "pipe-done",     stages: ["received"] },
     { key: "stopped",  label: "Declined",   cls: "pipe-stopped",  stages: ["declined", "rejected"] }
@@ -3032,7 +3049,7 @@ window.AWARD_CONFIG = {
       '<div class="kpis">' +
         kpiHtml("doc", "total", total, total === 1 ? "Requisition" : "Requisitions", "") +
         kpiHtml("clock", "wait", count.pending + count.held, "Waiting", "pending or on hold") +
-        kpiHtml("truck", "move", count.moving, "In progress", "approved to dispatched") +
+        kpiHtml("truck", "move", count.moving, "In progress", "verified to dispatched") +
         kpiHtml("done", "good", count.done, "Received", "") +
         '<div class="kpi kpi-ring">' +
           '<svg class="ring" viewBox="0 0 64 64" aria-hidden="true">' +
@@ -3071,7 +3088,7 @@ window.AWARD_CONFIG = {
       if (search && String(row.requester_name || "").toLowerCase()
                       .indexOf(search) === -1) return false;
       // Filtered on the stage itself. Going through statusOf collapsed
-      // every stage after approval into "approved", so choosing Dispatched
+      // every stage after verifying into "approved", so choosing Dispatched
       // or Received could not tell them apart.
       if (statusFilter && stageOf(row) !== statusFilter) return false;
       return true;
@@ -3488,6 +3505,7 @@ window.AWARD_CONFIG = {
 
   var HO_LABELS = {
     acknowledge: "Acknowledge",
+    approve:     "Approve",
     dispatch:    "Mark dispatched",
     hold:        "Put on hold",
     resume:      "Take off hold",
@@ -3516,12 +3534,12 @@ window.AWARD_CONFIG = {
     return '<span class="act-flag" title="Waiting for you"><i></i>' + escapeHtml(act.label) + "</span>";
   }
 
-  /* HO's queue: what has been approved and not yet finished with. Settled
+  /* HO's queue: what has been verified and not yet finished with. Settled
      requisitions drop off - this is a list of work, not a record. */
   // Head Office's queue, in the order they have to act on it.
   function deliveryQueue() {
-    var ORDER = { approved: 0, acknowledged: 1, on_hold: 2, dispatched: 3,
-                  received: 4, rejected: 5 };
+    var ORDER = { approved: 0, acknowledged: 1, ho_approved: 2, on_hold: 3,
+                  dispatched: 4, received: 5, rejected: 6 };
     return allRequisitions.filter(function (r) {
       return ORDER[stageOf(r)] !== undefined;
     }).sort(function (a, b) {
@@ -3546,7 +3564,7 @@ window.AWARD_CONFIG = {
         '<tr class="placeholder-row"><td colspan="' +
         (document.querySelectorAll("#delivery-table thead th").length || 9) + '">' +
         (hasAdmins
-          ? "Nothing yet. Requisitions appear here once they are approved."
+          ? "Nothing yet. Requisitions appear here once they are verified."
           : "Run sql/award-management-setup.sql to set this up.") +
         "</td></tr>";
       return;
@@ -3601,7 +3619,7 @@ window.AWARD_CONFIG = {
   function downloadRequisitionsExcel(forHo) {
     var list = forHo ? deliveryQueue() : filteredRequisitions();
     if (!list.length) {
-      if (forHo) awAlert("Nothing in the queue", "Requisitions appear here once they are approved.");
+      if (forHo) awAlert("Nothing in the queue", "Requisitions appear here once they are verified.");
       else if (!allRequisitions.length) awAlert("No requisitions yet", "There is nothing to download yet.");
       else awAlert("Nothing matches", "Change or clear the filters, then try again.");
       return;
