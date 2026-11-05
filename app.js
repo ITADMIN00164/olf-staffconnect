@@ -1400,11 +1400,11 @@ window.olfGetEmployees = async function () {
    staff are skipped: a district nobody is posted to any more should stop
    being offered.
 
-   Three spellings in the directory do not match the district they mean.
-   Each was checked against the division it sits under - Beed is in
-   Chhatrapati Sambhajinagar, Raigad in Konkan, Sangli in Pune - and is
+   A spelling in the directory that does not match the district it means is
    mapped here rather than corrected in Firestore, so nothing is rewritten
-   in production and the fix stays in one visible place.
+   in production and the fix stays in one visible place. (Bid is Beed, in
+   Chhatrapati Sambhajinagar. "Raigarh MH" is shown as it is written: it is
+   not renamed, so it can never be mistaken for Raigarh in Chhattisgarh.)
 
    A state with no districts is left out: it cannot carry a requisition, so
    offering it only strands whoever picks it. Delhi is the live example.
@@ -1413,8 +1413,7 @@ window.olfGetEmployees = async function () {
 ==================================== */
 
 const DISTRICT_RENAMES = {
-    "bid":        "Beed",
-    "raigarh mh": "Raigad"     // Raigarh is a Chhattisgarh district; this is Raigad
+    "bid":        "Beed"
 };
 
 /* Districts as the award form should offer them.
@@ -1427,7 +1426,7 @@ const DISTRICT_RENAMES = {
 
    It stays a rule about "- MC" specifically, not about suffixes generally:
    "Janjgir - Champa" is a real district name, and dropping what follows the
-   dash would rename it. "Raigarh MH" stays in the map above for the same
+   dash would rename it. "Raigarh MH" is left exactly as written for the same
    reason - taking off the MH leaves Raigarh, which is a different district
    in a different state. */
 function tidyDistrict(name) {
