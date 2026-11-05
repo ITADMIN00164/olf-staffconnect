@@ -128,8 +128,9 @@
           <select id="filter-status">
             <option value="">All statuses</option>
             <option value="submitted">Pending</option>
-            <option value="approved">Approved</option>
+            <option value="approved">Verified</option>
             <option value="acknowledged">Acknowledged</option>
+            <option value="ho_approved">Approved</option>
             <option value="on_hold">On hold</option>
             <option value="dispatched">Dispatched</option>
             <option value="received">Received</option>
@@ -748,20 +749,20 @@
           <label for="review-remark" class="rv-label">Remark
             <span class="hint">required when declining</span></label>
           <textarea id="review-remark" rows="2"
-                    placeholder="Why this is being approved or declined"></textarea>
+                    placeholder="Why this is being verified or declined"></textarea>
           <p class="error" id="review-remark-error" role="alert"></p>
           <div class="rv-actions">
             <button type="button" id="review-decline" class="btn btn-decline">Decline</button>
             <button type="button" id="review-approve" class="btn btn-primary">
               <i class="aw-icon" data-aw-icon="check" aria-hidden="true"></i>
-              Approve
+              Verify
             </button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- HO acting on an approved requisition. Its own dialog because the
+    <!-- HO acting on a verified requisition. Its own dialog because the
          wording changes with the action, and rejecting ends the thing. -->
     <div class="aw-overlay" id="ho-modal">
       <div class="aw-overlay-backdrop" data-aw-close-ho></div>
