@@ -2013,7 +2013,7 @@ const TAB_ROWS = [
     "#awHero .aw-toptabs", "#awHero .aw-hero-nav .aw-subtabs",
     "#sgHero .nav-tabs", "#sgHero .dash-subtabs",
     "#posPage .pos-top-tabs--header", "#posPage .pos-subtabs", "#prNav",
-    "#pcal-app .pcal-navcard", "#grPage .gr-tabs", "#page-forms .frm-tabs"
+    "#pcal-app .pcal-navcard", "#grPage .gr-tabs", "#page-forms .frm-tabs", "#tpHero .tp-view-tabs"
 ];
 const TAB_ACTIVE = ".is-active, .active, .is-on";
 const tabGliderLast = new Map();                    // where each row's piece last was, so a redrawn row still glides
