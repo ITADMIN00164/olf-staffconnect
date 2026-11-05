@@ -3212,12 +3212,14 @@ window.AWARD_CONFIG = {
   /* ------------------------------------------------------------- levels
 
      A requisition asks for stock at a level: Block, District, Nanhe Sitare
-     (NS) or Shikshan Utsav (SU). Block and District each split again by what
-     the awards are for - Academic, POM, or something else that is typed in.
+     (NS), Shikshan Utsav (SU), Other, Coffee With CEO or Top Clusters. District
+     splits again by what the awards are for - Academic, POM, or something else
+     that is typed in; Block the same, without Academic.
      The database still holds the four award types it always had; "POM Block"
      is the Block level, and a row filed before categories existed was a POM
      one, so that is what it reads as. */
-  var CATEGORY_CHOICES = ["Academic", "POM", "Other"];
+  var CATEGORY_CHOICES = ["Academic", "POM", "Other"];       // District
+  var BLOCK_CATEGORIES = ["POM", "Other"];                    // Block has no Academic
 
   /* Jute bags are asked for on the same form but are not an award: they have
      no row in award_types, so they never become a column in the stock sheet,
@@ -3244,7 +3246,8 @@ window.AWARD_CONFIG = {
 
   // What a level can be for: Block and District by what the awards are for, a jute bag by its size.
   function categoriesFor(label) {
-    return label === "Jute Bag" ? JUTE_CATEGORIES : CATEGORY_CHOICES;
+    return label === "Jute Bag" ? JUTE_CATEGORIES :
+           label === "Block"    ? BLOCK_CATEGORIES : CATEGORY_CHOICES;
   }
 
   // What a line reads as: "Block · Academic", "Jute Bag · Small", or just the level.
@@ -4050,6 +4053,13 @@ window.AWARD_CONFIG = {
   function renderGoLive() {
     if (!el.goLiveBar) return;
     var admin = canSetStock();
+    /* The go-live date and the reset are the administrator's: nobody else
+       is shown the bar, not even to read the date. */
+    if (!admin) {
+      el.goLiveBar.innerHTML = "";
+      el.goLiveBar.classList.remove("has-note", "is-off");
+      return;
+    }
     var html = "";
     if (goLiveProblem) {
       html = '<span class="golive-note is-bad">' + escapeHtml(goLiveProblem) + "</span>";
@@ -4069,7 +4079,7 @@ window.AWARD_CONFIG = {
     if (admin) {
       html += ' <button type="button" class="btn btn-ghost btn-xs golive-reset" data-golive="reset">Reset data\u2026</button>';
     }
-    var show = !!(goLiveProblem || goLive || admin);
+    var show = true;
     el.goLiveBar.classList.toggle("has-note", show);
     el.goLiveBar.classList.toggle("is-off", !goLive && !goLiveProblem);
     el.goLiveBar.innerHTML = html;
@@ -4534,6 +4544,8 @@ window.AWARD_CONFIG = {
     if (code === "JUTE_SMALL") return "Small";
     if (code === "JUTE_BIG") return "Big";
     if (code === "OTHER") return "Other";
+    if (code === "COFFEE_CEO") return "Coffee With CEO";
+    if (code === "TOP_CLUSTERS") return "Top Clusters";
     return code || t.name;
   }
 
