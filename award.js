@@ -5793,8 +5793,13 @@ window.AWARD_CONFIG = {
                occurred_on: m.occurred_on };
     }));
 
-    var rows = stockRows(fy, allRequisitions, pretend,
-                         [{ state: "", division: "", district: district, pm: "" }]);
+    var place = [{ state: "", division: "", district: district, pm: "" }];
+    var rows = stockRows(fy, allRequisitions, pretend, place);
+    // The same sheet without these changes: a balance that was already below nothing
+    // is not something the changes did, so only a balance they make WORSE is refused.
+    // (Verified awards count as used even where no stock has been entered yet, so a
+    // delivery must still be savable in a district that is already short.)
+    var before = stockRows(fy, allRequisitions, stockMovements, place);
 
     for (var i = 0; i < rows.length; i++) {
       // The carry-forward row counts only when the figure being set is the
@@ -5803,9 +5808,10 @@ window.AWARD_CONFIG = {
       if (fromKey ? (!key || key < fromKey) : false) continue;
 
       var balance = rows[i].balance;
+      var was = (before[i] && before[i].monthKey === key) ? before[i].balance : {};
       var ids = Object.keys(balance);
       for (var j = 0; j < ids.length; j++) {
-        if (balance[ids[j]] < 0) {
+        if (balance[ids[j]] < 0 && balance[ids[j]] < (was[ids[j]] || 0)) {
           return { month: key ? monthLabelOf(key) : "the carry forward",
                    award_type_id: Number(ids[j]), short: -balance[ids[j]] };
         }
