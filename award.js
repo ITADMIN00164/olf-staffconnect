@@ -3767,10 +3767,23 @@ window.AWARD_CONFIG = {
 
     /* Verified awards come off the stock in the month they belong to - the month
        the Utilisations tab shows them under - from the go-live month on. */
+    /* An award may be saved with the district written a little differently
+       ("Raigarh - MH" against "Raigarh MH"). It belongs to the directory
+       district that has the same letters and numbers - capitals, spaces and
+       dashes ignored. Nothing is renamed and no list is kept: the names come
+       from Employees, and an award with no such district is left alone. */
+    var looseKey = function (s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]/g, ""); };
+    var byLoose = {};
+    stockPlaces().forEach(function (p) {
+      var k = looseKey(p.district);
+      byLoose[k] = (k in byLoose && byLoose[k] !== p.district) ? null : p.district;   // null = two districts share it, so no guess
+    });
+
     verifiedUse.forEach(function (u) {
       var t = typeForGift(u.gift);
       var district = String(u.district_name || "").trim();
       if (!t || !district) return;
+      district = byLoose[looseKey(district)] || district;
       var q = {};
       q[t.id] = Number(u.n) || 0;
       events.push({ district: district, month: String(u.month_start).slice(0, 7),
