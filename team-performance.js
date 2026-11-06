@@ -3324,56 +3324,78 @@
     // Bus level: perfectly centered halfway between root bottom and nearest division top
     const minDivY = Math.min(...divPoints.map(p => p.dY));
     const busY = Math.round((rY + minDivY) / 2);
+    const minX = Math.min(rX, ...divPoints.map(p => p.dX));
+    const maxX = Math.max(rX, ...divPoints.map(p => p.dX));
 
     let paths = "";
 
     // 1. Root pip at bottom of State Lead card
     paths += `<circle cx="${rX}" cy="${rY}" r="4" class="tp-connector-root-pip"/>`;
 
-    // 2. Trunk stem from State Lead down to bus level
+    // 2. Base trunk stem from State Lead down to bus level
     paths += `<line x1="${rX}" y1="${rY}" x2="${rX}" y2="${busY}" class="tp-connector-trunk"/>`;
 
     // 3. Central junction hub
     paths += `<circle cx="${rX}" cy="${busY}" r="5" class="tp-connector-hub"/>`;
 
-    // 4. Step-orthogonal branch to each division card
+    // 4. Base horizontal bus bar (single clean continuous line across all divisions, ZERO overlap)
+    paths += `<line x1="${minX}" y1="${busY}" x2="${maxX}" y2="${busY}" class="tp-connector-branch tp-connector-busbar"/>`;
+
+    // 5. Individual vertical drops to each division card
     divPoints.forEach(pt => {
       paths += `
         <g class="tp-connector-group" id="conn-${pt.id}">
-          <path class="tp-connector-branch" id="branch-${pt.id}"
-                d="M ${rX} ${busY} L ${pt.dX} ${busY} L ${pt.dX} ${pt.dY}"
-                fill="none"/>
+          <line x1="${pt.dX}" y1="${busY}" x2="${pt.dX}" y2="${pt.dY}" class="tp-connector-branch tp-connector-drop" id="drop-${pt.id}"/>
           <circle cx="${pt.dX}" cy="${pt.dY}" r="3.5" class="tp-connector-anchor" id="anchor-${pt.id}"/>
         </g>
       `;
     });
 
+    // 6. Active overlay group (ALWAYS painted on top so highlighted paths never get covered)
+    paths += `
+      <g id="tpActiveOverlay" style="display: none;">
+        <line x1="${rX}" y1="${rY}" x2="${rX}" y2="${busY}" class="tp-connector-trunk highlighted" id="tpActiveTrunk"/>
+        <circle cx="${rX}" cy="${busY}" r="5" class="tp-connector-hub highlighted" id="tpActiveHub"/>
+        <path d="" fill="none" class="tp-connector-branch highlighted" id="tpActiveBranch"/>
+        <circle cx="0" cy="0" r="5" class="tp-connector-anchor highlighted" id="tpActiveAnchor"/>
+      </g>
+    `;
+
     svg.innerHTML = paths;
-    // Attach hover effects between cards and connectors
+
+    function setActiveHighlight(pt) {
+      const overlay = document.getElementById("tpActiveOverlay");
+      const activeBranch = document.getElementById("tpActiveBranch");
+      const activeAnchor = document.getElementById("tpActiveAnchor");
+      if (!overlay || !activeBranch || !activeAnchor) return;
+
+      let targetPt = pt;
+      if (!targetPt) {
+        targetPt = divPoints.find(p => p.el.classList.contains("tp-expanded-card"));
+      }
+
+      if (targetPt) {
+        overlay.style.display = "";
+        activeBranch.setAttribute("d", `M ${rX} ${busY} L ${targetPt.dX} ${busY} L ${targetPt.dX} ${targetPt.dY}`);
+        activeAnchor.setAttribute("cx", targetPt.dX);
+        activeAnchor.setAttribute("cy", targetPt.dY);
+      } else {
+        overlay.style.display = "none";
+      }
+    }
+
+    // Initial active highlight based on currently expanded division
+    setActiveHighlight(null);
+
+    // Attach hover effects
     divPoints.forEach(pt => {
-      pt.el.onmouseenter = () => {
-        const br = document.getElementById(`branch-${pt.id}`);
-        const an = document.getElementById(`anchor-${pt.id}`);
-        const trunk = document.querySelector(".tp-connector-trunk");
-        const hub = document.querySelector(".tp-connector-hub");
-        if (br) br.classList.add("highlighted");
-        if (an) an.classList.add("highlighted");
-        if (trunk) trunk.classList.add("highlighted");
-        if (hub) hub.classList.add("highlighted");
-      };
-      pt.el.onmouseleave = () => {
-        const br = document.getElementById(`branch-${pt.id}`);
-        const an = document.getElementById(`anchor-${pt.id}`);
-        const trunk = document.querySelector(".tp-connector-trunk");
-        const hub = document.querySelector(".tp-connector-hub");
-        if (br) br.classList.remove("highlighted");
-        if (an) an.classList.remove("highlighted");
-        if (trunk) trunk.classList.remove("highlighted");
-        if (hub) hub.classList.remove("highlighted");
-      };
+      pt.el.onmouseenter = () => setActiveHighlight(pt);
+      pt.el.onmouseleave = () => setActiveHighlight(null);
     });
 
     rootCard.onmouseenter = () => {
+      const overlay = document.getElementById("tpActiveOverlay");
+      if (overlay) overlay.style.display = "none";
       const trunk = document.querySelector(".tp-connector-trunk");
       const hub = document.querySelector(".tp-connector-hub");
       if (trunk) trunk.classList.add("highlighted");
@@ -3388,8 +3410,10 @@
       if (hub) hub.classList.remove("highlighted");
       document.querySelectorAll(".tp-connector-branch").forEach(b => b.classList.remove("highlighted"));
       document.querySelectorAll(".tp-connector-anchor").forEach(a => a.classList.remove("highlighted"));
+      setActiveHighlight(null);
     };
   }
+
 
   // --- Modal & Multi-Tab Editor Logic ---
 
