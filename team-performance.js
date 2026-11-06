@@ -2953,7 +2953,6 @@
           </div>
           <div class="tp-card-name">${esc(sl.name || "Vishvajit G Pawar")}</div>
           <div class="tp-card-role-label">${esc(sl.designation || sl.title || "State Lead")}</div>
-          <div class="tp-card-mgr-line"><span class="tp-mgr-k">Reporting Manager:</span> <span class="tp-mgr-v">${esc(sl.reportingManager || "Prashant Patil")}</span></div>
           <div class="tp-card-sub">${esc(sl.title || stateLabel)} &middot; ${sl.subtitle ? esc(sl.subtitle) : "State Operations &amp; Strategy"}</div>
           <div class="tp-card-stats">
             <div class="tp-stat-item"><strong>${divsTotal}</strong><span>${divsTotal === 1 ? "Division" : "Divisions"}</span></div>
@@ -3025,7 +3024,6 @@
                 </div>
                 <div class="tp-card-name">${esc(div.divisionLead || "Interim Lead")}</div>
                 <div class="tp-card-role-label">${esc(div.divisionRole || "Division Manager")}</div>
-                <div class="tp-card-mgr-line"><span class="tp-mgr-k">Reporting Manager:</span> <span class="tp-mgr-v">${esc(div.reportingManager || sl.name || "Vishvajit G Pawar")}</span></div>
                 <div class="tp-card-sub">${esc(div.divisionTitle)} &middot; Division Operations</div>
                 <div class="tp-badge-sm-tag">${divPmCount} ${divPmCount === 1 ? 'Program Manager Track' : 'Program Manager Tracks'} &middot; ${divDistCount} ${divDistCount === 1 ? 'District' : 'Districts'} &middot; ${divPoCount} POs</div>
               </div>
@@ -3126,7 +3124,6 @@
           </div>
           <div class="tp-card-name">${esc(pm.name)}</div>
           <div class="tp-card-role-label">${esc(pm.designation || pm.label || "Program Manager")}</div>
-          <div class="tp-card-mgr-line"><span class="tp-mgr-k">Reporting Manager:</span> <span class="tp-mgr-v">${esc(pmMgr)}</span></div>
           <div class="tp-card-sub">${pm.districts.length} ${pm.districts.length === 1 ? "District" : "Districts"} Assigned</div>
           ${pm.badge ? `<div class="tp-badge-sm-tag">${esc(pm.badge)}</div>` : ""}
         </div>
@@ -3147,7 +3144,6 @@
           <div class="tp-dist-pip"></div>
           <div class="tp-dist-title-box">
             <span class="tp-dist-title">${esc(dst.name)}</span>
-            <span class="tp-dist-mgr"><span class="tp-mgr-k">Reporting Manager:</span> <span class="tp-mgr-v">${esc(dstMgr)}</span></span>
           </div>
           <button type="button" class="tp-row-details-btn" onclick="window.TeamPerformance.openModal('${dst.roleId}', 'District Operations', '${esc(dst.name)}', '${esc(dstMgr)}')">Details &rarr;</button>
         </div>
@@ -3162,7 +3158,6 @@
                 <div class="tp-po-text-wrap">
                   <div class="tp-po-name">${esc(poName)}</div>
                   <div class="tp-po-role">${esc(po.designation || "Project Officer")}</div>
-                  <div class="tp-po-mgr"><span class="tp-mgr-k">Reporting Manager:</span> <span class="tp-mgr-v">${esc(poMgr)}</span></div>
                 </div>
               </div>
               <button type="button" class="tp-row-details-btn" onclick="window.TeamPerformance.openModal('${po.roleId}', '${esc(po.designation || "Project Officer")}', '${esc(poName)}', '${esc(poMgr)}')">Details &rarr;</button>
