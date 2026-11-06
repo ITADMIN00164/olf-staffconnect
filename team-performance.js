@@ -4391,20 +4391,28 @@
   function switchView(viewName) {
     activeView = viewName;
     const isSmart = viewName === "smart-goals";
+    const isHist = viewName === "historical" || viewName === "internal" || viewName === "external";
+    const isWeeklyOps = viewName === "weekly-ops";
+
     const smartView = document.getElementById("tpSmartGoalsView");
     const histView = document.getElementById("tpHistoricalView");
+    const opsView = document.getElementById("tpWeeklyOpsView");
+
     const smartTabBtn = document.getElementById("tpViewTabSmartGoals");
     const histTabBtn = document.getElementById("tpViewTabHistorical");
+    const opsTabBtn = document.getElementById("tpViewTabWeeklyOps");
 
     if (smartView) smartView.style.display = isSmart ? "block" : "none";
-    if (histView) histView.style.display = isSmart ? "none" : "block";
+    if (histView) histView.style.display = isHist ? "block" : "none";
+    if (opsView) opsView.style.display = isWeeklyOps ? "block" : "none";
 
     if (smartTabBtn) smartTabBtn.classList.toggle("active", isSmart);
-    if (histTabBtn) histTabBtn.classList.toggle("active", !isSmart);
+    if (histTabBtn) histTabBtn.classList.toggle("active", isHist);
+    if (opsTabBtn) opsTabBtn.classList.toggle("active", isWeeklyOps);
 
     if (isSmart) {
       scheduleConnectorUpdate();
-    } else {
+    } else if (isHist) {
       const ds = (viewName === 'internal') ? 'internal' : 'external';
       if (window.HistoricalModule) {
         if (typeof window.HistoricalModule.init === 'function') {
@@ -4413,6 +4421,10 @@
         if (typeof window.HistoricalModule.setDataSource === 'function') {
           window.HistoricalModule.setDataSource(ds);
         }
+      }
+    } else if (isWeeklyOps) {
+      if (window.WeeklyOpsModule && typeof window.WeeklyOpsModule.init === 'function') {
+        window.WeeklyOpsModule.init();
       }
     }
   }

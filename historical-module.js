@@ -122,15 +122,36 @@
 
 
 
+  const STORAGE_UPLOADED_INT_KEY = 'olf_historical_internal_uploaded_data';
+
+  function getUploadedInternalData() {
+    if (window._OLF_HISTORICAL_INTERNAL_UPLOADED) return window._OLF_HISTORICAL_INTERNAL_UPLOADED;
+    try {
+      const raw = localStorage.getItem(STORAGE_UPLOADED_INT_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (e) {
+      console.warn('Failed to parse uploaded internal data from localStorage', e);
+    }
+    return null;
+  }
+
   function getData() {
 
     const isInt = state.dataSource === 'internal';
 
-    const raw = isInt
+    let raw;
 
-      ? (window.OLF_HISTORICAL_INTERNAL_DATA || { sheets: [] })
+    if (isInt) {
 
-      : (window.OLF_HISTORICAL_DATA || { sheets: [] });
+      const custom = getUploadedInternalData();
+
+      raw = custom || window.OLF_HISTORICAL_INTERNAL_DATA || { sheets: [] };
+
+    } else {
+
+      raw = window.OLF_HISTORICAL_DATA || { sheets: [] };
+
+    }
 
     const edits = getSavedEdits();
 
@@ -472,11 +493,13 @@
 
     const isExt = state.dataSource === 'external';
 
+    const customInt = getUploadedInternalData();
 
+    const isCustomActive = !isExt && Boolean(customInt);
 
     const extCount = (window.OLF_HISTORICAL_DATA && window.OLF_HISTORICAL_DATA.sheets) ? window.OLF_HISTORICAL_DATA.sheets.length : 11;
 
-    const intCount = (window.OLF_HISTORICAL_INTERNAL_DATA && window.OLF_HISTORICAL_INTERNAL_DATA.sheets) ? window.OLF_HISTORICAL_INTERNAL_DATA.sheets.length : 15;
+    const intCount = (customInt && customInt.sheets) ? customInt.sheets.length : ((window.OLF_HISTORICAL_INTERNAL_DATA && window.OLF_HISTORICAL_INTERNAL_DATA.sheets) ? window.OLF_HISTORICAL_INTERNAL_DATA.sheets.length : 14);
 
 
 
@@ -486,9 +509,19 @@
 
         <div class="tp-header-left">
 
-          <div class="tp-title-row">
+          <div class="tp-title-row" style="display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
 
             <h2 class="tp-title">Historical Performance Archive</h2>
+
+            ${isCustomActive ? `
+
+              <span class="tp-hist-custom-badge" title="Active dataset loaded from uploaded file">
+
+                ✓ Custom Data Active (${customInt.filename || 'Uploaded Workbook'})
+
+              </span>
+
+            ` : ''}
 
           </div>
 
@@ -498,7 +531,11 @@
 
               ? 'Longitudinal educational benchmarks & student outcomes across 60 districts (2022–2026)'
 
-              : 'Operational cycles, exam dashboards, lifeskills & milestones across 45 districts (2025–2026)'}
+              : (isCustomActive 
+
+                  ? `Custom Academic Outcomes loaded from ${customInt.filename || 'uploaded workbook'} (${customInt.sheets ? customInt.sheets.length : 0} sheets, imported ${customInt.generatedAt || 'recently'})`
+
+                  : 'Operational cycles, exam dashboards, lifeskills & milestones across 45 districts (2025–2026)')}
 
           </p>
 
@@ -521,6 +558,8 @@
           <button type="button" class="tp-hist-source-btn ${!isExt ? 'active' : ''}" onclick="window.HistoricalModule.setDataSource('internal')">
 
             <span>🏢 Internal Data</span>
+
+            ${isCustomActive ? '<span style="font-size:10px; padding:1px 5px; border-radius:8px; background:#DBEAFE; color:#1D4ED8; margin-left:4px;">Custom</span>' : ''}
 
             
 
@@ -555,6 +594,10 @@
     const sheets = data.sheets || [];
 
     const isExt = state.dataSource === 'external';
+
+    const customInt = getUploadedInternalData();
+
+    const isCustomActive = !isExt && Boolean(customInt);
 
 
 
@@ -639,6 +682,32 @@
 
 
           <div class="tp-hist-export-actions">
+
+            ${!isExt ? `
+
+              <label class="tp-hist-btn-export tp-hist-btn-upload" title="Upload New Academic Outcomes Workbook (.xlsx)">
+
+                <input type="file" id="tpHistoricalUploadInput" accept=".xlsx, .xls" style="display:none;" onchange="window.HistoricalModule.handleWorkbookUpload(event)">
+
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+
+                <span>Upload</span>
+
+              </label>
+
+              ${isCustomActive ? `
+
+                <button type="button" class="tp-hist-btn-export tp-hist-btn-reset-data" onclick="window.HistoricalModule.resetInternalData()" title="Revert to bundled default 2025-26 data">
+
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+
+                  <span>Reset Default</span>
+
+                </button>
+
+              ` : ''}
+
+            ` : ''}
 
             <button type="button" class="tp-hist-btn-export tp-hist-btn-xlsx" onclick="window.HistoricalModule.downloadFullWorkbook()" title="Download Complete Multi-Sheet Dataset as Excel (.xlsx)">
 
@@ -4175,6 +4244,283 @@
 
 
 
+  // ========================================================
+  // UPLOAD & PARSING ENGINE FOR INTERNAL ACADEMIC WORKBOOK
+  // ========================================================
+
+  const KNOWN_INTERNAL_CONFIGS = {
+    'academiccycle': { id: 'academic-cycle', name: 'Academic Cycle', category: 'District Operations', icon: '🗺️', superRow: 2, headerRow: 3, dataStartRow: 4, startCol: 2 },
+    'academic cycle': { id: 'academic-cycle', name: 'Academic Cycle', category: 'District Operations', icon: '🗺️', superRow: 2, headerRow: 3, dataStartRow: 4, startCol: 2 },
+    'master': { id: 'master-overview', name: 'Master Overview', category: 'Program Overview', icon: '📊', superRow: null, headerRow: 3, dataStartRow: 4, startCol: 2 },
+    'master overview': { id: 'master-overview', name: 'Master Overview', category: 'Program Overview', icon: '📊', superRow: null, headerRow: 3, dataStartRow: 4, startCol: 2 },
+    'detailed program status': { id: 'detailed-status', name: 'Detailed Status', category: 'Program Status', icon: '📋', superRow: null, headerRow: 1, dataStartRow: 2, startCol: 1 },
+    'detailed status': { id: 'detailed-status', name: 'Detailed Status', category: 'Program Status', icon: '📋', superRow: null, headerRow: 1, dataStartRow: 2, startCol: 1 },
+    'fln': { id: 'fln-internal', name: 'FLN (25-26)', category: 'Foundational Literacy', icon: '🌱', superRow: 3, headerRow: 4, dataStartRow: 5, startCol: 2 },
+    'fln++': { id: 'fln-plus-internal', name: 'FLN++ (25-26)', category: 'Middle Literacy', icon: '🌿', superRow: 3, headerRow: 4, dataStartRow: 5, startCol: 2 },
+    'se-5': { id: 'se-5-internal', name: 'Scholarship 5th', category: 'Class 5 Scholarship', icon: '🏅', superRow: 3, headerRow: 5, dataStartRow: 6, startCol: 2 },
+    'scholarship 5th': { id: 'se-5-internal', name: 'Scholarship 5th', category: 'Class 5 Scholarship', icon: '🏅', superRow: 3, headerRow: 5, dataStartRow: 6, startCol: 2 },
+    'se-8': { id: 'se-8-internal', name: 'Scholarship 8th', category: 'Class 8 Scholarship', icon: '🎖️', superRow: 3, headerRow: 5, dataStartRow: 6, startCol: 2 },
+    'scholarship 8th': { id: 'se-8-internal', name: 'Scholarship 8th', category: 'Class 8 Scholarship', icon: '🎖️', superRow: 3, headerRow: 5, dataStartRow: 6, startCol: 2 },
+    'nmmse': { id: 'nmmse-internal', name: 'NMMSE', category: 'National Means-Merit', icon: '💡', superRow: 3, headerRow: 5, dataStartRow: 6, startCol: 1 },
+    'jnv': { id: 'jnv-internal', name: 'JNV', category: 'Jawahar Navodaya', icon: '🏫', superRow: 3, headerRow: 4, dataStartRow: 5, startCol: 1 },
+    'class 10': { id: 'class-10-internal', name: 'Class 10', category: 'Secondary Board', icon: '🎓', superRow: 3, headerRow: 4, dataStartRow: 5, startCol: 1 },
+    'class 12': { id: 'class-12-internal', name: 'Class 12', category: 'Senior Secondary Board', icon: '🎯', superRow: 3, headerRow: 4, dataStartRow: 5, startCol: 2 },
+    'jee-neet (cbt)': { id: 'jee-neet-cbt-internal', name: 'JEE-NEET (CBT)', category: 'Competitive CBT', icon: '💻', superRow: 3, headerRow: 4, dataStartRow: 5, startCol: 2 },
+    'jee-neet(omr)': { id: 'jee-neet-omr-internal', name: 'JEE-NEET (OMR)', category: 'Competitive OMR', icon: '📝', superRow: 3, headerRow: 4, dataStartRow: 5, startCol: 2 },
+    'jee-neet (omr)': { id: 'jee-neet-omr-internal', name: 'JEE-NEET (OMR)', category: 'Competitive OMR', icon: '📝', superRow: 3, headerRow: 4, dataStartRow: 5, startCol: 2 },
+    'lifeskill post': { id: 'lifeskill-post-internal', name: 'Lifeskill Posts', category: 'Teacher Lifeskills', icon: '🤝', superRow: 1, headerRow: 2, dataStartRow: 3, startCol: 2 },
+    'lifeskill posts': { id: 'lifeskill-post-internal', name: 'Lifeskill Posts', category: 'Teacher Lifeskills', icon: '🤝', superRow: 1, headerRow: 2, dataStartRow: 3, startCol: 2 },
+    'student and teacher count': { id: 'demographics-internal', name: 'Student & Teacher Count', category: 'School Demographics', icon: '👥', superRow: null, headerRow: 1, dataStartRow: 2, startCol: 4 },
+    'student & teacher count': { id: 'demographics-internal', name: 'Student & Teacher Count', category: 'School Demographics', icon: '👥', superRow: null, headerRow: 1, dataStartRow: 2, startCol: 4 }
+  };
+
+  function findInternalConfig(name) {
+    const clean = name.trim().toLowerCase();
+    if (KNOWN_INTERNAL_CONFIGS[clean]) return KNOWN_INTERNAL_CONFIGS[clean];
+    if (clean.includes('academic') || clean.includes('cycle')) return KNOWN_INTERNAL_CONFIGS['academic cycle'];
+    if (clean.includes('master')) return KNOWN_INTERNAL_CONFIGS['master'];
+    if (clean.startsWith('fln++')) return KNOWN_INTERNAL_CONFIGS['fln++'];
+    if (clean.startsWith('fln')) return KNOWN_INTERNAL_CONFIGS['fln'];
+    if (clean.includes('se-5') || clean.includes('5th')) return KNOWN_INTERNAL_CONFIGS['se-5'];
+    if (clean.includes('se-8') || clean.includes('8th')) return KNOWN_INTERNAL_CONFIGS['se-8'];
+    if (clean.includes('nmmse')) return KNOWN_INTERNAL_CONFIGS['nmmse'];
+    if (clean.includes('jnv')) return KNOWN_INTERNAL_CONFIGS['jnv'];
+    if (clean.includes('10')) return KNOWN_INTERNAL_CONFIGS['class 10'];
+    if (clean.includes('12')) return KNOWN_INTERNAL_CONFIGS['class 12'];
+    if (clean.includes('cbt')) return KNOWN_INTERNAL_CONFIGS['jee-neet (cbt)'];
+    if (clean.includes('omr')) return KNOWN_INTERNAL_CONFIGS['jee-neet (omr)'];
+    if (clean.includes('lifeskill')) return KNOWN_INTERNAL_CONFIGS['lifeskill post'];
+    if (clean.includes('student') || clean.includes('teacher') || clean.includes('demographic')) return KNOWN_INTERNAL_CONFIGS['student and teacher count'];
+    return null;
+  }
+
+  function getInternalIcon(name) {
+    const n = name.toLowerCase();
+    if (n.includes('cycle') || n.includes('academic')) return '🗺️';
+    if (n.includes('master') || n.includes('overview')) return '📊';
+    if (n.includes('scholarship') || n.includes('5th') || n.includes('8th')) return '🏅';
+    if (n.includes('fln')) return '🌱';
+    if (n.includes('board') || n.includes('10') || n.includes('12')) return '🎓';
+    if (n.includes('jee') || n.includes('neet') || n.includes('cbt')) return '💻';
+    if (n.includes('omr')) return '📝';
+    if (n.includes('skill')) return '🤝';
+    if (n.includes('student') || n.includes('teacher')) return '👥';
+    return '📋';
+  }
+
+  function formatUploadCell(v) {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'number') {
+      if (Number.isInteger(v)) return String(v);
+      if (v > 0 && v < 1) return (v * 100).toFixed(1) + '%';
+      return String(Math.round(v * 100) / 100);
+    }
+    if (v instanceof Date) {
+      if (isNaN(v.getTime())) return '';
+      if (v.getDate() === 1) {
+        const m = v.toLocaleString('en-US', { month: 'short' });
+        return `${m} ${v.getFullYear()}`;
+      }
+      const y = v.getFullYear();
+      const m = String(v.getMonth() + 1).padStart(2, '0');
+      const d = String(v.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+    return String(v).trim();
+  }
+
+  async function handleWorkbookUpload(event) {
+    const file = event && event.target && event.target.files && event.target.files[0];
+    if (!file) return;
+
+    if (!/\.(xlsx|xls)$/i.test(file.name)) {
+      alert('Please upload an Excel workbook (.xlsx or .xls).');
+      return;
+    }
+
+    const uploadBtnText = document.querySelector('.tp-hist-btn-upload span');
+    const origBtnText = uploadBtnText ? uploadBtnText.textContent : '';
+    if (uploadBtnText) uploadBtnText.textContent = 'Reading Excel...';
+
+    try {
+      const XLSX = await loadXLSX();
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
+
+      const parsedSheets = [];
+      const seenIds = new Set();
+
+      for (const sheetName of wb.SheetNames) {
+        const norm = sheetName.trim().toLowerCase();
+        if (norm.startsWith('copy of') || norm.startsWith('pivot') || norm === 'home' || norm === 'dashboard') continue;
+
+        const ws = wb.Sheets[sheetName];
+        if (!ws) continue;
+
+        const rawGrid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
+        if (!rawGrid || !rawGrid.length) continue;
+
+        const cleanGrid = rawGrid.map(row => (row || []).map(formatUploadCell));
+        if (!cleanGrid.some(row => row.some(Boolean))) continue;
+
+        const cfg = findInternalConfig(sheetName);
+
+        let superHeaders = [];
+        let headers = [];
+        let dataRows = [];
+        let startCol = 0;
+
+        if (cfg) {
+          const hIdx = (cfg.headerRow || 1) - 1;
+          const sIdx = cfg.superRow ? cfg.superRow - 1 : null;
+          const dStart = (cfg.dataStartRow || 2) - 1;
+          startCol = (cfg.startCol || 1) - 1;
+
+          if (cleanGrid[hIdx] && cleanGrid[hIdx].some(Boolean)) {
+            let rawH = cleanGrid[hIdx].slice(startCol);
+            while (rawH.length && !rawH[rawH.length - 1]) rawH.pop();
+            headers = rawH;
+            const maxC = headers.length;
+
+            if (sIdx !== null && cleanGrid[sIdx]) {
+              superHeaders = cleanGrid[sIdx].slice(startCol, startCol + maxC);
+            }
+            while (superHeaders.length < maxC) superHeaders.push('');
+
+            for (let r = dStart; r < cleanGrid.length; r++) {
+              const rowSlice = cleanGrid[r].slice(startCol, startCol + maxC);
+              while (rowSlice.length < maxC) rowSlice.push('');
+              if (!rowSlice.some(Boolean)) continue;
+              const head3 = rowSlice.slice(0, 3).join(' ');
+              if (/HOME|DASHBOARD|Sr\.?\s*No/i.test(head3) && !rowSlice[1]) continue;
+              dataRows.push(rowSlice);
+            }
+          }
+        }
+
+        // Robust heuristic fallback if not standard or headers empty
+        if (!headers.length) {
+          let bestHIdx = 0;
+          let bestScore = -1;
+
+          for (let r = 0; r < Math.min(10, cleanGrid.length); r++) {
+            const row = cleanGrid[r];
+            const textCols = row.filter(c => typeof c === 'string' && c.length > 0 && isNaN(Number(c)));
+            let score = textCols.length;
+            const rowStr = row.join(' ').toLowerCase();
+            if (/districts?|state|sr\.?\s*no|name|school|team leader|program/i.test(rowStr)) {
+              score += 10;
+            }
+            if (score > bestScore && textCols.length >= 2) {
+              bestScore = score;
+              bestHIdx = r;
+            }
+          }
+
+          let rawH = cleanGrid[bestHIdx];
+          startCol = rawH.findIndex(Boolean);
+          if (startCol < 0) startCol = 0;
+          rawH = rawH.slice(startCol);
+          while (rawH.length && !rawH[rawH.length - 1]) rawH.pop();
+          headers = rawH;
+          const maxC = headers.length;
+
+          if (bestHIdx > 0 && cleanGrid[bestHIdx - 1]) {
+            superHeaders = cleanGrid[bestHIdx - 1].slice(startCol, startCol + maxC);
+          }
+          while (superHeaders.length < maxC) superHeaders.push('');
+
+          for (let r = bestHIdx + 1; r < cleanGrid.length; r++) {
+            const rowSlice = cleanGrid[r].slice(startCol, startCol + maxC);
+            while (rowSlice.length < maxC) rowSlice.push('');
+            if (!rowSlice.some(Boolean)) continue;
+            dataRows.push(rowSlice);
+          }
+        }
+
+        if (headers.length && dataRows.length) {
+          let sId = (cfg && cfg.id) ? cfg.id : sheetName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+          if (seenIds.has(sId)) sId = `${sId}-${parsedSheets.length + 1}`;
+          seenIds.add(sId);
+
+          const sName = (cfg && cfg.name) ? cfg.name : sheetName;
+          const sCat = (cfg && cfg.category) ? cfg.category : 'Academic Outcomes';
+          const sIcon = (cfg && cfg.icon) ? cfg.icon : getInternalIcon(sName);
+
+          parsedSheets.push({
+            id: sId,
+            name: sName,
+            gid: sId,
+            category: sCat,
+            icon: sIcon,
+            superHeaders: superHeaders,
+            headers: headers,
+            rows: dataRows,
+            rowCount: dataRows.length
+          });
+        }
+      }
+
+      if (!parsedSheets.length) {
+        alert('Could not find any readable academic data sheets in the uploaded workbook.');
+        return;
+      }
+
+      const totalRows = parsedSheets.reduce((sum, s) => sum + s.rows.length, 0);
+
+      const uploadedData = {
+        generatedAt: new Date().toISOString().slice(0, 10),
+        filename: file.name,
+        title: `Internal Academic Outcomes (${file.name})`,
+        sheets: parsedSheets
+      };
+
+      try {
+        localStorage.setItem(STORAGE_UPLOADED_INT_KEY, JSON.stringify(uploadedData));
+      } catch (e) {
+        console.warn('localStorage full or quota exceeded, keeping in window cache:', e);
+      }
+      window._OLF_HISTORICAL_INTERNAL_UPLOADED = uploadedData;
+
+      state.dataSource = 'internal';
+      state.activeSheetId = parsedSheets[0].id;
+      state.programFocus = parsedSheets[0].id;
+
+      renderHeader();
+      renderControls();
+      renderMain();
+
+      const successMsg = `Successfully imported ${parsedSheets.length} sheets (${totalRows} rows) from ${file.name}`;
+      if (typeof window.showToast === 'function') {
+        window.showToast(successMsg, 'success');
+      } else {
+        alert(successMsg);
+      }
+    } catch (err) {
+      console.error('Error parsing uploaded workbook:', err);
+      alert('Failed to read Excel workbook: ' + (err.message || err));
+    } finally {
+      if (uploadBtnText) uploadBtnText.textContent = origBtnText;
+      if (event && event.target) event.target.value = '';
+    }
+  }
+
+  function resetInternalData() {
+    if (!confirm('Revert back to the bundled 2025-26 Academic Outcomes data?')) return;
+    window._OLF_HISTORICAL_INTERNAL_UPLOADED = null;
+    localStorage.removeItem(STORAGE_UPLOADED_INT_KEY);
+    state.activeSheetId = 'academic-cycle';
+    state.programFocus = 'academic-cycle';
+    renderHeader();
+    renderControls();
+    renderMain();
+    if (typeof window.showToast === 'function') {
+      window.showToast('Restored default internal academic outcomes dataset.', 'info');
+    } else {
+      alert('Restored default internal academic outcomes dataset.');
+    }
+  }
+
   window.HistoricalModule = {
 
     init,
@@ -4185,9 +4531,13 @@
 
       if (ds === 'internal') {
 
-        state.activeSheetId = 'academic-cycle';
+        const d = getData();
 
-        state.programFocus = 'academic-cycle';
+        const firstId = (d && d.sheets && d.sheets.length) ? d.sheets[0].id : 'academic-cycle';
+
+        state.activeSheetId = firstId;
+
+        state.programFocus = firstId;
 
       } else {
 
@@ -4351,7 +4701,13 @@
 
     handleSaveEdit,
 
-    isITAdmin
+    isITAdmin,
+
+    handleWorkbookUpload,
+
+    resetInternalData,
+
+    getUploadedInternalData
 
   };
 
