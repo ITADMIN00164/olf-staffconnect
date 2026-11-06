@@ -1017,10 +1017,7 @@ function renderTable() {
     const lt  = locked ? `title="${LOCK_MSG}"` : (isVerifier ? `title="View only — verifier access"` : "");
     return `
     <tr class="${[locked ? "locked-row" : "", "rec-" + recState(r)].filter(Boolean).join(" ")}" ${lt}>
-      <td class="name-cell">
-        <div class="nc-name">${r.fullName || ""}</div>
-        <div class="nc-sub">${r.mobile || ""}${r.mobile && r.schoolName ? " · " : ""}${r.schoolName || ""}</div>
-      </td>
+      <td class="name-cell" id="namecell-${i}">${renderNameCell(i)}</td>
       <td class="award-col">${r.awardName || ""}</td>
       <td class="award-col">${r.awardCategory || ""}</td>
       <td>
@@ -1044,6 +1041,166 @@ function renderTable() {
   }).join("");
 
   updateSaveAllBar();
+}
+
+// ===============================
+// MISSING DETAILS
+// Lists made by hand (SU, NS, Coffee With CEO, ...) often come without the contact
+// and place details the POM sheets carry. A record that lacks any of them shows a
+// small link under the name; the window it opens fills the blanks only. A value
+// already in the table is shown there but not changed, so nothing an upload brought
+// is overwritten. Post link and Post score are asked for on POM awards only.
+// Saving writes straight to award_records; it does not touch the award itself
+// (Awarded, Date, Image, Description) or its verification.
+// ===============================
+const DETAIL_FIELDS = [
+  { key: "mobile",     col: "mobile",      label: "Mobile number", type: "tel",   ph: "10-digit mobile" },
+  { key: "email",      col: "email",       label: "Email",         type: "email", ph: "name@example.com" },
+  { key: "schoolName", col: "school_name", label: "School name" },
+  { key: "circleName", col: "circle_name", label: "Circle name" },
+  { key: "blockName",  col: "block_name",  label: "Block Name" },
+  { key: "pmName",     col: "pm_name",     label: "PM Name" },
+  { key: "postLink",   col: "post_url",    label: "Post link URL", type: "url",    ph: "https://", postOnly: true },
+  { key: "postScore",  col: "post_score",  label: "Post score",    type: "number", postOnly: true }
+];
+const AWM_ADMIN_EMAIL = "itadmin@openlinksfoundation.org";
+
+function isPostAward(r) { return /\bPOM\b/i.test(r.awardCategory || ""); }
+function blankVal(v) { return v === null || v === undefined || String(v).trim() === ""; }
+function detailFieldsFor(r) { return DETAIL_FIELDS.filter(f => !f.postOnly || isPostAward(r)); }
+function missingDetails(r) { return detailFieldsFor(r).filter(f => blankVal(r[f.key])); }
+// Data-entry users fill them. A verifier's view is read-only, except for the IT admin.
+function canAddDetails() {
+  return !isVerifier || String(currentUser()).trim().toLowerCase() === AWM_ADMIN_EMAIL;
+}
+
+function renderNameCell(index) {
+  const r = currentRecords[index];
+  const sub = `${esc(r.mobile || "")}${r.mobile && r.schoolName ? " · " : ""}${esc(r.schoolName || "")}`;
+  const miss = missingDetails(r);
+  let note = "";
+  if (miss.length) {
+    const tip = esc("Missing: " + miss.map(f => f.label).join(", "));
+    note = canAddDetails()
+      ? `<button type="button" class="nc-missing" title="${tip}" onclick="awmAddDetails(${index})">Some details are missing – click here to add</button>`
+      : `<div class="nc-missing is-static" title="${tip}">Some details are missing</div>`;
+  }
+  return `<div class="nc-name">${esc(r.fullName || "")}</div>${sub ? `<div class="nc-sub">${sub}</div>` : ""}${note}`;
+}
+
+function ensureDetailsModal() {
+  if (document.getElementById("awmDetailsModal")) return;
+  const m = document.createElement("div");
+  m.id = "awmDetailsModal";
+  m.className = "pom-modal-overlay";
+  m.innerHTML = '<div class="pom-modal-box awm-edit-box"><div class="pom-modal-title">Add missing details</div>' +
+    '<p class="awm-edit-sub" id="awmDetailsSub"></p>' +
+    '<div class="awm-edit-grid" id="awmDetailsGrid"></div>' +
+    '<p class="awm-edit-err" id="awmDetailsErr"></p>' +
+    '<div class="pom-modal-actions"><button type="button" id="awmDetailsCancel" class="pmbtn cancel">Cancel</button>' +
+    '<button type="button" id="awmDetailsSave" class="pmbtn primary">Save details</button></div></div>';
+  (document.getElementById("aw-view-award") || document.body).appendChild(m);
+  m.addEventListener("click", e => { if (e.target === m) m.classList.remove("open"); });
+  document.getElementById("awmDetailsCancel").addEventListener("click", () => m.classList.remove("open"));
+}
+
+// What was typed, checked. Answers { values: {column: value}, labels, error }.
+function readDetailInputs(r) {
+  const values = {}, labels = [];
+  for (const f of missingDetails(r)) {
+    const input = document.querySelector(`#awmDetailsGrid [data-dkey="${f.key}"]`);
+    let v = input ? input.value.trim() : "";
+    if (!v) continue;
+    if (f.key === "mobile") {
+      const digits = v.replace(/\D/g, "").replace(/^(91|0)(?=\d{10}$)/, "");
+      if (!/^\d{10}$/.test(digits)) return { error: "Mobile number should have 10 digits." };
+      v = digits;
+    } else if (f.key === "email") {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return { error: "That email doesn't look right." };
+      v = v.toLowerCase();
+    } else if (f.key === "postLink") {
+      if (!/^https?:\/\/\S+$/i.test(v)) return { error: "Post link should start with http:// or https://" };
+    } else if (f.key === "postScore") {
+      const n = Number(v);
+      if (!isFinite(n)) return { error: "Post score should be a number." };
+      v = n;
+    }
+    values[f.col] = v;
+    labels.push(f.label);
+  }
+  if (!labels.length) return { error: "Fill at least one detail, or press Cancel." };
+  return { values, labels };
+}
+
+window.awmAddDetails = function (index) {
+  const r = currentRecords[index];
+  if (!r || !canAddDetails()) return;
+  ensureDetailsModal();
+  const where = [r.awardName, r.awardCategory, r.districtName, r.month].filter(Boolean).map(esc).join(" · ");
+  document.getElementById("awmDetailsSub").innerHTML =
+    `<b>${esc(r.fullName || "")}</b>${where ? " — " + where : ""}<br>` +
+    "Fill what you know and save. Anything left blank can be added later. Details already in the record are shown greyed out.";
+  document.getElementById("awmDetailsGrid").innerHTML = detailFieldsFor(r).map(f => {
+    const has = !blankVal(r[f.key]);
+    const type = f.type === "number" ? "number" : f.type || "text";
+    return `<label class="awm-ef${has ? " is-filled" : ""}"><span>${f.label}</span>` +
+      `<input type="${type}" data-dkey="${f.key}" ${has ? "disabled" : ""} ` +
+      `value="${has ? esc(r[f.key]) : ""}" placeholder="${has ? "" : esc(f.ph || "")}" ` +
+      `${f.type === "number" ? 'step="any"' : ""} autocomplete="off"></label>`;
+  }).join("");
+  const err = document.getElementById("awmDetailsErr");
+  err.textContent = "";
+  const save = document.getElementById("awmDetailsSave");
+  save.disabled = false;
+  save.onclick = () => saveDetails(index);
+  document.getElementById("awmDetailsModal").classList.add("open");
+  const first = document.querySelector("#awmDetailsGrid input:not([disabled])");
+  if (first) setTimeout(() => first.focus(), 50);
+};
+
+async function saveDetails(index) {
+  const r = currentRecords[index];
+  const err = document.getElementById("awmDetailsErr");
+  const save = document.getElementById("awmDetailsSave");
+  const typed = readDetailInputs(r);
+  if (typed.error) { err.textContent = typed.error; return; }
+  save.disabled = true;
+  err.textContent = "Saving…";
+  try {
+    // Read the row again: someone may have filled a blank since this page loaded.
+    // Only what is still blank in the table is written.
+    const cols = DETAIL_FIELDS.map(f => f.col).join(",");
+    const fresh = (await sbGet(`award_records?id=eq.${r.id}&select=id,${cols}`))[0];
+    if (!fresh) throw new Error("This record is no longer in the table.");
+    const patch = {}, added = [];
+    DETAIL_FIELDS.forEach(f => {
+      if (f.col in typed.values && blankVal(fresh[f.col])) { patch[f.col] = typed.values[f.col]; added.push(f.label); }
+    });
+    let row = fresh;
+    if (added.length) {
+      patch.updated_at = new Date().toISOString();
+      const done = await sbSend("PATCH", `award_records?id=eq.${r.id}`, patch);
+      if (!done.length) throw new Error("This record is no longer in the table.");
+      row = done[0];
+      dbLog(r.id, "details added", added.join(", "));
+    }
+    // Take what the table now holds, so the record matches it.
+    DETAIL_FIELDS.forEach(f => {
+      const v = row[f.col];
+      r[f.key] = f.key === "postScore" ? v : (v == null ? "" : String(v));
+    });
+    document.getElementById("awmDetailsModal").classList.remove("open");
+    const cell = document.getElementById("namecell-" + index);
+    if (cell) cell.innerHTML = renderNameCell(index);
+    const skipped = typed.labels.filter(l => added.indexOf(l) === -1);
+    if (!added.length) showToast("Someone already added these details. The latest ones are now shown.", "error");
+    else if (skipped.length) showToast(`Saved. ${skipped.join(", ")} had already been added by someone else and was kept.`);
+    else showToast(missingDetails(r).length ? "Details saved. Some are still missing." : "Details saved.");
+  } catch (e) {
+    console.error("Saving details failed:", e);
+    err.textContent = /no longer/.test(e.message || "") ? e.message : "Could not save. Check your connection and try again.";
+    save.disabled = false;
+  }
 }
 
 function resetDetail(msg) {

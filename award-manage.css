@@ -224,3 +224,11 @@
 .awm-view .awm-trash-list { overflow-x: hidden; }
 /* Questions asked from inside another window (All uploads, Deleted records, Edit) must show above it. */
 .awm-view #awmModal, .awm-view #awmTypeModal, .awm-view #awmPrompt { z-index: 790; }
+/* Missing details: a small link under the name when a record lacks contact or place details. */
+.awm-view .name-cell .nc-missing { display: inline-flex; align-items: center; gap: 4px; margin-top: 3px; padding: 1px 7px; border: 1px dashed #f5c27a; border-radius: 999px; background: #fff8eb; color: #b45309; font-size: 10px; font-weight: 600; font-family: inherit; line-height: 1.5; cursor: pointer; white-space: nowrap; }
+.awm-view .name-cell .nc-missing:hover { background: #fdecc8; border-style: solid; }
+.awm-view .name-cell .nc-missing:focus-visible { outline: 2px solid #f59e0b; outline-offset: 1px; }
+.awm-view .name-cell .nc-missing.is-static { cursor: default; }
+.awm-view .name-cell .nc-missing.is-static:hover { background: #fff8eb; border-style: dashed; }
+.awm-view .awm-ef.is-filled input { background: #f5f6f8; color: #6b7280; cursor: not-allowed; }
+@media (max-width: 560px) { .awm-view #awmDetailsGrid { grid-template-columns: 1fr; } }
