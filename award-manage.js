@@ -130,9 +130,28 @@ function toRec(row) {
 
 const ORDER = "order=full_name.asc,award_name.asc,id.asc";
 
+// Records are grouped by Award Category, in this order, so one kind of award always sits together.
+// A category not listed here comes after these, A-Z; a record with no category comes last.
+// Inside a category the order from the table stays: Full Name, then award, then id.
+const AWM_CATEGORY_ORDER = [
+  "District Level - POM", "Block Level - POM", "District Level - LIFESKILL", "District Level - Academics",
+  "Top Clusters", "Nanhe Sitare (NS)", "Shikshan Utsav (SU)", "Coffee With CEO", "Other"
+].map(c => c.toLowerCase());
+function categoryRank(r) {
+  const c = String(r.awardCategory || "").trim().toLowerCase();
+  if (!c) return [2, ""];
+  const i = AWM_CATEGORY_ORDER.indexOf(c);
+  return i === -1 ? [1, c] : [0, String(i).padStart(3, "0")];
+}
+function sortByCategory(recs) {
+  return recs.map((r, i) => ({ r, i, k: categoryRank(r) }))
+    .sort((a, b) => a.k[0] - b.k[0] || a.k[1].localeCompare(b.k[1]) || a.i - b.i)
+    .map(x => x.r);
+}
+
 async function dbDistrictRows(district) {
   const rows = await sbGet(`award_records?district_name=eq.${encodeURIComponent(district)}&select=*&${ORDER}`);
-  return rows.map(toRec);
+  return sortByCategory(rows.map(toRec));
 }
 
 async function dbMonthRows(district, month) {
@@ -140,7 +159,7 @@ async function dbMonthRows(district, month) {
     `award_records?district_name=eq.${encodeURIComponent(district)}` +
     `&month_label=eq.${encodeURIComponent(month)}&select=*&${ORDER}`
   );
-  return rows.map(toRec);
+  return sortByCategory(rows.map(toRec));
 }
 
 // Every change is written down: who, what, when.
@@ -777,13 +796,17 @@ let awmFilter = blankFilter();
 let awmPopOpenedAt = 0;            // when it opened, so the scroll that opening can cause does not close it
 let awmPopKey = "";                 // the heading whose list is open, "" when none
 
+// The status tab above the table: "" shows every record, else only "verify", "verified", "pending" or "rejected".
+let awmTab = "";
+
 function resetFilters() {
   awmFilter = blankFilter();
+  awmTab = "";
   closeFilterPop();
 }
 
 function filtersActive() {
-  return !!awmFilter.q.trim() || AWM_LISTS.some(k => awmFilter[k].length);
+  return !!awmTab || !!awmFilter.q.trim() || AWM_LISTS.some(k => awmFilter[k].length);
 }
 
 function colValue(key, r) {
@@ -792,6 +815,7 @@ function colValue(key, r) {
 
 // Does a record pass every filter except, perhaps, one (the one whose list is being worked out)?
 function recPasses(r, except) {
+  if (awmTab && tabOf(r) !== awmTab) return false;
   const q = awmFilter.q.trim().toLowerCase();
   if (q && except !== "q") {
     const hay = [r.fullName, r.mobile, r.schoolName, r.blockName, r.community].join(" ").toLowerCase();
@@ -933,12 +957,30 @@ function recState(r) {
   return r.awarded === "Yes" ? "saved" : "pending";
 }
 
-function statusChips() {
-  const n = { verified: 0, rejected: 0, unsaved: 0, saved: 0, pending: 0 };
-  currentRecords.forEach(r => { n[recState(r)] += 1; });
-  const chip = (cls, count, label) => count ? '<span class="awm-chip is-' + cls + '">' + count + " " + label + "</span>" : "";
-  return chip("verified", n.verified, "verified") + chip("saved", n.saved + n.unsaved, "to verify") +
-         chip("pending", n.pending, "not awarded") + chip("rejected", n.rejected, "rejected");
+/* The tab a record belongs to: verified, rejected, awarded and waiting to be verified
+   ("verify", saved or not), or not awarded yet ("pending"). */
+function tabOf(r) {
+  if (r.verified === "Yes") return "verified";
+  if (r.verified === "Rejected") return "rejected";
+  return r.awarded === "Yes" ? "verify" : "pending";
+}
+
+// The status tabs in the middle of the bar. Each shows only its records; clicking the open one shows all again.
+// The counts are of the whole month, whatever the column filters are.
+function statusTabs() {
+  const n = { verify: 0, verified: 0, pending: 0, rejected: 0 };
+  currentRecords.forEach(r => { n[tabOf(r)] += 1; });
+  const tabs = [
+    ["verify", "saved", "to verify"], ["verified", "verified", "Verified"], ["pending", "pending", "Pending"]
+  ];
+  if (n.rejected || awmTab === "rejected") tabs.push(["rejected", "rejected", "Rejected"]);
+  return '<div class="awm-tabs" role="tablist">' + tabs.map(([key, cls, label]) => {
+    const on = awmTab === key;
+    return '<button type="button" role="tab" aria-selected="' + on + '" data-tab="' + key + '"' +
+      ' class="awm-chip awm-tab is-' + cls + (on ? " is-active" : "") + '"' + (n[key] || on ? "" : " disabled") +
+      ' title="' + (on ? "Showing only these — click again to show all" : "Show only these records") + '">' +
+      n[key] + " " + label + "</button>";
+  }).join("") + "</div>";
 }
 
 // The funnels in the headings and the line above the table; both follow the filters.
@@ -947,12 +989,19 @@ function renderFilterBar() {
   if (strip) {
     strip.hidden = !currentRecords.length;
     const shown = currentRecords.filter(r => recPasses(r)).length;
-    strip.innerHTML = filtersActive()
+    const left = filtersActive()
       ? 'Showing <b>' + shown + '</b> of ' + currentRecords.length + ' records' +
         '<button type="button" class="awm-f-clear" id="awmFclear">Clear filters</button>'
-      : '<b>' + currentRecords.length + '</b> record' + (currentRecords.length === 1 ? "" : "s") + statusChips();
+      : '<b>' + currentRecords.length + '</b> record' + (currentRecords.length === 1 ? "" : "s");
+    strip.innerHTML = '<div class="awm-f-left">' + left + '</div>' + statusTabs() + '<div class="awm-f-right"></div>';
     const clear = document.getElementById("awmFclear");
     if (clear) clear.addEventListener("click", function () { resetFilters(); renderTable(); });
+    strip.querySelectorAll("[data-tab]").forEach(b => b.addEventListener("click", function () {
+      const key = b.getAttribute("data-tab");
+      awmTab = awmTab === key ? "" : key;
+      closeFilterPop();
+      renderTable();
+    }));
   }
 
   document.querySelectorAll(".awm-fbtn").forEach(b => {
@@ -1223,6 +1272,7 @@ window.awmUpdateField = function (index, field, value) {
   currentRecords[index]._dirty = true;
   dirty = true;
   if ((field === "awarded" || field === "awardedDate") && selectedMonth) updateMonthRow(selectedMonth);
+  if (field === "awarded") renderFilterBar();   // the tab counts move; the row itself stays put until the table is drawn again
   refreshRowControls(index);
   updateSaveAllBar();
 };

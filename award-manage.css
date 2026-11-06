@@ -164,7 +164,20 @@
 .awm-view .awm-fbtn:hover { background: #eef2ff; color: #4f6bd8; }
 .awm-view .awm-fbtn.is-on { background: #dbe7ff; color: #1d4ed8; }
 .awm-view .awm-fbtn.is-open { background: #e0e7ff; color: #1d4ed8; box-shadow: 0 0 0 2px rgba(79,142,247,.25); }
-.awm-view .awm-filters { display: flex; align-items: center; gap: 12px; margin: 0 0 10px; font-size: 12.5px; color: #6b7280; flex-shrink: 0; min-height: 28px; }
+.awm-view .awm-filters { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; margin: 0 0 10px; font-size: 12.5px; color: #6b7280; flex-shrink: 0; min-height: 28px; }
+.awm-view .awm-f-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+/* Status tabs, in the middle of the bar: each shows only its records. */
+.awm-view .awm-tabs { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.awm-view .awm-tab { cursor: pointer; font-family: inherit; line-height: 1.4; transition: box-shadow .15s, transform .15s, filter .15s; }
+.awm-view .awm-tab:hover:not(:disabled) { filter: brightness(.97); transform: translateY(-1px); box-shadow: 0 2px 6px rgba(15,23,42,.08); }
+.awm-view .awm-tab:focus-visible { outline: 2px solid #4f8ef7; outline-offset: 2px; }
+.awm-view .awm-tab:disabled { opacity: .45; cursor: default; }
+.awm-view .awm-tab.is-active { box-shadow: 0 0 0 2px currentColor inset; }
+@media (max-width: 760px) {
+  .awm-view .awm-filters { grid-template-columns: 1fr; justify-items: start; }
+  .awm-view .awm-tabs { justify-content: flex-start; }
+  .awm-view .awm-f-right { display: none; }
+}
 .awm-view .awm-filters[hidden] { display: none; }
 .awm-view .awm-filters b { color: #1a1d23; }
 .awm-view .awm-f-tip { color: #9ca3af; margin-left: 6px; }
