@@ -3041,33 +3041,52 @@
       box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5) !important;
     }
 
+    /* Flowchart Viewport Canvas */
+    html[data-theme="dark"] #tpRoot .tp-viewport {
+      background:
+        radial-gradient(rgba(148, 163, 184, 0.15) 1px, transparent 1.2px) 0 0 / 22px 22px,
+        linear-gradient(180deg, #0B1120 0%, #0F172A 100%) !important;
+      border-color: #1E293B !important;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+    }
+
     /* 2. SVG Tree Connectors */
     html[data-theme="dark"] #tpRoot .tp-connector-trunk,
     html[data-theme="dark"] #tpRoot .tp-connector-branch {
-      stroke: #475569 !important;
-      stroke-width: 2px !important;
+      stroke: #38BDF8 !important;
+      stroke-width: 2.5px !important;
       stroke-dasharray: none !important;
+      filter: drop-shadow(0 0 5px rgba(56, 189, 248, 0.5)) !important;
+      opacity: 0.85 !important;
     }
     html[data-theme="dark"] #tpRoot .tp-connector-hub,
     html[data-theme="dark"] #tpRoot .tp-connector-anchor {
-      fill: #1E293B !important;
-      stroke: #64748B !important;
-      stroke-width: 2px !important;
+      fill: #0B1329 !important;
+      stroke: #38BDF8 !important;
+      stroke-width: 2.5px !important;
+      filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.75)) !important;
     }
     html[data-theme="dark"] #tpRoot .tp-connector-trunk.highlighted,
     html[data-theme="dark"] #tpRoot .tp-connector-branch.highlighted {
-      stroke: #38BDF8 !important;
+      stroke: #00FFFF !important;
       stroke-width: 3.5px !important;
       stroke-dasharray: 9 6 !important;
-      filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.85)) !important;
+      filter: drop-shadow(0 0 10px rgba(0, 255, 255, 0.95)) !important;
       animation: tp-flow 1.1s linear infinite !important;
+      opacity: 1 !important;
     }
     html[data-theme="dark"] #tpRoot .tp-connector-hub.highlighted,
     html[data-theme="dark"] #tpRoot .tp-connector-anchor.highlighted {
       fill: #0284C7 !important;
       stroke: #E0F2FE !important;
-      stroke-width: 2.5px !important;
-      filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.9)) !important;
+      stroke-width: 3px !important;
+      filter: drop-shadow(0 0 8px rgba(56, 189, 248, 1)) !important;
+    }
+    html[data-theme="dark"] #tpRoot .tp-connector-root-pip {
+      fill: #38BDF8 !important;
+      stroke: #E0F2FE !important;
+      stroke-width: 2px !important;
+      filter: drop-shadow(0 0 5px rgba(56, 189, 248, 0.7)) !important;
     }
 
     /* 3. State Lead Card */

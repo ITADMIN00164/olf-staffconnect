@@ -4480,6 +4480,7 @@
     toggleDivision,
     expandAll,
     collapseAll,
+    drawConnectors: scheduleConnectorUpdate,
     onSearch,
     clearSearch,
     openModal,
