@@ -2121,9 +2121,9 @@
       if (directStaff.length === 0 && entry.subs.length > 0) continue;
 
       const divId = getDivId(mgr);
-      let label = mgr.Designation || "Program Manager";
+      let label = mgr.Designation ? mgr.Designation.replace(/\s+Track$/i, "") : "Program Manager";
       if (/div/i.test(mgr.Dept) || /division\s*manager/i.test(mgr.Designation)) {
-        label = "Division Manager Track";
+        label = "Division Manager";
       }
 
       const mgrLeadName = mgr.Name;
@@ -2342,9 +2342,9 @@
 
           directStaff.forEach(s => placedInThisDiv.add(s.id));
 
-          let label = mgr.Designation ? `${mgr.Designation} Track` : "Program Manager Track";
+          let label = mgr.Designation ? mgr.Designation.replace(/\s+Track$/i, "") : "Program Manager";
           if (/division\s*manager/i.test(mgr.Designation)) {
-            label = "Division Manager Track";
+            label = "Division Manager";
           }
 
           let roleId = mgr.id || `pm-${slugify(mgr.Name)}`;
@@ -2381,7 +2381,7 @@
             pmColumns.push({
               pmId: `pm-${divId}-support`,
               roleId: roleId,
-              label: leadForTrack ? `${leadForTrack.Designation || 'Support'} / Interim Support` : "Interim Support Track",
+              label: leadForTrack ? `${leadForTrack.Designation || 'Support'} / Interim Support` : "Interim Support",
               name: leadTrackName,
               designation: leadForTrack ? (leadForTrack.Designation || "Program Operations") : "Program Operations",
               reportingManager: resolveManagerName(leadForTrack, leadName || "Division Manager"),
@@ -2400,7 +2400,7 @@
               pmColumns.push({
                 pmId: pm.id,
                 roleId: roleId,
-                label: pm.Designation || "Program Manager Track",
+                label: pm.Designation ? pm.Designation.replace(/\s+Track$/i, "") : "Program Manager",
                 name: pm.Name,
                 designation: pm.Designation || "Program Manager",
                 reportingManager: resolveManagerName(pm, leadName || "Division Manager"),
@@ -2953,7 +2953,6 @@
           </div>
           <div class="tp-card-name">${esc(sl.name || "Vishvajit G Pawar")}</div>
           <div class="tp-card-role-label">${esc(sl.designation || sl.title || "State Lead")}</div>
-          <div class="tp-card-mgr-line"><span class="tp-mgr-k">Reporting Manager:</span> <span class="tp-mgr-v">${esc(sl.reportingManager || "Prashant Patil")}</span></div>
           <div class="tp-card-sub">${esc(sl.title || stateLabel)} &middot; ${sl.subtitle ? esc(sl.subtitle) : "State Operations &amp; Strategy"}</div>
           <div class="tp-card-stats">
             <div class="tp-stat-item"><strong>${divsTotal}</strong><span>${divsTotal === 1 ? "Division" : "Divisions"}</span></div>
@@ -3025,9 +3024,8 @@
                 </div>
                 <div class="tp-card-name">${esc(div.divisionLead || "Interim Lead")}</div>
                 <div class="tp-card-role-label">${esc(div.divisionRole || "Division Manager")}</div>
-                <div class="tp-card-mgr-line"><span class="tp-mgr-k">Reporting Manager:</span> <span class="tp-mgr-v">${esc(div.reportingManager || sl.name || "Vishvajit G Pawar")}</span></div>
                 <div class="tp-card-sub">${esc(div.divisionTitle)} &middot; Division Operations</div>
-                <div class="tp-badge-sm-tag">${divPmCount} ${divPmCount === 1 ? 'Program Manager Track' : 'Program Manager Tracks'} &middot; ${divDistCount} ${divDistCount === 1 ? 'District' : 'Districts'} &middot; ${divPoCount} POs</div>
+                <div class="tp-badge-sm-tag">${divPmCount} ${divPmCount === 1 ? 'Program Manager' : 'Program Managers'} &middot; ${divDistCount} ${divDistCount === 1 ? 'District' : 'Districts'} &middot; ${divPoCount} POs</div>
               </div>
             </div>
 
@@ -3121,12 +3119,11 @@
       <div class="tp-pm-col ${isMatched ? "tp-matched" : ""}">
         <div class="tp-card tp-card-pm" id="node-${pm.pmId}">
           <div class="tp-card-header">
-            <span class="tp-tag tp-tag-blue">${esc(pm.label || "Program Manager")}</span>
-            <button type="button" class="tp-card-details-btn" onclick="window.TeamPerformance.openModal('${pm.roleId || pm.pmId}', '${esc(pm.label || "Program Manager")}', '${esc(pm.name)}', '${esc(pmMgr)}')">Details &rarr;</button>
+            <span class="tp-tag tp-tag-blue">${esc((pm.label || "Program Manager").replace(/\s+Track$/i, ""))}</span>
+            <button type="button" class="tp-card-details-btn" onclick="window.TeamPerformance.openModal('${pm.roleId || pm.pmId}', '${esc((pm.label || "Program Manager").replace(/\s+Track$/i, ""))}', '${esc(pm.name)}', '${esc(pmMgr)}')">Details &rarr;</button>
           </div>
           <div class="tp-card-name">${esc(pm.name)}</div>
           <div class="tp-card-role-label">${esc(pm.designation || pm.label || "Program Manager")}</div>
-          <div class="tp-card-mgr-line"><span class="tp-mgr-k">Reporting Manager:</span> <span class="tp-mgr-v">${esc(pmMgr)}</span></div>
           <div class="tp-card-sub">${pm.districts.length} ${pm.districts.length === 1 ? "District" : "Districts"} Assigned</div>
           ${pm.badge ? `<div class="tp-badge-sm-tag">${esc(pm.badge)}</div>` : ""}
         </div>
@@ -3147,7 +3144,6 @@
           <div class="tp-dist-pip"></div>
           <div class="tp-dist-title-box">
             <span class="tp-dist-title">${esc(dst.name)}</span>
-            <span class="tp-dist-mgr"><span class="tp-mgr-k">Reporting Manager:</span> <span class="tp-mgr-v">${esc(dstMgr)}</span></span>
           </div>
           <button type="button" class="tp-row-details-btn" onclick="window.TeamPerformance.openModal('${dst.roleId}', 'District Operations', '${esc(dst.name)}', '${esc(dstMgr)}')">Details &rarr;</button>
         </div>
@@ -3162,7 +3158,6 @@
                 <div class="tp-po-text-wrap">
                   <div class="tp-po-name">${esc(poName)}</div>
                   <div class="tp-po-role">${esc(po.designation || "Project Officer")}</div>
-                  <div class="tp-po-mgr"><span class="tp-mgr-k">Reporting Manager:</span> <span class="tp-mgr-v">${esc(poMgr)}</span></div>
                 </div>
               </div>
               <button type="button" class="tp-row-details-btn" onclick="window.TeamPerformance.openModal('${po.roleId}', '${esc(po.designation || "Project Officer")}', '${esc(poName)}', '${esc(poMgr)}')">Details &rarr;</button>
@@ -3196,17 +3191,17 @@
       const sl = tree.chRoot;
       const activeDivName = (tree.chDivisions || []).find(d => expandedDivisions.has(d.divisionId))?.divisionTitle;
       const expStatus = activeDivName ? `${activeDivName} Active` : "All Collapsed";
-      badge.textContent = `Chhattisgarh · ${sl ? sl.divisionsCount : 5} Divisions (${expStatus}) · ${sl ? sl.pmsCount : 10} PM Tracks · ${sl ? sl.districtsCount : 16} Districts · ${sl ? sl.posCount : 24} POs (${sl ? sl.activeStaffCount : 29} Staff)`;
+      badge.textContent = `Chhattisgarh · ${sl ? sl.divisionsCount : 5} Divisions (${expStatus}) · ${sl ? sl.pmsCount : 10} PMs · ${sl ? sl.districtsCount : 16} Districts · ${sl ? sl.posCount : 24} POs (${sl ? sl.activeStaffCount : 29} Staff)`;
     } else if (activeState === "MP") {
       const sl = tree.mpRoot;
       const activeDivName = (tree.mpDivisions || []).find(d => expandedDivisions.has(d.divisionId))?.divisionTitle;
       const expStatus = activeDivName ? `${activeDivName} Active` : "All Collapsed";
-      badge.textContent = `Madhya Pradesh · ${sl ? sl.divisionsCount : 1} Division (${expStatus}) · ${sl ? sl.pmsCount : 1} PM Track · ${sl ? sl.districtsCount : 2} Districts · ${sl ? sl.posCount : 4} POs (${sl ? sl.activeStaffCount : 5} Staff)`;
+      badge.textContent = `Madhya Pradesh · ${sl ? sl.divisionsCount : 1} Division (${expStatus}) · ${sl ? sl.pmsCount : 1} PM · ${sl ? sl.districtsCount : 2} Districts · ${sl ? sl.posCount : 4} POs (${sl ? sl.activeStaffCount : 5} Staff)`;
     } else if (activeState === "BR") {
       const sl = tree.brRoot;
       const activeDivName = (tree.brDivisions || []).find(d => expandedDivisions.has(d.divisionId))?.divisionTitle;
       const expStatus = activeDivName ? `${activeDivName} Active` : "All Collapsed";
-      badge.textContent = `Bihar · ${sl ? sl.divisionsCount : 1} Division (${expStatus}) · ${sl ? sl.pmsCount : 1} Track · ${sl ? sl.districtsCount : 1} District · ${sl ? sl.posCount : 4} POs (${sl ? sl.activeStaffCount : 4} Staff)`;
+      badge.textContent = `Bihar · ${sl ? sl.divisionsCount : 1} Division (${expStatus}) · ${sl ? sl.pmsCount : 1} PM · ${sl ? sl.districtsCount : 1} District · ${sl ? sl.posCount : 4} POs (${sl ? sl.activeStaffCount : 4} Staff)`;
     }
   }
 
@@ -3329,56 +3324,78 @@
     // Bus level: perfectly centered halfway between root bottom and nearest division top
     const minDivY = Math.min(...divPoints.map(p => p.dY));
     const busY = Math.round((rY + minDivY) / 2);
+    const minX = Math.min(rX, ...divPoints.map(p => p.dX));
+    const maxX = Math.max(rX, ...divPoints.map(p => p.dX));
 
     let paths = "";
 
     // 1. Root pip at bottom of State Lead card
     paths += `<circle cx="${rX}" cy="${rY}" r="4" class="tp-connector-root-pip"/>`;
 
-    // 2. Trunk stem from State Lead down to bus level
+    // 2. Base trunk stem from State Lead down to bus level
     paths += `<line x1="${rX}" y1="${rY}" x2="${rX}" y2="${busY}" class="tp-connector-trunk"/>`;
 
     // 3. Central junction hub
     paths += `<circle cx="${rX}" cy="${busY}" r="5" class="tp-connector-hub"/>`;
 
-    // 4. Step-orthogonal branch to each division card
+    // 4. Base horizontal bus bar (single clean continuous line across all divisions, ZERO overlap)
+    paths += `<line x1="${minX}" y1="${busY}" x2="${maxX}" y2="${busY}" class="tp-connector-branch tp-connector-busbar"/>`;
+
+    // 5. Individual vertical drops to each division card
     divPoints.forEach(pt => {
       paths += `
         <g class="tp-connector-group" id="conn-${pt.id}">
-          <path class="tp-connector-branch" id="branch-${pt.id}"
-                d="M ${rX} ${busY} L ${pt.dX} ${busY} L ${pt.dX} ${pt.dY}"
-                fill="none"/>
+          <line x1="${pt.dX}" y1="${busY}" x2="${pt.dX}" y2="${pt.dY}" class="tp-connector-branch tp-connector-drop" id="drop-${pt.id}"/>
           <circle cx="${pt.dX}" cy="${pt.dY}" r="3.5" class="tp-connector-anchor" id="anchor-${pt.id}"/>
         </g>
       `;
     });
 
+    // 6. Active overlay group (ALWAYS painted on top so highlighted paths never get covered)
+    paths += `
+      <g id="tpActiveOverlay" style="display: none;">
+        <line x1="${rX}" y1="${rY}" x2="${rX}" y2="${busY}" class="tp-connector-trunk highlighted" id="tpActiveTrunk"/>
+        <circle cx="${rX}" cy="${busY}" r="5" class="tp-connector-hub highlighted" id="tpActiveHub"/>
+        <path d="" fill="none" class="tp-connector-branch highlighted" id="tpActiveBranch"/>
+        <circle cx="0" cy="0" r="5" class="tp-connector-anchor highlighted" id="tpActiveAnchor"/>
+      </g>
+    `;
+
     svg.innerHTML = paths;
-    // Attach hover effects between cards and connectors
+
+    function setActiveHighlight(pt) {
+      const overlay = document.getElementById("tpActiveOverlay");
+      const activeBranch = document.getElementById("tpActiveBranch");
+      const activeAnchor = document.getElementById("tpActiveAnchor");
+      if (!overlay || !activeBranch || !activeAnchor) return;
+
+      let targetPt = pt;
+      if (!targetPt) {
+        targetPt = divPoints.find(p => p.el.classList.contains("tp-expanded-card"));
+      }
+
+      if (targetPt) {
+        overlay.style.display = "";
+        activeBranch.setAttribute("d", `M ${rX} ${busY} L ${targetPt.dX} ${busY} L ${targetPt.dX} ${targetPt.dY}`);
+        activeAnchor.setAttribute("cx", targetPt.dX);
+        activeAnchor.setAttribute("cy", targetPt.dY);
+      } else {
+        overlay.style.display = "none";
+      }
+    }
+
+    // Initial active highlight based on currently expanded division
+    setActiveHighlight(null);
+
+    // Attach hover effects
     divPoints.forEach(pt => {
-      pt.el.onmouseenter = () => {
-        const br = document.getElementById(`branch-${pt.id}`);
-        const an = document.getElementById(`anchor-${pt.id}`);
-        const trunk = document.querySelector(".tp-connector-trunk");
-        const hub = document.querySelector(".tp-connector-hub");
-        if (br) br.classList.add("highlighted");
-        if (an) an.classList.add("highlighted");
-        if (trunk) trunk.classList.add("highlighted");
-        if (hub) hub.classList.add("highlighted");
-      };
-      pt.el.onmouseleave = () => {
-        const br = document.getElementById(`branch-${pt.id}`);
-        const an = document.getElementById(`anchor-${pt.id}`);
-        const trunk = document.querySelector(".tp-connector-trunk");
-        const hub = document.querySelector(".tp-connector-hub");
-        if (br) br.classList.remove("highlighted");
-        if (an) an.classList.remove("highlighted");
-        if (trunk) trunk.classList.remove("highlighted");
-        if (hub) hub.classList.remove("highlighted");
-      };
+      pt.el.onmouseenter = () => setActiveHighlight(pt);
+      pt.el.onmouseleave = () => setActiveHighlight(null);
     });
 
     rootCard.onmouseenter = () => {
+      const overlay = document.getElementById("tpActiveOverlay");
+      if (overlay) overlay.style.display = "none";
       const trunk = document.querySelector(".tp-connector-trunk");
       const hub = document.querySelector(".tp-connector-hub");
       if (trunk) trunk.classList.add("highlighted");
@@ -3393,8 +3410,10 @@
       if (hub) hub.classList.remove("highlighted");
       document.querySelectorAll(".tp-connector-branch").forEach(b => b.classList.remove("highlighted"));
       document.querySelectorAll(".tp-connector-anchor").forEach(a => a.classList.remove("highlighted"));
+      setActiveHighlight(null);
     };
   }
+
 
   // --- Modal & Multi-Tab Editor Logic ---
 
@@ -3453,7 +3472,7 @@
     personName = personName.replace(/\s*·\s*\d+\s*(?:districts?|zones?|staff|pos?).*$/i, "").trim();
 
     // 2. Resolve Role
-    let roleName = fallbackLevel || roleData.level || (emp ? emp.Designation : null) || roleData.designation || "Role";
+    let roleName = (fallbackLevel || roleData.level || (emp ? emp.Designation : null) || roleData.designation || "Role").replace(/\s+Track$/i, "").trim();
     if (cleanId === "statelead") {
       roleName = "State Lead";
     } else if (cleanId === "dm-pune") {
@@ -4461,6 +4480,7 @@
     toggleDivision,
     expandAll,
     collapseAll,
+    drawConnectors: scheduleConnectorUpdate,
     onSearch,
     clearSearch,
     openModal,

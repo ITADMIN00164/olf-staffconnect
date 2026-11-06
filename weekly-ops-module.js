@@ -412,7 +412,8 @@
       .tp-wops-tbl {
         width: 100%;
         min-width: 1650px;
-        border-collapse: collapse;
+        border-collapse: separate;
+        border-spacing: 0;
         font-size: 12.5px;
         table-layout: fixed;
       }
@@ -423,7 +424,9 @@
       
       /* Group Headers (Tier 1) */
       .tp-wops-tbl .grp-hd th {
-        padding: 8px 12px;
+        height: 32px;
+        line-height: 32px;
+        padding: 0 12px;
         font-size: 11px;
         font-weight: 800;
         letter-spacing: 0.08em;
@@ -431,7 +434,7 @@
         position: sticky;
         top: 0;
         z-index: 5;
-        border-bottom: 1px solid rgba(255,255,255,0.18);
+        border-bottom: none;
         text-align: center;
       }
       .tp-wops-tbl .grp-hd .g-plan {
@@ -449,6 +452,8 @@
 
       /* Column Headers (Tier 2) */
       .tp-wops-tbl .col-hd th {
+        height: 34px;
+        line-height: 16px;
         padding: 9px 10px;
         font-size: 11px;
         font-weight: 700;

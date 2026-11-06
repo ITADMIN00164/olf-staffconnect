@@ -67,6 +67,8 @@
 
         /* the select itself while its list is open */
         "select.olf-sel-open{border-color:var(--olf-sel-acc)!important;box-shadow:0 0 0 3px var(--olf-sel-ring)!important;}",
+        ".tp-hist-select-wrap select.olf-sel-open{border:none!important;box-shadow:none!important;outline:none!important;}",
+        ".tp-hist-select-wrap.olf-sel-open-wrap,.tp-hist-select-wrap:has(select.olf-sel-open){border-color:var(--olf-sel-acc)!important;box-shadow:0 0 0 3px var(--olf-sel-ring)!important;}",
 
         /* light */
         "html{--olf-sel-bg:rgba(255,255,255,.97);--olf-sel-ink:#1E293B;--olf-sel-faint:#7A8599;--olf-sel-line:rgba(15,23,42,.09);",
@@ -110,6 +112,9 @@
     }
     // CSS zoom on <html> (the app scales the whole UI): rects are in screen px,
     // fixed positions are in CSS px.
+    function anchorOf(s) {
+        return (s && s.closest && (s.closest(".tp-hist-select-wrap") || s.closest(".olf-select-wrap"))) || s;
+    }
     function zoomOf() {
         var z = parseFloat(getComputedStyle(document.documentElement).zoom);
         return z > 0 ? z : 1;
@@ -157,20 +162,28 @@
         var cur = shown.indexOf(s.selectedIndex);
         setActive(cur >= 0 ? cur : firstEnabled(0, 1), true);
         place();
-        anchor = s.getBoundingClientRect();
+        var a = anchorOf(s);
+        anchor = a.getBoundingClientRect();
         s.classList.add("olf-sel-open");
+        if (a !== s) a.classList.add("olf-sel-open-wrap");
         s.setAttribute("aria-expanded", "true");
     }
     function close() {
         if (pop) { pop.remove(); pop = null; listEl = null; qEl = null; }
-        if (sel) { sel.classList.remove("olf-sel-open"); sel.removeAttribute("aria-expanded"); }
+        if (sel) {
+            sel.classList.remove("olf-sel-open");
+            var a = anchorOf(sel);
+            if (a !== sel) a.classList.remove("olf-sel-open-wrap");
+            sel.removeAttribute("aria-expanded");
+        }
         sel = null; items = []; shown = []; active = -1; query = ""; typed = ""; anchor = null;
     }
 
     function place() {
         if (!pop || !sel) return;
         var z = zoomOf();
-        var r = sel.getBoundingClientRect();
+        var a = anchorOf(sel);
+        var r = a.getBoundingClientRect();
         var vw = window.innerWidth, vh = window.innerHeight, gap = 6 * z, pad = 8;
         var minW = r.width / z;
         pop.style.minWidth = minW + "px";
@@ -328,7 +341,7 @@
     // scroll-into-view, or some other panel scrolling - keeps the list open.)
     document.addEventListener("scroll", function (e) {
         if (!pop || (e.target && e.target.nodeType === 1 && pop.contains(e.target))) return;
-        var r = sel.getBoundingClientRect();
+        var r = anchorOf(sel).getBoundingClientRect();
         if (!anchor || Math.abs(r.top - anchor.top) > 1 || Math.abs(r.left - anchor.left) > 1) close();
     }, true);
     window.addEventListener("resize", function () { close(); });
