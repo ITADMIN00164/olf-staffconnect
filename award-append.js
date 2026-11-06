@@ -9,8 +9,11 @@
        (public.award_lists), exactly as written.
    Nothing else is validated and no column is mandatory: an empty cell is saved empty, a mobile number,
    email, link or score is saved as typed. The columns are found by their headings, so their order does not matter.
-   A row is a DUPLICATE when its Month + Full Name + School name + Award name are the same as a record
-   already in that month, or as an earlier row of the same sheet. Those four together are the unique key:
+   A row is a DUPLICATE when its Month + Full Name + School name + Award name + Award Category are the same
+   as a record already in that month, or as an earlier row of the same sheet. Those five together are the
+   unique key, so one teacher can win both a Block Level and a District Level award in the same month.
+   When Full Name or School name is blank (hand-made lists such as Top Clusters), District + Block + Circle
+   are added to the key, so blank rows from different clusters are not taken for one another:
    capitals and extra spaces do not matter. Duplicates are shown and NOTHING is added while there are any:
    the sheet is fixed (the duplicate rows removed) and chosen again.
    A wrong upload is taken out again with "All uploads".
@@ -311,9 +314,19 @@ async function downloadTemplate() {
   }
 }
 
-// ── Duplicates: Month + Full Name + School name + Award name is the unique key ──
+// ── Duplicates: Month + Full Name + School name + Award name + Award Category is the unique key ──
+// The category carries the level ("Block Level - POM" / "District Level - POM"), which splitAward and
+// parseSheet take out of the award name, so without it a Block and a District award would look the same.
 function norm(s) { return String(s == null ? "" : s).replace(/\s+/g, " ").trim().toLowerCase(); }
-function uniqueKey(fullName, school, awardName) { return [fullName, school, awardName].map(norm).join("|"); }
+// A row with no Full Name or no School name (Top Clusters and other hand-made lists) is told apart by
+// where it is: District + Block + Circle join the key, else every blank row of an award would clash.
+function uniqueKey(fullName, school, awardName, awardCategory, district, block, circle) {
+  const parts = [fullName, school, awardName, awardCategory];
+  if (!norm(fullName) || !norm(school)) parts.push(district, block, circle);
+  return parts.map(norm).join("|");
+}
+// What a duplicate row is shown as when its name or school is blank.
+function placeOf(r) { return [r.circle, r.block, r.district].filter(Boolean).join(", "); }
 
 const monthKeys = {};      // month label -> Set of the keys already in that month, kept while the window is open
 
@@ -321,11 +334,11 @@ async function loadMonthKeys(label) {
   if (monthKeys[label]) return monthKeys[label];
   const keys = new Set();
   for (let offset = 0; ; offset += 1000) {
-    const rows = await sbGet("award_records?select=full_name,school_name,award_name,award_category&month_label=eq." +
+    const rows = await sbGet("award_records?select=full_name,school_name,award_name,award_category,district_name,block_name,circle_name&month_label=eq." +
       encodeURIComponent(label) + "&order=id.asc&limit=1000&offset=" + offset);
     rows.forEach(r => {
       const s = splitAward(r.award_name, r.award_category);   // as the new rows are written
-      keys.add(uniqueKey(r.full_name, r.school_name, s.awardName));
+      keys.add(uniqueKey(r.full_name, r.school_name, s.awardName, s.awardCategory, r.district_name, r.block_name, r.circle_name));
     });
     if (rows.length < 1000) break;
   }
@@ -339,9 +352,11 @@ async function computeView(label, fresh) {
   const seen = new Set();
   const out = { label: label, fresh: [], dupes: [] };
   parsed.ok.forEach(r => {
-    const key = uniqueKey(r.fullName, r.school, r.awardName);
-    if (known.has(key)) { out.dupes.push({ line: r.line, name: r.fullName, school: r.school, award: r.awardName, where: "already in " + label }); return; }
-    if (seen.has(key)) { out.dupes.push({ line: r.line, name: r.fullName, school: r.school, award: r.awardName, where: "repeats an earlier row of this sheet" }); return; }
+    const key = uniqueKey(r.fullName, r.school, r.awardName, r.awardCategory, r.district, r.block, r.circle);
+    const award = r.awardName + (r.awardCategory ? " (" + r.awardCategory + ")" : "");
+    const who = r.fullName || "(no name)", where = r.school || placeOf(r);
+    if (known.has(key)) { out.dupes.push({ line: r.line, name: who, school: where, award: award, where: "already in " + label }); return; }
+    if (seen.has(key)) { out.dupes.push({ line: r.line, name: who, school: where, award: award, where: "repeats an earlier row of this sheet" }); return; }
     seen.add(key);
     out.fresh.push(r);
   });
@@ -394,7 +409,7 @@ function render(p) {
   }
   if (view && view.dupes.length) {
     parts.push('<div class="awa-dups"><div class="awa-dups-head"><b>Nothing is added until these duplicates are removed from the sheet</b>' +
-      "<span>Same Month, Full Name, School name and Award name</span></div><ul>" +
+      "<span>Same Month, Full Name, School name, Award name and Award Category</span></div><ul>" +
       view.dupes.slice(0, 60).map(d => "<li><span>Row " + d.line + " \u00b7 " + esc(d.name) + "</span> " +
         esc(d.school) + " \u00b7 " + esc(d.award) + " <em>" + esc(d.where) + "</em></li>").join("") +
       (view.dupes.length > 60 ? "<li>\u2026and " + (view.dupes.length - 60) + " more.</li>" : "") + "</ul></div>");

@@ -130,9 +130,28 @@ function toRec(row) {
 
 const ORDER = "order=full_name.asc,award_name.asc,id.asc";
 
+// Records are grouped by Award Category, in this order, so one kind of award always sits together.
+// A category not listed here comes after these, A-Z; a record with no category comes last.
+// Inside a category the order from the table stays: Full Name, then award, then id.
+const AWM_CATEGORY_ORDER = [
+  "District Level - POM", "Block Level - POM", "District Level - LIFESKILL", "District Level - Academics",
+  "Top Clusters", "Nanhe Sitare (NS)", "Shikshan Utsav (SU)", "Coffee With CEO", "Other"
+].map(c => c.toLowerCase());
+function categoryRank(r) {
+  const c = String(r.awardCategory || "").trim().toLowerCase();
+  if (!c) return [2, ""];
+  const i = AWM_CATEGORY_ORDER.indexOf(c);
+  return i === -1 ? [1, c] : [0, String(i).padStart(3, "0")];
+}
+function sortByCategory(recs) {
+  return recs.map((r, i) => ({ r, i, k: categoryRank(r) }))
+    .sort((a, b) => a.k[0] - b.k[0] || a.k[1].localeCompare(b.k[1]) || a.i - b.i)
+    .map(x => x.r);
+}
+
 async function dbDistrictRows(district) {
   const rows = await sbGet(`award_records?district_name=eq.${encodeURIComponent(district)}&select=*&${ORDER}`);
-  return rows.map(toRec);
+  return sortByCategory(rows.map(toRec));
 }
 
 async function dbMonthRows(district, month) {
@@ -140,7 +159,7 @@ async function dbMonthRows(district, month) {
     `award_records?district_name=eq.${encodeURIComponent(district)}` +
     `&month_label=eq.${encodeURIComponent(month)}&select=*&${ORDER}`
   );
-  return rows.map(toRec);
+  return sortByCategory(rows.map(toRec));
 }
 
 // Every change is written down: who, what, when.
@@ -777,13 +796,17 @@ let awmFilter = blankFilter();
 let awmPopOpenedAt = 0;            // when it opened, so the scroll that opening can cause does not close it
 let awmPopKey = "";                 // the heading whose list is open, "" when none
 
+// The status tab above the table: "" shows every record, else only "verify", "verified", "pending" or "rejected".
+let awmTab = "";
+
 function resetFilters() {
   awmFilter = blankFilter();
+  awmTab = "";
   closeFilterPop();
 }
 
 function filtersActive() {
-  return !!awmFilter.q.trim() || AWM_LISTS.some(k => awmFilter[k].length);
+  return !!awmTab || !!awmFilter.q.trim() || AWM_LISTS.some(k => awmFilter[k].length);
 }
 
 function colValue(key, r) {
@@ -792,6 +815,7 @@ function colValue(key, r) {
 
 // Does a record pass every filter except, perhaps, one (the one whose list is being worked out)?
 function recPasses(r, except) {
+  if (awmTab && tabOf(r) !== awmTab) return false;
   const q = awmFilter.q.trim().toLowerCase();
   if (q && except !== "q") {
     const hay = [r.fullName, r.mobile, r.schoolName, r.blockName, r.community].join(" ").toLowerCase();
@@ -933,12 +957,30 @@ function recState(r) {
   return r.awarded === "Yes" ? "saved" : "pending";
 }
 
-function statusChips() {
-  const n = { verified: 0, rejected: 0, unsaved: 0, saved: 0, pending: 0 };
-  currentRecords.forEach(r => { n[recState(r)] += 1; });
-  const chip = (cls, count, label) => count ? '<span class="awm-chip is-' + cls + '">' + count + " " + label + "</span>" : "";
-  return chip("verified", n.verified, "verified") + chip("saved", n.saved + n.unsaved, "to verify") +
-         chip("pending", n.pending, "not awarded") + chip("rejected", n.rejected, "rejected");
+/* The tab a record belongs to: verified, rejected, awarded and waiting to be verified
+   ("verify", saved or not), or not awarded yet ("pending"). */
+function tabOf(r) {
+  if (r.verified === "Yes") return "verified";
+  if (r.verified === "Rejected") return "rejected";
+  return r.awarded === "Yes" ? "verify" : "pending";
+}
+
+// The status tabs in the middle of the bar. Each shows only its records; clicking the open one shows all again.
+// The counts are of the whole month, whatever the column filters are.
+function statusTabs() {
+  const n = { verify: 0, verified: 0, pending: 0, rejected: 0 };
+  currentRecords.forEach(r => { n[tabOf(r)] += 1; });
+  const tabs = [
+    ["verify", "saved", "to verify"], ["verified", "verified", "Verified"], ["pending", "pending", "Pending"]
+  ];
+  if (n.rejected || awmTab === "rejected") tabs.push(["rejected", "rejected", "Rejected"]);
+  return '<div class="awm-tabs" role="tablist">' + tabs.map(([key, cls, label]) => {
+    const on = awmTab === key;
+    return '<button type="button" role="tab" aria-selected="' + on + '" data-tab="' + key + '"' +
+      ' class="awm-chip awm-tab is-' + cls + (on ? " is-active" : "") + '"' + (n[key] || on ? "" : " disabled") +
+      ' title="' + (on ? "Showing only these — click again to show all" : "Show only these records") + '">' +
+      n[key] + " " + label + "</button>";
+  }).join("") + "</div>";
 }
 
 // The funnels in the headings and the line above the table; both follow the filters.
@@ -947,12 +989,19 @@ function renderFilterBar() {
   if (strip) {
     strip.hidden = !currentRecords.length;
     const shown = currentRecords.filter(r => recPasses(r)).length;
-    strip.innerHTML = filtersActive()
+    const left = filtersActive()
       ? 'Showing <b>' + shown + '</b> of ' + currentRecords.length + ' records' +
         '<button type="button" class="awm-f-clear" id="awmFclear">Clear filters</button>'
-      : '<b>' + currentRecords.length + '</b> record' + (currentRecords.length === 1 ? "" : "s") + statusChips();
+      : '<b>' + currentRecords.length + '</b> record' + (currentRecords.length === 1 ? "" : "s");
+    strip.innerHTML = '<div class="awm-f-left">' + left + '</div>' + statusTabs() + '<div class="awm-f-right"></div>';
     const clear = document.getElementById("awmFclear");
     if (clear) clear.addEventListener("click", function () { resetFilters(); renderTable(); });
+    strip.querySelectorAll("[data-tab]").forEach(b => b.addEventListener("click", function () {
+      const key = b.getAttribute("data-tab");
+      awmTab = awmTab === key ? "" : key;
+      closeFilterPop();
+      renderTable();
+    }));
   }
 
   document.querySelectorAll(".awm-fbtn").forEach(b => {
@@ -1017,10 +1066,7 @@ function renderTable() {
     const lt  = locked ? `title="${LOCK_MSG}"` : (isVerifier ? `title="View only — verifier access"` : "");
     return `
     <tr class="${[locked ? "locked-row" : "", "rec-" + recState(r)].filter(Boolean).join(" ")}" ${lt}>
-      <td class="name-cell">
-        <div class="nc-name">${r.fullName || ""}</div>
-        <div class="nc-sub">${r.mobile || ""}${r.mobile && r.schoolName ? " · " : ""}${r.schoolName || ""}</div>
-      </td>
+      <td class="name-cell" id="namecell-${i}">${renderNameCell(i)}</td>
       <td class="award-col">${r.awardName || ""}</td>
       <td class="award-col">${r.awardCategory || ""}</td>
       <td>
@@ -1046,6 +1092,175 @@ function renderTable() {
   updateSaveAllBar();
 }
 
+// ===============================
+// MISSING DETAILS
+// Lists made by hand (SU, NS, Coffee With CEO, ...) often come without the contact
+// and place details the POM sheets carry. A record that lacks any of them shows a
+// small link under the name; the window it opens fills the blanks only. A value
+// already in the table is shown there but not changed, so nothing an upload brought
+// is overwritten. Post link and Post score are asked for on POM awards only.
+// Saving writes straight to award_records; it does not touch the award itself
+// (Awarded, Date, Image, Description) or its verification.
+// ===============================
+const DETAIL_FIELDS = [
+  { key: "fullName",   col: "full_name",   label: "Full Name" },
+  { key: "mobile",    col: "mobile",      label: "Mobile number", type: "tel",   ph: "10-digit mobile" },
+  { key: "email",      col: "email",       label: "Email",         type: "email", ph: "name@example.com" },
+  { key: "schoolName", col: "school_name", label: "School name" },
+  { key: "circleName", col: "circle_name", label: "Circle name" },
+  { key: "blockName",  col: "block_name",  label: "Block Name" },
+  { key: "pmName",     col: "pm_name",     label: "PM Name" },
+  { key: "postLink",   col: "post_url",    label: "Post link URL", type: "url",    ph: "https://", postOnly: true },
+  { key: "postScore",  col: "post_score",  label: "Post score",    type: "number", postOnly: true }
+];
+const AWM_ADMIN_EMAIL = "itadmin@openlinksfoundation.org";
+
+function isPostAward(r) { return /\bPOM\b/i.test(r.awardCategory || ""); }
+function isClusterAward(r) { return /^top clusters?$/i.test(String(r.awardCategory || "").trim()); }
+function blankVal(v) { return v === null || v === undefined || String(v).trim() === ""; }
+function detailFieldsFor(r) { return DETAIL_FIELDS.filter(f => !f.postOnly || isPostAward(r)); }
+function missingDetails(r) { return detailFieldsFor(r).filter(f => blankVal(r[f.key])); }
+// Data-entry users fill them. A verifier's view is read-only, except for the IT admin.
+function canAddDetails() {
+  return !isVerifier || String(currentUser()).trim().toLowerCase() === AWM_ADMIN_EMAIL;
+}
+
+function renderNameCell(index) {
+  const r = currentRecords[index];
+  // Under the name: a teacher's mobile and school; for Top Clusters, the cluster head's mobile,
+  // cluster (Circle name) and block, since a cluster award is for the cluster, not a school.
+  const parts = isClusterAward(r) ? [r.mobile, r.circleName, r.blockName] : [r.mobile, r.schoolName];
+  const sub = parts.filter(v => !blankVal(v)).map(esc).join(" · ");
+  const miss = missingDetails(r);
+  let note = "";
+  if (miss.length) {
+    // A small "!" beside the name; the full list of what is missing shows on hover.
+    // Red when the person cannot be identified or reached (no Full Name or no Mobile number), yellow otherwise.
+    const red = blankVal(r.fullName) || blankVal(r.mobile);
+    const list = "Some details are missing: " + miss.map(f => f.label).join(", ");
+    note = canAddDetails()
+      ? `<button type="button" class="nc-missing${red ? " is-red" : ""}" title="${esc(list + " – click to add")}" aria-label="${esc(list + " – click to add")}" onclick="event.stopPropagation();awmAddDetails(${index})">!</button>`
+      : `<span class="nc-missing is-static${red ? " is-red" : ""}" title="${esc(list)}" aria-label="${esc(list)}">!</span>`;
+  }
+  const name = blankVal(r.fullName) ? `<span class="nc-noname">Name not given</span>` : esc(r.fullName);
+  return `<div class="nc-name">${name}${note}</div>${sub ? `<div class="nc-sub">${sub}</div>` : ""}`;
+}
+
+function ensureDetailsModal() {
+  if (document.getElementById("awmDetailsModal")) return;
+  const m = document.createElement("div");
+  m.id = "awmDetailsModal";
+  m.className = "pom-modal-overlay";
+  m.innerHTML = '<div class="pom-modal-box awm-edit-box"><div class="pom-modal-title">Add missing details</div>' +
+    '<p class="awm-edit-sub" id="awmDetailsSub"></p>' +
+    '<div class="awm-edit-grid" id="awmDetailsGrid"></div>' +
+    '<p class="awm-edit-err" id="awmDetailsErr"></p>' +
+    '<div class="pom-modal-actions"><button type="button" id="awmDetailsCancel" class="pmbtn cancel">Cancel</button>' +
+    '<button type="button" id="awmDetailsSave" class="pmbtn primary">Save details</button></div></div>';
+  (document.getElementById("aw-view-award") || document.body).appendChild(m);
+  m.addEventListener("click", e => { if (e.target === m) m.classList.remove("open"); });
+  document.getElementById("awmDetailsCancel").addEventListener("click", () => m.classList.remove("open"));
+}
+
+// What was typed, checked. Answers { values: {column: value}, labels, error }.
+function readDetailInputs(r) {
+  const values = {}, labels = [];
+  for (const f of missingDetails(r)) {
+    const input = document.querySelector(`#awmDetailsGrid [data-dkey="${f.key}"]`);
+    let v = input ? input.value.trim() : "";
+    if (!v) continue;
+    if (f.key === "mobile") {
+      const digits = v.replace(/\D/g, "").replace(/^(91|0)(?=\d{10}$)/, "");
+      if (!/^\d{10}$/.test(digits)) return { error: "Mobile number should have 10 digits." };
+      v = digits;
+    } else if (f.key === "email") {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return { error: "That email doesn't look right." };
+      v = v.toLowerCase();
+    } else if (f.key === "postLink") {
+      if (!/^https?:\/\/\S+$/i.test(v)) return { error: "Post link should start with http:// or https://" };
+    } else if (f.key === "postScore") {
+      const n = Number(v);
+      if (!isFinite(n)) return { error: "Post score should be a number." };
+      v = n;
+    }
+    values[f.col] = v;
+    labels.push(f.label);
+  }
+  if (!labels.length) return { error: "Fill at least one detail, or press Cancel." };
+  return { values, labels };
+}
+
+window.awmAddDetails = function (index) {
+  const r = currentRecords[index];
+  if (!r || !canAddDetails()) return;
+  ensureDetailsModal();
+  const where = [r.awardName, r.awardCategory, r.districtName, r.month].filter(Boolean).map(esc).join(" · ");
+  document.getElementById("awmDetailsSub").innerHTML =
+    `<b>${esc(r.fullName || "")}</b>${where ? " — " + where : ""}<br>` +
+    "Fill what you know and save. Anything left blank can be added later. Details already in the record are shown greyed out.";
+  document.getElementById("awmDetailsGrid").innerHTML = detailFieldsFor(r).map(f => {
+    const has = !blankVal(r[f.key]);
+    const type = f.type === "number" ? "number" : f.type || "text";
+    return `<label class="awm-ef${has ? " is-filled" : ""}"><span>${f.label}</span>` +
+      `<input type="${type}" data-dkey="${f.key}" ${has ? "disabled" : ""} ` +
+      `value="${has ? esc(r[f.key]) : ""}" placeholder="${has ? "" : esc(f.ph || "")}" ` +
+      `${f.type === "number" ? 'step="any"' : ""} autocomplete="off"></label>`;
+  }).join("");
+  const err = document.getElementById("awmDetailsErr");
+  err.textContent = "";
+  const save = document.getElementById("awmDetailsSave");
+  save.disabled = false;
+  save.onclick = () => saveDetails(index);
+  document.getElementById("awmDetailsModal").classList.add("open");
+  const first = document.querySelector("#awmDetailsGrid input:not([disabled])");
+  if (first) setTimeout(() => first.focus(), 50);
+};
+
+async function saveDetails(index) {
+  const r = currentRecords[index];
+  const err = document.getElementById("awmDetailsErr");
+  const save = document.getElementById("awmDetailsSave");
+  const typed = readDetailInputs(r);
+  if (typed.error) { err.textContent = typed.error; return; }
+  save.disabled = true;
+  err.textContent = "Saving…";
+  try {
+    // Read the row again: someone may have filled a blank since this page loaded.
+    // Only what is still blank in the table is written.
+    const cols = DETAIL_FIELDS.map(f => f.col).join(",");
+    const fresh = (await sbGet(`award_records?id=eq.${r.id}&select=id,${cols}`))[0];
+    if (!fresh) throw new Error("This record is no longer in the table.");
+    const patch = {}, added = [];
+    DETAIL_FIELDS.forEach(f => {
+      if (f.col in typed.values && blankVal(fresh[f.col])) { patch[f.col] = typed.values[f.col]; added.push(f.label); }
+    });
+    let row = fresh;
+    if (added.length) {
+      patch.updated_at = new Date().toISOString();
+      const done = await sbSend("PATCH", `award_records?id=eq.${r.id}`, patch);
+      if (!done.length) throw new Error("This record is no longer in the table.");
+      row = done[0];
+      dbLog(r.id, "details added", added.join(", "));
+    }
+    // Take what the table now holds, so the record matches it.
+    DETAIL_FIELDS.forEach(f => {
+      const v = row[f.col];
+      r[f.key] = f.key === "postScore" ? v : (v == null ? "" : String(v));
+    });
+    document.getElementById("awmDetailsModal").classList.remove("open");
+    const cell = document.getElementById("namecell-" + index);
+    if (cell) cell.innerHTML = renderNameCell(index);
+    const skipped = typed.labels.filter(l => added.indexOf(l) === -1);
+    if (!added.length) showToast("Someone already added these details. The latest ones are now shown.", "error");
+    else if (skipped.length) showToast(`Saved. ${skipped.join(", ")} had already been added by someone else and was kept.`);
+    else showToast(missingDetails(r).length ? "Details saved. Some are still missing." : "Details saved.");
+  } catch (e) {
+    console.error("Saving details failed:", e);
+    err.textContent = /no longer/.test(e.message || "") ? e.message : "Could not save. Check your connection and try again.";
+    save.disabled = false;
+  }
+}
+
 function resetDetail(msg) {
   document.getElementById("awmTableBody").innerHTML =
     `<tr><td colspan="11" style="text-align:center;color:#9ca3af;padding:28px;">${msg}</td></tr>`;
@@ -1057,6 +1272,7 @@ window.awmUpdateField = function (index, field, value) {
   currentRecords[index]._dirty = true;
   dirty = true;
   if ((field === "awarded" || field === "awardedDate") && selectedMonth) updateMonthRow(selectedMonth);
+  if (field === "awarded") renderFilterBar();   // the tab counts move; the row itself stays put until the table is drawn again
   refreshRowControls(index);
   updateSaveAllBar();
 };
