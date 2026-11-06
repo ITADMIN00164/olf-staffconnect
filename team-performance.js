@@ -2121,9 +2121,9 @@
       if (directStaff.length === 0 && entry.subs.length > 0) continue;
 
       const divId = getDivId(mgr);
-      let label = mgr.Designation || "Program Manager";
+      let label = mgr.Designation ? mgr.Designation.replace(/\s+Track$/i, "") : "Program Manager";
       if (/div/i.test(mgr.Dept) || /division\s*manager/i.test(mgr.Designation)) {
-        label = "Division Manager Track";
+        label = "Division Manager";
       }
 
       const mgrLeadName = mgr.Name;
@@ -2342,9 +2342,9 @@
 
           directStaff.forEach(s => placedInThisDiv.add(s.id));
 
-          let label = mgr.Designation ? `${mgr.Designation} Track` : "Program Manager Track";
+          let label = mgr.Designation ? mgr.Designation.replace(/\s+Track$/i, "") : "Program Manager";
           if (/division\s*manager/i.test(mgr.Designation)) {
-            label = "Division Manager Track";
+            label = "Division Manager";
           }
 
           let roleId = mgr.id || `pm-${slugify(mgr.Name)}`;
@@ -2381,7 +2381,7 @@
             pmColumns.push({
               pmId: `pm-${divId}-support`,
               roleId: roleId,
-              label: leadForTrack ? `${leadForTrack.Designation || 'Support'} / Interim Support` : "Interim Support Track",
+              label: leadForTrack ? `${leadForTrack.Designation || 'Support'} / Interim Support` : "Interim Support",
               name: leadTrackName,
               designation: leadForTrack ? (leadForTrack.Designation || "Program Operations") : "Program Operations",
               reportingManager: resolveManagerName(leadForTrack, leadName || "Division Manager"),
@@ -2400,7 +2400,7 @@
               pmColumns.push({
                 pmId: pm.id,
                 roleId: roleId,
-                label: pm.Designation || "Program Manager Track",
+                label: pm.Designation ? pm.Designation.replace(/\s+Track$/i, "") : "Program Manager",
                 name: pm.Name,
                 designation: pm.Designation || "Program Manager",
                 reportingManager: resolveManagerName(pm, leadName || "Division Manager"),
@@ -3025,7 +3025,7 @@
                 <div class="tp-card-name">${esc(div.divisionLead || "Interim Lead")}</div>
                 <div class="tp-card-role-label">${esc(div.divisionRole || "Division Manager")}</div>
                 <div class="tp-card-sub">${esc(div.divisionTitle)} &middot; Division Operations</div>
-                <div class="tp-badge-sm-tag">${divPmCount} ${divPmCount === 1 ? 'Program Manager Track' : 'Program Manager Tracks'} &middot; ${divDistCount} ${divDistCount === 1 ? 'District' : 'Districts'} &middot; ${divPoCount} POs</div>
+                <div class="tp-badge-sm-tag">${divPmCount} ${divPmCount === 1 ? 'Program Manager' : 'Program Managers'} &middot; ${divDistCount} ${divDistCount === 1 ? 'District' : 'Districts'} &middot; ${divPoCount} POs</div>
               </div>
             </div>
 
@@ -3119,8 +3119,8 @@
       <div class="tp-pm-col ${isMatched ? "tp-matched" : ""}">
         <div class="tp-card tp-card-pm" id="node-${pm.pmId}">
           <div class="tp-card-header">
-            <span class="tp-tag tp-tag-blue">${esc(pm.label || "Program Manager")}</span>
-            <button type="button" class="tp-card-details-btn" onclick="window.TeamPerformance.openModal('${pm.roleId || pm.pmId}', '${esc(pm.label || "Program Manager")}', '${esc(pm.name)}', '${esc(pmMgr)}')">Details &rarr;</button>
+            <span class="tp-tag tp-tag-blue">${esc((pm.label || "Program Manager").replace(/\s+Track$/i, ""))}</span>
+            <button type="button" class="tp-card-details-btn" onclick="window.TeamPerformance.openModal('${pm.roleId || pm.pmId}', '${esc((pm.label || "Program Manager").replace(/\s+Track$/i, ""))}', '${esc(pm.name)}', '${esc(pmMgr)}')">Details &rarr;</button>
           </div>
           <div class="tp-card-name">${esc(pm.name)}</div>
           <div class="tp-card-role-label">${esc(pm.designation || pm.label || "Program Manager")}</div>
@@ -3191,17 +3191,17 @@
       const sl = tree.chRoot;
       const activeDivName = (tree.chDivisions || []).find(d => expandedDivisions.has(d.divisionId))?.divisionTitle;
       const expStatus = activeDivName ? `${activeDivName} Active` : "All Collapsed";
-      badge.textContent = `Chhattisgarh · ${sl ? sl.divisionsCount : 5} Divisions (${expStatus}) · ${sl ? sl.pmsCount : 10} PM Tracks · ${sl ? sl.districtsCount : 16} Districts · ${sl ? sl.posCount : 24} POs (${sl ? sl.activeStaffCount : 29} Staff)`;
+      badge.textContent = `Chhattisgarh · ${sl ? sl.divisionsCount : 5} Divisions (${expStatus}) · ${sl ? sl.pmsCount : 10} PMs · ${sl ? sl.districtsCount : 16} Districts · ${sl ? sl.posCount : 24} POs (${sl ? sl.activeStaffCount : 29} Staff)`;
     } else if (activeState === "MP") {
       const sl = tree.mpRoot;
       const activeDivName = (tree.mpDivisions || []).find(d => expandedDivisions.has(d.divisionId))?.divisionTitle;
       const expStatus = activeDivName ? `${activeDivName} Active` : "All Collapsed";
-      badge.textContent = `Madhya Pradesh · ${sl ? sl.divisionsCount : 1} Division (${expStatus}) · ${sl ? sl.pmsCount : 1} PM Track · ${sl ? sl.districtsCount : 2} Districts · ${sl ? sl.posCount : 4} POs (${sl ? sl.activeStaffCount : 5} Staff)`;
+      badge.textContent = `Madhya Pradesh · ${sl ? sl.divisionsCount : 1} Division (${expStatus}) · ${sl ? sl.pmsCount : 1} PM · ${sl ? sl.districtsCount : 2} Districts · ${sl ? sl.posCount : 4} POs (${sl ? sl.activeStaffCount : 5} Staff)`;
     } else if (activeState === "BR") {
       const sl = tree.brRoot;
       const activeDivName = (tree.brDivisions || []).find(d => expandedDivisions.has(d.divisionId))?.divisionTitle;
       const expStatus = activeDivName ? `${activeDivName} Active` : "All Collapsed";
-      badge.textContent = `Bihar · ${sl ? sl.divisionsCount : 1} Division (${expStatus}) · ${sl ? sl.pmsCount : 1} Track · ${sl ? sl.districtsCount : 1} District · ${sl ? sl.posCount : 4} POs (${sl ? sl.activeStaffCount : 4} Staff)`;
+      badge.textContent = `Bihar · ${sl ? sl.divisionsCount : 1} Division (${expStatus}) · ${sl ? sl.pmsCount : 1} PM · ${sl ? sl.districtsCount : 1} District · ${sl ? sl.posCount : 4} POs (${sl ? sl.activeStaffCount : 4} Staff)`;
     }
   }
 
@@ -3472,7 +3472,7 @@
     personName = personName.replace(/\s*·\s*\d+\s*(?:districts?|zones?|staff|pos?).*$/i, "").trim();
 
     // 2. Resolve Role
-    let roleName = fallbackLevel || roleData.level || (emp ? emp.Designation : null) || roleData.designation || "Role";
+    let roleName = (fallbackLevel || roleData.level || (emp ? emp.Designation : null) || roleData.designation || "Role").replace(/\s+Track$/i, "").trim();
     if (cleanId === "statelead") {
       roleName = "State Lead";
     } else if (cleanId === "dm-pune") {
