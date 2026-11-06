@@ -1054,7 +1054,8 @@ function renderTable() {
 // (Awarded, Date, Image, Description) or its verification.
 // ===============================
 const DETAIL_FIELDS = [
-  { key: "mobile",     col: "mobile",      label: "Mobile number", type: "tel",   ph: "10-digit mobile" },
+  { key: "fullName",   col: "full_name",   label: "Full Name" },
+  { key: "mobile",    col: "mobile",      label: "Mobile number", type: "tel",   ph: "10-digit mobile" },
   { key: "email",      col: "email",       label: "Email",         type: "email", ph: "name@example.com" },
   { key: "schoolName", col: "school_name", label: "School name" },
   { key: "circleName", col: "circle_name", label: "Circle name" },
@@ -1066,6 +1067,7 @@ const DETAIL_FIELDS = [
 const AWM_ADMIN_EMAIL = "itadmin@openlinksfoundation.org";
 
 function isPostAward(r) { return /\bPOM\b/i.test(r.awardCategory || ""); }
+function isClusterAward(r) { return /^top clusters?$/i.test(String(r.awardCategory || "").trim()); }
 function blankVal(v) { return v === null || v === undefined || String(v).trim() === ""; }
 function detailFieldsFor(r) { return DETAIL_FIELDS.filter(f => !f.postOnly || isPostAward(r)); }
 function missingDetails(r) { return detailFieldsFor(r).filter(f => blankVal(r[f.key])); }
@@ -1076,16 +1078,23 @@ function canAddDetails() {
 
 function renderNameCell(index) {
   const r = currentRecords[index];
-  const sub = `${esc(r.mobile || "")}${r.mobile && r.schoolName ? " · " : ""}${esc(r.schoolName || "")}`;
+  // Under the name: a teacher's mobile and school; for Top Clusters, the cluster head's mobile,
+  // cluster (Circle name) and block, since a cluster award is for the cluster, not a school.
+  const parts = isClusterAward(r) ? [r.mobile, r.circleName, r.blockName] : [r.mobile, r.schoolName];
+  const sub = parts.filter(v => !blankVal(v)).map(esc).join(" · ");
   const miss = missingDetails(r);
   let note = "";
   if (miss.length) {
-    const tip = esc("Missing: " + miss.map(f => f.label).join(", "));
+    // A small "!" beside the name; the full list of what is missing shows on hover.
+    // Red when the person cannot be identified or reached (no Full Name or no Mobile number), yellow otherwise.
+    const red = blankVal(r.fullName) || blankVal(r.mobile);
+    const list = "Some details are missing: " + miss.map(f => f.label).join(", ");
     note = canAddDetails()
-      ? `<button type="button" class="nc-missing" title="${tip}" onclick="awmAddDetails(${index})">Some details are missing – click here to add</button>`
-      : `<div class="nc-missing is-static" title="${tip}">Some details are missing</div>`;
+      ? `<button type="button" class="nc-missing${red ? " is-red" : ""}" title="${esc(list + " – click to add")}" aria-label="${esc(list + " – click to add")}" onclick="event.stopPropagation();awmAddDetails(${index})">!</button>`
+      : `<span class="nc-missing is-static${red ? " is-red" : ""}" title="${esc(list)}" aria-label="${esc(list)}">!</span>`;
   }
-  return `<div class="nc-name">${esc(r.fullName || "")}</div>${sub ? `<div class="nc-sub">${sub}</div>` : ""}${note}`;
+  const name = blankVal(r.fullName) ? `<span class="nc-noname">Name not given</span>` : esc(r.fullName);
+  return `<div class="nc-name">${name}${note}</div>${sub ? `<div class="nc-sub">${sub}</div>` : ""}`;
 }
 
 function ensureDetailsModal() {
