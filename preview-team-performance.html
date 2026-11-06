@@ -50,9 +50,9 @@
   <script src="historical-internal-data.js?v=20261106a"></script>
   <script src="historical-module.js?v=20261106e"></script>
   <script src="weekly-ops-data.js?v=20261106f"></script>
-  <script src="weekly-ops-module.js?v=20261106i"></script>
+  <script src="weekly-ops-module.js?v=20261106r"></script>
   <script src="team-performance-data.js?v=20261106a"></script>
-  <script src="team-performance.js?v=20261106q"></script>
+  <script src="team-performance.js?v=20261106r"></script>
   <script>
     function simulateRole(val) {
       if (val === 'admin') {
@@ -93,7 +93,7 @@
     // Default simulation = Regular User (View-Only)
     simulateRole('user');
 
-    fetch('pages/team-performance.html?v=20261106q')
+    fetch('pages/team-performance.html?v=20261106r')
       .then(res => res.text())
       .then(html => {
         document.getElementById('pageContent').innerHTML = html;
