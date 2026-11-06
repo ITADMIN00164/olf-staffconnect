@@ -2665,26 +2665,39 @@
       border: 1px solid #CBD5E1;
       border-radius: 8px;
       padding: 0 8px;
-      transition: border-color 0.15s ease;
+      transition: all 0.15s ease;
     }
-    .tp-hist-select-wrap:focus-within {
-      border-color: #0284C7;
-      box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
+    .tp-hist-select-wrap:hover {
+      border-color: #94A3B8;
+    }
+    .tp-hist-select-wrap:focus-within,
+    .tp-hist-select-wrap.olf-sel-open-wrap,
+    .tp-hist-select-wrap:has(select.olf-sel-open) {
+      border-color: #0284C7 !important;
+      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.2) !important;
     }
     .tp-hist-select-icon {
       font-size: 13px;
       margin-right: 4px;
+      user-select: none;
     }
     .tp-hist-select-input {
-      border: none;
-      background: transparent;
+      border: none !important;
+      background: transparent !important;
       padding: 6px 4px;
       font-size: 12px;
       font-weight: 600;
       color: #334155;
-      outline: none;
+      outline: none !important;
+      box-shadow: none !important;
       cursor: pointer;
       max-width: 160px;
+    }
+    .tp-hist-select-wrap select.olf-sel-open,
+    .tp-hist-select-wrap select:focus {
+      border: none !important;
+      box-shadow: none !important;
+      outline: none !important;
     }
     .tp-hist-search-wrap {
       display: inline-flex;
@@ -3422,6 +3435,74 @@
     html[data-theme="dark"] .tp-wops-form-group textarea:focus {
       border-color: #38BDF8 !important;
       box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2) !important;
+    }
+
+    /* Historical Data Filters — Dark Mode Refinements */
+    html[data-theme="dark"] .tp-hist-filter-strip {
+      background: #0F172A !important;
+      border-color: #1E293B !important;
+    }
+    html[data-theme="dark"] .tp-hist-filter-title {
+      color: #94A3B8 !important;
+    }
+    html[data-theme="dark"] .tp-hist-pill-opt {
+      background: #1E293B !important;
+      border-color: #334155 !important;
+      color: #94A3B8 !important;
+    }
+    html[data-theme="dark"] .tp-hist-pill-opt:hover {
+      background: #334155 !important;
+      color: #F8FAFC !important;
+    }
+    html[data-theme="dark"] .tp-hist-pill-opt.active {
+      background: #0284C7 !important;
+      border-color: #38BDF8 !important;
+      color: #FFFFFF !important;
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.4) !important;
+    }
+    html[data-theme="dark"] .tp-hist-filter-divider {
+      background: #334155 !important;
+    }
+    html[data-theme="dark"] .tp-hist-select-wrap {
+      background: #1E293B !important;
+      border-color: #334155 !important;
+      color: #F8FAFC !important;
+    }
+    html[data-theme="dark"] .tp-hist-select-wrap:hover {
+      border-color: #475569 !important;
+    }
+    html[data-theme="dark"] .tp-hist-select-input {
+      color: #F8FAFC !important;
+      background: transparent !important;
+    }
+    html[data-theme="dark"] .tp-hist-select-wrap:focus-within,
+    html[data-theme="dark"] .tp-hist-select-wrap.olf-sel-open-wrap,
+    html[data-theme="dark"] .tp-hist-select-wrap:has(select.olf-sel-open) {
+      border-color: #38BDF8 !important;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.28) !important;
+    }
+    html[data-theme="dark"] .tp-hist-search-wrap {
+      background: #1E293B !important;
+      border-color: #334155 !important;
+    }
+    html[data-theme="dark"] .tp-hist-search-wrap:focus-within {
+      border-color: #38BDF8 !important;
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.28) !important;
+    }
+    html[data-theme="dark"] .tp-hist-search-field {
+      color: #F8FAFC !important;
+    }
+    html[data-theme="dark"] .tp-hist-search-field::placeholder {
+      color: #64748B !important;
+    }
+    html[data-theme="dark"] .tp-hist-btn-reset-all {
+      background: #1E293B !important;
+      border-color: #334155 !important;
+      color: #94A3B8 !important;
+    }
+    html[data-theme="dark"] .tp-hist-btn-reset-all:hover {
+      background: #334155 !important;
+      color: #F8FAFC !important;
     }
 
   </style>
