@@ -894,6 +894,9 @@
     .tp-pos-list {
       display: flex;
       flex-direction: column;
+      padding: 6px 10px 8px 0;
+      background: #F8FAFC;
+      border-top: 1px solid #E2E8F0;
     }
     .tp-po-row {
       display: flex;
@@ -902,42 +905,25 @@
       gap: 8px;
       font-size: 12px;
       color: var(--tp-ink);
-      border-bottom: 1px solid #F1F5F9;
-      border-left: 3px solid transparent;
-      padding: 7px 10px;
-      border-radius: 6px;
+      border-bottom: 1px solid #E2E8F0;
+      border-left: 2px solid #CBD5E1;
+      padding: 7px 10px 7px 12px;
+      margin-left: 18px;
+      margin-bottom: 4px;
+      border-radius: 0 6px 6px 0;
+      background: #FFFFFF;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
       transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .tp-po-row:last-child {
-      border-bottom: none;
+      margin-bottom: 0;
     }
     .tp-po-row:hover {
-      background: #F0F9FF;
-      border-left-color: #0284C7;
-      transform: translateX(3px);
-      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.08);
-      color: var(--tp-brand-dark);
-    }
-    /* Demo: Indented PO layout under District header (Solapur demo) */
-    .tp-district-demo .tp-pos-list {
-      padding: 6px 10px 8px 0;
-      background: #F8FAFC;
-      border-top: 1px solid #E2E8F0;
-    }
-    .tp-district-demo .tp-po-row {
-      margin-left: 18px;
-      padding: 7px 10px 7px 12px;
-      border-left: 2px solid #CBD5E1;
-      border-radius: 0 6px 6px 0;
-      background: #FFFFFF;
-      margin-bottom: 4px;
-      border-bottom: 1px solid #E2E8F0;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-    }
-    .tp-district-demo .tp-po-row:hover {
-      border-left-color: #2563EB;
       background: #EFF6FF;
+      border-left-color: #2563EB;
       transform: translateX(3px);
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
+      color: var(--tp-brand-dark);
     }
     .tp-po-info {
       display: flex;

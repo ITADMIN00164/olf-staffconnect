@@ -3138,9 +3138,8 @@
   function renderDistrictCard(dst, pmName) {
     const isMatched = searchQuery && (matchesQuery(dst.name, dst.roleId, dst.reportingManager) || dst.pos.some(p => matchesQuery(p.cleanName || p.name, p.roleId, p.designation, p.reportingManager)));
     const dstMgr = dst.reportingManager || pmName || "Program Manager";
-    const isSolapur = (dst.name || "").trim().toLowerCase() === "solapur";
     return `
-      <div class="tp-district-card ${isMatched ? "tp-matched" : ""} ${isSolapur ? "tp-district-demo" : ""}" id="node-${dst.cardId}">
+      <div class="tp-district-card ${isMatched ? "tp-matched" : ""}" id="node-${dst.cardId}">
         <div class="tp-district-header">
           <div class="tp-dist-pip"></div>
           <div class="tp-dist-title-box">
