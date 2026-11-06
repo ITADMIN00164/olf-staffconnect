@@ -34,8 +34,10 @@
     <div style="display:flex; align-items:center; gap:12px;">
       <span style="color:#94A3B8; font-size:11px;">RBAC Simulator:</span>
       <select id="previewRoleSelect" onchange="simulateRole(this.value)" style="background:#0F172A; color:#F8FAFC; border:1px solid #334155; border-radius:6px; padding:3px 8px; font-size:12px; cursor:pointer;">
-        <option value="user" selected>👤 Regular User (Strictly View-Only)</option>
-        <option value="admin">👑 IT Admin (Default Editor + Manage Editors)</option>
+        <option value="user" selected>👤 Regular Staff (Strictly View-Only)</option>
+        <option value="admin">👑 IT Admin (Can edit ALL plans)</option>
+        <option value="bharat">👤 Bharat (PM - Can edit Bharat's plans)</option>
+        <option value="shubham">👤 Shubham (PM - Can edit Shubham's plans)</option>
         <option value="vishvajit">👤 Vishvajit Pawar (View-Only by default)</option>
       </select>
       <a href="index.html">&larr; Open Full StaffConnect App</a>
@@ -43,15 +45,21 @@
   </div>
   <div id="pageContent"></div>
 
-  <script src="historical-data.js?v=20261105p"></script>
-  <script src="historical-internal-data.js?v=20261105p"></script>
-  <script src="historical-module.js?v=20261105p"></script>
-  <script src="team-performance-data.js?v=20261105p"></script>
-  <script src="team-performance.js?v=20261105p"></script>
+  <script src="historical-data.js?v=20261106a"></script>
+  <script src="historical-internal-data.js?v=20261106a"></script>
+  <script src="historical-module.js?v=20261106e"></script>
+  <script src="weekly-ops-data.js?v=20261106f"></script>
+  <script src="weekly-ops-module.js?v=20261106i"></script>
+  <script src="team-performance-data.js?v=20261106a"></script>
+  <script src="team-performance.js?v=20261106f"></script>
   <script>
     function simulateRole(val) {
       if (val === 'admin') {
         window.__olfUser = { email: 'admin@openlinksfoundation.org', displayName: 'IT Admin', role: 'Admin' };
+      } else if (val === 'bharat') {
+        window.__olfUser = { email: 'bharat@openlinksfoundation.org', displayName: 'Bharat', role: 'User' };
+      } else if (val === 'shubham') {
+        window.__olfUser = { email: 'shubham@openlinksfoundation.org', displayName: 'Shubham', role: 'User' };
       } else if (val === 'vishvajit') {
         window.__olfUser = { email: 'vishvajit@openlinksfoundation.org', displayName: 'Vishvajit Pawar', role: 'User' };
       } else {
@@ -63,6 +71,9 @@
       }
       if (window.HistoricalModule && typeof window.HistoricalModule.init === 'function') {
         window.HistoricalModule.init();
+      }
+      if (window.WeeklyOpsModule && typeof window.WeeklyOpsModule.init === 'function') {
+        window.WeeklyOpsModule.init();
       }
     }
 
