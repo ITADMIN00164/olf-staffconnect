@@ -4410,27 +4410,36 @@
   function switchView(viewName) {
     activeView = viewName;
     const isSmart = viewName === "smart-goals";
+    const isProgress = viewName === "progress";
     const isHist = viewName === "historical" || viewName === "internal" || viewName === "external";
     const isWeeklyOps = viewName === "weekly-ops";
 
     const smartView = document.getElementById("tpSmartGoalsView");
+    const progView = document.getElementById("tpProgressView");
     const histView = document.getElementById("tpHistoricalView");
     const opsView = document.getElementById("tpWeeklyOpsView");
 
     const smartTabBtn = document.getElementById("tpViewTabSmartGoals");
+    const progTabBtn = document.getElementById("tpViewTabProgress");
     const histTabBtn = document.getElementById("tpViewTabHistorical");
     const opsTabBtn = document.getElementById("tpViewTabWeeklyOps");
 
     if (smartView) smartView.style.display = isSmart ? "block" : "none";
+    if (progView) progView.style.display = isProgress ? "block" : "none";
     if (histView) histView.style.display = isHist ? "block" : "none";
     if (opsView) opsView.style.display = isWeeklyOps ? "block" : "none";
 
     if (smartTabBtn) smartTabBtn.classList.toggle("active", isSmart);
+    if (progTabBtn) progTabBtn.classList.toggle("active", isProgress);
     if (histTabBtn) histTabBtn.classList.toggle("active", isHist);
     if (opsTabBtn) opsTabBtn.classList.toggle("active", isWeeklyOps);
 
     if (isSmart) {
       scheduleConnectorUpdate();
+    } else if (isProgress) {
+      if (window.ProgressModule && typeof window.ProgressModule.init === 'function') {
+        window.ProgressModule.init();
+      }
     } else if (isHist) {
       const ds = (viewName === 'internal') ? 'internal' : 'external';
       if (window.HistoricalModule) {
@@ -4458,6 +4467,12 @@
       const edModal = document.getElementById("tpEditorsModal");
       if (edModal && edModal.style.display === "flex") {
         closeEditorsModal();
+      }
+      const progModal = document.getElementById("tpProgModal");
+      if (progModal && progModal.style.display !== "none") {
+        if (window.ProgressModule && typeof window.ProgressModule.closeModal === "function") {
+          window.ProgressModule.closeModal();
+        }
       }
     }
   });
@@ -4511,6 +4526,9 @@
     tableDelCol,
     addTableToAnnexure,
     addNoteToAnnexure,
+    // Progress Module helpers
+    getStaffList: () => liveEmployees,
+    getTree: () => dynamicTree || window.TEAM_PERFORMANCE_TREE,
     // Reset
     resetDefaultAll
   };
