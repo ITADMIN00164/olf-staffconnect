@@ -2147,28 +2147,31 @@
       padding: 4px;
       border-radius: 12px;
       gap: 4px;
+      border: 1px solid #CBD5E1;
     }
     .tp-hist-source-btn {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      padding: 8px 18px;
+      padding: 7px 16px;
       font-size: 13px;
       font-weight: 700;
-      color: #475569;
+      color: #64748B;
       background: transparent;
-      border: none;
+      border: 1px solid transparent;
       border-radius: 9px;
       cursor: pointer;
       transition: all 0.15s ease;
     }
-    .tp-hist-source-btn:hover {
+    .tp-hist-source-btn:hover:not(.active) {
       color: #0F172A;
+      background: rgba(255, 255, 255, 0.5);
     }
     .tp-hist-source-btn.active {
       background: #FFFFFF;
-      color: #0F172A;
-      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+      color: #0284C7;
+      border-color: #BAE6FD;
+      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.15);
     }
     .tp-hist-source-btn.active .tp-hist-source-badge {
       background: #0284C7;
@@ -3503,6 +3506,55 @@
     html[data-theme="dark"] .tp-hist-btn-reset-all:hover {
       background: #334155 !important;
       color: #F8FAFC !important;
+    }
+
+    /* Historical Data Source Switcher (External vs Internal Data) — Dark Mode */
+    html[data-theme="dark"] .tp-hist-source-switcher {
+      background: #0B1120 !important;
+      border: 1px solid #334155 !important;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4) !important;
+    }
+    html[data-theme="dark"] .tp-hist-source-btn {
+      color: #94A3B8 !important;
+      background: transparent !important;
+      border: 1px solid transparent !important;
+    }
+    html[data-theme="dark"] .tp-hist-source-btn:hover:not(.active) {
+      color: #F8FAFC !important;
+      background: rgba(255, 255, 255, 0.06) !important;
+    }
+    html[data-theme="dark"] .tp-hist-source-btn.active {
+      background: #0284C7 !important;
+      color: #FFFFFF !important;
+      border: 1px solid #38BDF8 !important;
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.45) !important;
+      font-weight: 800 !important;
+    }
+    html[data-theme="dark"] .tp-hist-source-btn.active span {
+      color: #FFFFFF !important;
+    }
+
+    /* Mode Switcher (Executive Analytics vs Raw Sheet Grid) — Dark Mode */
+    html[data-theme="dark"] .tp-hist-mode-switcher {
+      background: #0B1120 !important;
+      border: 1px solid #334155 !important;
+      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4) !important;
+    }
+    html[data-theme="dark"] .tp-hist-mode-btn {
+      color: #94A3B8 !important;
+      background: transparent !important;
+      border: 1px solid transparent !important;
+    }
+    html[data-theme="dark"] .tp-hist-mode-btn:hover:not(.active) {
+      color: #F8FAFC !important;
+      background: rgba(255, 255, 255, 0.06) !important;
+    }
+    html[data-theme="dark"] .tp-hist-mode-btn.active {
+      background: #0284C7 !important;
+      color: #FFFFFF !important;
+      border: 1px solid #38BDF8 !important;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.35) !important;
+      font-weight: 800 !important;
     }
 
   </style>
