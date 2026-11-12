@@ -10,7 +10,7 @@
 
   // State
   let state = {
-    activeState: 'MH',    // Default: Maharashtra
+    activeState: 'MH',     // Default: Maharashtra
     activeMonth: '202610', // Default: October 2026
     searchQuery: '',
     isLoading: false,
@@ -614,6 +614,7 @@
     const sl = stateData.sl || {
       roleId: "statelead",
       name: "Vishvajit G Pawar",
+      designation: "State Lead",
       title: "State Lead — Maharashtra",
       reportingManager: "Prashant Patil"
     };
@@ -625,6 +626,7 @@
       Location: stateData.label
     };
     const slEval = evaluateEmployee(slStaff);
+    const slMgr = sl.reportingManager || "Prashant Patil";
 
     const distTotal = sl.districtsCount != null ? sl.districtsCount : divisions.reduce((a, c) => a + c.pmColumns.reduce((pa, p) => pa + p.districts.length, 0), 0);
     const poTotal = sl.posCount != null ? sl.posCount : divisions.reduce((a, c) => a + c.pmColumns.reduce((pa, p) => pa + p.districts.reduce((da, d) => da + d.pos.length, 0), 0), 0);
@@ -637,7 +639,7 @@
         <div class="tp-card tp-card-root" id="prog-node-statelead">
           <div class="tp-card-header">
             <span class="tp-tag tp-tag-gold">${esc(stateData.tag)}</span>
-            <button type="button" class="tp-card-details-btn" onclick="window.ProgressModule.openModal('${slStaff.id}')">Details &rarr;</button>
+            <button type="button" class="tp-card-details-btn" onclick="window.ProgressModule.openModal('${slStaff.id}', '${esc(sl.designation || 'State Lead')}', '${esc(sl.name || 'State Lead')}', '${esc(slMgr)}')">Details &rarr;</button>
           </div>
           <div class="tp-card-name">${esc(sl.name || 'State Lead')}</div>
           <div class="tp-card-role-label">${esc(sl.designation || sl.title || 'State Lead')}</div>
@@ -707,6 +709,7 @@
           Location: div.divisionTitle
         };
         const dmEval = evaluateEmployee(dmStaff);
+        const dmMgr = div.reportingManager || sl.name || "State Lead";
 
         html += `
           <div class="tp-division-expanded-panel" id="prog-divpanel-${divId}">
@@ -725,7 +728,7 @@
               <div class="tp-card tp-card-dm ${isInterim ? 'tp-card-interim' : ''}" id="prog-node-dm-${divId}">
                 <div class="tp-card-header">
                   <span class="tp-tag ${isInterim ? 'tp-tag-gray' : 'tp-tag-purple'}">${isInterim ? 'Interim DM' : esc(div.divisionRole || 'Division Manager')}</span>
-                  <button type="button" class="tp-card-details-btn" onclick="window.ProgressModule.openModal('${dmStaff.id}')">Details &rarr;</button>
+                  <button type="button" class="tp-card-details-btn" onclick="window.ProgressModule.openModal('${dmStaff.id}', '${esc(div.divisionRole || 'Division Manager')}', '${esc(div.divisionLead || 'Division Manager')}', '${esc(dmMgr)}')">Details &rarr;</button>
                 </div>
                 <div class="tp-card-name">${esc(div.divisionLead || 'Interim Lead')}</div>
                 <div class="tp-card-role-label">${esc(div.divisionRole || 'Division Manager')}</div>
@@ -778,7 +781,7 @@
         <div class="tp-card tp-card-pm" id="prog-node-pm-${pm.pmId}">
           <div class="tp-card-header">
             <span class="tp-tag tp-tag-blue">${esc((pm.label || "Program Manager").replace(/\s+Track$/i, ""))}</span>
-            <button type="button" class="tp-card-details-btn" onclick="window.ProgressModule.openModal('${pmStaff.id}')">Details &rarr;</button>
+            <button type="button" class="tp-card-details-btn" onclick="window.ProgressModule.openModal('${pmStaff.id}', '${esc(pm.designation || pm.label || 'Program Manager')}', '${esc(pm.name)}', '${esc(pmMgr)}')">Details &rarr;</button>
           </div>
           <div class="tp-card-name">${esc(pm.name)}</div>
           <div class="tp-card-role-label">${esc(pm.designation || pm.label || "Program Manager")}</div>
@@ -812,7 +815,7 @@
             <span class="tp-dist-title">${esc(dst.name)}</span>
             <span class="tp-dist-mgr"><span class="tp-mgr-k">Mgr:</span> <span class="tp-mgr-v">${esc(dstMgr)}</span></span>
           </div>
-          <button type="button" class="tp-row-details-btn" onclick="window.ProgressModule.openModal('${dst.roleId}')">Details &rarr;</button>
+          <button type="button" class="tp-row-details-btn" onclick="window.ProgressModule.openModal('${dst.roleId}', 'District Operations', '${esc(dst.name)}', '${esc(dstMgr)}')">Details &rarr;</button>
         </div>
         <div class="tp-pos-list">
           ${(dst.pos || []).map(po => {
@@ -828,7 +831,7 @@
             const poMatched = q && (poCleanName.toLowerCase().includes(q) || (po.designation || '').toLowerCase().includes(q));
 
             return `
-              <div class="tp-po-row ${poMatched ? 'tp-matched-row' : ''}" style="cursor:pointer;" onclick="window.ProgressModule.openModal('${poStaff.id}')">
+              <div class="tp-po-row ${poMatched ? 'tp-matched-row' : ''}" style="cursor:pointer;" onclick="window.ProgressModule.openModal('${poStaff.id}', '${esc(po.designation || 'Project Officer')}', '${esc(poCleanName || po.name)}', '${esc(poMgr)}')">
                 <div class="tp-po-info">
                   <span class="tp-po-dot"></span>
                   <div class="tp-po-text-wrap">
@@ -840,7 +843,7 @@
                   <span class="tp-prog-pill ${poEval.statusClass}" style="font-size:10px; padding:2px 6px;">${poEval.statusLabel}</span>
                   <span class="tp-prog-score" style="font-size:10px;">${poEval.scoreLabel}</span>
                 </div>
-                <button type="button" class="tp-row-details-btn" onclick="event.stopPropagation(); window.ProgressModule.openModal('${poStaff.id}')">Details &rarr;</button>
+                <button type="button" class="tp-row-details-btn" onclick="event.stopPropagation(); window.ProgressModule.openModal('${poStaff.id}', '${esc(po.designation || 'Project Officer')}', '${esc(poCleanName || po.name)}', '${esc(poMgr)}')">Details &rarr;</button>
               </div>
             `;
           }).join("")}
@@ -949,42 +952,77 @@
   }
 
   // --- Open Detailed Field Review Modal ---
-  function openModal(empId) {
+  function openModal(empId, fallbackRole, fallbackName, fallbackMgr) {
+    const modal = document.getElementById('tpProgModal');
+    if (!modal) return;
+
+    // Check if this is a district overview click
+    const isDistrict = String(empId).startsWith('d-') || fallbackRole === 'District Operations';
+    if (isDistrict) {
+      renderDistrictModal(empId, fallbackName, fallbackMgr);
+    } else {
+      renderStaffModal(empId, fallbackRole, fallbackName, fallbackMgr);
+    }
+
+    modal.style.display = 'flex';
+    void modal.offsetWidth; // Force layout flush so transition fires cleanly
+    modal.classList.add('open');
+  }
+
+  function renderStaffModal(empId, fallbackRole, fallbackName, fallbackMgr) {
+    const modal = document.getElementById('tpProgModal');
+    if (!modal) return;
+
+    let staff = null;
     const staffList = getStaffList();
-    const staff = staffList.find(s => s.id === empId || s.Email === empId) || findStaffByNameOrId(null, empId) || {
-      id: empId,
-      Name: "Staff Member",
-      Designation: "Field Staff",
-      Location: "Field"
-    };
+    if (empId) {
+      staff = staffList.find(s => s.id === empId || s.Email === empId);
+    }
+    if (!staff && fallbackName) {
+      staff = findStaffByNameOrId(fallbackName, empId);
+    }
+    if (!staff && empId) {
+      staff = findStaffByNameOrId(null, empId);
+    }
+    if (!staff) {
+      staff = {
+        id: empId || 'staff',
+        Name: fallbackName || 'Staff Member',
+        Designation: fallbackRole || 'Field Staff',
+        Location: 'Field'
+      };
+    }
 
     const evalRes = evaluateEmployee(staff);
     state.selectedEmp = { staff, evalRes };
 
-    const modal = document.getElementById('tpProgModal');
-    if (!modal) return;
+    const mgrName = fallbackMgr || staff.Reporting_manager || staff['Reporting manager'] || 'Reporting Manager';
 
     let modalBody = '';
     const d = evalRes.details;
 
     if (!evalRes.isAssigned) {
       modalBody = `
-        <div class="tp-prog-modal-notice" style="text-align:center; padding:24px 16px;">
-          <div class="tp-prog-notice-ico" style="font-size:36px; margin-bottom:8px;">📋</div>
-          <h4 style="font-size:16px; font-weight:800; color:var(--tp-ink, #0F172A); margin-bottom:8px;">Option 1 Notice: Pending Field Assignment</h4>
-          <p style="font-size:13px; color:var(--tp-ink-muted, #64748B); max-width:500px; margin:0 auto; line-height:1.5;">${esc(evalRes.managerRemark || 'This employee is active in SMART GOALS roster, but does not yet have an active assignment registered in the Field Review System.')}</p>
+        <div class="tp-prog-modal-notice" style="text-align:center; padding:32px 20px;">
+          <div class="tp-prog-notice-ico" style="font-size:42px; margin-bottom:12px;">📋</div>
+          <h4 style="font-size:17px; font-weight:800; color:var(--tp-ink, #0F172A); margin-bottom:8px;">Pending Field Assignment</h4>
+          <p style="font-size:13.5px; color:var(--tp-ink-muted, #64748B); max-width:520px; margin:0 auto; line-height:1.55;">
+            ${esc(evalRes.managerRemark || 'This staff member is active on the SMART GOALS roster, but does not yet have an active district assignment registered in the Field Review System.')}
+          </p>
         </div>
       `;
     } else if (!d) {
       modalBody = `
-        <div class="tp-prog-modal-notice" style="text-align:center; padding:24px 16px;">
-          <div class="tp-prog-notice-ico" style="font-size:36px; margin-bottom:8px;">○</div>
-          <h4 style="font-size:16px; font-weight:800; color:var(--tp-ink, #0F172A); margin-bottom:8px;">Review Pending for ${formatMonthLabel(state.activeMonth)}</h4>
-          <p style="font-size:13px; color:var(--tp-ink-muted, #64748B); max-width:500px; margin:0 auto; line-height:1.5;">No monthly review data has been submitted for this staff member in ${formatMonthLabel(state.activeMonth)} yet.</p>
+        <div class="tp-prog-modal-notice" style="text-align:center; padding:32px 20px;">
+          <div class="tp-prog-notice-ico" style="font-size:42px; margin-bottom:12px;">○</div>
+          <h4 style="font-size:17px; font-weight:800; color:var(--tp-ink, #0F172A); margin-bottom:8px;">Review Pending for ${formatMonthLabel(state.activeMonth)}</h4>
+          <p style="font-size:13.5px; color:var(--tp-ink-muted, #64748B); max-width:520px; margin:0 auto; line-height:1.55;">
+            Monthly field review responses have not been submitted for this staff member in ${formatMonthLabel(state.activeMonth)} yet.
+          </p>
         </div>
       `;
     } else {
-      // Build Sections
+      // Build Sections H, B, G, A, M
       const A = d.A || {};
       const B = d.B || {};
       const G = d.G || {};
@@ -1043,8 +1081,8 @@
             </div>
             <div class="tp-prog-sec-body">
               <div class="tp-prog-mgr-grid">
-                <div><strong>Manager Status Rating:</strong> <span class="tp-badge">${esc(H.H2 || 'Not recorded')}</span></div>
-                <div><strong>Manager Reviewer:</strong> ${esc(staff.Reporting_manager || staff['Reporting manager'] || 'Manager')}</div>
+                <div><strong>Manager Status Rating:</strong> <span class="tp-badge" style="background:#0284C7; color:#fff; font-weight:700;">${esc(H.H2 || 'Not recorded')}</span></div>
+                <div><strong>Reporting Manager:</strong> <strong>${esc(mgrName)}</strong></div>
               </div>
               ${H.H3 ? `<div class="tp-prog-mgr-remark"><strong>Manager Feedback &amp; Remarks:</strong><p>${esc(H.H3)}</p></div>` : ''}
             </div>
@@ -1085,33 +1123,123 @@
     }
 
     modal.innerHTML = `
-      <div class="tp-modal-dialog tp-prog-modal-dialog" role="dialog" aria-modal="true">
-        <div class="tp-modal-header">
+      <div class="tp-modal-dialog tp-prog-modal-dialog" role="dialog" aria-modal="true" style="background:var(--tp-surface, #fff); border-radius:16px; overflow:hidden;">
+        <div class="tp-modal-header" style="padding:18px 24px; border-bottom:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:flex-start;">
           <div class="tp-modal-title-wrap">
-            <h3 class="tp-modal-title">${esc(staff.Name)}</h3>
-            <div class="tp-modal-role-row">
-              <span class="tp-modal-badge">${esc(staff.Designation || 'Field Staff')}</span>
+            <h3 class="tp-modal-title" style="margin:0 0 4px; font-size:19px; font-weight:800; color:var(--tp-ink, #0F172A);">${esc(staff.Name)}</h3>
+            <div class="tp-modal-role-row" style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+              <span class="tp-modal-badge" style="background:#F1F5F9; color:#475569; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">${esc(staff.Designation || fallbackRole || 'Field Staff')}</span>
               <span class="tp-prog-pill ${evalRes.statusClass}">${evalRes.statusLabel}</span>
-              <span class="tp-prog-score">${evalRes.scoreLabel}</span>
+              <span class="tp-prog-score" style="margin-left:4px;">${evalRes.scoreLabel}</span>
             </div>
-            <div class="tp-modal-person">
-              <span>District: ${esc(staff.District || staff.Location || 'Field')} · Month: ${formatMonthLabel(state.activeMonth)}</span>
+            <div class="tp-modal-person" style="font-size:12px; color:#64748B;">
+              <span>District: <strong>${esc(staff.District || staff.Location || 'Field')}</strong> &middot; Reporting to: <strong>${esc(mgrName)}</strong> &middot; Cycle: <strong>${formatMonthLabel(state.activeMonth)}</strong></span>
             </div>
           </div>
-          <button type="button" class="tp-modal-close" onclick="window.ProgressModule.closeModal()" title="Close">&times;</button>
+          <button type="button" class="tp-modal-close" onclick="window.ProgressModule.closeModal()" title="Close" style="font-size:24px; cursor:pointer; background:none; border:none; color:#64748B;">&times;</button>
         </div>
-        <div class="tp-modal-body" style="padding: 20px;">
+        <div class="tp-modal-body" style="padding:22px 24px 28px; max-height:76vh; overflow-y:auto;">
           ${modalBody}
         </div>
       </div>
     `;
+  }
 
-    modal.style.display = 'flex';
+  function renderDistrictModal(districtRoleId, districtName, pmName) {
+    const modal = document.getElementById('tpProgModal');
+    if (!modal) return;
+
+    const cleanDist = String(districtName || districtRoleId).replace(/^d-/, '').trim();
+    const tree = getTreeData();
+    const stateData = getStateData(tree, state.activeState);
+
+    // Find all POs in this district across all PM columns
+    const distPOs = [];
+    (stateData.divisions || []).forEach(div => {
+      (div.pmColumns || []).forEach(pm => {
+        (pm.districts || []).forEach(dst => {
+          if (dst.name.toLowerCase() === cleanDist.toLowerCase() || dst.cardId === districtRoleId || dst.roleId === districtRoleId) {
+            (dst.pos || []).forEach(po => {
+              const poCleanName = po.cleanName || (po.name ? po.name.replace(/\s*·\s*PO.*$/i, '') : '');
+              const s = findStaffByNameOrId(poCleanName, po.roleId) || {
+                id: po.roleId,
+                Name: poCleanName || po.name,
+                Designation: po.designation || 'Project Officer',
+                District: dst.name
+              };
+              const ev = evaluateEmployee(s);
+              distPOs.push({ staff: s, evalRes: ev, poMgr: po.reportingManager || pm.name });
+            });
+          }
+        });
+      });
+    });
+
+    const doneCount = distPOs.filter(p => p.evalRes.status === 'done').length;
+
+    let poListHtml = '';
+    if (distPOs.length === 0) {
+      poListHtml = `<div class="tp-muted" style="padding:16px 0; font-size:13px; color:#64748B;">No Project Officers mapped to this district.</div>`;
+    } else {
+      poListHtml = `
+        <div class="tp-prog-sec">
+          <div class="tp-prog-sec-hd">
+            <span>District Field Review Roster (${doneCount}/${distPOs.length} Reviews Done)</span>
+          </div>
+          <div class="tp-prog-sec-body" style="padding:8px 12px;">
+            ${distPOs.map(p => `
+              <div class="tp-po-row" style="cursor:pointer; margin:4px 0;" onclick="window.ProgressModule.openModal('${p.staff.id}', '${esc(p.staff.Designation || 'Project Officer')}', '${esc(p.staff.Name)}', '${esc(p.poMgr)}')">
+                <div class="tp-po-info">
+                  <span class="tp-po-dot"></span>
+                  <div class="tp-po-text-wrap">
+                    <div class="tp-po-name" style="font-weight:700;">${esc(p.staff.Name)}</div>
+                    <div class="tp-po-role" style="font-size:11px; color:#64748B;">${esc(p.staff.Designation || 'Project Officer')}</div>
+                  </div>
+                </div>
+                <div class="tp-prog-strip-inline" style="display:flex; align-items:center; gap:6px; margin:0 8px;">
+                  <span class="tp-prog-pill ${p.evalRes.statusClass}">${p.evalRes.statusLabel}</span>
+                  <span class="tp-prog-score">${p.evalRes.scoreLabel}</span>
+                </div>
+                <button type="button" class="tp-row-details-btn" onclick="event.stopPropagation(); window.ProgressModule.openModal('${p.staff.id}', '${esc(p.staff.Designation || 'Project Officer')}', '${esc(p.staff.Name)}', '${esc(p.poMgr)}')">Details &rarr;</button>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    modal.innerHTML = `
+      <div class="tp-modal-dialog tp-prog-modal-dialog" role="dialog" aria-modal="true" style="background:var(--tp-surface, #fff); border-radius:16px; overflow:hidden;">
+        <div class="tp-modal-header" style="padding:18px 24px; border-bottom:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:flex-start;">
+          <div class="tp-modal-title-wrap">
+            <h3 class="tp-modal-title" style="margin:0 0 4px; font-size:19px; font-weight:800; color:var(--tp-ink, #0F172A);">${esc(cleanDist)} &mdash; District Operations</h3>
+            <div class="tp-modal-role-row" style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+              <span class="tp-modal-badge" style="background:#0D9488; color:#fff; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">District Operations</span>
+              <span class="tp-badge" style="background:#F1F5F9; color:#475569; padding:2px 8px; border-radius:4px; font-size:11px;">${distPOs.length} POs</span>
+            </div>
+            <div class="tp-modal-person" style="font-size:12px; color:#64748B;">
+              <span>Program Manager: <strong>${esc(pmName || 'Program Manager')}</strong> &middot; Cycle: <strong>${formatMonthLabel(state.activeMonth)}</strong></span>
+            </div>
+          </div>
+          <button type="button" class="tp-modal-close" onclick="window.ProgressModule.closeModal()" title="Close" style="font-size:24px; cursor:pointer; background:none; border:none; color:#64748B;">&times;</button>
+        </div>
+        <div class="tp-modal-body" style="padding:22px 24px 28px; max-height:76vh; overflow-y:auto;">
+          ${poListHtml}
+        </div>
+      </div>
+    `;
   }
 
   function closeModal() {
     const modal = document.getElementById('tpProgModal');
-    if (modal) modal.style.display = 'none';
+    if (modal) {
+      modal.classList.remove('open');
+      setTimeout(() => {
+        if (!modal.classList.contains('open')) {
+          modal.style.display = 'none';
+        }
+      }, 220);
+    }
   }
 
   // Export module to global scope
