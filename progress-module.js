@@ -17,8 +17,8 @@
     selectedEmp: null
   };
 
-  // Divisions open by default (Pune open by default so tree is immediately visible on first load)
-  let expandedDivisions = new Set(['pune']);
+  // Divisions open state (starts empty so user sees all division overview cards first; opens one at a time)
+  let expandedDivisions = new Set();
 
   // Local data store (initialized from precached data, updated live from Supabase)
   let cachedReviews = (typeof window !== 'undefined' && window.FIELD_REVIEW_PRECACHED_DATA)
@@ -358,14 +358,6 @@
     });
 
     expandedDivisions.clear();
-    const tree = getTreeData();
-    const stateData = getStateData(tree, st);
-    if (st === 'MH') {
-      expandedDivisions.add('pune');
-    } else if (stateData.divisions.length > 0) {
-      expandedDivisions.add(stateData.divisions[0].divisionId);
-    }
-
     render();
   }
 
@@ -493,13 +485,16 @@
     }
   }
 
-  // Toggle single division expand/collapse
+  // Toggle division (strictly opens ONE at a time; collapses others)
   function toggleDivision(divId) {
     const norm = normalizeDivId(divId);
-    if (expandedDivisions.has(norm) || expandedDivisions.has(divId)) {
-      expandedDivisions.delete(norm);
-      expandedDivisions.delete(divId);
-    } else {
+    const isAlreadyOpen = expandedDivisions.has(norm) || expandedDivisions.has(divId);
+
+    // Open one at a time: clear any currently expanded division
+    expandedDivisions.clear();
+
+    // If it wasn't already open, open only this division
+    if (!isAlreadyOpen) {
       expandedDivisions.add(norm);
     }
 
@@ -508,7 +503,7 @@
     renderDivisionPills(stateData.divisions);
     renderTreeOnly();
 
-    if (expandedDivisions.has(norm)) {
+    if (!isAlreadyOpen) {
       setTimeout(() => {
         const panel = document.getElementById('prog-divpanel-' + norm) || document.getElementById('prog-divpanel-' + divId);
         if (panel && typeof panel.scrollIntoView === 'function') {
