@@ -1109,7 +1109,16 @@
               <span>Section A · Self Check-in</span>
             </div>
             <div class="tp-prog-sec-body">
-              <div style="font-size: 13px;"><strong>Monthly Sentiment / Mood:</strong> ${A.A1 === 'Y' ? '😊 Positive / Good' : esc(A.A1 || 'Not recorded')}</div>
+              <div style="font-size: 13px;">
+                <strong>Monthly Sentiment / Mood:</strong>
+                ${(() => {
+                  const val = String(A.A1 || '').trim().toUpperCase();
+                  if (val === 'G') return '<span style="color:#16A34A; font-weight:700;">🟢 Good / Positive (Green)</span>';
+                  if (val === 'Y') return '<span style="color:#D97706; font-weight:700;">🟡 Moderate / Needs Support (Yellow)</span>';
+                  if (val === 'R') return '<span style="color:#DC2626; font-weight:700;">🔴 Challenging / High Pressure (Red)</span>';
+                  return esc(A.A1 || 'Not recorded');
+                })()}
+              </div>
               ${A.A2 ? `<div style="font-size: 13px; margin-top: 6px;"><strong>Mindset &amp; Notes:</strong> ${esc(A.A2)}</div>` : ''}
             </div>
           </div>
