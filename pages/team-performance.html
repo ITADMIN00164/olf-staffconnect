@@ -3973,6 +3973,21 @@
         <p class="tp-subtitle">Monthly field review performance, submission status, and manager scorecards</p>
       </div>
       <div class="tp-header-controls">
+        <!-- Segmented State Switcher -->
+        <div class="tp-segmented-control" role="tablist">
+          <button type="button" class="tp-seg-btn active" id="tpProgSegMH" onclick="window.ProgressModule.setState('MH')">
+            <span class="tp-seg-icon">🚩</span> Maharashtra
+          </button>
+          <button type="button" class="tp-seg-btn" id="tpProgSegCH" onclick="window.ProgressModule.setState('CH')">
+            <span class="tp-seg-icon">🏛️</span> Chhattisgarh
+          </button>
+          <button type="button" class="tp-seg-btn" id="tpProgSegMP" onclick="window.ProgressModule.setState('MP')">
+            <span class="tp-seg-icon">🌳</span> Madhya Pradesh
+          </button>
+          <button type="button" class="tp-seg-btn" id="tpProgSegBR" onclick="window.ProgressModule.setState('BR')">
+            <span class="tp-seg-icon">🌾</span> Bihar
+          </button>
+        </div>
         <div style="display:flex; align-items:center; gap:8px;">
           <label for="tpProgMonthSelect" style="font-size:12px; font-weight:700; color:var(--text, #0F172A);">Month:</label>
           <select id="tpProgMonthSelect" class="tp-input" style="padding:6px 12px; font-weight:700; border-radius:8px; cursor:pointer;">

@@ -2,6 +2,7 @@
  * Progress Module for OLF StaffConnect (OLF Insight)
  * Exact Flowchart Hierarchy Replica of SMART GOALS displaying live Monthly Field Review Performance
  * Connected directly to Supabase Field Review System (review_responses & assignments)
+ * Supports all 4 States: Maharashtra (MH), Chhattisgarh (CH), Madhya Pradesh (MP), Bihar (BR)
  */
 
 (function () {
@@ -9,7 +10,8 @@
 
   // State
   let state = {
-    activeMonth: '202610', // Default latest active cycle (October 2026)
+    activeState: 'MH',    // Default: Maharashtra
+    activeMonth: '202610', // Default: October 2026
     searchQuery: '',
     isLoading: false,
     selectedEmp: null
@@ -73,6 +75,71 @@
       if (t) return t;
     }
     return (typeof window !== 'undefined' && window.TEAM_PERFORMANCE_TREE) ? window.TEAM_PERFORMANCE_TREE : null;
+  }
+
+  function getStateData(tree, stateCode) {
+    if (!tree) return { sl: null, divisions: [], label: 'Maharashtra', tag: 'Maharashtra', code: 'MH' };
+
+    if (stateCode === 'CH') {
+      return {
+        sl: tree.chRoot || {
+          roleId: "dm-cg",
+          name: "Jeetendra Singh",
+          designation: "Division Manager",
+          reportingManager: "Vishvajit G Pawar",
+          title: "State Lead — Chhattisgarh"
+        },
+        divisions: tree.chDivisions || [],
+        label: "Chhattisgarh",
+        tag: "Chhattisgarh",
+        code: "CH"
+      };
+    }
+    if (stateCode === 'MP') {
+      return {
+        sl: tree.mpRoot || {
+          roleId: "pm-v2",
+          name: "Abhijeet L Vaidhay",
+          designation: "Program Manager / Interim",
+          reportingManager: "Vishvajit G Pawar",
+          title: "State Operations — Madhya Pradesh"
+        },
+        divisions: tree.mpDivisions || [],
+        label: "Madhya Pradesh",
+        tag: "Madhya Pradesh",
+        code: "MP"
+      };
+    }
+    if (stateCode === 'BR') {
+      return {
+        sl: tree.brRoot || {
+          roleId: "dm-pune",
+          name: "Manoj C Girase",
+          designation: "Associate Division Manager / Interim",
+          reportingManager: "Vishvajit G Pawar",
+          title: "State Operations — Bihar"
+        },
+        divisions: tree.brDivisions || [],
+        label: "Bihar",
+        tag: "Bihar",
+        code: "BR"
+      };
+    }
+
+    // Default: MH
+    return {
+      sl: tree.stateLead || {
+        roleId: "statelead",
+        name: "Vishvajit G Pawar",
+        designation: "State Lead",
+        reportingManager: "Prashant Patil",
+        title: "State Lead — Maharashtra"
+      },
+      divisions: tree.mhDivisions || [],
+      label: "Maharashtra",
+      tag: "Maharashtra",
+      code: "MH"
+    };
   }
 
   function findStaffByNameOrId(name, id) {
@@ -282,6 +349,26 @@
     }
   }
 
+  // --- Switch Active State (MH, CH, MP, BR) ---
+  function setState(st) {
+    state.activeState = st;
+    ['MH', 'CH', 'MP', 'BR'].forEach(code => {
+      const btn = document.getElementById('tpProgSeg' + code);
+      if (btn) btn.classList.toggle('active', code === st);
+    });
+
+    expandedDivisions.clear();
+    const tree = getTreeData();
+    const stateData = getStateData(tree, st);
+    if (st === 'MH') {
+      expandedDivisions.add('pune');
+    } else if (stateData.divisions.length > 0) {
+      expandedDivisions.add(stateData.divisions[0].divisionId);
+    }
+
+    render();
+  }
+
   function clearSearch() {
     state.searchQuery = '';
     const searchInput = document.getElementById('tpProgSearchInput');
@@ -368,7 +455,7 @@
   }
 
   // --- Render Top KPI Summary Row ---
-  function renderKPIRow(stats) {
+  function renderKPIRow(stats, stateData) {
     const kpiEl = document.getElementById('tpProgKpiRow');
     if (!kpiEl) return;
 
@@ -401,7 +488,8 @@
 
     const countBadge = document.getElementById('tpProgTotalCountBadge');
     if (countBadge) {
-      countBadge.textContent = `${stats.total} Staff · ${stats.done} Done`;
+      const activeDivCount = stateData.divisions.length;
+      countBadge.textContent = `${stateData.label} · ${activeDivCount} ${activeDivCount === 1 ? 'Division' : 'Divisions'} · ${stats.total} Staff · ${stats.done} Done`;
     }
   }
 
@@ -416,7 +504,8 @@
     }
 
     const tree = getTreeData();
-    renderDivisionPills(tree ? tree.mhDivisions || [] : []);
+    const stateData = getStateData(tree, state.activeState);
+    renderDivisionPills(stateData.divisions);
     renderTreeOnly();
 
     if (expandedDivisions.has(norm)) {
@@ -432,12 +521,12 @@
   // Expand all divisions
   function expandAll() {
     const tree = getTreeData();
-    const divisions = tree ? tree.mhDivisions || [] : [];
-    divisions.forEach(d => {
+    const stateData = getStateData(tree, state.activeState);
+    stateData.divisions.forEach(d => {
       expandedDivisions.add(normalizeDivId(d.divisionId));
       expandedDivisions.add(d.divisionId);
     });
-    renderDivisionPills(divisions);
+    renderDivisionPills(stateData.divisions);
     renderTreeOnly();
   }
 
@@ -445,7 +534,8 @@
   function collapseAll() {
     expandedDivisions.clear();
     const tree = getTreeData();
-    renderDivisionPills(tree ? tree.mhDivisions || [] : []);
+    const stateData = getStateData(tree, state.activeState);
+    renderDivisionPills(stateData.divisions);
     renderTreeOnly();
   }
 
@@ -469,10 +559,37 @@
     const tree = getTreeData();
     if (!tree) return;
 
+    const stateData = getStateData(tree, state.activeState);
     const staffList = getStaffList();
-    const stats = { total: staffList.length, done: 0, partial: 0, pending: 0, unassigned: 0, hq: 0 };
 
-    staffList.forEach(s => {
+    // Collect staff associated with this active state
+    const stateStaffList = [];
+    const stateStaffIds = new Set();
+    function addStaff(name, id) {
+      const s = findStaffByNameOrId(name, id);
+      if (s && s.id && !stateStaffIds.has(s.id)) {
+        stateStaffIds.add(s.id);
+        stateStaffList.push(s);
+      }
+    }
+
+    if (stateData.sl) addStaff(stateData.sl.name, stateData.sl.roleId);
+    (stateData.divisions || []).forEach(div => {
+      addStaff(div.divisionLead, div.divisionRoleId);
+      (div.pmColumns || []).forEach(pm => {
+        addStaff(pm.name, pm.pmId);
+        (pm.districts || []).forEach(dst => {
+          (dst.pos || []).forEach(po => {
+            addStaff(po.cleanName || po.name, po.roleId);
+          });
+        });
+      });
+    });
+
+    const targetList = stateStaffList.length > 0 ? stateStaffList : staffList;
+    const stats = { total: targetList.length, done: 0, partial: 0, pending: 0, unassigned: 0, hq: 0 };
+
+    targetList.forEach(s => {
       const evalRes = evaluateEmployee(s);
       if (evalRes.status === 'done') stats.done++;
       else if (evalRes.status === 'partial') stats.partial++;
@@ -481,8 +598,8 @@
       else if (evalRes.status === 'hq') stats.hq++;
     });
 
-    renderKPIRow(stats);
-    renderDivisionPills(tree.mhDivisions || []);
+    renderKPIRow(stats, stateData);
+    renderDivisionPills(stateData.divisions);
     renderTreeOnly();
   }
 
@@ -492,9 +609,9 @@
     if (!container || !tree) return;
 
     const q = state.searchQuery;
-    const divisions = tree.mhDivisions || [];
-
-    const sl = tree.stateLead || {
+    const stateData = getStateData(tree, state.activeState);
+    const divisions = stateData.divisions;
+    const sl = stateData.sl || {
       roleId: "statelead",
       name: "Vishvajit G Pawar",
       title: "State Lead — Maharashtra",
@@ -502,10 +619,10 @@
     };
 
     const slStaff = findStaffByNameOrId(sl.name, sl.roleId) || {
-      id: "OLF-23-010",
-      Name: sl.name || "Vishvajit G Pawar",
-      Designation: "State Lead",
-      Location: "Pune HO"
+      id: sl.roleId || "statelead",
+      Name: sl.name || "State Lead",
+      Designation: sl.designation || sl.title || "State Lead",
+      Location: stateData.label
     };
     const slEval = evaluateEmployee(slStaff);
 
@@ -515,16 +632,16 @@
     const divsTotal = divisions.length;
 
     let html = `
-      <!-- Level 0: State Lead Node (Maharashtra) -->
+      <!-- Level 0: State Lead Node (${esc(stateData.label)}) -->
       <div class="tp-row tp-row-root" id="tpProgRowRoot">
         <div class="tp-card tp-card-root" id="prog-node-statelead">
           <div class="tp-card-header">
-            <span class="tp-tag tp-tag-gold">Maharashtra</span>
+            <span class="tp-tag tp-tag-gold">${esc(stateData.tag)}</span>
             <button type="button" class="tp-card-details-btn" onclick="window.ProgressModule.openModal('${slStaff.id}')">Details &rarr;</button>
           </div>
-          <div class="tp-card-name">${esc(sl.name || 'Vishvajit G Pawar')}</div>
+          <div class="tp-card-name">${esc(sl.name || 'State Lead')}</div>
           <div class="tp-card-role-label">${esc(sl.designation || sl.title || 'State Lead')}</div>
-          <div class="tp-card-sub">${esc(sl.title || 'State Lead · Maharashtra')} &middot; State Operations &amp; Strategy</div>
+          <div class="tp-card-sub">${esc(sl.title || stateData.label)} &middot; State Operations &amp; Strategy</div>
           <div class="tp-card-stats">
             <div class="tp-stat-item"><strong>${divsTotal}</strong><span>${divsTotal === 1 ? 'Division' : 'Divisions'}</span></div>
             <div class="tp-stat-item"><strong>${pmsTotal}</strong><span>${pmsTotal === 1 ? 'Prog Mgr' : 'Prog Mgrs'}</span></div>
@@ -538,7 +655,7 @@
         </div>
       </div>
 
-      <!-- Level 1: Row of 5 Division Overview Cards -->
+      <!-- Level 1: Row of Division Overview Cards -->
       <div class="tp-divisions-row" id="tpProgDivisionsRow">
     `;
 
@@ -650,7 +767,7 @@
       id: pm.pmId,
       Name: pm.name,
       Designation: pm.designation || pm.label || "Program Manager",
-      Location: div ? div.divisionTitle : "Maharashtra"
+      Location: div ? div.divisionTitle : "Operations"
     };
     const pmEval = evaluateEmployee(pmStaff);
     const pmMgr = pm.reportingManager || (div ? (div.divisionLead || "Division Manager") : "Division Manager");
@@ -1001,6 +1118,7 @@
   window.ProgressModule = {
     init,
     render,
+    setState,
     switchDivision: toggleDivision,
     toggleDivision,
     expandAll,
