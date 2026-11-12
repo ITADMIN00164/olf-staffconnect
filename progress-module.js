@@ -251,13 +251,13 @@
     const M = rev.M || {};
 
     const selfDone = (A.A1 != null && A.A1 !== '') || Object.keys(B).length > 0 || Object.keys(G).length > 0;
-    const mgrDone = H.H1 === 'Y' && H.H2 != null && H.H2 !== '';
+    const mgrDone = (H.H1 === 'Y' && H.H2 != null && H.H2 !== '') || (H.H2 != null && H.H2 !== '');
 
     let status = 'pending';
     let statusLabel = 'Pending Review';
     let statusClass = 'tp-prog-pill--pending';
 
-    if (selfDone && mgrDone) {
+    if (mgrDone) {
       status = 'done';
       statusLabel = 'Review Done';
       statusClass = 'tp-prog-pill--done';
