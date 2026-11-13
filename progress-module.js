@@ -13,9 +13,12 @@
     activeState: 'MH',     // Default: Maharashtra
     activeMonth: '202610', // Default: October 2026
     searchQuery: '',
+    statusFilter: null,    // null (All) or 'done', 'partial', 'pending', 'unassigned', 'hq'
     isLoading: false,
     selectedEmp: null
   };
+
+  let currentModalRoster = [];
 
   // Divisions open state (starts empty so user sees all division overview cards first; opens one at a time)
   let expandedDivisions = new Set();
@@ -451,38 +454,149 @@
     const kpiEl = document.getElementById('tpProgKpiRow');
     if (!kpiEl) return;
 
+    const sf = state.statusFilter;
+
     kpiEl.innerHTML = `
-      <div class="tp-prog-kpi-card">
-        <div class="tp-prog-kpi-val">${stats.total}</div>
+      <div class="tp-prog-kpi-card ${sf === null ? 'active' : ''}" onclick="window.ProgressModule.setStatusFilter('all')" ondblclick="window.ProgressModule.openStatusModal('all')" title="Click to show all staff · Click 📋 to view full roster">
+        <div class="tp-kpi-val-row">
+          <div class="tp-prog-kpi-val">${stats.total}</div>
+          <button type="button" class="tp-kpi-view-btn" onclick="event.stopPropagation(); window.ProgressModule.openStatusModal('all')" title="View complete roster">📋</button>
+        </div>
         <div class="tp-prog-kpi-lbl">Total Staff</div>
       </div>
-      <div class="tp-prog-kpi-card tp-prog-kpi--done">
-        <div class="tp-prog-kpi-val">${stats.done}</div>
+      <div class="tp-prog-kpi-card tp-prog-kpi--done ${sf === 'done' ? 'active' : ''}" onclick="window.ProgressModule.setStatusFilter('done')" ondblclick="window.ProgressModule.openStatusModal('done')" title="Click to filter by Review Done · Click 📋 to view list">
+        <div class="tp-kpi-val-row">
+          <div class="tp-prog-kpi-val">${stats.done}</div>
+          <button type="button" class="tp-kpi-view-btn" onclick="event.stopPropagation(); window.ProgressModule.openStatusModal('done')" title="View Review Done roster">📋</button>
+        </div>
         <div class="tp-prog-kpi-lbl">✓ Review Done</div>
       </div>
-      <div class="tp-prog-kpi-card tp-prog-kpi--partial">
-        <div class="tp-prog-kpi-val">${stats.partial}</div>
+      <div class="tp-prog-kpi-card tp-prog-kpi--partial ${sf === 'partial' ? 'active' : ''}" onclick="window.ProgressModule.setStatusFilter('partial')" ondblclick="window.ProgressModule.openStatusModal('partial')" title="Filter by Partially Done · Click 📋 to view list">
+        <div class="tp-kpi-val-row">
+          <div class="tp-prog-kpi-val">${stats.partial}</div>
+          <button type="button" class="tp-kpi-view-btn" onclick="event.stopPropagation(); window.ProgressModule.openStatusModal('partial')" title="View Partially Done roster">📋</button>
+        </div>
         <div class="tp-prog-kpi-lbl">◐ Partially Done</div>
       </div>
-      <div class="tp-prog-kpi-card tp-prog-kpi--pending">
-        <div class="tp-prog-kpi-val">${stats.pending}</div>
+      <div class="tp-prog-kpi-card tp-prog-kpi--pending ${sf === 'pending' ? 'active' : ''}" onclick="window.ProgressModule.setStatusFilter('pending')" ondblclick="window.ProgressModule.openStatusModal('pending')" title="Filter by Review Pending · Click 📋 to view list">
+        <div class="tp-kpi-val-row">
+          <div class="tp-prog-kpi-val">${stats.pending}</div>
+          <button type="button" class="tp-kpi-view-btn" onclick="event.stopPropagation(); window.ProgressModule.openStatusModal('pending')" title="View Review Pending roster">📋</button>
+        </div>
         <div class="tp-prog-kpi-lbl">○ Review Pending</div>
       </div>
-      <div class="tp-prog-kpi-card tp-prog-kpi--opt1">
-        <div class="tp-prog-kpi-val">${stats.unassigned}</div>
+      <div class="tp-prog-kpi-card tp-prog-kpi--opt1 ${sf === 'unassigned' ? 'active' : ''}" onclick="window.ProgressModule.setStatusFilter('unassigned')" ondblclick="window.ProgressModule.openStatusModal('unassigned')" title="Filter by Pending Assignment · Click 📋 to view list">
+        <div class="tp-kpi-val-row">
+          <div class="tp-prog-kpi-val">${stats.unassigned}</div>
+          <button type="button" class="tp-kpi-view-btn" onclick="event.stopPropagation(); window.ProgressModule.openStatusModal('unassigned')" title="View Pending Assignment roster">📋</button>
+        </div>
         <div class="tp-prog-kpi-lbl">📋 Pending Assign.</div>
       </div>
-      <div class="tp-prog-kpi-card tp-prog-kpi--hq">
-        <div class="tp-prog-kpi-val">${stats.hq}</div>
+      <div class="tp-prog-kpi-card tp-prog-kpi--hq ${sf === 'hq' ? 'active' : ''}" onclick="window.ProgressModule.setStatusFilter('hq')" ondblclick="window.ProgressModule.openStatusModal('hq')" title="Filter by HQ Leadership · Click 📋 to view list">
+        <div class="tp-kpi-val-row">
+          <div class="tp-prog-kpi-val">${stats.hq}</div>
+          <button type="button" class="tp-kpi-view-btn" onclick="event.stopPropagation(); window.ProgressModule.openStatusModal('hq')" title="View HQ Leadership roster">📋</button>
+        </div>
         <div class="tp-prog-kpi-lbl">🏛️ HQ Leadership</div>
       </div>
     `;
+
+    renderFilterBanner(stats, stateData);
 
     const countBadge = document.getElementById('tpProgTotalCountBadge');
     if (countBadge) {
       const activeDivCount = stateData.divisions.length;
       countBadge.textContent = `${stateData.label} · ${activeDivCount} ${activeDivCount === 1 ? 'Division' : 'Divisions'} · ${stats.total} Staff · ${stats.done} Done`;
     }
+  }
+
+  function renderFilterBanner(stats, stateData) {
+    const banner = document.getElementById('tpProgFilterBanner');
+    if (!banner) return;
+
+    const sf = state.statusFilter;
+    if (!sf) {
+      banner.style.display = 'none';
+      banner.innerHTML = '';
+      return;
+    }
+
+    let label = 'Filtered';
+    let count = 0;
+    let cls = 'tp-banner--all';
+
+    if (sf === 'done') {
+      label = '✓ Review Done';
+      count = stats.done;
+      cls = 'tp-banner--done';
+    } else if (sf === 'partial') {
+      label = '◐ Partially Done';
+      count = stats.partial;
+      cls = 'tp-banner--partial';
+    } else if (sf === 'pending') {
+      label = '○ Review Pending';
+      count = stats.pending;
+      cls = 'tp-banner--pending';
+    } else if (sf === 'unassigned') {
+      label = '📋 Pending Assignment';
+      count = stats.unassigned;
+      cls = 'tp-banner--opt1';
+    } else if (sf === 'hq') {
+      label = '🏛️ HQ Leadership';
+      count = stats.hq;
+      cls = 'tp-banner--hq';
+    }
+
+    banner.className = `tp-prog-filter-banner ${cls}`;
+    banner.style.display = 'flex';
+    banner.innerHTML = `
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-size:14px;">⚡</span>
+        <span>Active Filter: <strong>${label}</strong> (${count} ${count === 1 ? 'Staff Member' : 'Staff Members'}) &mdash; flowchart dimmed to matching roles</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <button type="button" class="tp-btn tp-btn-sm" style="background:var(--tp-surface, #fff); color:var(--tp-ink, #0F172A); border:1px solid #CBD5E1; font-weight:700; padding:4px 10px; border-radius:6px; cursor:pointer;" onclick="window.ProgressModule.openStatusModal('${sf}')">
+          📋 View Full Roster (${count}) &rarr;
+        </button>
+        <button type="button" class="tp-btn tp-btn-sm" style="background:transparent; border:none; color:inherit; font-weight:700; cursor:pointer; padding:4px 8px;" onclick="window.ProgressModule.clearStatusFilter()" title="Clear filter">
+          &times; Clear Filter
+        </button>
+      </div>
+    `;
+  }
+
+  function setStatusFilter(statusKey) {
+    if (statusKey === 'all' || state.statusFilter === statusKey) {
+      state.statusFilter = null;
+    } else {
+      state.statusFilter = statusKey;
+    }
+
+    const tree = getTreeData();
+    const stateData = getStateData(tree, state.activeState);
+    const roster = getRosterForState();
+    const stats = calculateStats(roster);
+
+    // When filter is active, auto-expand the first division with matching members if none currently expanded has matches
+    if (state.statusFilter) {
+      const matchingDivs = new Set();
+      roster.filter(r => r.evalRes.status === state.statusFilter).forEach(r => {
+        if (r.divisionId) matchingDivs.add(normalizeDivId(r.divisionId));
+      });
+      const hasExpandedMatch = Array.from(expandedDivisions).some(d => matchingDivs.has(normalizeDivId(d)));
+      if (!hasExpandedMatch && matchingDivs.size > 0) {
+        expandedDivisions.clear();
+        expandedDivisions.add(Array.from(matchingDivs)[0]);
+      }
+    }
+
+    renderKPIRow(stats, stateData);
+    renderDivisionPills(stateData.divisions);
+    renderTreeOnly();
+  }
+
+  function clearStatusFilter() {
+    setStatusFilter('all');
   }
 
   // Toggle division (strictly opens ONE at a time; collapses others)
@@ -534,16 +648,111 @@
     renderTreeOnly();
   }
 
+  // Collect full roster with state/division/district metadata
+  function getRosterForState() {
+    const tree = getTreeData();
+    const stateData = getStateData(tree, state.activeState);
+    const roster = [];
+    const seenIds = new Set();
+
+    function record(staffObj, role, divTitle, divId, distName, mgrName) {
+      if (!staffObj) return;
+      const sId = staffObj.id || (staffObj.Name || '');
+      if (seenIds.has(sId)) return;
+      seenIds.add(sId);
+
+      const ev = evaluateEmployee(staffObj);
+      roster.push({
+        staff: staffObj,
+        evalRes: ev,
+        role: role || staffObj.Designation || 'Field Staff',
+        division: divTitle || staffObj.Location || stateData.label,
+        divisionId: divId || '',
+        district: distName || staffObj.District || '—',
+        manager: mgrName || staffObj.ReportingManager || 'Leadership'
+      });
+    }
+
+    // State Lead
+    if (stateData.sl) {
+      const slStaff = findStaffByNameOrId(stateData.sl.name, stateData.sl.roleId) || {
+        id: stateData.sl.roleId || 'statelead',
+        Name: stateData.sl.name,
+        Designation: stateData.sl.designation || 'State Lead',
+        Location: stateData.label
+      };
+      record(slStaff, stateData.sl.designation || 'State Lead', stateData.label, '', 'Statewide', stateData.sl.reportingManager || 'Prashant Patil');
+    }
+
+    // Divisions
+    (stateData.divisions || []).forEach(div => {
+      const dmStaff = findStaffByNameOrId(div.divisionLead, div.divisionRoleId) || {
+        id: div.divisionRoleId,
+        Name: div.divisionLead,
+        Designation: div.divisionRole || 'Division Manager',
+        Location: div.divisionTitle
+      };
+      record(dmStaff, div.divisionRole || 'Division Manager', div.divisionTitle, div.divisionId, 'Division HQ', div.reportingManager || (stateData.sl ? stateData.sl.name : 'State Lead'));
+
+      (div.pmColumns || []).forEach(pm => {
+        const pmStaff = findStaffByNameOrId(pm.name, pm.pmId) || {
+          id: pm.pmId,
+          Name: pm.name,
+          Designation: pm.designation || pm.label || 'Program Manager',
+          Location: div.divisionTitle
+        };
+        const distNames = (pm.districts || []).map(d => d.name).join(', ') || 'Assigned Districts';
+        record(pmStaff, pm.designation || pm.label || 'Program Manager', div.divisionTitle, div.divisionId, distNames, pm.reportingManager || div.divisionLead);
+
+        (pm.districts || []).forEach(dst => {
+          (dst.pos || []).forEach(po => {
+            const poCleanName = po.cleanName || (po.name ? po.name.replace(/\s*·\s*PO.*$/i, '') : '');
+            const poStaff = findStaffByNameOrId(poCleanName, po.roleId) || {
+              id: po.roleId,
+              Name: poCleanName || po.name,
+              Designation: po.designation || 'Project Officer',
+              District: dst.name,
+              Location: div.divisionTitle
+            };
+            record(poStaff, po.designation || 'Project Officer', div.divisionTitle, div.divisionId, dst.name, po.reportingManager || dst.reportingManager || pm.name);
+          });
+        });
+      });
+    });
+
+    return roster;
+  }
+
+  function calculateStats(roster) {
+    const stats = { total: roster.length, done: 0, partial: 0, pending: 0, unassigned: 0, hq: 0 };
+    roster.forEach(r => {
+      const st = r.evalRes.status;
+      if (st === 'done') stats.done++;
+      else if (st === 'partial') stats.partial++;
+      else if (st === 'pending') stats.pending++;
+      else if (st === 'unassigned') stats.unassigned++;
+      else if (st === 'hq') stats.hq++;
+    });
+    return stats;
+  }
+
   // --- Render Division Filter Pills ---
   function renderDivisionPills(divisions) {
     const container = document.getElementById('tpProgDivisionPills');
     if (!container) return;
 
+    const roster = getRosterForState();
+    const sf = state.statusFilter;
+
     let html = `<button type="button" class="tp-pill-btn ${expandedDivisions.size === 0 ? 'active' : ''}" onclick="window.ProgressModule.collapseAll()">Overview (All Collapsed)</button>`;
 
     (divisions || []).forEach(d => {
       const isExpanded = isDivisionExpanded(d.divisionId);
-      html += `<button type="button" class="tp-pill-btn ${isExpanded ? 'active' : ''}" onclick="window.ProgressModule.toggleDivision('${d.divisionId}')">${esc(d.divisionTitle.replace(/\s*Division$/i, ''))} <span class="tp-pill-badge">${isExpanded ? 'Hide ▲' : 'View Team ▼'}</span></button>`;
+      const divRoster = roster.filter(r => normalizeDivId(r.divisionId) === normalizeDivId(d.divisionId) || r.division === d.divisionTitle);
+      const matchCount = sf ? divRoster.filter(r => r.evalRes.status === sf).length : 0;
+      const countTag = sf ? ` <span class="tp-pill-badge" style="background:${matchCount > 0 ? '#2563EB' : '#94A3B8'}; color:#fff; font-weight:700;">${matchCount} matching</span>` : '';
+
+      html += `<button type="button" class="tp-pill-btn ${isExpanded ? 'active' : ''}" onclick="window.ProgressModule.toggleDivision('${d.divisionId}')">${esc(d.divisionTitle.replace(/\s*Division$/i, ''))}${countTag} <span class="tp-pill-badge">${isExpanded ? 'Hide ▲' : 'View Team ▼'}</span></button>`;
     });
 
     container.innerHTML = html;
@@ -555,43 +764,8 @@
     if (!tree) return;
 
     const stateData = getStateData(tree, state.activeState);
-    const staffList = getStaffList();
-
-    // Collect staff associated with this active state
-    const stateStaffList = [];
-    const stateStaffIds = new Set();
-    function addStaff(name, id) {
-      const s = findStaffByNameOrId(name, id);
-      if (s && s.id && !stateStaffIds.has(s.id)) {
-        stateStaffIds.add(s.id);
-        stateStaffList.push(s);
-      }
-    }
-
-    if (stateData.sl) addStaff(stateData.sl.name, stateData.sl.roleId);
-    (stateData.divisions || []).forEach(div => {
-      addStaff(div.divisionLead, div.divisionRoleId);
-      (div.pmColumns || []).forEach(pm => {
-        addStaff(pm.name, pm.pmId);
-        (pm.districts || []).forEach(dst => {
-          (dst.pos || []).forEach(po => {
-            addStaff(po.cleanName || po.name, po.roleId);
-          });
-        });
-      });
-    });
-
-    const targetList = stateStaffList.length > 0 ? stateStaffList : staffList;
-    const stats = { total: targetList.length, done: 0, partial: 0, pending: 0, unassigned: 0, hq: 0 };
-
-    targetList.forEach(s => {
-      const evalRes = evaluateEmployee(s);
-      if (evalRes.status === 'done') stats.done++;
-      else if (evalRes.status === 'partial') stats.partial++;
-      else if (evalRes.status === 'pending') stats.pending++;
-      else if (evalRes.status === 'unassigned') stats.unassigned++;
-      else if (evalRes.status === 'hq') stats.hq++;
-    });
+    const roster = getRosterForState();
+    const stats = calculateStats(roster);
 
     renderKPIRow(stats, stateData);
     renderDivisionPills(stateData.divisions);
@@ -631,7 +805,7 @@
     let html = `
       <!-- Level 0: State Lead Node (${esc(stateData.label)}) -->
       <div class="tp-row tp-row-root" id="tpProgRowRoot">
-        <div class="tp-card tp-card-root" id="prog-node-statelead">
+        <div class="tp-card tp-card-root" id="prog-node-statelead" data-prog-status="${slEval.status}">
           <div class="tp-card-header">
             <span class="tp-tag tp-tag-gold">${esc(stateData.tag)}</span>
             <button type="button" class="tp-card-details-btn" onclick="window.ProgressModule.openModal('${slStaff.id}', '${esc(sl.designation || 'State Lead')}', '${esc(sl.name || 'State Lead')}', '${esc(slMgr)}')">Details &rarr;</button>
@@ -656,6 +830,8 @@
       <div class="tp-divisions-row" id="tpProgDivisionsRow">
     `;
 
+    const roster = getRosterForState();
+
     divisions.forEach(div => {
       const isExpanded = isDivisionExpanded(div.divisionId);
       const isMatched = q && (div.divisionTitle.toLowerCase().includes(q) || (div.divisionLead || '').toLowerCase().includes(q));
@@ -663,8 +839,12 @@
       const poCount = div.pmColumns.reduce((a, c) => a + c.districts.reduce((da, d) => da + (d.pos?.length || 0), 0), 0);
       const divId = div.divisionId;
 
+      const divRoster = roster.filter(r => normalizeDivId(r.divisionId) === normalizeDivId(divId) || r.division === div.divisionTitle);
+      const divMatchCount = state.statusFilter ? divRoster.filter(r => r.evalRes.status === state.statusFilter).length : 0;
+      const divHasMatch = !state.statusFilter || divMatchCount > 0;
+
       html += `
-        <div class="tp-card tp-card-div ${isExpanded ? 'tp-expanded-card' : ''} ${isMatched ? 'tp-matched' : ''}" id="prog-node-${divId}">
+        <div class="tp-card tp-card-div ${isExpanded ? 'tp-expanded-card' : ''} ${isMatched ? 'tp-matched' : ''}" id="prog-node-${divId}" data-has-matches="${divHasMatch}">
           <div class="tp-card-header">
             <span class="tp-tag tp-tag-teal">Division</span>
           </div>
@@ -674,6 +854,7 @@
             <span>${div.pmColumns.length} ${div.pmColumns.length === 1 ? 'PM' : 'PMs'}</span> &middot; 
             <span>${distCount} ${distCount === 1 ? 'District' : 'Districts'}</span> &middot; 
             <span>${poCount} POs</span>
+            ${state.statusFilter && divMatchCount > 0 ? `<div style="font-size:11px; font-weight:700; color:#2563EB; margin-top:3px;">● ${divMatchCount} matching filter</div>` : ''}
           </div>
           <div class="tp-card-footer-actions">
             <button type="button" class="tp-toggle-team-btn ${isExpanded ? 'active' : ''}" onclick="window.ProgressModule.toggleDivision('${divId}')">
@@ -720,7 +901,7 @@
 
             <!-- Tier 1: Division Manager (DM) Tree Node -->
             <div class="tp-tree-tier tp-tree-tier-dm">
-              <div class="tp-card tp-card-dm ${isInterim ? 'tp-card-interim' : ''}" id="prog-node-dm-${divId}">
+              <div class="tp-card tp-card-dm ${isInterim ? 'tp-card-interim' : ''}" id="prog-node-dm-${divId}" data-prog-status="${dmEval.status}">
                 <div class="tp-card-header">
                   <span class="tp-tag ${isInterim ? 'tp-tag-gray' : 'tp-tag-purple'}">${isInterim ? 'Interim DM' : esc(div.divisionRole || 'Division Manager')}</span>
                   <button type="button" class="tp-card-details-btn" onclick="window.ProgressModule.openModal('${dmStaff.id}', '${esc(div.divisionRole || 'Division Manager')}', '${esc(div.divisionLead || 'Division Manager')}', '${esc(dmMgr)}')">Details &rarr;</button>
@@ -753,9 +934,7 @@
 
     container.innerHTML = html;
 
-    if (q) {
-      applySearchHighlight(q);
-    }
+    applyFilterAndSearchHighlight();
 
     setTimeout(drawConnectors, 50);
   }
@@ -771,9 +950,16 @@
     const pmMgr = pm.reportingManager || (div ? (div.divisionLead || "Division Manager") : "Division Manager");
     const isMatched = q && (pm.name.toLowerCase().includes(q) || (pm.label || '').toLowerCase().includes(q));
 
+    const pmMatchesStatus = !state.statusFilter || pmEval.status === state.statusFilter;
+    const pmSubMatches = state.statusFilter ? (pm.districts || []).some(dst => (dst.pos || []).some(po => {
+      const poClean = po.cleanName || (po.name ? po.name.replace(/\s*·\s*PO.*$/i, '') : '');
+      return evaluateEmployee(findStaffByNameOrId(poClean, po.roleId)).status === state.statusFilter;
+    })) : false;
+    const pmHasMatch = !state.statusFilter || pmMatchesStatus || pmSubMatches;
+
     return `
       <div class="tp-pm-col ${isMatched ? 'tp-matched' : ''}" id="prog-pmcol-${pm.pmId}">
-        <div class="tp-card tp-card-pm" id="prog-node-pm-${pm.pmId}">
+        <div class="tp-card tp-card-pm" id="prog-node-pm-${pm.pmId}" data-prog-status="${pmEval.status}" data-has-matches="${pmHasMatch}">
           <div class="tp-card-header">
             <span class="tp-tag tp-tag-blue">${esc((pm.label || "Program Manager").replace(/\s+Track$/i, ""))}</span>
             <button type="button" class="tp-card-details-btn" onclick="window.ProgressModule.openModal('${pmStaff.id}', '${esc(pm.designation || pm.label || 'Program Manager')}', '${esc(pm.name)}', '${esc(pmMgr)}')">Details &rarr;</button>
@@ -801,9 +987,13 @@
   function renderDistrictCard(dst, pmName, q) {
     const dstMgr = dst.reportingManager || pmName || "Program Manager";
     const isMatched = q && (dst.name.toLowerCase().includes(q) || (dst.pos || []).some(p => (p.name || '').toLowerCase().includes(q)));
+    const distHasMatch = !state.statusFilter || (dst.pos || []).some(po => {
+      const poClean = po.cleanName || (po.name ? po.name.replace(/\s*·\s*PO.*$/i, '') : '');
+      return evaluateEmployee(findStaffByNameOrId(poClean, po.roleId)).status === state.statusFilter;
+    });
 
     return `
-      <div class="tp-district-card ${isMatched ? 'tp-matched' : ''}" id="prog-node-dst-${dst.cardId}">
+      <div class="tp-district-card ${isMatched ? 'tp-matched' : ''}" id="prog-node-dst-${dst.cardId}" data-has-matches="${distHasMatch}">
         <div class="tp-district-header">
           <div class="tp-dist-pip"></div>
           <div class="tp-dist-title-box">
@@ -826,7 +1016,7 @@
             const poMatched = q && (poCleanName.toLowerCase().includes(q) || (po.designation || '').toLowerCase().includes(q));
 
             return `
-              <div class="tp-po-row ${poMatched ? 'tp-matched-row' : ''}" style="cursor:pointer;" onclick="window.ProgressModule.openModal('${poStaff.id}', '${esc(po.designation || 'Project Officer')}', '${esc(poCleanName || po.name)}', '${esc(poMgr)}')">
+              <div class="tp-po-row ${poMatched ? 'tp-matched-row' : ''}" style="cursor:pointer;" data-prog-status="${poEval.status}" onclick="window.ProgressModule.openModal('${poStaff.id}', '${esc(po.designation || 'Project Officer')}', '${esc(poCleanName || po.name)}', '${esc(poMgr)}')">
                 <div class="tp-po-info">
                   <span class="tp-po-dot"></span>
                   <div class="tp-po-text-wrap">
@@ -847,15 +1037,42 @@
     `;
   }
 
-  function applySearchHighlight(q) {
+  function applyFilterAndSearchHighlight() {
+    const q = state.searchQuery;
+    const sf = state.statusFilter;
+
     const cards = document.querySelectorAll('#tpProgTreeContainer .tp-card, #tpProgTreeContainer .tp-district-card, #tpProgTreeContainer .tp-po-row');
     cards.forEach(c => {
-      const text = c.textContent.toLowerCase();
-      const match = text.includes(q);
-      c.style.opacity = match ? '1' : '0.28';
-      if (match) c.classList.add('tp-matched');
-      else c.classList.remove('tp-matched');
+      let matchSearch = true;
+      if (q) {
+        const text = c.textContent.toLowerCase();
+        matchSearch = text.includes(q);
+      }
+
+      let matchStatus = true;
+      if (sf) {
+        const st = c.getAttribute('data-prog-status');
+        const hasSub = c.getAttribute('data-has-matches') === 'true';
+        matchStatus = (st === sf) || hasSub;
+      }
+
+      const match = matchSearch && matchStatus;
+      c.style.opacity = match ? '1' : '0.22';
+      if (match && (q || sf)) {
+        if (c.classList.contains('tp-po-row')) {
+          c.classList.add('tp-matched-row');
+        } else {
+          c.classList.add('tp-matched');
+        }
+      } else {
+        c.classList.remove('tp-matched');
+        c.classList.remove('tp-matched-row');
+      }
     });
+  }
+
+  function applySearchHighlight(q) {
+    applyFilterAndSearchHighlight();
   }
 
   // --- SVG Connectors for Progress Tab (Exact Replica of Smart Goals) ---
@@ -1246,6 +1463,111 @@
     }
   }
 
+  // --- Open Full Filtered Roster Modal ---
+  function openStatusModal(statusKey) {
+    const modal = document.getElementById('tpProgModal');
+    if (!modal) return;
+
+    const roster = getRosterForState();
+    let filtered = roster;
+    let title = 'All Staff Members';
+
+    if (statusKey && statusKey !== 'all') {
+      filtered = roster.filter(r => r.evalRes.status === statusKey);
+      if (statusKey === 'done') {
+        title = '✓ Review Done';
+      } else if (statusKey === 'partial') {
+        title = '◐ Partially Done';
+      } else if (statusKey === 'pending') {
+        title = '○ Review Pending';
+      } else if (statusKey === 'unassigned') {
+        title = '📋 Pending Assignment';
+      } else if (statusKey === 'hq') {
+        title = '🏛️ HQ Leadership';
+      }
+    }
+
+    currentModalRoster = filtered;
+    const stateData = getStateData(getTreeData(), state.activeState);
+
+    modal.innerHTML = `
+      <div class="tp-modal-dialog tp-prog-modal-dialog" role="dialog" aria-modal="true" style="background:var(--tp-surface, #fff); border-radius:16px; overflow:hidden; max-width:860px; width:92vw;">
+        <div class="tp-modal-header" style="padding:18px 24px; border-bottom:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:flex-start;">
+          <div class="tp-modal-title-wrap">
+            <h3 class="tp-modal-title" style="margin:0 0 4px; font-size:19px; font-weight:800; color:var(--tp-ink, #0F172A);">${esc(title)} Roster</h3>
+            <div class="tp-modal-role-row" style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+              <span class="tp-modal-badge" style="background:#2563EB; color:#fff; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">${esc(stateData.label)}</span>
+              <span class="tp-badge" id="tpModalRosterCountBadge" style="background:#F1F5F9; color:#475569; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">${filtered.length} Staff</span>
+              <span class="tp-badge" style="background:#E2E8F0; color:#334155; padding:2px 8px; border-radius:4px; font-size:11px;">Cycle: ${formatMonthLabel(state.activeMonth)}</span>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            ${(statusKey && statusKey !== 'all') ? `
+              <button type="button" class="tp-btn tp-btn-sm" style="background:#0284C7; color:#fff; border:none; padding:6px 12px; border-radius:6px; font-size:12px; font-weight:700; cursor:pointer;" onclick="window.ProgressModule.setStatusFilter('${statusKey}'); window.ProgressModule.closeModal();" title="Apply filter to flowchart tree">
+                Highlight in Tree
+              </button>
+            ` : ''}
+            <button type="button" class="tp-modal-close" onclick="window.ProgressModule.closeModal()" title="Close" style="font-size:24px; cursor:pointer; background:none; border:none; color:#64748B;">&times;</button>
+          </div>
+        </div>
+        <div style="padding:12px 24px; background:var(--tp-surface-muted, #F8FAFC); border-bottom:1px solid #E2E8F0; display:flex; gap:10px; align-items:center;">
+          <input type="text" id="tpProgModalFilterInput" placeholder="Quick search staff by name, role, division, or district..." style="flex:1; padding:8px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:12.5px;" oninput="window.ProgressModule.filterStatusModalList(this.value)">
+        </div>
+        <div class="tp-modal-body" id="tpProgModalRosterBody" style="padding:16px 24px 24px; max-height:68vh; overflow-y:auto;">
+          ${renderRosterListRows(filtered)}
+        </div>
+      </div>
+    `;
+
+    modal.style.display = 'flex';
+    void modal.offsetWidth;
+    modal.classList.add('open');
+  }
+
+  function filterStatusModalList(query) {
+    const body = document.getElementById('tpProgModalRosterBody');
+    const badge = document.getElementById('tpModalRosterCountBadge');
+    if (!body || !currentModalRoster) return;
+
+    const q = (query || '').trim().toLowerCase();
+    const list = q ? currentModalRoster.filter(r => {
+      const name = (r.staff.Name || '').toLowerCase();
+      const role = (r.role || '').toLowerCase();
+      const div = (r.division || '').toLowerCase();
+      const dist = (r.district || '').toLowerCase();
+      return name.includes(q) || role.includes(q) || div.includes(q) || dist.includes(q);
+    }) : currentModalRoster;
+
+    if (badge) badge.textContent = `${list.length} Staff`;
+    body.innerHTML = renderRosterListRows(list);
+  }
+
+  function renderRosterListRows(list) {
+    if (!list || list.length === 0) {
+      return `<div style="padding:28px 16px; text-align:center; color:#64748B; font-size:13px;">No staff found matching this filter criteria.</div>`;
+    }
+    return `
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        ${list.map(item => `
+          <div class="tp-po-row tp-roster-row" style="cursor:pointer; padding:10px 14px; border:1px solid #E2E8F0; border-radius:8px; display:flex; align-items:center; justify-content:space-between; gap:12px;" onclick="window.ProgressModule.openModal('${item.staff.id}', '${esc(item.role)}', '${esc(item.staff.Name)}', '${esc(item.manager)}')">
+            <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:0;">
+              <span class="tp-po-dot" style="width:8px; height:8px; border-radius:50%; background:#2563EB; flex-shrink:0;"></span>
+              <div style="min-width:0;">
+                <div style="font-weight:700; font-size:13px; color:var(--tp-ink, #0F172A); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(item.staff.Name)}</div>
+                <div style="font-size:11px; color:#64748B; margin-top:1px;">${esc(item.role)} &middot; <strong style="color:var(--tp-ink, #334155);">${esc(item.division)}</strong> &middot; ${esc(item.district)}</div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+              <span class="tp-prog-pill ${item.evalRes.statusClass}" style="font-size:11px;">${item.evalRes.statusLabel}</span>
+              <span class="tp-prog-score" style="font-size:11px;">${item.evalRes.scoreLabel}</span>
+              <button type="button" class="tp-row-details-btn" onclick="event.stopPropagation(); window.ProgressModule.openModal('${item.staff.id}', '${esc(item.role)}', '${esc(item.staff.Name)}', '${esc(item.manager)}')">Details &rarr;</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
   // Export module to global scope
   window.ProgressModule = {
     init,
@@ -1255,6 +1577,10 @@
     toggleDivision,
     expandAll,
     collapseAll,
+    setStatusFilter,
+    clearStatusFilter,
+    openStatusModal,
+    filterStatusModalList,
     clearSearch,
     drawConnectors,
     openModal,

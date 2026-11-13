@@ -3589,11 +3589,80 @@
       text-align: center;
       box-shadow: 0 1px 3px rgba(15,23,42,0.04);
       transition: all 0.2s ease;
+      cursor: pointer;
+      user-select: none;
+      position: relative;
     }
     .tp-prog-kpi-card:hover {
       transform: translateY(-2px);
       box-shadow: 0 4px 12px rgba(15,23,42,0.08);
+      border-color: #CBD5E1;
     }
+    .tp-prog-kpi-card.active,
+    .tp-prog-kpi-card.tp-active {
+      transform: translateY(-2px);
+      border-width: 2px !important;
+    }
+    .tp-prog-kpi-card.active { border-color: #2563EB !important; box-shadow: 0 0 0 3px rgba(37,99,235,0.18) !important; }
+    .tp-prog-kpi-card.tp-prog-kpi--done.active { border-color: #059669 !important; box-shadow: 0 0 0 3px rgba(5,150,105,0.22) !important; }
+    .tp-prog-kpi-card.tp-prog-kpi--partial.active { border-color: #D97706 !important; box-shadow: 0 0 0 3px rgba(217,119,6,0.22) !important; }
+    .tp-prog-kpi-card.tp-prog-kpi--pending.active { border-color: #64748B !important; box-shadow: 0 0 0 3px rgba(100,116,139,0.22) !important; }
+    .tp-prog-kpi-card.tp-prog-kpi--opt1.active { border-color: #7C3AED !important; box-shadow: 0 0 0 3px rgba(124,58,237,0.22) !important; }
+    .tp-prog-kpi-card.tp-prog-kpi--hq.active { border-color: #2563EB !important; box-shadow: 0 0 0 3px rgba(37,99,235,0.22) !important; }
+
+    .tp-kpi-val-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      position: relative;
+    }
+    .tp-kpi-view-btn {
+      background: rgba(100, 116, 139, 0.1);
+      border: 1px solid rgba(100, 116, 139, 0.2);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 11px;
+      line-height: 1.2;
+      color: var(--muted, #64748B);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .tp-kpi-view-btn:hover {
+      background: #2563EB;
+      border-color: #2563EB;
+      color: #FFFFFF;
+      transform: scale(1.08);
+    }
+    .tp-prog-filter-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 9px 16px;
+      margin-top: 10px;
+      margin-bottom: 2px;
+      background: #F0FDF4;
+      border: 1px solid #BBF7D0;
+      border-radius: 10px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #166534;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+    .tp-prog-filter-banner.tp-banner--done { background: #ECFDF5; border-color: #A7F3D0; color: #065F46; }
+    .tp-prog-filter-banner.tp-banner--partial { background: #FFFBEB; border-color: #FDE68A; color: #92400E; }
+    .tp-prog-filter-banner.tp-banner--pending { background: #F8FAFC; border-color: #E2E8F0; color: #334155; }
+    .tp-prog-filter-banner.tp-banner--opt1 { background: #FAF5FF; border-color: #E9D5FF; color: #6B21A8; }
+    .tp-prog-filter-banner.tp-banner--hq { background: #EFF6FF; border-color: #BFDBFE; color: #1E40AF; }
+
+    html[data-theme="dark"] .tp-prog-filter-banner { background: #064E3B; border-color: #059669; color: #A7F3D0; }
+    html[data-theme="dark"] .tp-prog-filter-banner.tp-banner--partial { background: #78350F; border-color: #D97706; color: #FDE68A; }
+    html[data-theme="dark"] .tp-prog-filter-banner.tp-banner--pending { background: #1E293B; border-color: #334155; color: #CBD5E1; }
+    html[data-theme="dark"] .tp-prog-filter-banner.tp-banner--opt1 { background: #3B0764; border-color: #7C3AED; color: #E9D5FF; }
+    html[data-theme="dark"] .tp-prog-filter-banner.tp-banner--hq { background: #172554; border-color: #2563EB; color: #BFDBFE; }
+    html[data-theme="dark"] .tp-kpi-view-btn { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.15); color: #94A3B8; }
+    html[data-theme="dark"] .tp-kpi-view-btn:hover { background: #38BDF8; border-color: #38BDF8; color: #0F172A; }
     .tp-prog-kpi-val {
       font-size: 20px;
       font-weight: 800;
@@ -4025,6 +4094,9 @@
     <div class="tp-prog-kpi-row" id="tpProgKpiRow">
       <!-- Dynamically injected -->
     </div>
+
+    <!-- Active KPI Status Filter Banner -->
+    <div class="tp-prog-filter-banner" id="tpProgFilterBanner" style="display:none;"></div>
 
     <!-- Division Toggle Pills Bar -->
     <div class="tp-division-pills-bar" id="tpProgDivisionBar">
