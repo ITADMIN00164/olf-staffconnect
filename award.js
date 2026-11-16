@@ -209,14 +209,9 @@ window.AWARD_CONFIG = {
      so none is named when they are the only ones left. */
   function waitingOn(row) {
     switch (stageOf(row)) {
-      case "submitted":
-        var lvl = levelRaisedAt(row);
-        var div = String(row.division_name || "").trim();
-        if (lvl >= 3) return "the COO";
-        var who = lvl === 2
-          ? "a Divisional Manager or the COO"
-          : "a Programme Manager, Divisional Manager or the COO";
-        return who + (div ? " in " + div : "");
+      // Said simply: who may verify it depends on the level it was raised at and
+      // the division, which the row already shows - "With Manager" is enough here.
+      case "submitted":    return "Manager";
 
       case "approved":     return "Head Office, to acknowledge it";
       case "acknowledged": return "Head Office, to approve it";
