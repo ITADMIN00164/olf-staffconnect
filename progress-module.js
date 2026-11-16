@@ -13,7 +13,7 @@
     activeState: 'MH',     // Default: Maharashtra
     activeMonth: '202610', // Default: October 2026
     searchQuery: '',
-    statusFilter: null,    // null (All) or 'done', 'partial', 'pending', 'unassigned', 'hq'
+    statusFilter: null,    // null (All) or 'done', 'partial', 'pending', 'unassigned'
     isLoading: false,
     selectedEmp: null
   };
@@ -184,27 +184,6 @@
     }
 
     const maps = buildAssignmentMaps();
-    const loc = String(emp.Location || '').toLowerCase();
-    const des = String(emp.Designation || '').toLowerCase();
-    const isHQ = loc.includes('ho') || des.includes('analyst') || des.includes('communications') || des.includes('guest') || (emp.id && String(emp.id).includes('VISITOR'));
-
-    if (isHQ) {
-      return {
-        empId: emp.id || 'hq',
-        name: emp.Name || 'HQ Leadership',
-        designation: emp.Designation || 'Executive',
-        isHQ: true,
-        isAssigned: false,
-        status: 'hq',
-        statusLabel: 'HQ Reviewer',
-        statusClass: 'tp-prog-pill--hq',
-        scoreLabel: 'Executive',
-        managerStatus: 'Reviewer / Leadership',
-        managerRemark: '',
-        details: null
-      };
-    }
-
     const id = (emp.id || '').trim().toUpperCase();
     const email = (emp.Email || '').trim().toLowerCase();
     const name = (emp.Name || '').trim().toLowerCase();
@@ -492,13 +471,6 @@
         </div>
         <div class="tp-prog-kpi-lbl">📋 Pending Assign.</div>
       </div>
-      <div class="tp-prog-kpi-card tp-prog-kpi--hq ${sf === 'hq' ? 'active' : ''}" onclick="window.ProgressModule.setStatusFilter('hq')" ondblclick="window.ProgressModule.openStatusModal('hq')" title="Filter by HQ Leadership · Click 📋 to view list">
-        <div class="tp-kpi-val-row">
-          <div class="tp-prog-kpi-val">${stats.hq}</div>
-          <button type="button" class="tp-kpi-view-btn" onclick="event.stopPropagation(); window.ProgressModule.openStatusModal('hq')" title="View HQ Leadership roster">📋</button>
-        </div>
-        <div class="tp-prog-kpi-lbl">🏛️ HQ Leadership</div>
-      </div>
     `;
 
     renderFilterBanner(stats, stateData);
@@ -541,10 +513,6 @@
       label = '📋 Pending Assignment';
       count = stats.unassigned;
       cls = 'tp-banner--opt1';
-    } else if (sf === 'hq') {
-      label = '🏛️ HQ Leadership';
-      count = stats.hq;
-      cls = 'tp-banner--hq';
     }
 
     banner.className = `tp-prog-filter-banner ${cls}`;
@@ -724,14 +692,13 @@
   }
 
   function calculateStats(roster) {
-    const stats = { total: roster.length, done: 0, partial: 0, pending: 0, unassigned: 0, hq: 0 };
+    const stats = { total: roster.length, done: 0, partial: 0, pending: 0, unassigned: 0 };
     roster.forEach(r => {
       const st = r.evalRes.status;
       if (st === 'done') stats.done++;
       else if (st === 'partial') stats.partial++;
       else if (st === 'pending') stats.pending++;
       else if (st === 'unassigned') stats.unassigned++;
-      else if (st === 'hq') stats.hq++;
     });
     return stats;
   }
@@ -1482,8 +1449,6 @@
         title = '○ Review Pending';
       } else if (statusKey === 'unassigned') {
         title = '📋 Pending Assignment';
-      } else if (statusKey === 'hq') {
-        title = '🏛️ HQ Leadership';
       }
     }
 
