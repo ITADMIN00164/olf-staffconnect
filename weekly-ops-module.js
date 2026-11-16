@@ -402,24 +402,27 @@
       .tp-wops-tbl-wrap {
         background: #FFFFFF;
         border: 1px solid #E2E8F0;
-        border-radius: 14px;
-        overflow: auto;
-        max-height: 68vh;
-        min-height: 300px;
+        border-radius: 14px 14px 0 0;
+        overflow: visible;
         box-shadow: 0 4px 16px rgba(0,0,0,0.04);
         position: relative;
       }
       .tp-wops-tbl {
         width: 100%;
-        min-width: 1650px;
         border-collapse: separate;
         border-spacing: 0;
-        font-size: 12.5px;
+        font-size: 12px;
         table-layout: fixed;
       }
       .tp-wops-tbl th,
       .tp-wops-tbl td {
         box-sizing: border-box;
+      }
+      .tp-wops-tbl .grp-hd th:first-child {
+        border-top-left-radius: 13px;
+      }
+      .tp-wops-tbl .grp-hd th:last-child {
+        border-top-right-radius: 13px;
       }
       
       /* Group Headers (Tier 1) */
@@ -494,10 +497,10 @@
       
       /* Explicitly override index.html global td { white-space: nowrap } */
       .tp-wops-tbl td {
-        padding: 9px 10px;
+        padding: 7px 5px;
         vertical-align: top;
-        font-size: 12px;
-        line-height: 1.45;
+        font-size: 11.5px;
+        line-height: 1.4;
         color: #334155;
         white-space: normal !important;
         overflow-wrap: break-word !important;
@@ -548,23 +551,23 @@
       }
       .tp-wops-chip-date {
         font-family: inherit;
-        font-size: 11.5px;
+        font-size: 11px;
         color: #475569;
         background: #F8FAFC;
         border: 1px solid #E2E8F0;
-        padding: 2px 7px;
+        padding: 2px 4px;
         border-radius: 6px;
         white-space: nowrap;
         display: inline-flex;
         align-items: center;
-        gap: 4px;
+        gap: 3px;
       }
       
       /* Form-like Controls inside Table Cells */
       .tp-wops-status-select {
         width: 100%;
-        padding: 5px 8px;
-        font-size: 11.5px;
+        padding: 4px 4px;
+        font-size: 11px;
         font-weight: 700;
         border-radius: 6px;
         border: 1px solid #CBD5E1;
@@ -578,8 +581,8 @@
       }
       .tp-wops-remarks-input {
         width: 100%;
-        padding: 5px 8px;
-        font-size: 12px;
+        padding: 4px 6px;
+        font-size: 11.5px;
         font-family: inherit;
         border-radius: 6px;
         border: 1px solid #CBD5E1;
@@ -788,6 +791,10 @@
           <option value="All">All Months</option>
         </select>
 
+        <select id="wopsWeekFilter" onchange="window.WeeklyOpsModule.onFilterChange('week', this.value)" title="Week">
+          <option value="All">All Weeks</option>
+        </select>
+
         <select id="wopsStateFilter" onchange="window.WeeklyOpsModule.onFilterChange('stateCode', this.value)" title="State">
           <option value="All">All States</option>
         </select>
@@ -798,10 +805,6 @@
 
         <select id="wopsPmFilter" onchange="window.WeeklyOpsModule.onFilterChange('pm', this.value)" title="Project Manager">
           <option value="All">All PMs</option>
-        </select>
-
-        <select id="wopsWeekFilter" onchange="window.WeeklyOpsModule.onFilterChange('week', this.value)" title="Week">
-          <option value="All">All Weeks</option>
         </select>
 
         <select id="wopsStatusFilter" onchange="window.WeeklyOpsModule.onFilterChange('status', this.value)" title="Status">
@@ -837,18 +840,18 @@
       <div class="tp-wops-tbl-wrap">
         <table class="tp-wops-tbl" id="tpWopsTable">
           <colgroup>
-            <col style="width: 60px;">   <!-- State -->
-            <col style="width: 100px;">  <!-- PM -->
-            <col style="width: 110px;">  <!-- District -->
-            <col style="width: 70px;">   <!-- Month -->
-            <col style="width: 75px;">   <!-- Week -->
-            <col style="width: 420px;">  <!-- Weekly Meeting Plans -->
-            <col style="width: 130px;">  <!-- Support From -->
-            <col style="width: 140px;">  <!-- Support (What?) -->
-            <col style="width: 105px;">  <!-- Deadline -->
-            <col style="width: 135px;">  <!-- Status -->
-            <col style="width: 240px;">  <!-- Remarks -->
-            <col style="width: 78px;">   <!-- Action (Edit + Delete) -->
+            <col style="width: 4%;">   <!-- State -->
+            <col style="width: 7%;">   <!-- PM -->
+            <col style="width: 7.5%;"> <!-- District -->
+            <col style="width: 4.5%;"> <!-- Month -->
+            <col style="width: 6%;">   <!-- Week -->
+            <col style="width: 28%;">  <!-- Weekly Meeting Plans -->
+            <col style="width: 7.5%;"> <!-- Support From -->
+            <col style="width: 7.5%;"> <!-- Support (What?) -->
+            <col style="width: 7%;">   <!-- Deadline -->
+            <col style="width: 8.5%;"> <!-- Status -->
+            <col style="width: 18%;">  <!-- Remarks -->
+            <col style="width: 4.5%;"> <!-- Action (Edit + Delete) -->
           </colgroup>
           <thead>
             <!-- Group Header Tier 1 -->
@@ -1391,7 +1394,10 @@
     const container = document.getElementById('tpWopsModalContainer');
     if (!container) return;
 
-    const pms = Array.from(new Set(allPlans.map(d => d.pm).filter(Boolean))).sort();
+    const staffNames = (window.TeamPerformance && typeof window.TeamPerformance.getStaffList === 'function')
+      ? (window.TeamPerformance.getStaffList() || []).map(s => s.Name || s.name).filter(Boolean)
+      : [];
+    const pms = Array.from(new Set([...allPlans.map(d => d.pm), ...staffNames].filter(Boolean))).sort();
     const dists = Array.from(new Set(allPlans.map(d => d.district).filter(Boolean))).sort();
     const admin = isITAdmin();
 
@@ -1565,7 +1571,10 @@
     if (!container) return;
 
     // Build datalists for auto-suggestions
-    const pms = Array.from(new Set(allPlans.map(d => d.pm).filter(Boolean))).sort();
+    const staffNames = (window.TeamPerformance && typeof window.TeamPerformance.getStaffList === 'function')
+      ? (window.TeamPerformance.getStaffList() || []).map(s => s.Name || s.name).filter(Boolean)
+      : [];
+    const pms = Array.from(new Set([...allPlans.map(d => d.pm), ...staffNames].filter(Boolean))).sort();
     const dists = Array.from(new Set(allPlans.map(d => d.district).filter(Boolean))).sort();
     const admin = isITAdmin();
     const user = getCurrentUser();

@@ -164,6 +164,167 @@
     return null;
   }
 
+  function getInitials(name) {
+    if (!name) return 'ST';
+    const parts = String(name).trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  // Compute structured goals score and category breakdown
+  function computeStaffScore(d) {
+    const emptyResult = {
+      totalScore: 0,
+      g1Score: 0,
+      g2Score: 0,
+      g3Score: 0,
+      g4Score: 0,
+      g5Score: 0,
+      g1Done: 0,
+      g1Pct: 0,
+      g2Pct: 0,
+      g2DoneTxt: 'Pending Review',
+      g3Clusters: 0,
+      g3Pct: 0,
+      g4T: 100,
+      g4D: 0,
+      g4Pct: 0,
+      g4Name: 'District Specific Priorities',
+      g5DoneCount: 0,
+      g5Pct: 0,
+      habitStatuses: []
+    };
+
+    if (!d) return emptyResult;
+
+    const A = d.A || {};
+    const B = d.B || {};
+    const G = d.G || {};
+    const H = d.H || {};
+    const M = d.M || {};
+    const bDone = d.bDone || 0;
+    const bTotal = d.bTotal || 0;
+
+    const hasData = (H.H2 != null && H.H2 !== '') || bTotal > 0 || Object.keys(M).length > 0 || (A.A1 != null && A.A1 !== '');
+    if (!hasData) return emptyResult;
+
+    // G1: Academic Programs (weight 40, target 2 exams)
+    let g1Done = 0;
+    if (M.M_G1_DONE != null && M.M_G1_DONE !== '') {
+      g1Done = Number(M.M_G1_DONE) || 0;
+    } else if (H.H2 === 'On track') {
+      g1Done = 2;
+    } else if (bDone > 0) {
+      g1Done = Math.min(2, Math.round((bDone / Math.max(1, bTotal)) * 2));
+    }
+    const g1Pct = Math.min(100, Math.round((g1Done / 2) * 100));
+    const g1Score = Math.min(40, Math.round((g1Pct / 100) * 40));
+
+    // G2: Life Skills (weight 20)
+    let g2Pct = 100;
+    let g2DoneTxt = 'On Track';
+    if (H.H2 === 'Needs support') {
+      g2Pct = 60;
+      g2DoneTxt = 'Needs Support (60%)';
+    } else if (H.H2 === 'Critical') {
+      g2Pct = 40;
+      g2DoneTxt = 'Lagging (40%)';
+    } else if (bTotal > 0) {
+      g2Pct = Math.round((bDone / bTotal) * 100);
+      g2DoneTxt = `${g2Pct}% Achieved`;
+    }
+    const g2Score = Math.min(20, Math.round((g2Pct / 100) * 20));
+
+    // G3: Vibrant Teacher Community (weight 20, target 3 POM clusters)
+    let g3Clusters = 0;
+    if (M.M_G3_POMCLUSTERS != null && M.M_G3_POMCLUSTERS !== '') {
+      g3Clusters = Number(M.M_G3_POMCLUSTERS) || 0;
+    } else if (H.H2 === 'On track') {
+      g3Clusters = 3;
+    } else if (bDone >= 3) {
+      g3Clusters = 2;
+    } else if (bDone > 0) {
+      g3Clusters = 1;
+    }
+    const g3Pct = Math.min(100, Math.round((g3Clusters / 3) * 100));
+    const g3Score = Math.min(20, Math.round((g3Pct / 100) * 20));
+
+    // G4: Other Priorities (weight 10)
+    const g4Name = (M.M_G4_1_NAME && String(M.M_G4_1_NAME).trim()) || 'District Specific Priorities';
+    const g4T = Number(M.M_G4_1_T) || 100;
+    let g4D = 0;
+    if (M.M_G4_1_D != null && M.M_G4_1_D !== '') {
+      g4D = Number(M.M_G4_1_D) || 0;
+    } else if (H.H2 === 'On track') {
+      g4D = g4T;
+    } else if (bTotal > 0) {
+      g4D = Math.round((bDone / bTotal) * g4T);
+    }
+    const g4Pct = g4T > 0 ? Math.min(100, Math.round((g4D / g4T) * 100)) : 100;
+    const g4Score = Math.min(10, Math.round((g4Pct / 100) * 10));
+
+    // G5: Self-Development & Execution Habits (weight 10, 9 habits)
+    const g5Habits = [
+      { key: 'M_G5_NIMBLE', label: 'Nimble System', sub: 'Field Activity Daily' },
+      { key: 'M_G5_WHATSAPP', label: 'WhatsApp Groups', sub: 'Vinoba Teacher Groups' },
+      { key: 'M_G5_FVR', label: 'Field Visit Reports', sub: 'School Visit Submissions' },
+      { key: 'M_G5_POM', label: 'POM Tracking', sub: 'Monthly Meet Register' },
+      { key: 'M_G5_CEOPPT', label: 'CEO Presentation', sub: 'Monthly District Review PPT' },
+      { key: 'M_G5_ACTTRACKER', label: 'Activity Tracker', sub: 'Daily Action Log' },
+      { key: 'M_G5_CEOTRACKER', label: 'CEO Tracker', sub: 'Action Points Register' },
+      { key: 'M_G5_COMMIT', label: 'Weekly Commitments', sub: 'Team Action Goals' },
+      { key: 'M_G5_CASESTUDY', label: 'Case Studies', sub: 'Inspiring Stories' }
+    ];
+
+    let g5DoneCount = 0;
+    const habitStatuses = g5Habits.map(h => {
+      const val = M[h.key];
+      let isDone = false;
+      let valDisplay = '';
+      if (h.key === 'M_G5_CASESTUDY') {
+        const num = Number(val) || 0;
+        isDone = num > 0;
+        valDisplay = num > 0 ? `${num} Logged` : '0';
+      } else {
+        isDone = val === 'Y' || val === true || val === '1';
+        valDisplay = isDone ? '✓ Yes' : 'Pending';
+      }
+      if (!isDone && Object.keys(M).length === 0 && H.H2 === 'On track') {
+        isDone = true;
+        valDisplay = '✓ Yes';
+      }
+      if (isDone) g5DoneCount++;
+      return Object.assign({}, h, { isDone, valDisplay });
+    });
+
+    const g5Pct = Math.min(100, Math.round((g5DoneCount / 9) * 100));
+    const g5Score = Math.min(10, Math.round((g5Pct / 100) * 10));
+
+    const totalScore = Math.min(100, g1Score + g2Score + g3Score + g4Score + g5Score);
+
+    return {
+      totalScore,
+      g1Score,
+      g2Score,
+      g3Score,
+      g4Score,
+      g5Score,
+      g1Done,
+      g1Pct,
+      g2Pct,
+      g2DoneTxt,
+      g3Clusters,
+      g3Pct,
+      g4T,
+      g4D,
+      g4Pct,
+      g4Name,
+      g5DoneCount,
+      g5Pct,
+      habitStatuses
+    };
+  }
+
   // Evaluate progress status for an employee
   function evaluateEmployee(emp) {
     if (!emp) {
@@ -177,6 +338,8 @@
         statusLabel: 'Pending Review',
         statusClass: 'tp-prog-pill--pending',
         scoreLabel: '— / 100',
+        totalScore: 0,
+        scoreData: null,
         managerStatus: 'Not submitted',
         managerRemark: '',
         details: null
@@ -200,6 +363,8 @@
         statusLabel: 'Pending Assignment',
         statusClass: 'tp-prog-pill--unassigned',
         scoreLabel: '—',
+        totalScore: 0,
+        scoreData: null,
         managerStatus: 'Assignment Pending',
         managerRemark: 'Staff member added to SMART GOALS roster; pending district assignment in Field Review System.',
         details: null
@@ -220,6 +385,8 @@
         statusLabel: 'Pending Review',
         statusClass: 'tp-prog-pill--pending',
         scoreLabel: '— / 100',
+        totalScore: 0,
+        scoreData: null,
         managerStatus: 'Not submitted',
         managerRemark: 'Monthly review not yet submitted for this period.',
         details: null
@@ -261,13 +428,19 @@
       }
     });
 
+    const details = { A, B, G, H, M, bTotal, bDone };
+    const scoreData = computeStaffScore(details);
+    const totalScore = scoreData.totalScore;
+
     let scoreLabel = '— / 100';
     if (H.H2 === 'On track') {
-      scoreLabel = '⭐ On Track';
+      scoreLabel = totalScore > 0 ? `⭐ ${totalScore}/100` : '⭐ On Track';
     } else if (H.H2 === 'Needs support') {
-      scoreLabel = '⚠️ Needs Support';
+      scoreLabel = totalScore > 0 ? `⚠️ ${totalScore}/100` : '⚠️ Needs Support';
     } else if (H.H2 === 'Critical') {
-      scoreLabel = '🚨 Critical';
+      scoreLabel = totalScore > 0 ? `🚨 ${totalScore}/100` : '🚨 Critical';
+    } else if (totalScore > 0) {
+      scoreLabel = `${totalScore} / 100`;
     } else if (bTotal > 0) {
       const pct = Math.round((bDone / bTotal) * 100);
       scoreLabel = `${pct}% Actions Done`;
@@ -285,9 +458,11 @@
       statusLabel,
       statusClass,
       scoreLabel,
+      totalScore,
+      scoreData,
       managerStatus: H.H2 || (mgrDone ? 'Review Held' : 'Awaiting Manager Review'),
       managerRemark: H.H3 || '',
-      details: { A, B, G, H, M, bTotal, bDone }
+      details
     };
   }
 
@@ -1176,158 +1351,474 @@
     state.selectedEmp = { staff, evalRes };
 
     const mgrName = fallbackMgr || staff.Reporting_manager || staff['Reporting manager'] || 'Reporting Manager';
-
-    let modalBody = '';
     const d = evalRes.details;
+    const initials = getInitials(staff.Name);
+    const cycleLabel = formatMonthLabel(state.activeMonth);
 
     if (!evalRes.isAssigned) {
-      modalBody = `
-        <div class="tp-prog-modal-notice" style="text-align:center; padding:32px 20px;">
-          <div class="tp-prog-notice-ico" style="font-size:42px; margin-bottom:12px;">📋</div>
-          <h4 style="font-size:17px; font-weight:800; color:var(--tp-ink, #0F172A); margin-bottom:8px;">Pending Field Assignment</h4>
-          <p style="font-size:13.5px; color:var(--tp-ink-muted, #64748B); max-width:520px; margin:0 auto; line-height:1.55;">
-            ${esc(evalRes.managerRemark || 'This staff member is active on the SMART GOALS roster, but does not yet have an active district assignment registered in the Field Review System.')}
-          </p>
-        </div>
-      `;
-    } else if (!d) {
-      modalBody = `
-        <div class="tp-prog-modal-notice" style="text-align:center; padding:32px 20px;">
-          <div class="tp-prog-notice-ico" style="font-size:42px; margin-bottom:12px;">○</div>
-          <h4 style="font-size:17px; font-weight:800; color:var(--tp-ink, #0F172A); margin-bottom:8px;">Review Pending for ${formatMonthLabel(state.activeMonth)}</h4>
-          <p style="font-size:13.5px; color:var(--tp-ink-muted, #64748B); max-width:520px; margin:0 auto; line-height:1.55;">
-            Monthly field review responses have not been submitted for this staff member in ${formatMonthLabel(state.activeMonth)} yet.
-          </p>
-        </div>
-      `;
-    } else {
-      // Build Sections H, B, G, A, M
-      const A = d.A || {};
-      const B = d.B || {};
-      const G = d.G || {};
-      const H = d.H || {};
-      const M = d.M || {};
-
-      // B Items List
-      let bItemsHtml = '';
-      [1, 2, 3, 4, 5].forEach(n => {
-        const item = B['B' + n];
-        if (item) {
-          const text = item.text || item;
-          const status = item.status || 'Pending';
-          const isDone = status === 'Done';
-          bItemsHtml += `
-            <div class="tp-prog-action-row">
-              <span class="tp-prog-action-num">B${n}</span>
-              <span class="tp-prog-action-txt">${esc(text)}</span>
-              <span class="tp-prog-pill ${isDone ? 'tp-prog-pill--done' : 'tp-prog-pill--pending'}">${esc(status)}</span>
+      modal.innerHTML = `
+        <div class="tp-modal-dialog tp-prog-modal-dialog" role="dialog" aria-modal="true">
+          <div class="tp-prog-modal-hdr">
+            <div class="tp-prog-modal-hdr-left">
+              <div class="tp-prog-avatar" style="background:#64748B;">📋</div>
+              <div class="tp-prog-hdr-titles">
+                <h3 class="tp-prog-hdr-name">${esc(staff.Name)}</h3>
+                <div class="tp-prog-hdr-meta">
+                  <span class="tp-modal-badge" style="background:#F1F5F9; color:#475569; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">${esc(staff.Designation || fallbackRole || 'Field Staff')}</span>
+                  <span class="tp-prog-pill tp-prog-pill--unassigned">Pending Assignment</span>
+                </div>
+              </div>
             </div>
-          `;
-        }
-      });
+            <div class="tp-prog-modal-hdr-actions">
+              <button type="button" class="tp-modal-close" onclick="window.ProgressModule.closeModal()" title="Close" style="font-size:24px; cursor:pointer; background:none; border:none; color:#64748B;">&times;</button>
+            </div>
+          </div>
+          <div class="tp-prog-body" style="padding:48px 24px; text-align:center;">
+            <div style="font-size:46px; margin-bottom:12px;">📋</div>
+            <h4 style="font-size:18px; font-weight:800; color:var(--tp-ink, #0F172A); margin-bottom:8px;">Pending District Assignment</h4>
+            <p style="font-size:13.5px; color:var(--tp-ink-muted, #64748B); max-width:540px; margin:0 auto; line-height:1.55;">
+              ${esc(evalRes.managerRemark || 'This staff member is active on the SMART GOALS roster, but does not yet have an active district assignment registered in the Field Review System.')}
+            </p>
+          </div>
+        </div>
+      `;
+      return;
+    }
 
-      // G Items List
-      let gItemsHtml = '';
-      if (G.G1) {
-        gItemsHtml += `
-          <div class="tp-prog-action-row tp-prog-blocker">
-            <span class="tp-prog-action-num">Blocker</span>
-            <span class="tp-prog-action-txt">${esc(G.G1)}</span>
+    if (!d) {
+      modal.innerHTML = `
+        <div class="tp-modal-dialog tp-prog-modal-dialog" role="dialog" aria-modal="true">
+          <div class="tp-prog-modal-hdr">
+            <div class="tp-prog-modal-hdr-left">
+              <div class="tp-prog-avatar">${esc(initials)}</div>
+              <div class="tp-prog-hdr-titles">
+                <h3 class="tp-prog-hdr-name">${esc(staff.Name)}</h3>
+                <div class="tp-prog-hdr-meta">
+                  <span class="tp-modal-badge" style="background:#F1F5F9; color:#475569; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">${esc(staff.Designation || fallbackRole || 'Field Staff')}</span>
+                  <span class="tp-prog-pill tp-prog-pill--pending">Review Pending</span>
+                  <span>District: <strong>${esc(staff.District || staff.Location || 'Field')}</strong></span>
+                  <span>Manager: <strong>${esc(mgrName)}</strong></span>
+                  <span>Cycle: <strong>${esc(cycleLabel)}</strong></span>
+                </div>
+              </div>
+            </div>
+            <div class="tp-prog-modal-hdr-actions">
+              <button type="button" class="tp-modal-close" onclick="window.ProgressModule.closeModal()" title="Close" style="font-size:24px; cursor:pointer; background:none; border:none; color:#64748B;">&times;</button>
+            </div>
+          </div>
+          <div class="tp-prog-body" style="padding:48px 24px; text-align:center;">
+            <div style="font-size:46px; margin-bottom:12px;">○</div>
+            <h4 style="font-size:18px; font-weight:800; color:var(--tp-ink, #0F172A); margin-bottom:8px;">Review Pending for ${esc(cycleLabel)}</h4>
+            <p style="font-size:13.5px; color:var(--tp-ink-muted, #64748B); max-width:540px; margin:0 auto; line-height:1.55;">
+              Monthly field review responses have not been submitted for this staff member in ${esc(cycleLabel)} yet.
+            </p>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    const A = d.A || {};
+    const B = d.B || {};
+    const G = d.G || {};
+    const H = d.H || {};
+    const M = d.M || {};
+
+    const scoreData = evalRes.scoreData || computeStaffScore(d);
+    const {
+      totalScore,
+      g1Score,
+      g2Score,
+      g3Score,
+      g4Score,
+      g5Score,
+      g1Done,
+      g1Pct,
+      g2Pct,
+      g2DoneTxt,
+      g3Clusters,
+      g3Pct,
+      g4T,
+      g4D,
+      g4Pct,
+      g4Name,
+      g5DoneCount,
+      g5Pct,
+      habitStatuses
+    } = scoreData;
+
+    // Workflow status banner
+    let wfClass = 'tp-prog-wf--pending';
+    let wfText = '';
+    if (evalRes.status === 'done') {
+      wfClass = 'tp-prog-wf--done';
+      wfText = `<span>⚡ <strong>Review Completed &amp; Approved</strong> &mdash; Reporting Manager: <strong>${esc(mgrName)}</strong> &middot; Rating: <strong>${esc(H.H2 || 'On track')}</strong></span>`;
+    } else if (evalRes.status === 'partial') {
+      wfClass = 'tp-prog-wf--partial';
+      wfText = `<span>⚡ <strong>Self-Assessment Submitted by Staff</strong> &mdash; Awaiting Manager Review Evaluation from <strong>${esc(mgrName)}</strong></span>`;
+    } else {
+      wfClass = 'tp-prog-wf--pending';
+      wfText = `<span>⚡ <strong>Monthly Review Pending</strong> &mdash; Evaluation Cycle: <strong>${esc(cycleLabel)}</strong></span>`;
+    }
+
+    // Score ribbon HTML
+    const ribbonHtml = `
+      <div class="tp-prog-score-ribbon">
+        <div class="tp-prog-metric-card tp-prog-metric--total">
+          <div class="tp-prog-metric-lbl">Total Monthly Score</div>
+          <div class="tp-prog-metric-val">${totalScore}<span style="font-size:13px; font-weight:500; opacity:0.85;"> / 100</span></div>
+          <div class="tp-prog-metric-sub">${H.H2 ? `⭐ Rating: ${esc(H.H2)}` : (evalRes.status === 'done' ? 'Evaluated' : 'Provisional Score')}</div>
+        </div>
+        <div class="tp-prog-metric-card" style="border-left: 4px solid #2563EB;">
+          <div class="tp-prog-metric-lbl">G1 · Academics</div>
+          <div class="tp-prog-metric-val">${g1Score}<span style="font-size:12px; font-weight:500; color:#64748B;"> / 40</span></div>
+          <div class="tp-prog-metric-sub">${g1Done} of 2 Exams (${g1Pct}%)</div>
+        </div>
+        <div class="tp-prog-metric-card" style="border-left: 4px solid #059669;">
+          <div class="tp-prog-metric-lbl">G2 · Life Skills</div>
+          <div class="tp-prog-metric-val">${g2Score}<span style="font-size:12px; font-weight:500; color:#64748B;"> / 20</span></div>
+          <div class="tp-prog-metric-sub">${g2Pct}% Engagement</div>
+        </div>
+        <div class="tp-prog-metric-card" style="border-left: 4px solid #D97706;">
+          <div class="tp-prog-metric-lbl">G3 · Teachers</div>
+          <div class="tp-prog-metric-val">${g3Score}<span style="font-size:12px; font-weight:500; color:#64748B;"> / 20</span></div>
+          <div class="tp-prog-metric-sub">${g3Clusters} of 3 Clusters</div>
+        </div>
+        <div class="tp-prog-metric-card" style="border-left: 4px solid #7C3AED;">
+          <div class="tp-prog-metric-lbl">G4 · Priorities</div>
+          <div class="tp-prog-metric-val">${g4Score}<span style="font-size:12px; font-weight:500; color:#64748B;"> / 10</span></div>
+          <div class="tp-prog-metric-sub">${g4Pct}% Achieved</div>
+        </div>
+        <div class="tp-prog-metric-card" style="border-left: 4px solid #DB2777;">
+          <div class="tp-prog-metric-lbl">G5 · Self-Dev</div>
+          <div class="tp-prog-metric-val">${g5Score}<span style="font-size:12px; font-weight:500; color:#64748B;"> / 10</span></div>
+          <div class="tp-prog-metric-sub">${g5DoneCount} of 9 Habits</div>
+        </div>
+      </div>
+    `;
+
+    // Section M Drawer
+    const secMHtml = `
+      <details class="tp-prog-acc" open>
+        <summary class="tp-prog-acc-summary">
+          <div class="tp-prog-acc-summary-left">
+            <span class="tp-prog-sec-tag" style="background:#EFF6FF; color:#1D4ED8; border:1px solid #BFDBFE;">Section M</span>
+            <span>Operational Goals &amp; Performance Breakdown</span>
+          </div>
+          <div class="tp-prog-acc-summary-right">
+            <span class="tp-badge" style="background:#2563EB; color:#fff; font-weight:700;">Score: ${totalScore}/100</span>
+            <span class="tp-prog-acc-chevron">▼</span>
+          </div>
+        </summary>
+        <div class="tp-prog-acc-content">
+          <div style="overflow-x:auto;">
+            <table class="tp-prog-goals-tbl">
+              <thead>
+                <tr>
+                  <th style="width:38%;">Goal / Key Performance Domain</th>
+                  <th style="width:10%; text-align:center;">Weight</th>
+                  <th style="width:16%;">Target</th>
+                  <th style="width:16%;">Actual Done</th>
+                  <th style="width:10%; text-align:center;">% Achieved</th>
+                  <th style="width:10%; text-align:right;">Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <div style="font-weight:700;">G1 · Academic Programs</div>
+                    <div style="font-size:11px; color:#64748B;">Conduct CBT &amp; OMR practice examinations (JEE / NEET / FLN)</div>
+                  </td>
+                  <td style="text-align:center; font-weight:700;">40</td>
+                  <td>2 Practice Exams</td>
+                  <td><strong>${g1Done}</strong> Practice Exams</td>
+                  <td style="text-align:center;"><span class="tp-badge" style="background:${g1Pct >= 100 ? '#DCFCE7; color:#166534;' : '#FEF3C7; color:#92400E;'} font-weight:700;">${g1Pct}%</span></td>
+                  <td style="text-align:right; font-weight:800; color:#2563EB;">${g1Score} / 40</td>
+                </tr>
+                <tr>
+                  <td>
+                    <div style="font-weight:700;">G2 · Life Skills Programs</div>
+                    <div style="font-size:11px; color:#64748B;">Strengthen school club posts, streaks &amp; student life skills engagement</div>
+                  </td>
+                  <td style="text-align:center; font-weight:700;">20</td>
+                  <td>Active Club Posts</td>
+                  <td><strong>${esc(g2DoneTxt)}</strong></td>
+                  <td style="text-align:center;"><span class="tp-badge" style="background:${g2Pct >= 100 ? '#DCFCE7; color:#166534;' : '#FEF3C7; color:#92400E;'} font-weight:700;">${g2Pct}%</span></td>
+                  <td style="text-align:right; font-weight:800; color:#059669;">${g2Score} / 20</td>
+                </tr>
+                <tr>
+                  <td>
+                    <div style="font-weight:700;">G3 · Vibrant Teacher Community</div>
+                    <div style="font-size:11px; color:#64748B;">Cluster POM meetings, teacher recognition &amp; Vinoba app mobilization</div>
+                  </td>
+                  <td style="text-align:center; font-weight:700;">20</td>
+                  <td>3 POM Clusters</td>
+                  <td><strong>${g3Clusters}</strong> Clusters Conducted</td>
+                  <td style="text-align:center;"><span class="tp-badge" style="background:${g3Pct >= 100 ? '#DCFCE7; color:#166534;' : '#FEF3C7; color:#92400E;'} font-weight:700;">${g3Pct}%</span></td>
+                  <td style="text-align:right; font-weight:800; color:#D97706;">${g3Score} / 20</td>
+                </tr>
+                <tr>
+                  <td>
+                    <div style="font-weight:700;">G4 · ${esc(g4Name)}</div>
+                    <div style="font-size:11px; color:#64748B;">District-specific key deliverables, special events &amp; administrative alignment</div>
+                  </td>
+                  <td style="text-align:center; font-weight:700;">10</td>
+                  <td>${g4T}%</td>
+                  <td><strong>${g4D}%</strong></td>
+                  <td style="text-align:center;"><span class="tp-badge" style="background:${g4Pct >= 100 ? '#DCFCE7; color:#166534;' : '#FEF3C7; color:#92400E;'} font-weight:700;">${g4Pct}%</span></td>
+                  <td style="text-align:right; font-weight:800; color:#7C3AED;">${g4Score} / 10</td>
+                </tr>
+                <tr>
+                  <td>
+                    <div style="font-weight:700;">G5 · Self-Development &amp; Execution Habits</div>
+                    <div style="font-size:11px; color:#64748B;">Routine discipline across reporting systems, WhatsApp groups &amp; field presence</div>
+                  </td>
+                  <td style="text-align:center; font-weight:700;">10</td>
+                  <td>9 Execution Habits</td>
+                  <td><strong>${g5DoneCount}</strong> of 9 Completed</td>
+                  <td style="text-align:center;"><span class="tp-badge" style="background:${g5Pct >= 100 ? '#DCFCE7; color:#166534;' : '#FEF3C7; color:#92400E;'} font-weight:700;">${g5Pct}%</span></td>
+                  <td style="text-align:right; font-weight:800; color:#DB2777;">${g5Score} / 10</td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td>TOTAL MONTHLY PERFORMANCE SCORE</td>
+                  <td style="text-align:center;">100</td>
+                  <td colspan="2">Comprehensive Monthly Review Target</td>
+                  <td style="text-align:center; font-size:13px; color:#2563EB;">${totalScore}%</td>
+                  <td style="text-align:right; font-size:14px; color:#2563EB;">${totalScore} / 100</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <!-- Habit breakdown pills -->
+          <div style="margin-top:14px;">
+            <div style="font-size:11.5px; font-weight:700; color:var(--tp-ink-muted, #64748B); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.03em;">
+              Self-Development Habits Breakdown (${g5DoneCount}/9 Active):
+            </div>
+            <div class="tp-prog-habits-grid">
+              ${habitStatuses.map(h => `
+                <div class="tp-prog-habit-chip ${h.isDone ? 'done' : ''}">
+                  <div>
+                    <div style="font-weight:700; font-size:11.5px;">${esc(h.label)}</div>
+                    <div style="font-size:10px; color:#64748B;">${esc(h.sub)}</div>
+                  </div>
+                  <span class="tp-badge" style="font-size:10px; font-weight:700; ${h.isDone ? 'background:#10B981; color:#fff;' : 'background:#E2E8F0; color:#64748B;'}">
+                    ${esc(h.valDisplay)}
+                  </span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      </details>
+    `;
+
+    // Section H Drawer
+    const secHHtml = `
+      <details class="tp-prog-acc" open>
+        <summary class="tp-prog-acc-summary">
+          <div class="tp-prog-acc-summary-left">
+            <span class="tp-prog-sec-tag" style="background:#EFF6FF; color:#0284C7; border:1px solid #BAE6FD;">Section H</span>
+            <span>Reporting Manager Evaluation &amp; Remarks</span>
+          </div>
+          <div class="tp-prog-acc-summary-right">
+            <span class="tp-prog-pill ${H.H1 === 'Y' ? 'tp-prog-pill--done' : 'tp-prog-pill--pending'}">
+              ${H.H1 === 'Y' ? '✓ Review Held' : 'Review Pending'}
+            </span>
+            <span class="tp-prog-acc-chevron">▼</span>
+          </div>
+        </summary>
+        <div class="tp-prog-acc-content">
+          <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding-bottom:12px; border-bottom:1px solid var(--tp-border, #E2E8F0);">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:12px; color:var(--tp-ink-muted, #64748B);">Manager Status Rating:</span>
+              <span class="tp-badge" style="background:#2563EB; color:#fff; font-weight:800; font-size:12px; padding:3px 10px; border-radius:6px;">
+                ${esc(H.H2 || 'Pending Evaluation')}
+              </span>
+            </div>
+            <div style="font-size:12px; color:var(--tp-ink-muted, #64748B);">
+              Reporting Manager: <strong style="color:var(--tp-ink, #0F172A);">${esc(mgrName)}</strong>
+            </div>
+          </div>
+          ${H.H3 ? `
+            <div class="tp-prog-mgr-quote">
+              <div style="font-weight:700; color:#1D4ED8; font-size:11.5px; text-transform:uppercase; letter-spacing:0.03em; margin-bottom:4px;">
+                Manager Feedback &amp; Direct Remarks
+              </div>
+              <div>${esc(H.H3)}</div>
+            </div>
+          ` : `
+            <div style="font-size:12px; color:var(--tp-ink-muted, #64748B); padding:10px 0;">
+              No qualitative feedback notes recorded for this cycle.
+            </div>
+          `}
+        </div>
+      </details>
+    `;
+
+    // Section B Drawer
+    const bPct = d.bTotal > 0 ? Math.round((d.bDone / d.bTotal) * 100) : 0;
+    let bRowsHtml = '';
+    [1, 2, 3, 4, 5].forEach(n => {
+      const item = B['B' + n];
+      if (item) {
+        const text = item.text || item;
+        const status = item.status || 'Pending';
+        const isDone = status === 'Done' || (typeof status === 'string' && status.toLowerCase() === 'done');
+        bRowsHtml += `
+          <div class="tp-prog-action-row">
+            <span class="tp-prog-action-num">B${n}</span>
+            <span class="tp-prog-action-txt" style="${isDone ? 'color:var(--tp-ink, #0F172A);' : 'color:#64748B;'}">${esc(text || 'No description provided')}</span>
+            <span class="tp-badge" style="font-size:11px; font-weight:700; ${isDone ? 'background:#DCFCE7; color:#166534;' : 'background:#F1F5F9; color:#64748B;'}">
+              ${isDone ? '✓ Done' : '○ Incomplete'}
+            </span>
           </div>
         `;
       }
-      [2, 3, 4, 5, 6].forEach((n, idx) => {
-        const val = G['G' + n];
-        if (val) {
-          gItemsHtml += `
-            <div class="tp-prog-action-row">
-              <span class="tp-prog-action-num">Action ${idx + 1}</span>
-              <span class="tp-prog-action-txt">${esc(val)}</span>
-            </div>
-          `;
-        }
-      });
+    });
 
-      modalBody = `
-        <div class="tp-prog-sections">
-          <!-- Section H: Manager Review -->
-          <div class="tp-prog-sec tp-prog-sec--mgr">
-            <div class="tp-prog-sec-hd">
-              <span>Section H · Reporting Manager Evaluation</span>
-              <span class="tp-prog-pill ${H.H1 === 'Y' ? 'tp-prog-pill--done' : 'tp-prog-pill--pending'}">
-                ${H.H1 === 'Y' ? '✓ Review Held' : 'Review Not Held'}
-              </span>
-            </div>
-            <div class="tp-prog-sec-body">
-              <div class="tp-prog-mgr-grid">
-                <div><strong>Manager Status Rating:</strong> <span class="tp-badge" style="background:#0284C7; color:#fff; font-weight:700;">${esc(H.H2 || 'Not recorded')}</span></div>
-                <div><strong>Reporting Manager:</strong> <strong>${esc(mgrName)}</strong></div>
-              </div>
-              ${H.H3 ? `<div class="tp-prog-mgr-remark"><strong>Manager Feedback &amp; Remarks:</strong><p>${esc(H.H3)}</p></div>` : ''}
-            </div>
+    const secBHtml = `
+      <details class="tp-prog-acc" open>
+        <summary class="tp-prog-acc-summary">
+          <div class="tp-prog-acc-summary-left">
+            <span class="tp-prog-sec-tag" style="background:#F0FDF4; color:#15803D; border:1px solid #BBF7D0;">Section B</span>
+            <span>Previous Month Action Execution</span>
           </div>
+          <div class="tp-prog-acc-summary-right">
+            <span class="tp-badge" style="background:#10B981; color:#fff; font-weight:700;">${d.bDone}/${d.bTotal} Completed (${bPct}%)</span>
+            <span class="tp-prog-acc-chevron">▼</span>
+          </div>
+        </summary>
+        <div class="tp-prog-acc-content">
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-bottom:4px;">
+            <span style="color:var(--tp-ink-muted, #64748B);">Completion Progress</span>
+            <strong>${d.bDone} of ${d.bTotal} actions achieved (${bPct}%)</strong>
+          </div>
+          <div class="tp-prog-progress-bar-wrap">
+            <div class="tp-prog-progress-bar-fill" style="width:${bPct}%;"></div>
+          </div>
+          ${bRowsHtml || '<div style="font-size:12px; color:#64748B; padding:8px 0;">No carried action items logged for this cycle.</div>'}
+        </div>
+      </details>
+    `;
 
-          <!-- Section B: Previous Month Actions -->
-          <div class="tp-prog-sec">
-            <div class="tp-prog-sec-hd">
-              <span>Section B · Action Item Execution (${d.bDone}/${d.bTotal} Completed)</span>
-            </div>
-            <div class="tp-prog-sec-body">
-              ${bItemsHtml || '<div class="tp-muted" style="font-size:12px; color:#64748B;">No specific carried actions recorded.</div>'}
-            </div>
+    // Section G Drawer
+    let gBlockerHtml = '';
+    if (G.G1 && String(G.G1).trim()) {
+      gBlockerHtml = `
+        <div class="tp-prog-blocker">
+          <div style="font-weight:800; font-size:12px; color:#DC2626; text-transform:uppercase; letter-spacing:0.03em; margin-bottom:4px;">
+            🚨 Field Blocker &amp; Operational Escalation
           </div>
-
-          <!-- Section G: Next Month Commitments -->
-          <div class="tp-prog-sec">
-            <div class="tp-prog-sec-hd">
-              <span>Section G · Commitments &amp; Escalations for Next Month</span>
-            </div>
-            <div class="tp-prog-sec-body">
-              ${gItemsHtml || '<div class="tp-muted" style="font-size:12px; color:#64748B;">No future commitments recorded.</div>'}
-            </div>
-          </div>
-
-          <!-- Section A: Mood & Mindset -->
-          <div class="tp-prog-sec">
-            <div class="tp-prog-sec-hd">
-              <span>Section A · Self Check-in</span>
-            </div>
-            <div class="tp-prog-sec-body">
-              <div style="font-size: 13px;">
-                <strong>Monthly Sentiment / Mood:</strong>
-                ${(() => {
-                  const val = String(A.A1 || '').trim().toUpperCase();
-                  if (val === 'G') return '<span style="color:#16A34A; font-weight:700;">🟢 Good / Positive (Green)</span>';
-                  if (val === 'Y') return '<span style="color:#D97706; font-weight:700;">🟡 Moderate / Needs Support (Yellow)</span>';
-                  if (val === 'R') return '<span style="color:#DC2626; font-weight:700;">🔴 Challenging / High Pressure (Red)</span>';
-                  return esc(A.A1 || 'Not recorded');
-                })()}
-              </div>
-              ${A.A2 ? `<div style="font-size: 13px; margin-top: 6px;"><strong>Mindset &amp; Notes:</strong> ${esc(A.A2)}</div>` : ''}
-            </div>
-          </div>
+          <div style="font-size:13px; color:#7F1D1D; line-height:1.45;">${esc(G.G1)}</div>
         </div>
       `;
     }
 
-    modal.innerHTML = `
-      <div class="tp-modal-dialog tp-prog-modal-dialog" role="dialog" aria-modal="true" style="background:var(--tp-surface, #fff); border-radius:16px; overflow:hidden;">
-        <div class="tp-modal-header" style="padding:18px 24px; border-bottom:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:flex-start;">
-          <div class="tp-modal-title-wrap">
-            <h3 class="tp-modal-title" style="margin:0 0 4px; font-size:19px; font-weight:800; color:var(--tp-ink, #0F172A);">${esc(staff.Name)}</h3>
-            <div class="tp-modal-role-row" style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-              <span class="tp-modal-badge" style="background:#F1F5F9; color:#475569; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">${esc(staff.Designation || fallbackRole || 'Field Staff')}</span>
-              <span class="tp-prog-pill ${evalRes.statusClass}">${evalRes.statusLabel}</span>
-              <span class="tp-prog-score" style="margin-left:4px;">${evalRes.scoreLabel}</span>
+    let gActionsHtml = '';
+    [2, 3, 4, 5, 6].forEach((n, idx) => {
+      const val = G['G' + n];
+      if (val && String(val).trim()) {
+        gActionsHtml += `
+          <div class="tp-prog-action-row">
+            <span class="tp-prog-action-num" style="color:#7C3AED;">Action ${idx + 1}</span>
+            <span class="tp-prog-action-txt">${esc(val)}</span>
+          </div>
+        `;
+      }
+    });
+
+    const secGHtml = `
+      <details class="tp-prog-acc" open>
+        <summary class="tp-prog-acc-summary">
+          <div class="tp-prog-acc-summary-left">
+            <span class="tp-prog-sec-tag" style="background:#FAF5FF; color:#7E22CE; border:1px solid #E9D5FF;">Section G</span>
+            <span>Next Month Commitments &amp; Escalations</span>
+          </div>
+          <div class="tp-prog-acc-summary-right">
+            ${G.G1 ? '<span class="tp-badge" style="background:#EF4444; color:#fff; font-weight:700;">1 Blocker</span>' : ''}
+            <span class="tp-prog-acc-chevron">▼</span>
+          </div>
+        </summary>
+        <div class="tp-prog-acc-content">
+          ${gBlockerHtml}
+          ${gActionsHtml || '<div style="font-size:12px; color:#64748B; padding:8px 0;">No upcoming action commitments recorded.</div>'}
+        </div>
+      </details>
+    `;
+
+    // Section A Drawer
+    let moodBadge = '<span class="tp-badge" style="background:#E2E8F0; color:#475569;">Not recorded</span>';
+    const a1Val = String(A.A1 || '').trim().toUpperCase();
+    if (a1Val === 'G') {
+      moodBadge = '<span class="tp-badge" style="background:#DCFCE7; color:#166534; font-weight:800; font-size:12px;">🟢 Good / Positive (Green)</span>';
+    } else if (a1Val === 'Y') {
+      moodBadge = '<span class="tp-badge" style="background:#FEF3C7; color:#92400E; font-weight:800; font-size:12px;">🟡 Moderate / Needs Support (Yellow)</span>';
+    } else if (a1Val === 'R') {
+      moodBadge = '<span class="tp-badge" style="background:#FEE2E2; color:#991B1B; font-weight:800; font-size:12px;">🔴 Challenging / High Pressure (Red)</span>';
+    }
+
+    const secAHtml = `
+      <details class="tp-prog-acc">
+        <summary class="tp-prog-acc-summary">
+          <div class="tp-prog-acc-summary-left">
+            <span class="tp-prog-sec-tag" style="background:#FDF2F8; color:#BE185D; border:1px solid #FBCFE8;">Section A</span>
+            <span>Self Check-in &amp; Staff Mindset</span>
+          </div>
+          <div class="tp-prog-acc-summary-right">
+            ${moodBadge}
+            <span class="tp-prog-acc-chevron">▼</span>
+          </div>
+        </summary>
+        <div class="tp-prog-acc-content">
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+            <span style="font-size:12.5px; color:var(--tp-ink-muted, #64748B);">Self-Assessed Sentiment:</span>
+            ${moodBadge}
+          </div>
+          ${A.A2 ? `
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:10px 14px; font-size:12.5px; line-height:1.5;">
+              <div style="font-weight:700; color:var(--tp-ink-muted, #64748B); font-size:11px; text-transform:uppercase; margin-bottom:4px;">Mindset &amp; Field Focus</div>
+              <div>${esc(A.A2)}</div>
             </div>
-            <div class="tp-modal-person" style="font-size:12px; color:#64748B;">
-              <span>District: <strong>${esc(staff.District || staff.Location || 'Field')}</strong> &middot; Reporting to: <strong>${esc(mgrName)}</strong> &middot; Cycle: <strong>${formatMonthLabel(state.activeMonth)}</strong></span>
+          ` : '<div style="font-size:12px; color:#64748B;">No narrative notes recorded for check-in.</div>'}
+        </div>
+      </details>
+    `;
+
+    modal.innerHTML = `
+      <div class="tp-modal-dialog tp-prog-modal-dialog" role="dialog" aria-modal="true">
+        <div class="tp-prog-modal-hdr">
+          <div class="tp-prog-modal-hdr-left">
+            <div class="tp-prog-avatar">${esc(initials)}</div>
+            <div class="tp-prog-hdr-titles">
+              <h3 class="tp-prog-hdr-name">${esc(staff.Name)}</h3>
+              <div class="tp-prog-hdr-meta">
+                <span class="tp-modal-badge" style="background:#F1F5F9; color:#475569; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">${esc(staff.Designation || fallbackRole || 'Field Staff')}</span>
+                <span class="tp-prog-pill ${evalRes.statusClass}">${evalRes.statusLabel}</span>
+                <span>District: <strong>${esc(staff.District || staff.Location || 'Field')}</strong></span>
+                <span>Reporting to: <strong>${esc(mgrName)}</strong></span>
+                <span>Cycle: <strong>${esc(cycleLabel)}</strong></span>
+              </div>
             </div>
           </div>
-          <button type="button" class="tp-modal-close" onclick="window.ProgressModule.closeModal()" title="Close" style="font-size:24px; cursor:pointer; background:none; border:none; color:#64748B;">&times;</button>
+          <div class="tp-prog-modal-hdr-actions">
+            <button type="button" class="tp-btn tp-btn-sm" style="background:transparent; border:1px solid #CBD5E1; color:var(--tp-ink, #0F172A); font-weight:700; padding:5px 12px; border-radius:6px; cursor:pointer;" onclick="window.ProgressModule.toggleAllDetails()" id="tpProgToggleAllBtn">Collapse All</button>
+            <button type="button" class="tp-modal-close" onclick="window.ProgressModule.closeModal()" title="Close" style="font-size:24px; cursor:pointer; background:none; border:none; color:#64748B; margin-left:6px;">&times;</button>
+          </div>
         </div>
-        <div class="tp-modal-body" style="padding:22px 24px 28px; max-height:76vh; overflow-y:auto;">
-          ${modalBody}
+        <div class="tp-prog-body">
+          <div class="tp-prog-wf-strip ${wfClass}">
+            ${wfText}
+            <div style="font-size:11.5px; opacity:0.85;">Cycle: <strong>${esc(cycleLabel)}</strong></div>
+          </div>
+          ${ribbonHtml}
+          ${secMHtml}
+          ${secHHtml}
+          ${secBHtml}
+          ${secGHtml}
+          ${secAHtml}
         </div>
       </div>
     `;
@@ -1340,6 +1831,7 @@
     const cleanDist = String(districtName || districtRoleId).replace(/^d-/, '').trim();
     const tree = getTreeData();
     const stateData = getStateData(tree, state.activeState);
+    const cycleLabel = formatMonthLabel(state.activeMonth);
 
     // Find all POs in this district across all PM columns
     const distPOs = [];
@@ -1364,31 +1856,36 @@
     });
 
     const doneCount = distPOs.filter(p => p.evalRes.status === 'done').length;
+    const distPct = distPOs.length > 0 ? Math.round((doneCount / distPOs.length) * 100) : 0;
 
     let poListHtml = '';
     if (distPOs.length === 0) {
-      poListHtml = `<div class="tp-muted" style="padding:16px 0; font-size:13px; color:#64748B;">No Project Officers mapped to this district.</div>`;
+      poListHtml = `<div style="padding:32px 16px; text-align:center; color:#64748B; font-size:13px;">No Project Officers mapped to this district.</div>`;
     } else {
       poListHtml = `
-        <div class="tp-prog-sec">
-          <div class="tp-prog-sec-hd">
-            <span>District Field Review Roster (${doneCount}/${distPOs.length} Reviews Done)</span>
+        <div class="tp-prog-acc" style="border:none; box-shadow:none; margin:0;">
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-bottom:6px;">
+            <span style="color:var(--tp-ink-muted, #64748B); font-weight:700;">District Reviews Progress</span>
+            <strong>${doneCount} of ${distPOs.length} Reviews Completed (${distPct}%)</strong>
           </div>
-          <div class="tp-prog-sec-body" style="padding:8px 12px;">
+          <div class="tp-prog-progress-bar-wrap" style="margin-bottom:16px;">
+            <div class="tp-prog-progress-bar-fill" style="width:${distPct}%;"></div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
             ${distPOs.map(p => `
-              <div class="tp-po-row" style="cursor:pointer; margin:4px 0;" onclick="window.ProgressModule.openModal('${p.staff.id}', '${esc(p.staff.Designation || 'Project Officer')}', '${esc(p.staff.Name)}', '${esc(p.poMgr)}')">
-                <div class="tp-po-info">
-                  <span class="tp-po-dot"></span>
-                  <div class="tp-po-text-wrap">
-                    <div class="tp-po-name" style="font-weight:700;">${esc(p.staff.Name)}</div>
-                    <div class="tp-po-role" style="font-size:11px; color:#64748B;">${esc(p.staff.Designation || 'Project Officer')}</div>
+              <div class="tp-po-row tp-roster-row" style="cursor:pointer; padding:10px 14px; border:1px solid var(--tp-border, #E2E8F0); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--tp-surface, #FFFFFF);" onclick="window.ProgressModule.openModal('${p.staff.id}', '${esc(p.staff.Designation || 'Project Officer')}', '${esc(p.staff.Name)}', '${esc(p.poMgr)}')">
+                <div style="display:flex; align-items:center; gap:12px; min-width:0; flex:1;">
+                  <div class="tp-prog-avatar" style="width:36px; height:36px; font-size:13px; border-radius:8px;">${esc(getInitials(p.staff.Name))}</div>
+                  <div style="min-width:0;">
+                    <div style="font-weight:700; font-size:13.5px; color:var(--tp-ink, #0F172A); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(p.staff.Name)}</div>
+                    <div style="font-size:11.5px; color:#64748B; margin-top:1px;">${esc(p.staff.Designation || 'Project Officer')} &middot; Reporting to: <strong style="color:var(--tp-ink, #334155);">${esc(p.poMgr)}</strong></div>
                   </div>
                 </div>
-                <div class="tp-prog-strip-inline" style="display:flex; align-items:center; gap:6px; margin:0 8px;">
+                <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
                   <span class="tp-prog-pill ${p.evalRes.statusClass}">${p.evalRes.statusLabel}</span>
                   <span class="tp-prog-score">${p.evalRes.scoreLabel}</span>
+                  <button type="button" class="tp-row-details-btn" onclick="event.stopPropagation(); window.ProgressModule.openModal('${p.staff.id}', '${esc(p.staff.Designation || 'Project Officer')}', '${esc(p.staff.Name)}', '${esc(p.poMgr)}')">Details &rarr;</button>
                 </div>
-                <button type="button" class="tp-row-details-btn" onclick="event.stopPropagation(); window.ProgressModule.openModal('${p.staff.id}', '${esc(p.staff.Designation || 'Project Officer')}', '${esc(p.staff.Name)}', '${esc(p.poMgr)}')">Details &rarr;</button>
               </div>
             `).join('')}
           </div>
@@ -1397,25 +1894,40 @@
     }
 
     modal.innerHTML = `
-      <div class="tp-modal-dialog tp-prog-modal-dialog" role="dialog" aria-modal="true" style="background:var(--tp-surface, #fff); border-radius:16px; overflow:hidden;">
-        <div class="tp-modal-header" style="padding:18px 24px; border-bottom:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:flex-start;">
-          <div class="tp-modal-title-wrap">
-            <h3 class="tp-modal-title" style="margin:0 0 4px; font-size:19px; font-weight:800; color:var(--tp-ink, #0F172A);">${esc(cleanDist)} &mdash; District Operations</h3>
-            <div class="tp-modal-role-row" style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-              <span class="tp-modal-badge" style="background:#0D9488; color:#fff; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">District Operations</span>
-              <span class="tp-badge" style="background:#F1F5F9; color:#475569; padding:2px 8px; border-radius:4px; font-size:11px;">${distPOs.length} POs</span>
-            </div>
-            <div class="tp-modal-person" style="font-size:12px; color:#64748B;">
-              <span>Program Manager: <strong>${esc(pmName || 'Program Manager')}</strong> &middot; Cycle: <strong>${formatMonthLabel(state.activeMonth)}</strong></span>
+      <div class="tp-modal-dialog tp-prog-modal-dialog" role="dialog" aria-modal="true">
+        <div class="tp-prog-modal-hdr">
+          <div class="tp-prog-modal-hdr-left">
+            <div class="tp-prog-avatar" style="background:linear-gradient(135deg, #0D9488 0%, #0F766E 100%);">📍</div>
+            <div class="tp-prog-hdr-titles">
+              <h3 class="tp-prog-hdr-name">${esc(cleanDist)} &mdash; District Operations</h3>
+              <div class="tp-prog-hdr-meta">
+                <span class="tp-modal-badge" style="background:#0D9488; color:#fff; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">District Operations</span>
+                <span class="tp-badge" style="background:#F1F5F9; color:#475569; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">${distPOs.length} POs</span>
+                <span>Program Manager: <strong>${esc(pmName || 'Program Manager')}</strong></span>
+                <span>Cycle: <strong>${esc(cycleLabel)}</strong></span>
+              </div>
             </div>
           </div>
-          <button type="button" class="tp-modal-close" onclick="window.ProgressModule.closeModal()" title="Close" style="font-size:24px; cursor:pointer; background:none; border:none; color:#64748B;">&times;</button>
+          <div class="tp-prog-modal-hdr-actions">
+            <button type="button" class="tp-modal-close" onclick="window.ProgressModule.closeModal()" title="Close" style="font-size:24px; cursor:pointer; background:none; border:none; color:#64748B;">&times;</button>
+          </div>
         </div>
-        <div class="tp-modal-body" style="padding:22px 24px 28px; max-height:76vh; overflow-y:auto;">
+        <div class="tp-prog-body" style="padding:20px 24px;">
           ${poListHtml}
         </div>
       </div>
     `;
+  }
+
+  function toggleAllDetails() {
+    const detailsList = document.querySelectorAll('#tpProgModal .tp-prog-acc');
+    if (!detailsList.length) return;
+    const anyOpen = Array.from(detailsList).some(d => d.open);
+    detailsList.forEach(d => {
+      d.open = !anyOpen;
+    });
+    const btn = document.getElementById('tpProgToggleAllBtn');
+    if (btn) btn.textContent = anyOpen ? 'Expand All' : 'Collapse All';
   }
 
   function closeModal() {
@@ -1456,13 +1968,13 @@
     const stateData = getStateData(getTreeData(), state.activeState);
 
     modal.innerHTML = `
-      <div class="tp-modal-dialog tp-prog-modal-dialog" role="dialog" aria-modal="true" style="background:var(--tp-surface, #fff); border-radius:16px; overflow:hidden; max-width:860px; width:92vw;">
-        <div class="tp-modal-header" style="padding:18px 24px; border-bottom:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:flex-start;">
+      <div class="tp-modal-dialog tp-prog-modal-dialog" role="dialog" aria-modal="true" style="border-radius:16px; overflow:hidden; max-width:860px; width:92vw;">
+        <div class="tp-modal-header" style="padding:18px 24px; display:flex; justify-content:space-between; align-items:flex-start;">
           <div class="tp-modal-title-wrap">
-            <h3 class="tp-modal-title" style="margin:0 0 4px; font-size:19px; font-weight:800; color:var(--tp-ink, #0F172A);">${esc(title)} Roster</h3>
+            <h3 class="tp-modal-title" style="margin:0 0 4px; font-size:19px; font-weight:800;">${esc(title)} Roster</h3>
             <div class="tp-modal-role-row" style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
               <span class="tp-modal-badge" style="background:#2563EB; color:#fff; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">${esc(stateData.label)}</span>
-              <span class="tp-badge" id="tpModalRosterCountBadge" style="background:#F1F5F9; color:#475569; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">${filtered.length} Staff</span>
+              <span class="tp-badge" id="tpModalRosterCountBadge" style="padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">${filtered.length} Staff</span>
               <span class="tp-badge" style="background:#E2E8F0; color:#334155; padding:2px 8px; border-radius:4px; font-size:11px;">Cycle: ${formatMonthLabel(state.activeMonth)}</span>
             </div>
           </div>
@@ -1475,8 +1987,14 @@
             <button type="button" class="tp-modal-close" onclick="window.ProgressModule.closeModal()" title="Close" style="font-size:24px; cursor:pointer; background:none; border:none; color:#64748B;">&times;</button>
           </div>
         </div>
-        <div style="padding:12px 24px; background:var(--tp-surface-muted, #F8FAFC); border-bottom:1px solid #E2E8F0; display:flex; gap:10px; align-items:center;">
-          <input type="text" id="tpProgModalFilterInput" placeholder="Quick search staff by name, role, division, or district..." style="flex:1; padding:8px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:12.5px;" oninput="window.ProgressModule.filterStatusModalList(this.value)">
+        <div class="tp-prog-modal-search-wrap">
+          <div class="tp-search-box" style="flex:1; width:100%;">
+            <svg class="tp-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="tpProgModalFilterInput" class="tp-prog-modal-filter-field" placeholder="Quick search staff by name, role, division, or district..." oninput="window.ProgressModule.filterStatusModalList(this.value)">
+          </div>
         </div>
         <div class="tp-modal-body" id="tpProgModalRosterBody" style="padding:16px 24px 24px; max-height:68vh; overflow-y:auto;">
           ${renderRosterListRows(filtered)}
@@ -1550,7 +2068,8 @@
     drawConnectors,
     openModal,
     closeModal,
-    refreshFromSupabase
+    refreshFromSupabase,
+    toggleAllDetails
   };
 
 })();
