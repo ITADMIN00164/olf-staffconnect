@@ -1045,6 +1045,7 @@ if (!window.__awmFilterOutside) {
 
 function renderTable() {
   const tbody = document.getElementById("awmTableBody");
+  try { if (typeof window.awmBulkRefresh === "function") window.awmBulkRefresh(); } catch (e) { /* the admin tool is optional */ }
 
   if (!currentRecords || currentRecords.length === 0) {
     renderFilterBar();
@@ -1332,6 +1333,18 @@ window.awmUploadImage = async function (index, file) {
     if (!ok) { cell.innerHTML = renderImageCell(index); return; } // Cancel → keep old image
   }
 
+  // The old picture is deleted from Drive once the new one is stored - unless another record
+  // uses the same file (one picture can be shared by many), or we cannot tell. Keep it then.
+  let deleteOld = true;
+  const oldFile = driveId(existingUrl);
+  if (oldFile) {
+    try {
+      const others = await sbGet("award_records?select=id&drive_file_id=eq." + encodeURIComponent(oldFile) +
+        (rec.id ? "&id=neq." + encodeURIComponent(rec.id) : "") + "&limit=1");
+      deleteOld = !others.length;
+    } catch (e) { deleteOld = false; }
+  }
+
   cell.innerHTML = '<span class="img-status">Uploading…</span>';
   try {
     const dataUrl = await fileToBase64(file);
@@ -1345,7 +1358,7 @@ window.awmUploadImage = async function (index, file) {
       fileName: `${safeName}_${Date.now()}${ext}`,
       mimeType: file.type || "image/jpeg",
       data: dataUrl.split(",")[1],
-      replaceId: driveId(existingUrl) || null   // the Apps Script deletes this file once the new one is stored
+      replaceId: (deleteOld && driveId(existingUrl)) || null   // the Apps Script deletes this file once the new one is stored
     };
 
     const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
@@ -1939,6 +1952,27 @@ window.awmApi = {
     dirty = false;
     renderTable();
     updateMonthRow(selectedMonth);
+  },
+  month: function () { return selectedMonth; },
+  district: function () { return (document.getElementById("awmDistrict") || {}).value || ""; },
+  hasRejected: function () { return hasRejected; },
+  // One picture for many records (the IT admin's bulk verify): stored once in Drive.
+  uploadSharedImage: async function (file, month, district) {
+    const dataUrl = await fileToBase64(file);
+    const ext = (file.name.match(/\.[a-z0-9]+$/i) || [".jpg"])[0];
+    const payload = {
+      action: "uploadImage",
+      month: String(month || "").replace("-", " ").toUpperCase(),
+      district: district,
+      fileName: "SU_shared_" + Date.now() + ext,
+      mimeType: file.type || "image/jpeg",
+      data: dataUrl.split(",")[1],
+      replaceId: null
+    };
+    const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
+    const out = await res.json();
+    if (!out.success) throw new Error(out.error || "Upload failed");
+    return out.url;
   },
   showToast: showToast,
   showModal: showModal,
