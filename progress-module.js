@@ -14,6 +14,15 @@
     activeMonth: '202610', // Default: October 2026
     searchQuery: '',
     statusFilter: null,    // null (All) or 'done', 'partial', 'pending', 'unassigned'
+    viewMode: 'flowchart', // 'flowchart' or 'table' (task-271)
+    sortColumn: 'name',    // 'name', 'role', 'division', 'district', 'manager', 'status', 'score', 'managerStatus'
+    sortDirection: 'asc',  // 'asc' or 'desc'
+    filterRole: '',
+    filterDivision: '',
+    filterDistrict: '',
+    filterManager: '',
+    filterScore: '',
+    filterManagerStatus: '',
     isLoading: false,
     selectedEmp: null
   };
@@ -470,6 +479,7 @@
   function init() {
     buildAssignmentMaps();
     bindControls();
+    setViewMode(state.viewMode);
     render();
   }
 
@@ -497,7 +507,11 @@
       searchInput.oninput = function () {
         state.searchQuery = this.value.trim().toLowerCase();
         if (searchClear) searchClear.style.display = state.searchQuery ? 'block' : 'none';
-        renderTreeOnly();
+        if (state.viewMode === 'table') {
+          renderTableOnly();
+        } else {
+          renderTreeOnly();
+        }
       };
     }
 
@@ -515,6 +529,9 @@
     });
 
     expandedDivisions.clear();
+    state.filterDivision = '';
+    state.filterDistrict = '';
+    state.filterManager = '';
     render();
   }
 
@@ -524,7 +541,11 @@
     const searchClear = document.getElementById('tpProgSearchClear');
     if (searchInput) searchInput.value = '';
     if (searchClear) searchClear.style.display = 'none';
-    renderTreeOnly();
+    if (state.viewMode === 'table') {
+      renderTableOnly();
+    } else {
+      renderTreeOnly();
+    }
   }
 
   function debounce(fn, ms) {
@@ -735,7 +756,11 @@
 
     renderKPIRow(stats, stateData);
     renderDivisionPills(stateData.divisions);
-    renderTreeOnly();
+    if (state.viewMode === 'table') {
+      renderTableOnly();
+    } else {
+      renderTreeOnly();
+    }
   }
 
   function clearStatusFilter() {
@@ -911,7 +936,11 @@
 
     renderKPIRow(stats, stateData);
     renderDivisionPills(stateData.divisions);
-    renderTreeOnly();
+    if (state.viewMode === 'table') {
+      renderTableOnly();
+    } else {
+      renderTreeOnly();
+    }
   }
 
   function renderTreeOnly() {
@@ -1310,6 +1339,14 @@
     const modal = document.getElementById('tpProgModal');
     if (!modal) return;
 
+    if (empId && typeof empId === 'object') {
+      const o = empId;
+      fallbackRole = fallbackRole || o.role || o.Designation;
+      fallbackName = fallbackName || o.Name || o.name || (o.staff && o.staff.Name);
+      fallbackMgr = fallbackMgr || o.manager || o.ReportingManager;
+      empId = o.id || o.empId || (o.staff && o.staff.id);
+    }
+
     // Check if this is a district overview click
     const isDistrict = String(empId).startsWith('d-') || fallbackRole === 'District Operations';
     if (isDistrict) {
@@ -1321,6 +1358,17 @@
     modal.style.display = 'flex';
     void modal.offsetWidth; // Force layout flush so transition fires cleanly
     modal.classList.add('open');
+    if (window.TeamPerformance && typeof window.TeamPerformance.lockScroll === 'function') {
+      window.TeamPerformance.lockScroll();
+    }
+
+    const dialog = modal.querySelector('.tp-modal-dialog');
+    if (dialog && !dialog.__wheelAttached) {
+      dialog.__wheelAttached = true;
+      dialog.addEventListener('wheel', function(e) {
+        e.stopPropagation();
+      }, { passive: true });
+    }
   }
 
   function renderStaffModal(empId, fallbackRole, fallbackName, fallbackMgr) {
@@ -1940,6 +1988,9 @@
         }
       }, 220);
     }
+    if (window.TeamPerformance && typeof window.TeamPerformance.unlockScroll === 'function') {
+      window.TeamPerformance.unlockScroll();
+    }
   }
 
   // --- Open Full Filtered Roster Modal ---
@@ -1996,7 +2047,7 @@
             <input type="text" id="tpProgModalFilterInput" class="tp-prog-modal-filter-field" placeholder="Quick search staff by name, role, division, or district..." oninput="window.ProgressModule.filterStatusModalList(this.value)">
           </div>
         </div>
-        <div class="tp-modal-body" id="tpProgModalRosterBody" style="padding:16px 24px 24px; max-height:68vh; overflow-y:auto;">
+        <div class="tp-modal-body" id="tpProgModalRosterBody" style="padding:16px 24px 24px; max-height:68vh; overflow-y:auto; overscroll-behavior:contain !important;">
           ${renderRosterListRows(filtered)}
         </div>
       </div>
@@ -2005,6 +2056,17 @@
     modal.style.display = 'flex';
     void modal.offsetWidth;
     modal.classList.add('open');
+    if (window.TeamPerformance && typeof window.TeamPerformance.lockScroll === 'function') {
+      window.TeamPerformance.lockScroll();
+    }
+
+    const dialog = modal.querySelector('.tp-modal-dialog');
+    if (dialog && !dialog.__wheelAttached) {
+      dialog.__wheelAttached = true;
+      dialog.addEventListener('wheel', function(e) {
+        e.stopPropagation();
+      }, { passive: true });
+    }
   }
 
   function filterStatusModalList(query) {
@@ -2051,11 +2113,616 @@
     `;
   }
 
+  // --- Dual-View Mode & Table View (task-271) ---
+  function getAvatarColor(role) {
+    const r = String(role || '').toLowerCase();
+    if (r.includes('state lead')) return 'linear-gradient(135deg, #F59E0B, #D97706)';
+    if (r.includes('division manager') || r.includes('dm')) return 'linear-gradient(135deg, #8B5CF6, #6D28D9)';
+    if (r.includes('program manager') || r.includes('pm')) return 'linear-gradient(135deg, #3B82F6, #1D4ED8)';
+    if (r.includes('project officer') || r.includes('po')) return 'linear-gradient(135deg, #10B981, #059669)';
+    return 'linear-gradient(135deg, #64748B, #475569)';
+  }
+
+  function getRoleBadgeClass(role) {
+    const r = String(role || '').toLowerCase();
+    if (r.includes('state lead')) return 'tp-role-badge--lead';
+    if (r.includes('division manager') || r.includes('dm')) return 'tp-role-badge--dm';
+    if (r.includes('program manager') || r.includes('pm')) return 'tp-role-badge--pm';
+    if (r.includes('project officer') || r.includes('po')) return 'tp-role-badge--po';
+    return 'tp-role-badge--default';
+  }
+
+  function getScoreColor(score) {
+    const s = Number(score) || 0;
+    if (s >= 80) return '#10B981';
+    if (s >= 60) return '#3B82F6';
+    if (s >= 40) return '#F59E0B';
+    return '#EF4444';
+  }
+
+  function getManagerStatusDisplay(evalRes) {
+    if (!evalRes) return 'Awaiting Review';
+    if (evalRes.managerStatus === 'On track') return '⭐ On Track';
+    if (evalRes.managerStatus === 'Needs support') return '⚠️ Needs Support';
+    if (evalRes.managerStatus === 'Critical') return '🚨 Critical';
+    return evalRes.managerStatus || 'Awaiting Review';
+  }
+
+  function setViewMode(mode) {
+    state.viewMode = mode === 'table' ? 'table' : 'flowchart';
+
+    const flowBtn = document.getElementById('tpProgViewBtnFlow');
+    const tableBtn = document.getElementById('tpProgViewBtnTable');
+    if (flowBtn) flowBtn.classList.toggle('active', state.viewMode === 'flowchart');
+    if (tableBtn) tableBtn.classList.toggle('active', state.viewMode === 'table');
+
+    const viewport = document.getElementById('tpProgViewport');
+    const tableView = document.getElementById('tpProgTableView');
+    const divisionBar = document.getElementById('tpProgDivisionBar');
+    const treeActions = document.getElementById('tpProgTreeActions');
+    const legend = document.querySelector('#tpProgressView .tp-legend');
+
+    if (state.viewMode === 'table') {
+      if (viewport) viewport.style.display = 'none';
+      if (tableView) tableView.style.display = 'block';
+      if (divisionBar) divisionBar.style.display = 'none';
+      if (treeActions) treeActions.style.display = 'none';
+      if (legend) legend.style.display = 'none';
+      renderTableOnly();
+    } else {
+      if (viewport) viewport.style.display = 'block';
+      if (tableView) tableView.style.display = 'none';
+      if (divisionBar) divisionBar.style.display = 'flex';
+      if (treeActions) treeActions.style.display = 'inline-flex';
+      if (legend) legend.style.display = 'flex';
+      renderTreeOnly();
+    }
+  }
+
+  function setSort(col) {
+    if (state.sortColumn === col) {
+      state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      state.sortColumn = col;
+      state.sortDirection = (col === 'score') ? 'desc' : 'asc';
+    }
+    renderTableOnly();
+  }
+
+  function clearAllFilters() {
+    clearAllTableFilters();
+  }
+
+  function setTableFilter(key, val) {
+    if (key === 'status') {
+      state.statusFilter = val || null;
+      renderFilterBanner();
+    } else if (key === 'role') {
+      state.filterRole = val || '';
+    } else if (key === 'division') {
+      state.filterDivision = val || '';
+    } else if (key === 'district') {
+      state.filterDistrict = val || '';
+    } else if (key === 'manager') {
+      state.filterManager = val || '';
+    } else if (key === 'score') {
+      state.filterScore = val || '';
+    } else if (key === 'managerStatus') {
+      state.filterManagerStatus = val || '';
+    }
+    updateTableRowsOnly();
+  }
+
+  function clearAllTableFilters() {
+    state.statusFilter = null;
+    state.filterRole = '';
+    state.filterDivision = '';
+    state.filterDistrict = '';
+    state.filterManager = '';
+    state.filterScore = '';
+    state.filterManagerStatus = '';
+    state.searchQuery = '';
+    const topSearch = document.getElementById('tpProgSearchInput');
+    const topClear = document.getElementById('tpProgSearchClear');
+    if (topSearch) topSearch.value = '';
+    if (topClear) topClear.style.display = 'none';
+
+    const colSearch = document.getElementById('tpColFilterSearch');
+    if (colSearch) colSearch.value = '';
+
+    renderFilterBanner();
+    updateTableRowsOnly();
+  }
+
+  function setTableSearch(val) {
+    state.searchQuery = (val || '').trim().toLowerCase();
+    const topSearch = document.getElementById('tpProgSearchInput');
+    const topClear = document.getElementById('tpProgSearchClear');
+    if (topSearch && topSearch.value !== val) topSearch.value = val;
+    if (topClear) topClear.style.display = state.searchQuery ? 'block' : 'none';
+    updateTableRowsOnly();
+  }
+
+  function getFilteredAndSortedRoster(fullRoster) {
+    let list = [...(fullRoster || [])];
+    const sf = state.statusFilter;
+    const fRole = state.filterRole;
+    const fDiv = state.filterDivision;
+    const fDist = state.filterDistrict;
+    const fMgr = state.filterManager;
+    const fScore = state.filterScore;
+    const fMgrSt = state.filterManagerStatus;
+    const q = (state.searchQuery || '').trim().toLowerCase();
+
+    if (sf) {
+      list = list.filter(r => r.evalRes.status === sf);
+    }
+    if (fRole) {
+      list = list.filter(r => (r.role || '').toLowerCase() === fRole.toLowerCase());
+    }
+    if (fDiv) {
+      list = list.filter(r => (r.division || '').toLowerCase() === fDiv.toLowerCase());
+    }
+    if (fDist) {
+      list = list.filter(r => (r.district || '').toLowerCase() === fDist.toLowerCase());
+    }
+    if (fMgr) {
+      list = list.filter(r => (r.manager || '').toLowerCase() === fMgr.toLowerCase());
+    }
+    if (fMgrSt) {
+      list = list.filter(r => (r.evalRes.managerStatus || '').toLowerCase() === fMgrSt.toLowerCase());
+    }
+    if (fScore) {
+      list = list.filter(r => {
+        const sc = Number(r.evalRes.totalScore) || 0;
+        const isUnassigned = r.evalRes.status === 'unassigned';
+        if (fScore === 'unassigned') return isUnassigned;
+        if (isUnassigned) return false;
+        if (fScore === '80+') return sc >= 80;
+        if (fScore === '50-79') return sc >= 50 && sc < 80;
+        if (fScore === '<50') return sc < 50;
+        return true;
+      });
+    }
+    if (q) {
+      list = list.filter(r => {
+        const name = (r.staff.Name || '').toLowerCase();
+        const id = (r.staff.id || '').toLowerCase();
+        const role = (r.role || '').toLowerCase();
+        const div = (r.division || '').toLowerCase();
+        const dist = (r.district || '').toLowerCase();
+        const mgr = (r.manager || '').toLowerCase();
+        const st = (r.evalRes.statusLabel || '').toLowerCase();
+        const mst = (r.evalRes.managerStatus || '').toLowerCase();
+        return name.includes(q) || id.includes(q) || role.includes(q) || div.includes(q) || dist.includes(q) || mgr.includes(q) || st.includes(q) || mst.includes(q);
+      });
+    }
+
+    const col = state.sortColumn || 'name';
+    const dir = state.sortDirection === 'desc' ? -1 : 1;
+    const statusRank = { 'done': 1, 'partial': 2, 'pending': 3, 'unassigned': 4 };
+
+    list.sort((a, b) => {
+      let diff = 0;
+      if (col === 'name') {
+        diff = (a.staff.Name || '').localeCompare(b.staff.Name || '');
+      } else if (col === 'role') {
+        diff = (a.role || '').localeCompare(b.role || '');
+      } else if (col === 'division') {
+        diff = (a.division || '').localeCompare(b.division || '');
+      } else if (col === 'district') {
+        diff = (a.district || '').localeCompare(b.district || '');
+      } else if (col === 'manager') {
+        diff = (a.manager || '').localeCompare(b.manager || '');
+      } else if (col === 'status') {
+        const aR = statusRank[a.evalRes.status] || 5;
+        const bR = statusRank[b.evalRes.status] || 5;
+        diff = aR - bR;
+      } else if (col === 'score') {
+        diff = (Number(a.evalRes.totalScore) || 0) - (Number(b.evalRes.totalScore) || 0);
+      } else if (col === 'managerStatus') {
+        diff = (a.evalRes.managerStatus || '').localeCompare(b.evalRes.managerStatus || '');
+      }
+
+      if (diff !== 0) return diff * dir;
+      // Stable secondary tie-breaker by staff name
+      return (a.staff.Name || '').localeCompare(b.staff.Name || '');
+    });
+
+    return list;
+  }
+
+  function exportTableCSV() {
+    const fullRoster = getRosterForState();
+    let list = getFilteredAndSortedRoster(fullRoster);
+    if (!list || !list.length) {
+      showToast('No rows to export.');
+      return;
+    }
+
+    const headers = ['Staff Name', 'Staff ID', 'Role', 'Division', 'District', 'Reporting Manager', 'Review Status', 'Goal Score', 'Manager Rating', 'Manager Remark'];
+    const rows = list.map(r => [
+      r.staff.Name || '',
+      r.staff.id || '',
+      r.role || '',
+      r.division || '',
+      r.district || '',
+      r.manager || '',
+      r.evalRes.statusLabel || '',
+      r.evalRes.totalScore != null ? r.evalRes.totalScore : '',
+      r.evalRes.managerStatus || '',
+      r.evalRes.managerRemark || ''
+    ]);
+
+    const csvContent = [
+      headers.map(h => `"${String(h).replace(/"/g, '""')}"`).join(','),
+      ...rows.map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+    ].join('\r\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `OLF_Progress_${state.activeState}_${state.activeMonth}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast(`Exported ${list.length} rows to CSV!`);
+  }
+
+  function buildTableRowsHtml(list) {
+    if (!list.length) {
+      return `
+        <tr>
+          <td colspan="9" style="text-align:center; padding:48px 16px; color:var(--tp-ink-muted, #64748B);">
+            <div style="font-size:28px; margin-bottom:8px;">🔍</div>
+            <div style="font-weight:700; font-size:15px; color:var(--tp-ink, #0F172A); margin-bottom:4px;">No matching staff members found</div>
+            <div style="font-size:12px; margin-bottom:12px;">Try adjusting your search terms or clearing active filters.</div>
+            <button type="button" class="tp-btn tp-btn-sm tp-btn-secondary" onclick="window.ProgressModule.clearAllTableFilters()" style="font-weight:700;">&times; Clear All Filters</button>
+          </td>
+        </tr>
+      `;
+    }
+
+    return list.map(r => {
+      const empId = r.staff.id || '';
+      const empName = r.staff.Name || 'Staff Member';
+      const role = r.role || 'Field Staff';
+      const mgr = r.manager || 'Leadership';
+      const score = r.evalRes.totalScore || 0;
+      const scoreColor = getScoreColor(score);
+      const avatarColor = getAvatarColor(role);
+      const roleClass = getRoleBadgeClass(role);
+      const mgrDisplay = getManagerStatusDisplay(r.evalRes);
+
+      return `
+        <tr>
+          <!-- 1. Staff Name & ID -->
+          <td>
+            <div style="display:flex; align-items:center; gap:9px; min-width:0; overflow:hidden;">
+              <div class="tp-prog-tbl-avatar" style="background:${avatarColor};">${getInitials(empName)}</div>
+              <div style="min-width:0; overflow:hidden;">
+                <div style="font-weight:700; font-size:12.5px; color:var(--tp-ink, #0F172A); line-height:1.25; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${esc(empName)}">${esc(empName)}</div>
+                <div style="font-size:10px; color:var(--tp-ink-muted, #64748B); font-family:monospace; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; background:rgba(100,116,139,0.08); display:inline-block; padding:1px 5px; border-radius:4px;">${esc(empId || '—')}</div>
+              </div>
+            </div>
+          </td>
+
+          <!-- 2. Role / Level badge -->
+          <td>
+            <span class="tp-role-badge ${roleClass}" style="overflow:hidden; text-overflow:ellipsis; max-width:100%; display:inline-block;" title="${esc(role)}">${esc(role)}</span>
+          </td>
+
+          <!-- 3. Division -->
+          <td>
+            <span style="font-weight:700; color:var(--tp-ink, #1E293B); font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block;" title="${esc(r.division)}">${esc(r.division)}</span>
+          </td>
+
+          <!-- 4. District -->
+          <td>
+            <span style="color:var(--tp-ink-muted, #475569); font-size:11.5px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block;" title="${esc(r.district)}">${esc(r.district)}</span>
+          </td>
+
+          <!-- 5. Reporting Manager -->
+          <td>
+            <span style="color:var(--tp-ink, #334155); font-size:12px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block;" title="${esc(mgr)}">${esc(mgr)}</span>
+          </td>
+
+          <!-- 6. Review Status badge -->
+          <td>
+            <span class="tp-prog-pill ${r.evalRes.statusClass}" style="font-size:11px; padding:3px 8px; white-space:nowrap; display:inline-block; max-width:100%; overflow:hidden; text-overflow:ellipsis; border-radius:6px; font-weight:700;">${r.evalRes.statusLabel}</span>
+          </td>
+
+          <!-- 7. Goal Score (/ 100) with progress bar -->
+          <td>
+            <div style="display:flex; flex-direction:column; gap:3px; width:100%;">
+              <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; font-weight:700;">
+                <span style="${r.evalRes.status === 'unassigned' ? 'color:var(--tp-ink-muted, #94A3B8);' : (score > 0 ? `color:${scoreColor}; font-weight:800;` : 'color:var(--tp-ink-muted, #64748B);')}">${r.evalRes.status === 'unassigned' ? '—' : `${score}/100`}</span>
+                <span style="font-size:9.5px; font-weight:600; color:var(--tp-ink-muted, #64748B);">${score}%</span>
+              </div>
+              <div class="tp-score-bar-track">
+                <div class="tp-score-bar-fill" style="width:${Math.min(100, Math.max(0, score))}%; background:${scoreColor};"></div>
+              </div>
+            </div>
+          </td>
+
+          <!-- 8. Manager Status & Rating -->
+          <td>
+            <div style="display:flex; flex-direction:column; gap:2px; width:100%; overflow:hidden;">
+              ${r.evalRes.managerStatus === 'On track' ? `
+                <span class="tp-mgr-rating-pill" style="background:#FEF9C3; color:#854D0E; border:1px solid #FEF08A; padding:2px 7px; border-radius:6px; font-size:10.5px; display:inline-block; max-width:fit-content;" title="On Track">⭐ On Track</span>
+              ` : r.evalRes.managerStatus === 'Needs support' ? `
+                <span class="tp-mgr-rating-pill" style="background:#FEF3C7; color:#92400E; border:1px solid #FDE68A; padding:2px 7px; border-radius:6px; font-size:10.5px; display:inline-block; max-width:fit-content;" title="Needs Support">⚠️ Needs Support</span>
+              ` : `
+                <span style="color:var(--tp-ink-muted, #94A3B8); font-style:italic; font-size:11px;" title="Monthly review pending">Pending Review</span>
+              `}
+              ${r.evalRes.managerRemark ? `<div style="font-size:10px; color:var(--tp-ink-muted, #64748B); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:1px;" title="${esc(r.evalRes.managerRemark)}">${esc(r.evalRes.managerRemark)}</div>` : ''}
+            </div>
+          </td>
+
+          <!-- 9. Actions -->
+          <td style="text-align:center;">
+            <button type="button" class="tp-row-action-btn" onclick="window.ProgressModule.openModal('${empId}', '${esc(role)}', '${esc(empName)}', '${esc(mgr)}')">
+              Details &rarr;
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function buildTableFilterTags() {
+    let filterTags = [];
+    const q = state.searchQuery;
+    if (state.statusFilter) {
+      let sfLabel = state.statusFilter;
+      if (sfLabel === 'done') sfLabel = 'Status: Done';
+      else if (sfLabel === 'partial') sfLabel = 'Status: Partial';
+      else if (sfLabel === 'pending') sfLabel = 'Status: Pending';
+      else if (sfLabel === 'unassigned') sfLabel = 'Status: Unassigned';
+      filterTags.push(`<span class="tp-prog-tbl-filter-tag">${sfLabel} <button type="button" style="background:none; border:none; color:inherit; font-weight:800; cursor:pointer; padding:0 0 0 4px;" onclick="window.ProgressModule.setTableFilter('status', '')">&times;</button></span>`);
+    }
+    if (state.filterRole) {
+      filterTags.push(`<span class="tp-prog-tbl-filter-tag">Role: ${esc(state.filterRole)} <button type="button" style="background:none; border:none; color:inherit; font-weight:800; cursor:pointer; padding:0 0 0 4px;" onclick="window.ProgressModule.setTableFilter('role', '')">&times;</button></span>`);
+    }
+    if (state.filterDivision) {
+      filterTags.push(`<span class="tp-prog-tbl-filter-tag">Div: ${esc(state.filterDivision)} <button type="button" style="background:none; border:none; color:inherit; font-weight:800; cursor:pointer; padding:0 0 0 4px;" onclick="window.ProgressModule.setTableFilter('division', '')">&times;</button></span>`);
+    }
+    if (state.filterDistrict) {
+      filterTags.push(`<span class="tp-prog-tbl-filter-tag">Dist: ${esc(state.filterDistrict)} <button type="button" style="background:none; border:none; color:inherit; font-weight:800; cursor:pointer; padding:0 0 0 4px;" onclick="window.ProgressModule.setTableFilter('district', '')">&times;</button></span>`);
+    }
+    if (state.filterManager) {
+      filterTags.push(`<span class="tp-prog-tbl-filter-tag">Mgr: ${esc(state.filterManager)} <button type="button" style="background:none; border:none; color:inherit; font-weight:800; cursor:pointer; padding:0 0 0 4px;" onclick="window.ProgressModule.setTableFilter('manager', '')">&times;</button></span>`);
+    }
+    if (state.filterScore) {
+      filterTags.push(`<span class="tp-prog-tbl-filter-tag">Score: ${esc(state.filterScore)} <button type="button" style="background:none; border:none; color:inherit; font-weight:800; cursor:pointer; padding:0 0 0 4px;" onclick="window.ProgressModule.setTableFilter('score', '')">&times;</button></span>`);
+    }
+    if (state.filterManagerStatus) {
+      filterTags.push(`<span class="tp-prog-tbl-filter-tag">Rating: ${esc(state.filterManagerStatus)} <button type="button" style="background:none; border:none; color:inherit; font-weight:800; cursor:pointer; padding:0 0 0 4px;" onclick="window.ProgressModule.setTableFilter('managerStatus', '')">&times;</button></span>`);
+    }
+    if (q) {
+      filterTags.push(`<span class="tp-prog-tbl-filter-tag">Search: "${esc(q)}" <button type="button" style="background:none; border:none; color:inherit; font-weight:800; cursor:pointer; padding:0 0 0 4px;" onclick="window.ProgressModule.clearSearch()">&times;</button></span>`);
+    }
+    return filterTags;
+  }
+
+  function updateTableRowsOnly() {
+    const tbody = document.getElementById('tpProgTableBody');
+    if (!tbody) {
+      renderTableOnly(true);
+      return;
+    }
+    const fullRoster = getRosterForState();
+    const list = getFilteredAndSortedRoster(fullRoster);
+    tbody.innerHTML = buildTableRowsHtml(list);
+
+    const countEl = document.getElementById('tpProgTableCount');
+    if (countEl) {
+      const tree = getTreeData();
+      const stateData = getStateData(tree, state.activeState);
+      countEl.innerHTML = `Showing <strong>${list.length}</strong> of ${fullRoster.length} staff members (${stateData.label})`;
+    }
+
+    const badgeEl = document.getElementById('tpProgTableBadge');
+    if (badgeEl) {
+      badgeEl.textContent = `${list.length} Staff`;
+    }
+
+    const tagsEl = document.getElementById('tpProgTableTags');
+    if (tagsEl) {
+      tagsEl.innerHTML = buildTableFilterTags().join('');
+    }
+
+    const hasAnyFilter = Boolean(state.statusFilter || state.filterRole || state.filterDivision || state.filterDistrict || state.filterManager || state.filterScore || state.filterManagerStatus || state.searchQuery);
+    const clearBtnWrap = document.getElementById('tpProgTableClearBtnWrap');
+    if (clearBtnWrap) {
+      clearBtnWrap.innerHTML = hasAnyFilter
+        ? `<button type="button" class="tp-btn tp-btn-sm tp-btn-secondary" onclick="window.ProgressModule.clearAllTableFilters()" style="cursor:pointer; font-weight:700;">&times; Clear Filters</button>`
+        : '';
+    }
+
+    const resetBtn = document.querySelector('.tp-btn-filter-reset');
+    if (resetBtn) {
+      resetBtn.classList.toggle('has-filters', hasAnyFilter);
+    }
+
+    const filterMap = {
+      'Role': state.filterRole,
+      'Division': state.filterDivision,
+      'District': state.filterDistrict,
+      'Manager': state.filterManager,
+      'Status': state.statusFilter || '',
+      'Score': state.filterScore,
+      'Rating': state.filterManagerStatus
+    };
+    Object.keys(filterMap).forEach(k => {
+      const sel = document.getElementById('tpColFilter' + k);
+      if (sel) {
+        if (sel.value !== filterMap[k]) sel.value = filterMap[k];
+        sel.classList.toggle('active', !!filterMap[k]);
+      }
+    });
+
+    const tblInput = document.getElementById('tpColFilterSearch');
+    if (tblInput && document.activeElement !== tblInput && tblInput.value !== (state.searchQuery || '')) {
+      tblInput.value = state.searchQuery || '';
+    }
+  }
+
+  function renderTableOnly(forceRebuild) {
+    const container = document.getElementById('tpProgTableView');
+    if (!container) return;
+
+    const existingTable = document.getElementById('tpProgTable');
+    if (existingTable && !forceRebuild) {
+      updateTableRowsOnly();
+      return;
+    }
+
+    const tree = getTreeData();
+    if (!tree) return;
+
+    const stateData = getStateData(tree, state.activeState);
+    const fullRoster = getRosterForState();
+    const list = getFilteredAndSortedRoster(fullRoster);
+
+    const uniqueRoles = [...new Set(fullRoster.map(r => r.role).filter(Boolean))].sort();
+    const uniqueDivisions = [...new Set(fullRoster.map(r => r.division).filter(Boolean))].sort();
+    const uniqueDistricts = [...new Set(fullRoster.map(r => r.district).filter(d => d && d !== '—' && d !== '-'))].sort();
+    const uniqueManagers = [...new Set(fullRoster.map(r => r.manager).filter(m => m && m !== 'Leadership'))].sort();
+    const uniqueMgrRatings = [...new Set(fullRoster.map(r => r.evalRes.managerStatus).filter(Boolean))].sort();
+
+    const filterTags = buildTableFilterTags();
+    const hasAnyFilter = Boolean(state.statusFilter || state.filterRole || state.filterDivision || state.filterDistrict || state.filterManager || state.filterScore || state.filterManagerStatus || state.searchQuery);
+    const rowsHtml = buildTableRowsHtml(list);
+
+    container.innerHTML = `
+      <div class="tp-prog-tbl-card">
+        <div class="tp-prog-tbl-toolbar">
+          <div class="tp-prog-tbl-toolbar-left">
+            <div class="tp-prog-tbl-title-badge">
+              <span class="tp-prog-tbl-main-title">Field Staff Directory</span>
+              <span class="tp-prog-tbl-pill-count" id="tpProgTableBadge">${list.length} Staff</span>
+            </div>
+            <span class="tp-prog-tbl-count" id="tpProgTableCount">Showing <strong>${list.length}</strong> of ${fullRoster.length} staff members (${stateData.label})</span>
+            <div id="tpProgTableTags" style="display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;">${filterTags.join('')}</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div id="tpProgTableClearBtnWrap">${hasAnyFilter ? `<button type="button" class="tp-btn tp-btn-sm tp-btn-secondary" onclick="window.ProgressModule.clearAllTableFilters()" style="cursor:pointer; font-weight:700;">&times; Clear Filters</button>` : ''}</div>
+            <button type="button" class="tp-prog-tbl-export-btn" onclick="window.ProgressModule.exportTableCSV()" title="Export filtered rows to CSV">
+              <span>📥</span>
+              <span>Export CSV</span>
+            </button>
+          </div>
+        </div>
+        <div class="tp-prog-tbl-wrap">
+          <table class="tp-prog-table" id="tpProgTable" aria-label="Monthly Field Review Staff Roster">
+            <colgroup>
+              <col style="width: 17%;">
+              <col style="width: 12%;">
+              <col style="width: 11%;">
+              <col style="width: 11%;">
+              <col style="width: 12%;">
+              <col style="width: 11%;">
+              <col style="width: 10%;">
+              <col style="width: 10%;">
+              <col style="width: 6%;">
+            </colgroup>
+            <thead>
+              <tr class="tp-table-filter-row">
+                <!-- 1. Search text filter -->
+                <th>
+                  <div class="tp-col-filter-wrap">
+                    <svg class="tp-col-filter-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input type="text" id="tpColFilterSearch" class="tp-col-filter-input" placeholder="Search Name / ID..." value="${esc(state.searchQuery)}" oninput="window.ProgressModule.setTableSearch(this.value)">
+                  </div>
+                </th>
+                <!-- 2. Role dropdown -->
+                <th>
+                  <select id="tpColFilterRole" class="tp-col-filter-select ${state.filterRole ? 'active' : ''}" onchange="window.ProgressModule.setTableFilter('role', this.value)" title="Filter by Role">
+                    <option value="">Role (All)</option>
+                    ${uniqueRoles.map(r => `<option value="${esc(r)}" ${state.filterRole === r ? 'selected' : ''}>${esc(r)}</option>`).join('')}
+                  </select>
+                </th>
+                <!-- 3. Division dropdown -->
+                <th>
+                  <select id="tpColFilterDivision" class="tp-col-filter-select ${state.filterDivision ? 'active' : ''}" onchange="window.ProgressModule.setTableFilter('division', this.value)" title="Filter by Division">
+                    <option value="">Division (All)</option>
+                    ${uniqueDivisions.map(d => `<option value="${esc(d)}" ${state.filterDivision === d ? 'selected' : ''}>${esc(d)}</option>`).join('')}
+                  </select>
+                </th>
+                <!-- 4. District dropdown -->
+                <th>
+                  <select id="tpColFilterDistrict" class="tp-col-filter-select ${state.filterDistrict ? 'active' : ''}" onchange="window.ProgressModule.setTableFilter('district', this.value)" title="Filter by District">
+                    <option value="">District (All)</option>
+                    ${uniqueDistricts.map(d => `<option value="${esc(d)}" ${state.filterDistrict === d ? 'selected' : ''}>${esc(d)}</option>`).join('')}
+                  </select>
+                </th>
+                <!-- 5. Manager dropdown -->
+                <th>
+                  <select id="tpColFilterManager" class="tp-col-filter-select ${state.filterManager ? 'active' : ''}" onchange="window.ProgressModule.setTableFilter('manager', this.value)" title="Filter by Manager">
+                    <option value="">Manager (All)</option>
+                    ${uniqueManagers.map(m => `<option value="${esc(m)}" ${state.filterManager === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}
+                  </select>
+                </th>
+                <!-- 6. Review Status dropdown -->
+                <th>
+                  <select id="tpColFilterStatus" class="tp-col-filter-select ${state.statusFilter ? 'active' : ''}" onchange="window.ProgressModule.setTableFilter('status', this.value)" title="Filter by Review Status">
+                    <option value="">Status (All)</option>
+                    <option value="done" ${state.statusFilter === 'done' ? 'selected' : ''}>✓ Review Done</option>
+                    <option value="partial" ${state.statusFilter === 'partial' ? 'selected' : ''}>◐ Partially Done</option>
+                    <option value="pending" ${state.statusFilter === 'pending' ? 'selected' : ''}>○ Review Pending</option>
+                    <option value="unassigned" ${state.statusFilter === 'unassigned' ? 'selected' : ''}>📋 Pending Assign.</option>
+                  </select>
+                </th>
+                <!-- 7. Score dropdown -->
+                <th>
+                  <select id="tpColFilterScore" class="tp-col-filter-select ${state.filterScore ? 'active' : ''}" onchange="window.ProgressModule.setTableFilter('score', this.value)" title="Filter by Score">
+                    <option value="">Score (All)</option>
+                    <option value="80+" ${state.filterScore === '80+' ? 'selected' : ''}>80 - 100%</option>
+                    <option value="50-79" ${state.filterScore === '50-79' ? 'selected' : ''}>50 - 79%</option>
+                    <option value="<50" ${state.filterScore === '<50' ? 'selected' : ''}>&lt; 50%</option>
+                    <option value="unassigned" ${state.filterScore === 'unassigned' ? 'selected' : ''}>Unassigned</option>
+                  </select>
+                </th>
+                <!-- 8. Manager Rating dropdown -->
+                <th>
+                  <select id="tpColFilterRating" class="tp-col-filter-select ${state.filterManagerStatus ? 'active' : ''}" onchange="window.ProgressModule.setTableFilter('managerStatus', this.value)" title="Filter by Manager Rating">
+                    <option value="">Rating (All)</option>
+                    ${uniqueMgrRatings.map(r => `<option value="${esc(r)}" ${state.filterManagerStatus === r ? 'selected' : ''}>${esc(r)}</option>`).join('')}
+                  </select>
+                </th>
+                <!-- 9. Reset Button -->
+                <th style="text-align:center;">
+                  <button type="button" class="tp-btn-filter-reset ${hasAnyFilter ? 'has-filters' : ''}" onclick="window.ProgressModule.clearAllTableFilters()" title="Reset all column dropdown filters">
+                    ↺ Reset
+                  </button>
+                </th>
+              </tr>
+            </thead>
+            <tbody id="tpProgTableBody">
+              ${rowsHtml}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
   // Export module to global scope
   window.ProgressModule = {
     init,
     render,
     setState,
+    setViewMode,
+    setSort,
+    setTableFilter,
+    clearAllTableFilters,
+    setTableSearch,
+    exportTableCSV,
+    clearAllFilters,
+    renderTableOnly,
     switchDivision: toggleDivision,
     toggleDivision,
     expandAll,

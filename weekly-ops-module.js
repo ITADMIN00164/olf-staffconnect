@@ -1393,6 +1393,9 @@
 
     const container = document.getElementById('tpWopsModalContainer');
     if (!container) return;
+    if (window.TeamPerformance && typeof window.TeamPerformance.lockScroll === 'function') {
+      window.TeamPerformance.lockScroll();
+    }
 
     const staffNames = (window.TeamPerformance && typeof window.TeamPerformance.getStaffList === 'function')
       ? (window.TeamPerformance.getStaffList() || []).map(s => s.Name || s.name).filter(Boolean)
@@ -1569,6 +1572,9 @@
   function openAddModal() {
     const container = document.getElementById('tpWopsModalContainer');
     if (!container) return;
+    if (window.TeamPerformance && typeof window.TeamPerformance.lockScroll === 'function') {
+      window.TeamPerformance.lockScroll();
+    }
 
     // Build datalists for auto-suggestions
     const staffNames = (window.TeamPerformance && typeof window.TeamPerformance.getStaffList === 'function')
@@ -1705,6 +1711,9 @@
   function closeModal() {
     const container = document.getElementById('tpWopsModalContainer');
     if (container) container.innerHTML = '';
+    if (window.TeamPerformance && typeof window.TeamPerformance.unlockScroll === 'function') {
+      window.TeamPerformance.unlockScroll();
+    }
   }
 
   function submitAddPlan(e) {
