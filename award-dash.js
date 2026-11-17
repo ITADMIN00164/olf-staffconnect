@@ -231,6 +231,9 @@ function buildBar() {
     '<button type="button" class="dash-export-btn" id="awdExportBtn" title="Download the current table as an Excel file">' +
       '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' +
       '<span>Download Excel</span></button>' +
+    '<button type="button" class="dash-export-btn dash-export-detail" id="awdDetailBtn" title="Download every award record (district, block, person, award, awarded yes/no, verified) for the selected filters">' +
+      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' +
+      '<span id="awdDetailTxt">Download Detailed Excel</span></button>' +
     '<button type="button" class="dash-refresh-btn" id="awdRefreshBtn" title="Reload the latest data from Award Management">' +
       '<span class="dash-refresh-ico">⟳</span><span id="awdRefreshTxt">Refresh Data</span></button>';
 
@@ -255,6 +258,7 @@ function buildBar() {
     });
   });
   el("awdExportBtn").addEventListener("click", function (e) { e.stopPropagation(); downloadExcel(); });
+  el("awdDetailBtn").addEventListener("click", function (e) { e.stopPropagation(); downloadDetailedExcel(); });
   el("awdRefreshBtn").addEventListener("click", function (e) { e.stopPropagation(); refresh(); });
   if (!outsideClickBound) {
     outsideClickBound = true;
@@ -477,6 +481,142 @@ function downloadExcel() {
   } catch (e) {
     console.error("Excel export failed:", e);
     toast("Could not generate the Excel file.", "error");
+  }
+}
+
+// ── Detailed Excel: one line per award record ──
+// Same filters as the table (by default that is every month, district and award). Read fresh
+// from the database with every column, so it always matches Award Management.
+const DETAIL_ORDER = [
+  "District Level - POM", "Block Level - POM", "District Level - LIFESKILL", "District Level - Academics",
+  "Top Clusters", "Nanhe Sitare (NS)", "Shikshan Utsav (SU)", "Coffee With CEO", "Other"
+].map(function (c) { return c.toLowerCase(); });
+function categoryRank(c) {
+  const i = DETAIL_ORDER.indexOf(String(c || "").trim().toLowerCase());
+  return i === -1 ? 900 : i;
+}
+
+async function fetchAllDetailed() {
+  const out = [];
+  for (let offset = 0; ; offset += PAGE) {
+    const res = await fetch(SB_URL + "/rest/v1/award_records?select=*&order=id.asc&limit=" + PAGE + "&offset=" + offset,
+      { headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY } });
+    if (!res.ok) throw new Error(await res.text());
+    const page = await res.json();
+    Array.prototype.push.apply(out, page);
+    if (page.length < PAGE) break;
+  }
+  return out;
+}
+
+let detailBusy = false;
+async function downloadDetailedExcel() {
+  if (!loaded) { toast("The data is still loading.", "info"); return; }
+  if (detailBusy) return;
+  detailBusy = true;
+  const btn = el("awdDetailBtn"), txt = el("awdDetailTxt");
+  if (btn) btn.disabled = true;
+  if (txt) txt.textContent = "Preparing…";
+  try {
+    const raw = await fetchAllDetailed();
+    const pick = {};
+    FILTERS.forEach(function (f) { pick[f.key] = new Set(sel[f.key] || []); });
+
+    const recs = raw.map(function (row) {
+      const s = splitAward(row.award_name, row.award_category);
+      const r = {
+        month: row.month_label || "",
+        district: row.district_name || "",
+        community: row.community || BLANK.community,
+        award: s.awardName || BLANK.award,
+        category: s.awardCategory || BLANK.category,
+        awarded: !!row.awarded,
+        awardedDate: row.awarded_date || "",
+        verified: !!row.verified && !row.rejected,
+        row: row
+      };
+      r.late = isLate(r);
+      r.status = !r.awarded ? "Pending" : (r.late ? "Awarded Late" : "Awarded In Time");
+      return r;
+    }).filter(function (r) {
+      return FILTERS.every(function (f) { return pick[f.key].size === 0 || pick[f.key].has(valueOf(r, f.key)); });
+    });
+    if (!recs.length) { toast("No records match the selected filters.", "info"); return; }
+
+    const txtOf = function (v) { return v == null ? "" : String(v).trim(); };
+    recs.sort(function (a, b) {
+      return byMonth(a.month, b.month)
+        || a.district.localeCompare(b.district)
+        || txtOf(a.row.block_name).localeCompare(txtOf(b.row.block_name))
+        || categoryRank(a.category) - categoryRank(b.category) || a.category.localeCompare(b.category)
+        || txtOf(a.row.full_name).localeCompare(txtOf(b.row.full_name));
+    });
+
+    const H = function (v) { return { s: 1, v: v }; };
+    const s0 = function (v) { return (v === BLANK.category || v === BLANK.award) ? "" : v; };
+    const header = ["Month", "District", "Block", "Cluster", "Community", "School", "Full Name", "Mobile", "Email",
+      "PM", "Award Category", "Award Name", "Awarded", "Awarded Date", "Status", "Awarded By", "Verified",
+      "Verified By", "Image Link", "Uploaded By", "Post Link", "Post Score", "Description"];
+    const lines = recs.map(function (r) {
+      const x = r.row;
+      const score = x.post_score === null || x.post_score === undefined || x.post_score === "" ? "" : Number(x.post_score);
+      return [r.month, r.district, txtOf(x.block_name), txtOf(x.circle_name), x.community ? txtOf(x.community) : "",
+        txtOf(x.school_name), txtOf(x.full_name), txtOf(x.mobile), txtOf(x.email), txtOf(x.pm_name),
+        s0(r.category), s0(r.award), r.awarded ? "Yes" : "No", formatDate(r.awardedDate), r.status, txtOf(x.awarded_by),
+        x.rejected ? "Rejected" : (x.verified ? "Yes" : "No"), txtOf(x.verified_by), txtOf(x.image_url),
+        txtOf(x.uploaded_by), txtOf(x.post_url), isNaN(score) ? txtOf(x.post_score) : score, txtOf(x.description)];
+    });
+
+    // District · Block summary, same counting as the table above.
+    const groups = new Map();
+    recs.forEach(function (r) {
+      const key = r.district + "\u0001" + txtOf(r.row.block_name);
+      if (!groups.has(key)) groups.set(key, { district: r.district, block: txtOf(r.row.block_name), recs: [] });
+      groups.get(key).recs.push(r);
+    });
+    const sumHead = ["District", "Block", "Total Awards", "Awarded In Time", "Awarded Late", "Pending",
+      "Total Awarded", "Awarded %", "Verified", "Verified %"];
+    const sumRows = Array.from(groups.values()).sort(function (a, b) {
+      return a.district.localeCompare(b.district) || a.block.localeCompare(b.block);
+    }).map(function (g) {
+      const c = counts(g.recs);
+      return [g.district, g.block || "(No block)", c.total, c.awarded, c.late, c.pending, c.totalAwarded,
+        pct(c.totalAwarded, c.total), c.verified, pct(c.verified, c.total)];
+    });
+    const all = counts(recs);
+    sumRows.push([H("Total"), H(""), H(all.total), H(all.awarded), H(all.late), H(all.pending), H(all.totalAwarded),
+      H(pct(all.totalAwarded, all.total)), H(all.verified), H(pct(all.verified, all.total))]);
+
+    const styles = '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts>' +
+      '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>' +
+      '<fill><patternFill patternType="solid"><fgColor rgb="FF2F6FE4"/><bgColor indexed="64"/></patternFill></fill></fills>' +
+      '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>' +
+      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+      '<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+      '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs>' +
+      '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+
+    const bytes = buildWorkbook([
+      { name: "Award Records", rows: [header.map(H)].concat(lines), freeze: { rows: 1 },
+        widths: [14, 18, 20, 18, 16, 30, 26, 14, 26, 20, 26, 26, 10, 13, 17, 24, 10, 24, 40, 24, 40, 10, 40] },
+      { name: "District-Block Summary", rows: [sumHead.map(H)].concat(sumRows), freeze: { rows: 1 },
+        widths: [20, 24, 12, 15, 13, 10, 13, 11, 10, 11] },
+      { name: "Filters", rows: [[H("Filter"), H("Selected")]].concat(FILTERS.map(function (f) {
+          const arr = sel[f.key] || [];
+          const total = document.querySelectorAll("#awd-" + f.key + "-items .awd-cb").length;
+          return [f.label, arr.length === 0 ? "None" : (total && arr.length === total) ? f.all : arr.join(", ")];
+        }), [[], ["Downloaded", new Date().toLocaleString("en-IN")], ["Records", recs.length]]), widths: [18, 100] }
+    ], { styles: styles });
+    downloadXlsx(bytes, "Award_Records_Detailed_" + new Date().toISOString().slice(0, 10) + ".xlsx");
+    toast(recs.length + " records downloaded.");
+  } catch (e) {
+    console.error("Detailed Excel export failed:", e);
+    toast("Could not prepare the detailed Excel file. Please try again.", "error");
+  } finally {
+    detailBusy = false;
+    if (btn) btn.disabled = false;
+    if (txt) txt.textContent = "Download Detailed Excel";
   }
 }
 
