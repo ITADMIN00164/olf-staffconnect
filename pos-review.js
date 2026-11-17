@@ -3104,5 +3104,138 @@
     }).catch(function (e) { toast(e.message || String(e)); });
   }
 
-  window.FTRDashboard = { mount: mount, orgChanged: orgChanged };
+  /* ---------- Export for Progress Tab (OLF Insight) ----------
+     Returns exact G1, G2, G3 target and achieved figures matching the Field Review System.
+  */
+  async function getMonthlyGoalNumbers(empId, month) {
+    await loadOrg();
+    month = String(month || "").replace(/-/g, "").substring(0, 6);
+    if (!month && state.base && state.base.months && state.base.months[0]) {
+      month = state.base.months[0].code;
+    }
+    if (!month) month = "202610";
+
+    var id = normId(empId);
+    var p = ORG.people.filter(function (x) { return normId(x.emp_id) === id; })[0];
+    if (!p) {
+      p = ORG.people.filter(function (x) {
+        return (x.name && x.name.toLowerCase() === String(empId).toLowerCase()) ||
+               (x.email && x.email.toLowerCase() === String(empId).toLowerCase());
+      })[0];
+    }
+    var unit = "PO", value = empId;
+    if (p) {
+      unit = p.designation === "PM" ? "PM" : p.designation === "DM" ? "DM" : "PO";
+      value = p.emp_id;
+    } else if (String(empId).startsWith("d-")) {
+      unit = "District";
+      value = String(empId).replace(/^d-/, "");
+    }
+
+    var savedMView = MVIEW;
+    try {
+      var res = await Promise.all([
+        sbGetWeeklyView(unit, value, month),
+        sbGetAcademic(unit, value, month).catch(function () { return null; }),
+        sbGetTargets(unit, value, month).catch(function () { return null; })
+      ]);
+      var v = res[0];
+      v.academic = res[1];
+      v.targets = res[2];
+      MVIEW = v;
+
+      var w0 = (v.weeks || []).filter(function (w) { return w.week === 0; })[0] || { week: 0, code: month + "00", sections: {}, readPoints: {} };
+      var rp = w0.readPoints || {};
+
+      var totalScore = 0, totalGoalsScored = 0;
+      MO_GOALS.forEach(function (g) {
+        var gs = moGoalScore(g, rp);
+        if (gs && gs.score != null) {
+          totalScore += gs.score;
+          totalGoalsScored++;
+        }
+      });
+      totalScore = Math.round(totalScore * 100) / 100;
+
+      var goalsData = [];
+      MO_GOALS.forEach(function (g) {
+        if (g.key !== "G1" && g.key !== "G2" && g.key !== "G3") return;
+        var gs = moGoalScore(g, rp);
+        var scoreVal = (gs && gs.score != null) ? Math.round(gs.score * 100) / 100 : null;
+
+        var foot = g.key === "G1"
+          ? ((v.academic ? acadTotal(v.academic) : 0) + " exam" + (acadTotal(v.academic) === 1 ? "" : "s") + " planned")
+          : (gs && gs.scored ? gs.scored + " of " + gs.total + " parts scored" : "Needs data or targets");
+
+        var goalItem = {
+          key: g.key,
+          title: g.title,
+          weight: g.weight,
+          score: scoreVal,
+          scored: gs ? gs.scored : 0,
+          totalParts: gs ? gs.total : 0,
+          foot: foot,
+          rows: []
+        };
+
+        g.rows.forEach(function (r) {
+          if (r.head) {
+            goalItem.rows.push({
+              label: r.label,
+              isHead: true,
+              lvl: r.lvl
+            });
+            return;
+          }
+
+          var targetVal = null;
+          var doneVal = null;
+
+          if (r.academic) {
+            var ac = v.academic;
+            targetVal = ac ? acadTotal(ac) : 0;
+            var dv = moG1Done();
+            doneVal = dv === "" ? 0 : dv;
+          } else {
+            var ev = moEval(g, r, rp);
+            if (ev.tg && ev.tg.state === "ok" && ev.tg.value != null) {
+              targetVal = ev.tg.value;
+            }
+            var st = ev.st;
+            if (st.kind === "num") {
+              doneVal = st.value;
+            } else if (st.kind === "yn") {
+              doneVal = st.yes ? "Yes" : "No";
+            } else if (st.kind === "ynentry") {
+              doneVal = st.value || "—";
+            } else if (st.value != null && st.value !== "") {
+              doneVal = st.value;
+            }
+          }
+
+          goalItem.rows.push({
+            label: r.label,
+            lvl: r.lvl,
+            target: targetVal,
+            done: doneVal,
+            note: r.note || ""
+          });
+        });
+
+        goalsData.push(goalItem);
+      });
+
+      return {
+        header: v.header,
+        month: month,
+        totalScore: totalScore,
+        totalGoalsScored: totalGoalsScored,
+        goals: goalsData
+      };
+    } finally {
+      MVIEW = savedMView;
+    }
+  }
+
+  window.FTRDashboard = { mount: mount, orgChanged: orgChanged, getMonthlyGoalNumbers: getMonthlyGoalNumbers };
 })();
