@@ -5,7 +5,8 @@ import {
     GoogleAuthProvider,
     signInWithPopup,
     signOut,
-    onAuthStateChanged
+    onAuthStateChanged,
+    getAdditionalUserInfo
 } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
 
 import {
@@ -497,6 +498,13 @@ window.showAppConfirm = showAppConfirm;
 ==================================== */
 
 onAuthStateChanged(auth, async (user) => {
+    if (user && identityCheck) {
+        // A sign-in is in progress: wait until login() has compared the
+        // Google account's current email with the one Firebase has stored.
+        const outcome = await identityCheck;
+        if (outcome === "refreshed") { hideLoading(); showSignin(); return; }
+    }
+    if (user && auth.currentUser?.uid !== user.uid) return;   // superseded by a newer sign-in change
     if (user) {
         // A sign-in lasts for the day it was made on: yesterday's is not resumed
         if (signedInBeforeToday(user)) {
@@ -543,13 +551,56 @@ onAuthStateChanged(auth, async (user) => {
    LOGIN / LOGOUT
 ==================================== */
 
+/* ------------------------------------
+   RENAMED GOOGLE ACCOUNTS
+   Firebase Auth ties a sign-in record to the Google account's permanent
+   ID ("sub"), not to its email, and it does not refresh the stored email
+   or name on later sign-ins. So when IT renames a Google Workspace
+   account (old.employee@ -> new.employee@) and hands it to someone new,
+   Firebase keeps reporting the OLD email and name.
+   Fix: right after the popup, compare the email Google sent for THIS
+   sign-in with the one Firebase has stored. If they differ, delete the
+   stale Firebase sign-in record (allowed because the sign-in is seconds
+   old) and ask for one more sign-in, which creates a fresh record with
+   the current email and name. Nothing else is lost: every page keys its
+   data by email, never by the Firebase uid.
+------------------------------------ */
+let identityCheck = null;
+
 async function login() {
     freshSignIn = true;                // the sign-in starting now is today's
+    let settle;
+    identityCheck = new Promise(r => { settle = r; });
     try {
-        await signInWithPopup(auth, provider);
+        const result      = await signInWithPopup(auth, provider);
+        const googleEmail = String(getAdditionalUserInfo(result)?.profile?.email || "").toLowerCase();
+        const storedEmail = String(result.user.email || "").toLowerCase();
+
+        if (googleEmail && googleEmail !== storedEmail) {
+            console.warn("[Auth] Stale sign-in record:", storedEmail, "->", googleEmail);
+            try {
+                await result.user.delete();          // drop the record bound to the old identity
+            } catch (e) {
+                console.error("[Auth] Could not delete stale record:", e);
+                await signOut(auth);
+            }
+            forgetSignIn();
+            settle("refreshed");
+            await showAppAlert({
+                title: "Account updated",
+                message: "This Google account was renamed to " + googleEmail +
+                         ". Staff Connect has cleared the old details. Please click Sign in once more.",
+                type: "info"
+            });
+            return;
+        }
+        settle("ok");
     } catch (err) {
+        settle("error");
         console.error(err);
         await showAppAlert({ title: "Sign-in failed", message: err.message, type: "error" });
+    } finally {
+        identityCheck = null;
     }
 }
 
@@ -2754,7 +2805,8 @@ async function loadHomeFacts(sb) {
     const p = periods && !periods.error && periods.data && periods.data[0];
     if (p) {
         const rows = await pages(() => sb.from("vinoba_v")            // the same view the Field Review dashboard reads
-            .select("total_schools,total_teachers,unique_schools_posting,unique_teachers_posting,total_posts,total_lifeskills,star_teachers")
+            .select("total_schools,total_teachers,unique_schools_posting,unique_teachers_posting,total_posts,total_lifeskills,star_teachers,"
+                  + "creative_writing,storytelling,poetry_recitation,spoken_english,spelling_bee")
             .eq("year", p.year).eq("month", p.month).eq("week", 0));
         const sum = (k) => rows.reduce((t, r) => t + (Number(r[k]) || 0), 0);
         const mon = MON[p.month - 1];
@@ -2764,7 +2816,11 @@ async function loadHomeFacts(sb) {
         add("active", "#10B981", sum("unique_teachers_posting"), "Teachers posted in " + mon);
         add("school", "#14B8A6", sum("unique_schools_posting"), "Schools posted in " + mon);
         add("post", "#2F6FE4", sum("total_posts"), "Posts in " + mon);
-        add("spark", "#EC4899", sum("total_lifeskills"), "Life-skill posts");
+        // Life-skill posts = the 5 core clubs (Spelling Bee is core since Nov 2026; older uploads
+        // left it out of total_lifeskills, so add the clubs up rather than trusting that column).
+        const LS = ["creative_writing", "storytelling", "poetry_recitation", "spoken_english", "spelling_bee"];
+        const lsRow = r => LS.some(k => r[k] != null && r[k] !== "") ? LS.reduce((t, k) => t + (Number(r[k]) || 0), 0) : (Number(r.total_lifeskills) || 0);
+        add("spark", "#EC4899", rows.reduce((t, r) => t + lsRow(r), 0), "Life-skill posts");
         add("star", "#EAB308", sum("star_teachers"), "Star teachers");
     }
     return { facts, when };
