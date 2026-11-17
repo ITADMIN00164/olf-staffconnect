@@ -1875,185 +1875,235 @@
 
 
   // -------------------------------------------------------------
-
   // EXTERNAL DATA VIEW (EXECUTIVE ANALYTICS VIEW)
-
   // -------------------------------------------------------------
 
-  function renderAnalyticsView() {
+  function computeExternalSheetKpis(sheet, filteredRows) {
+    if (!sheet) return [];
+    const sId = sheet.id;
+    const headers = sheet.headers || [];
+    const dataRows = filteredRows.filter(r => !isTotalRow(r));
+    const totalDistrictsCount = dataRows.length;
 
-    const targetSheet = getSheet(state.programFocus);
+    // 1. Events Sheet (POM Events & Teachers)
+    if (sId === 'events') {
+      let activeDistCount = 0;
+      let totalPomEvents = 0;
+      let totalPomTeachers = 0;
+      dataRows.forEach(r => {
+        const ev = parseNum(r[17]);
+        const tc = parseNum(r[18]);
+        if ((ev && ev > 0) || (tc && tc > 0)) activeDistCount++;
+        if (ev) totalPomEvents += ev;
+        if (tc) totalPomTeachers += tc;
+      });
+      const avgT = totalPomEvents > 0 ? (totalPomTeachers / totalPomEvents).toFixed(1) : '—';
+      return [
+        {
+          title: 'Active Districts',
+          icon: '📍',
+          val: activeDistCount,
+          sub: `${activeDistCount} of ${totalDistrictsCount} Districts`,
+          desc: 'Districts conducting cluster events'
+        },
+        {
+          title: 'POM Events Conducted',
+          icon: '🔄',
+          val: formatKpiNum(totalPomEvents),
+          sub: 'Latest Cycle (2025–26)',
+          desc: 'Teacher community clusters held'
+        },
+        {
+          title: 'Teachers Mobilized',
+          icon: '👥',
+          val: formatKpiNum(totalPomTeachers),
+          sub: 'Active Educator Base',
+          desc: 'Total teachers attending cluster events'
+        },
+        {
+          title: 'Attendance Density',
+          icon: '📈',
+          val: avgT,
+          sub: 'Teachers / Event',
+          desc: 'Mean attendance per cluster meeting'
+        }
+      ];
+    }
 
-    if (!targetSheet) return '<div class="tp-hist-empty">No dataset available.</div>';
+    // 2. Posts Sheet (Teacher Community Posts)
+    if (sId === 'posts') {
+      let activeDistCount = 0;
+      let totalRegTeachers = 0;
+      let totalSchools = 0;
+      let totalPosts = 0;
+      dataRows.forEach(r => {
+        const reg = parseNum(r[11]);
+        const sch = parseNum(r[21]);
+        const pst = parseNum(r[23]);
+        if ((pst && pst > 0) || (sch && sch > 0)) activeDistCount++;
+        if (reg) totalRegTeachers += reg;
+        if (sch) totalSchools += sch;
+        if (pst) totalPosts += pst;
+      });
+      return [
+        {
+          title: 'Contributing Districts',
+          icon: '📍',
+          val: activeDistCount,
+          sub: `${activeDistCount} of ${totalDistrictsCount} Districts`,
+          desc: 'Districts publishing on Vinoba platform'
+        },
+        {
+          title: 'Registered Teachers',
+          icon: '👥',
+          val: formatKpiNum(totalRegTeachers),
+          sub: 'Enrolled Educator Base',
+          desc: 'Teachers registered on Vinoba app'
+        },
+        {
+          title: 'Community Posts',
+          icon: '📝',
+          val: formatKpiNum(totalPosts),
+          sub: 'Latest Cycle (2025–26)',
+          desc: 'Classroom practices & innovations shared'
+        },
+        {
+          title: 'Contributing Schools',
+          icon: '🏫',
+          val: formatKpiNum(totalSchools),
+          sub: 'Active Partner Schools',
+          desc: 'Schools with published posts in 2025–26'
+        }
+      ];
+    }
 
+    // 3. All Academic Board & Competitive Exam Sheets
+    let appearedCols = [];
+    let passedCols = [];
+    let pctCols = [];
 
-
-    const filteredRows = filterRows(targetSheet.rows);
-
-    const totalDistricts = filteredRows.length;
-
-    let gradeCounts = { 'A': 0, 'B': 0, 'C': 0, 'Other': 0 };
-
-    let totalAge = 0;
-
-    let ageCount = 0;
-
-    let rates = [];
-
-
-
-    const yearCols = identifyYearMetricColumns(targetSheet);
-
-
-
-    filteredRows.forEach(r => {
-
-      const grade = cleanVal(r[9]).toUpperCase();
-
-      if (gradeCounts[grade] !== undefined) gradeCounts[grade]++;
-
-      else if (grade) gradeCounts.Other++;
-
-
-
-      const age = parseNum(r[8]);
-
-      if (age !== null) {
-
-        totalAge += age;
-
-        ageCount++;
-
+    headers.forEach((h, idx) => {
+      const l = (h || '').toLowerCase().trim();
+      if (l.includes('pass %') || l.includes('pass%') || l.includes('nipun %')) {
+        pctCols.push(idx);
+      } else if (l.includes('passed') || l.includes('nipun') || l.includes('awarded')) {
+        passedCols.push(idx);
+      } else if (l.includes('appeared')) {
+        appearedCols.push(idx);
       }
-
-
-
-      if (yearCols.length > 0) {
-
-        const latestCol = yearCols[yearCols.length - 1];
-
-        const val = parseNum(r[latestCol.colIdx]);
-
-        if (val !== null) rates.push(val);
-
-      }
-
     });
 
+    const latestAppCol = appearedCols.length ? appearedCols[appearedCols.length - 1] : -1;
+    const latestPassCol = passedCols.length ? passedCols[passedCols.length - 1] : -1;
+    const latestPctCol = pctCols.length ? pctCols[pctCols.length - 1] : -1;
 
+    let activeDistCount = 0;
+    let totalAppeared = 0;
+    let totalPassed = 0;
+    let rates = [];
 
-    const avgAge = ageCount > 0 ? (totalAge / ageCount).toFixed(1) : '—';
+    dataRows.forEach(r => {
+      let hasData = false;
+      for (let c = 11; c < r.length; c++) {
+        const val = parseNum(r[c]);
+        if (val !== null && val > 0) { hasData = true; break; }
+      }
+      if (hasData) activeDistCount++;
 
-    const avgLatestRate = rates.length > 0 ? (rates.reduce((a, b) => a + b, 0) / rates.length).toFixed(1) : '—';
+      if (latestAppCol >= 0) {
+        const a = parseNum(r[latestAppCol]);
+        if (a) totalAppeared += a;
+      }
+      if (latestPassCol >= 0) {
+        const p = parseNum(r[latestPassCol]);
+        if (p) totalPassed += p;
+      }
+      if (latestPctCol >= 0) {
+        const pct = parseNum(r[latestPctCol]);
+        if (pct !== null) rates.push(pct);
+      }
+    });
 
+    const avgRate = rates.length ? (rates.reduce((a, b) => a + b, 0) / rates.length).toFixed(1) + '%' : (totalAppeared && totalPassed ? ((totalPassed / totalAppeared) * 100).toFixed(1) + '%' : '—');
+
+    let appearedTitle = 'Students Appeared';
+    let appearedDesc = 'Total candidates appeared in latest cycle';
+    let passedTitle = 'Students Qualified';
+    let passedDesc = 'Students meeting qualifying benchmark';
+    let rateTitle = 'Latest Pass %';
+    let rateSub = '2025–26 Outcome Benchmark';
+
+    if (sId.includes('fln')) {
+      appearedTitle = 'Students Evaluated';
+      appearedDesc = 'Students evaluated on FLN competencies';
+      passedTitle = 'NIPUN Achieved';
+      passedDesc = 'Students achieving NIPUN level mastery';
+      rateTitle = 'NIPUN % (25–26)';
+    } else if (sId.includes('jnv') || sId.includes('nmmse')) {
+      passedTitle = 'Scholars Awarded';
+      passedDesc = 'Students winning scholarship admissions';
+      rateTitle = 'Success Rate (25–26)';
+    } else if (sId.includes('class-10') || sId.includes('class-12')) {
+      passedTitle = 'Students Passed';
+      passedDesc = 'Students passing board examinations';
+      rateTitle = 'Pass % (25–26)';
+    }
+
+    return [
+      {
+        title: 'Active Districts',
+        icon: '📍',
+        val: activeDistCount,
+        sub: `${activeDistCount} of ${totalDistrictsCount} Districts`,
+        desc: `Districts with published ${sheet.name} results`
+      },
+      {
+        title: appearedTitle,
+        icon: '👥',
+        val: totalAppeared ? formatKpiNum(totalAppeared) : (activeDistCount ? `${activeDistCount} Cohorts` : '—'),
+        sub: 'Candidate Demographic Base',
+        desc: appearedDesc
+      },
+      {
+        title: passedTitle,
+        icon: '🏅',
+        val: totalPassed ? formatKpiNum(totalPassed) : '—',
+        sub: 'Qualification Benchmark',
+        desc: passedDesc
+      },
+      {
+        title: rateTitle,
+        icon: '📈',
+        val: avgRate,
+        sub: rateSub,
+        desc: 'Mean qualification rate across districts'
+      }
+    ];
+  }
+
+  function renderAnalyticsView() {
+    const targetSheet = getSheet(state.programFocus);
+    if (!targetSheet) return '<div class="tp-hist-empty">No dataset available.</div>';
+
+    const filteredRows = filterRows(targetSheet.rows);
+    const kpis = computeExternalSheetKpis(targetSheet, filteredRows);
+    const yearCols = identifyYearMetricColumns(targetSheet);
     const isAdmin = isITAdmin();
 
-
-
     let html = `
-
       <div class="tp-hist-kpi-grid">
-
-        <div class="tp-hist-kpi-card">
-
-          <div class="tp-hist-kpi-header">
-
-            <span class="tp-hist-kpi-title">Districts Mapped</span>
-
-            <span class="tp-hist-kpi-icon">📍</span>
-
+        ${kpis.map(k => `
+          <div class="tp-hist-kpi-card">
+            <div class="tp-hist-kpi-header">
+              <span class="tp-hist-kpi-title">${escapeHtml(k.title)}</span>
+              <span class="tp-hist-kpi-icon">${k.icon || '📊'}</span>
+            </div>
+            <div class="tp-hist-kpi-val">${k.val}</div>
+            <div class="tp-hist-kpi-sub">${escapeHtml(k.sub)}</div>
+            <p class="tp-hist-kpi-desc">${escapeHtml(k.desc)}</p>
           </div>
-
-          <div class="tp-hist-kpi-val">${totalDistricts}</div>
-
-          <div class="tp-hist-kpi-sub">Across 4 States</div>
-
-          <p class="tp-hist-kpi-desc">Cohort districts with verified longitudinal data</p>
-
-        </div>
-
-
-
-        <div class="tp-hist-kpi-card">
-
-          <div class="tp-hist-kpi-header">
-
-            <span class="tp-hist-kpi-title">Avg Program Maturity</span>
-
-            <span class="tp-hist-kpi-icon">⏳</span>
-
-          </div>
-
-          <div class="tp-hist-kpi-val">${avgAge} <span style="font-size:16px; font-weight:500;">months</span></div>
-
-          <div class="tp-hist-kpi-sub">Longitudinal Engagement</div>
-
-          <p class="tp-hist-kpi-desc">Average operational age with district</p>
-
-        </div>
-
-
-
-        <div class="tp-hist-kpi-card">
-
-          <div class="tp-hist-kpi-header">
-
-            <span class="tp-hist-kpi-title">Quality Grade Mix</span>
-
-            <span class="tp-hist-kpi-icon">🏅</span>
-
-          </div>
-
-          <div class="tp-hist-kpi-val" style="display:flex; gap:12px; align-items:baseline;">
-
-            <span class="tp-hist-grade-badge grade-a">A: ${gradeCounts.A}</span>
-
-            <span class="tp-hist-grade-badge grade-b">B: ${gradeCounts.B}</span>
-
-            <span class="tp-hist-grade-badge grade-c">C: ${gradeCounts.C}</span>
-
-          </div>
-
-          <div class="tp-hist-kpi-sub">Achieved Grade (25–26)</div>
-
-          <p class="tp-hist-kpi-desc">Evaluated operational tiering</p>
-
-        </div>
-
-
-
-        <div class="tp-hist-kpi-card">
-
-          <div class="tp-hist-kpi-header">
-
-            <span class="tp-hist-kpi-title">Latest Outcome Avg</span>
-
-            <span class="tp-hist-kpi-icon">📈</span>
-
-          </div>
-
-          <div class="tp-hist-kpi-val">${
-
-            avgLatestRate !== '—'
-
-              ? (yearCols.length > 0 && (yearCols[yearCols.length - 1].label.includes('%') || yearCols[yearCols.length - 1].label.toLowerCase().includes('rate') || yearCols[yearCols.length - 1].label.toLowerCase().includes('score'))
-
-                  ? avgLatestRate + '%'
-
-                  : Number(avgLatestRate).toLocaleString())
-
-              : '—'
-
-          }</div>
-
-          <div class="tp-hist-kpi-sub">${yearCols.length > 0 ? escapeHtml(yearCols[yearCols.length - 1].label) : '2025–26 Benchmark'}</div>
-
-          <p class="tp-hist-kpi-desc">Most recent academic outcome metric</p>
-
-        </div>
-
+        `).join('')}
       </div>
-
     `;
 
 
@@ -2481,6 +2531,10 @@
     const modalWrap = document.getElementById('tpHistoricalModalContainer');
 
     if (!modalWrap) return;
+
+    if (window.TeamPerformance && typeof window.TeamPerformance.lockScroll === 'function') {
+      window.TeamPerformance.lockScroll();
+    }
 
 
 
@@ -3222,6 +3276,10 @@
 
     if (modalWrap) modalWrap.innerHTML = '';
 
+    if (window.TeamPerformance && typeof window.TeamPerformance.unlockScroll === 'function') {
+      window.TeamPerformance.unlockScroll();
+    }
+
   }
 
 
@@ -3279,6 +3337,10 @@
     const modalWrap = document.getElementById('tpHistoricalModalContainer');
 
     if (!modalWrap) return;
+
+    if (window.TeamPerformance && typeof window.TeamPerformance.lockScroll === 'function') {
+      window.TeamPerformance.lockScroll();
+    }
 
 
 

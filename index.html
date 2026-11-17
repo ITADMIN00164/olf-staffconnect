@@ -278,6 +278,13 @@
             overflow-x: hidden;
             min-width: 0; /* critical: allows flex child to shrink below content size */
             height: 100%;
+            scrollbar-gutter: stable;
+        }
+
+        /* ── Modal Background Scroll Lock for OLF Insight ── */
+        body.tp-modal-open,
+        body.tp-modal-open .content-area {
+            overflow: hidden !important;
         }
 
         /* ── Sign-in page (embedded) ── */
@@ -4020,7 +4027,7 @@
     </div>
 </div>
 
-<script type="module" src="app.js?v=2026-11-17b"></script>
+<script type="module" src="app.js?v=20261117j"></script>
 <script src="profile.js"></script>
 <script src="pom.js"></script>
 <script src="calendar.js?v=2026-11-04a"></script>
@@ -4042,13 +4049,13 @@
 <script src="award-admin.js?v=2026-11-16c"></script>
 <script src="historical-data.js?v=20261106a"></script>
   <script src="historical-internal-data.js?v=20261106a"></script>
-<script src="historical-module.js?v=20261106e"></script>
+<script src="historical-module.js?v=20261117j"></script>
 <script src="weekly-ops-data.js?v=20261106f"></script>
-<script src="weekly-ops-module.js?v=20261116f"></script>
+<script src="weekly-ops-module.js?v=20261117j"></script>
 <script src="progress-data.js?v=20261116a"></script>
-<script src="progress-module.js?v=20261116g"></script>
+<script src="progress-module.js?v=20261117j"></script>
 <script src="team-performance-data.js?v=20261106a"></script>
-<script src="team-performance.js?v=20261116h"></script>
+<script src="team-performance.js?v=20261117j"></script>
 <script src="insight-icons.js?v=20261106a"></script>
 </body>
 </html>

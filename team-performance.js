@@ -1734,6 +1734,7 @@
     if (modal) {
       modal.style.display = "flex";
       modal.classList.add("open");
+      lockBackgroundScroll();
       renderEditorsList();
       populateStaffEmailDropdown();
     }
@@ -1744,6 +1745,7 @@
     if (modal) {
       modal.classList.remove("open");
       modal.style.display = "none";
+      unlockBackgroundScroll();
     }
   }
 
@@ -3509,6 +3511,25 @@
     return { resolvedId, personName, roleName, reportingMgr, roleData };
   }
 
+  // --- Global Background Scroll Lock Manager for OLF Insight ---
+  let savedContentScrollTop = 0;
+
+  function lockBackgroundScroll() {
+    const contentArea = document.querySelector('.content-area') || document.getElementById('pageContent');
+    if (contentArea) {
+      savedContentScrollTop = contentArea.scrollTop;
+    }
+    document.body.classList.add('tp-modal-open');
+  }
+
+  function unlockBackgroundScroll() {
+    document.body.classList.remove('tp-modal-open');
+    const contentArea = document.querySelector('.content-area') || document.getElementById('pageContent');
+    if (contentArea && savedContentScrollTop > 0) {
+      contentArea.scrollTop = savedContentScrollTop;
+    }
+  }
+
   function openModal(roleId, fallbackLevel, fallbackPerson, fallbackReportingMgr) {
     const details = resolveCardDetails(roleId, fallbackLevel, fallbackPerson, fallbackReportingMgr);
     const resolvedId = details.resolvedId;
@@ -3547,7 +3568,15 @@
     switchTab("goals");
     updateModalEditControlsVisibility();
 
+    lockBackgroundScroll();
     modal.classList.add("open");
+    const dialog = modal.querySelector(".tp-modal-dialog");
+    if (dialog && !dialog.__wheelAttached) {
+      dialog.__wheelAttached = true;
+      dialog.addEventListener("wheel", function(e) {
+        e.stopPropagation();
+      }, { passive: true });
+    }
   }
 
   function toggleModalMaximize() {
@@ -3577,6 +3606,7 @@
     }
     currentModalRoleId = null;
     tabEditStates = { goals: false, role: false, priority: false, annexures: false };
+    unlockBackgroundScroll();
   }
 
   function switchTab(tabKey) {
@@ -4407,10 +4437,32 @@
     }
   }
 
+  // Prevent wheel events on modal overlay backdrops from scrolling background
+  if (typeof document !== "undefined") {
+    document.addEventListener("wheel", function (e) {
+      const activeOverlay = document.querySelector(".tp-modal-overlay.open, .tp-hist-modal-overlay, .tp-wops-modal-backdrop");
+      if (!activeOverlay) return;
+
+      const scrollable = e.target.closest(".tp-modal-body, .tp-prog-body, #tpProgModalRosterBody, .tp-hist-modal-card, .tp-wops-modal-body");
+      if (!scrollable) {
+        e.preventDefault();
+        return;
+      }
+
+      // Inside a scrollable modal container: prevent overscroll chaining if at boundaries
+      const atTop = scrollable.scrollTop <= 0 && e.deltaY < 0;
+      const atBottom = (scrollable.scrollTop + scrollable.clientHeight >= scrollable.scrollHeight - 1) && e.deltaY > 0;
+      if (atTop || atBottom) {
+        e.preventDefault();
+      }
+    }, { passive: false });
+  }
+
   function switchView(viewName) {
     if (viewName === "weekly-ops") {
       viewName = "progress"; // Operation Tracker is temporarily on hold / disabled
     }
+    unlockBackgroundScroll();
     activeView = viewName;
     const isSmart = viewName === "smart-goals";
     const isProgress = viewName === "progress";
@@ -4468,15 +4520,22 @@
         closeModal();
       }
       const edModal = document.getElementById("tpEditorsModal");
-      if (edModal && edModal.style.display === "flex") {
+      if (edModal && (edModal.style.display === "flex" || edModal.classList.contains("open"))) {
         closeEditorsModal();
       }
       const progModal = document.getElementById("tpProgModal");
-      if (progModal && progModal.style.display !== "none") {
+      if (progModal && (progModal.style.display !== "none" || progModal.classList.contains("open"))) {
         if (window.ProgressModule && typeof window.ProgressModule.closeModal === "function") {
           window.ProgressModule.closeModal();
         }
       }
+      if (window.HistoricalModule && typeof window.HistoricalModule.closeDistrictDrawer === "function") {
+        window.HistoricalModule.closeDistrictDrawer();
+      }
+      if (window.WeeklyOpsModule && typeof window.WeeklyOpsModule.closeModal === "function") {
+        window.WeeklyOpsModule.closeModal();
+      }
+      unlockBackgroundScroll();
     }
   });
 
@@ -4503,6 +4562,8 @@
     clearSearch,
     openModal,
     closeModal,
+    lockScroll: lockBackgroundScroll,
+    unlockScroll: unlockBackgroundScroll,
     toggleModalMaximize,
     switchTab,
     // Goals
