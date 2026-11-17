@@ -1367,6 +1367,10 @@
   var UE = { entry: true };                                           // will be typed in the UI
   var NE = { numentry: true };                                        // a number typed by the PO (saved as M_ field)
 
+  // [label on this page, Vinoba column suffix] for the 5 core clubs' streak lines
+  var MO_STREAK_CLUBS = [["Storytelling", "Storytelling"], ["Creative Writing", "Creative Writing"], ["Spoken English", "Spoken English"],
+                         ["Poetry", "Poetry Recitation"], ["Spelling Bee", "Spelling Bee"]];
+
   // lvl: 0 = component (carries weight), 1 = item / sub-component, 2 = sub-item
   var MO_GOALS = [
     { key: "G1", title: "Academic Programs", weight: 40, rows: [
@@ -1384,17 +1388,19 @@
       { lvl: 0, label: "LS Program Cycle (Non-core)", w: 0, v: A(function (rp) { return mv(rp, "vinoba", "Morning Assembly"); }, "Vinoba \u00B7 Morning Assembly") },
       { lvl: 1, label: "Morning Assembly", v: A(function (rp) { return mv(rp, "vinoba", "Morning Assembly"); }, "Vinoba \u00B7 morning_assembly") },
       // Streak is scored on IMPROVED streaks of the 5 core clubs, compared with the sum of their 5 streak targets.
-      // Total streaks are shown for information (no target, no score).
-      { lvl: 0, label: "Streak", w: 10, note: "Improved streaks of the 5 core clubs",
+      // Shown as two blocks: Total streaks (achieved only - no target, no score) with the 5 clubs under it,
+      // then Streaks improved (target + achieved) with the 5 clubs under it.
+      { lvl: 0, label: "Streak", w: 10, note: "Scored on improved streaks of the 5 core clubs",
         v: A(function (rp) { return mv(rp, "vinoba", "Improved Streaks"); }, "Vinoba \u00B7 improved streaks, sum of the 5 core clubs") },
-      { lvl: 1, label: "Total streaks", info: true, v: A(function (rp) { return mv(rp, "vinoba", "Total Streaks"); }, "Vinoba \u00B7 total streaks, sum of the 5 core clubs (information only)") }
-    ].concat([["Storytelling", "Storytelling"], ["Creative Writing", "Creative Writing"], ["Spoken English", "Spoken English"],
-              ["Poetry", "Poetry Recitation"], ["Spelling Bee", "Spelling Bee"]].map(function (c) {
-      return [
-        { lvl: 1, label: "Streak \u00B7 " + c[0], v: A(function (rp) { return mv(rp, "vinoba", "Improved Streak \u00B7 " + c[1]); }, "Vinoba \u00B7 improved streaks \u00B7 " + c[1]) },
-        { lvl: 2, label: "Total \u00B7 " + c[0], info: true, v: A(function (rp) { return mv(rp, "vinoba", "Total Streak \u00B7 " + c[1]); }, "Vinoba \u00B7 total streaks \u00B7 " + c[1] + " (information only)") }
-      ];
-    }).reduce(function (a, x) { return a.concat(x); }, [])) },
+      { lvl: 1, label: "Total streaks", info: true, note: "Achieved only \u2014 no target",
+        v: A(function (rp) { return mv(rp, "vinoba", "Total Streaks"); }, "Vinoba \u00B7 total streaks, sum of the 5 core clubs (information only)") }
+    ].concat(MO_STREAK_CLUBS.map(function (c) {
+      return { lvl: 2, label: "Total \u00B7 " + c[0], info: true, v: A(function (rp) { return mv(rp, "vinoba", "Total Streak \u00B7 " + c[1]); }, "Vinoba \u00B7 total streaks \u00B7 " + c[1] + " (information only)") };
+    })).concat([
+      { lvl: 1, label: "Streaks improved", v: A(function (rp) { return mv(rp, "vinoba", "Improved Streaks"); }, "Vinoba \u00B7 improved streaks, sum of the 5 core clubs") }
+    ]).concat(MO_STREAK_CLUBS.map(function (c) {
+      return { lvl: 2, label: "Improved \u00B7 " + c[0], v: A(function (rp) { return mv(rp, "vinoba", "Improved Streak \u00B7 " + c[1]); }, "Vinoba \u00B7 improved streaks \u00B7 " + c[1]) };
+    })) },
 
     { key: "G3", title: "Vibrant Teacher Community", weight: 20, rows: [
       { lvl: 0, label: "Vinoba Kathavli Stories", w: 5, v: A(function (rp) { return mv(rp, "visit", "Kathawli Yes"); }, "Visit & Activity \u00B7 Kathavli \u201CYes\u201D count") },
@@ -1584,10 +1590,15 @@
     document.querySelectorAll("#prMoBody tr[data-ent]").forEach(function (tr) {
       var it = MO_ENT[Number(tr.dataset.ent)]; if (!it) return;
       var ev = moEval(it.g, it.r, rp), weighted = (it.r.lvl === 0 && it.r.w > 0) || it.r.community;
+      if (moTgtUsesEntry(it.r)) {
+        tr.cells[2].innerHTML = moTargetHtml(it.g, it.r, ev.tg);
+        var tb = tr.cells[2].querySelector(".pr-mo-tlink");
+        if (tb) tb.addEventListener("click", function () { openTargetPopup(Number(tb.dataset.ti)); });
+      }
       tr.cells[4].innerHTML = ev.pct != null ? fmtNum(Math.round(ev.pct * 1000) / 10) + "%" : moDash();
       tr.cells[5].innerHTML = weighted ? (ev.score != null ? fmtNum(r2(ev.score)) : moDash()) : "";
       if (it.r.community) { var sub = tr.cells[0].querySelector(".pr-mo-sub");
-        if (sub) sub.textContent = "Average of the 10 metrics below that have both a target and data (" + ev.used + " of " + ev.of + " now), \u00D7 15."; }
+        if (sub) sub.textContent = "Average of the 10 metrics below (a metric with no target counts as 100%) \u2014 " + ev.used + " of " + ev.of + " scored now, \u00D7 15."; }
     });
     moG4SummaryRefresh();
     MO_GOALS.forEach(function (g) {
@@ -1910,7 +1921,7 @@
     MO_GOALS.forEach(function (g) {
       var gs = moGoalScore(g, rp), acad = MVIEW.academic;
       if (gs.score != null) { total += gs.score; totalN++; if (g.key !== "G1") others += gs.score; }
-      var foot = g.key === "G1" ? (acad == null ? "Academic Plan unavailable" : acadTotal(acad) + " exam" + (acadTotal(acad) === 1 ? "" : "s") + " planned")
+      var foot = g.key === "G1" ? (acad == null ? "Academic Plan unavailable" : (acadTotal(acad) ? acadTotal(acad) + " exam" + (acadTotal(acad) === 1 ? "" : "s") + " planned" : "No exams planned \u2014 full score"))
                : g.key === "G4" ? moG4Foot()
                : (gs.scored ? gs.scored + " of " + gs.total + " parts scored" : (MVIEW.targets && MVIEW.targets.rowsInMonth ? "Needs data or targets" : "No targets for this month"));
       cards += '<div class="pr-card" data-goal="' + g.key + '"><div class="pr-card-k">' + g.key + " \u00B7 " + esc(g.title) + '</div><div class="pr-card-v">'
@@ -1943,7 +1954,7 @@
       var cls = "pr-row pr-hidden pr-mo-l" + r.lvl + (r.head ? " pr-mo-head" : "");
       var ev = (r.head || r.academic || r.compliance) ? null : moEval(g, r, rp);
       var sub = r.note || "";
-      if (r.community && ev) sub = "Average of the 10 metrics below that have both a target and data (" + ev.used + " of " + ev.of + " now), \u00D7 15.";
+      if (r.community && ev) sub = "Average of the 10 metrics below (a metric with no target counts as 100%) \u2014 " + ev.used + " of " + ev.of + " scored now, \u00D7 15.";
       var item = esc(r.label) + (sub ? '<div class="pr-mo-sub">' + esc(sub) + "</div>" : "");
       var entIdx = null;
       if (r.community) { MO_ENT.push({ g: g, r: r }); entIdx = MO_ENT.length - 1; }
@@ -1965,16 +1976,18 @@
             : (dv === "" ? moPill("Not entered", "pr-mo-entry", "Entered by the person under review") : fmtNum(dv));
           var g1 = moPctScore(dv, n, r.w);
           if (g1) { pct = fmtNum(g1.pct) + "%"; score = fmtNum(g1.score); }
+        } else if (ac && !n) {           // no exams planned this month = nothing asked -> full score
+          done = '<span class="pr-mut" title="No exams in the Academic Plan for this month \u2014 full score">\u2014</span>';
+          pct = "100%"; score = fmtNum(r.w);
         } else done = moDash();
       } else if (r.compliance) {
         var cc = moComplianceCells(g, r, rp);
         done = cc.done; target = String(r.target); pct = cc.pct; score = cc.score;
       } else {
         var st = ev.st;
-        // target: clickable number, or why there is none
-        if (ev.tg.state === "ok") { MO_TLINES.push({ r: r, g: g }); target = '<button type="button" class="pr-mo-tlink" data-ti="' + (MO_TLINES.length - 1) + '" title="See where this target comes from">' + fmtNum(r2(ev.tg.value)) + "</button>"; }
-        else if (ev.tg.state === "notset") target = moPill("Not set", "pr-mo-na", "No target for this line this month (blank or 0)");
-        else if (ev.tg.state === "unavailable") target = moPill("Unavailable", "pr-mo-na", "The targets table could not be loaded");
+        // target: clickable number, a box to type it (targets the file doesn't carry yet), or why there is none
+        target = moTargetHtml(g, r, ev.tg);
+        if (moTgtIsEntry(r) || moTgtUsesEntry(r)) { MO_ENT.push({ g: g, r: r }); entIdx = MO_ENT.length - 1; }
         if (r.v && r.v.numentry) {
           var curv = st.kind === "num" ? st.value : "";
           MO_ENT.push({ g: g, r: r }); entIdx = MO_ENT.length - 1;
@@ -2165,6 +2178,7 @@
 
     if (unit === "PO") {
       var r = rows.filter(function (x) { return normId(x.po_id) === normId(value); })[0] || null;
+      out.unitRows = r ? 1 : 0;
       TGT_KEYS.forEach(function (k) {
         var v = r ? tnum(r[k]) : null;
         out.cols[k] = { value: v > 0 ? v : null, parts: r ? [{ district: r.district, po: r.po_name || r.po_id, value: v, status: v > 0 ? "counted" : "zero" }] : [] };
@@ -2202,6 +2216,7 @@
       });
     });
 
+    out.unitRows = contributors.length;
     TGT_KEYS.forEach(function (k) {
       if (k === "posts_per_teacher") { out.cols[k] = { value: 1, fixed: true, parts: [] }; return; }
       var perDistrict = k === "district_recognition_event", parts = [], total = 0, best = {};
@@ -2231,9 +2246,10 @@
     "G2|LS Program Cycle (Non-core)": { t: "morning_assembly" },
     "G2|Morning Assembly": { t: "morning_assembly" },
     "G2|Streak": { tsum: ["st_streak", "cw_streak", "se_streak", "pr_streak", "sb_streak"] },
-    "G2|Streak \u00B7 Storytelling": { t: "st_streak" }, "G2|Streak \u00B7 Creative Writing": { t: "cw_streak" },
-    "G2|Streak \u00B7 Spoken English": { t: "se_streak" }, "G2|Streak \u00B7 Poetry": { t: "pr_streak" },
-    "G2|Streak \u00B7 Spelling Bee": { t: "sb_streak" },
+    "G2|Streaks improved": { tsum: ["st_streak", "cw_streak", "se_streak", "pr_streak", "sb_streak"] },
+    "G2|Improved \u00B7 Storytelling": { t: "st_streak" }, "G2|Improved \u00B7 Creative Writing": { t: "cw_streak" },
+    "G2|Improved \u00B7 Spoken English": { t: "se_streak" }, "G2|Improved \u00B7 Poetry": { t: "pr_streak" },
+    "G2|Improved \u00B7 Spelling Bee": { t: "sb_streak" },
     "G3|Vinoba Kathavli Stories": { t: "kathawli" },
     "G3|Online + Offline community": { community: true },
     "G3|Unique teachers posting": { t: "online_unique_teachers" }, "G3|Unique schools posting": { t: "online_unique_schools" },
@@ -2248,20 +2264,61 @@
   };
   MO_GOALS.forEach(function (g) { g.rows.forEach(function (r) { var x = MO_TMAP[g.key + "|" + r.label]; if (x) { for (var k in x) r[k] = x[k]; } }); });
 
+  // Targets that the targets file does not carry yet can be typed on the Monthly page by the person
+  // under review (saved as an M_ field of that month). Today: the SB improved-streak target.
+  // A value in the targets file always wins; the typed value is used only while the file has none.
+  var MO_TGT_ENTRY = { sb_streak: "M_G2_SBSTREAK_TGT" };
+  function moTgtFile(k) { var T = MVIEW && MVIEW.targets, c = T && T.cols[k]; return c && c.value != null ? c.value : null; }
+  function moTgtEntered(k) { var f = MO_TGT_ENTRY[k]; if (!f) return null; var v = moNumVal(f); return (v === "" || !(v > 0)) ? null : v; }
+  function moTgtVal(k) { var v = moTgtFile(k); return v != null ? v : moTgtEntered(k); }
+  // true when this line's target is typed on the page (its key has an entry field and the file has no value)
+  function moTgtIsEntry(r) { return !!(r.t && MO_TGT_ENTRY[r.t] && MVIEW && MVIEW.targets && moTgtFile(r.t) == null); }
+  function moTgtUsesEntry(r) { return !!(r.tsum && r.tsum.some(function (k) { return MO_TGT_ENTRY[k]; })); }
   function moTarget(r) {
     var T = MVIEW && MVIEW.targets;
     if (!r.t && !r.tsum) return { state: "none" };
     if (!T) return { state: "unavailable" };
-    if (r.t) { var c = T.cols[r.t]; return c && c.value != null ? { state: "ok", value: c.value, fixed: !!c.fixed } : { state: "notset" }; }
-    var vs = r.tsum.map(function (k) { return T.cols[k] && T.cols[k].value; }).filter(function (v) { return v != null; });
+    if (r.t) {
+      var c = T.cols[r.t];
+      if (c && c.value != null) return { state: "ok", value: c.value, fixed: !!c.fixed };
+      var e = moTgtEntered(r.t);
+      return e != null ? { state: "ok", value: e, entered: true } : { state: "notset" };
+    }
+    var vs = r.tsum.map(moTgtVal).filter(function (v) { return v != null; });
     return vs.length ? { state: "ok", value: vs.reduce(function (a, b) { return a + b; }, 0) } : { state: "notset" };
   }
+  // Target cell HTML (shared by the first draw and moRefreshScores)
+  function moTargetHtml(g, r, tg) {
+    if (moTgtIsEntry(r)) {
+      var cur = moValue(MO_TGT_ENTRY[r.t]);
+      return canEditSelf(MVIEW)
+        ? '<input type="number" min="0" step="any" inputmode="decimal" class="pr-mo-ent pr-mo-tent" placeholder="Enter" data-wc="' + moW0().code
+          + '" data-fid="' + MO_TGT_ENTRY[r.t] + '" value="' + (cur === "" || cur == null ? "" : cur) + '" title="Not in the targets file yet \u2014 type this month\'s target">'
+          + '<div class="pr-mo-sub">Enter target</div>'
+        : (tg.state === "ok" ? '<span title="Typed on this page (not in the targets file)">' + fmtNum(r2(tg.value)) + "</span>"
+                             : moPill("Not set", "pr-mo-na", "Not in the targets file; typed on this page by the person under review"));
+    }
+    if (tg.state === "ok") { MO_TLINES.push({ r: r, g: g }); return '<button type="button" class="pr-mo-tlink" data-ti="' + (MO_TLINES.length - 1) + '" title="See where this target comes from">' + fmtNum(r2(tg.value)) + "</button>"; }
+    if (tg.state === "notset") return moNoTargetFull()
+      ? '<span class="pr-mut" title="No target for this line this month (blank or 0) \u2014 counted as fully achieved">0</span>'
+      : moPill("Not set", "pr-mo-na", "No target for this line this month (blank or 0)");
+    if (tg.state === "unavailable") return moPill("Unavailable", "pr-mo-na", "The targets table could not be loaded");
+    return "";
+  }
+  // No target for a line this month (blank or 0 in the targets file) = nothing was asked, so the line
+  // counts as fully achieved (100%, full weight). Applies only once this person / unit has a row in
+  // the month's targets file — a month with no targets uploaded yet still shows "—".
+  function moNoTargetFull() { var T = MVIEW && MVIEW.targets; return !!(T && T.unitRows > 0); }
   // One evaluation per line, shared by the table and the cards.
   function moEval(g, r, rp) {
     var res = { st: moRowState(r, rp), tg: moTarget(r), pct: null, score: null };
     if (r.community) {           // equal weights: average of capped % over metrics with a target and data, x 15
       var mets = g.rows.filter(function (x) { return x.lvl === 2 && x.t; }), ach = [];
-      mets.forEach(function (x) { var t = moTarget(x), s = moRowState(x, rp); if (t.state === "ok" && s.kind === "num") ach.push(Math.min(s.value / t.value, 1)); });
+      mets.forEach(function (x) {
+        var t = moTarget(x), s = moRowState(x, rp);
+        if (t.state === "ok" && s.kind === "num") ach.push(Math.min(s.value / t.value, 1));
+        else if (t.state === "notset" && moNoTargetFull()) ach.push(1);          // no target = fully achieved
+      });
       res.used = ach.length; res.of = mets.length;
       if (ach.length) { res.pct = ach.reduce(function (a, b) { return a + b; }, 0) / ach.length; res.score = r.w * res.pct; }
       return res;
@@ -2269,6 +2326,9 @@
     if (res.tg.state === "ok" && res.st.kind === "num" && res.tg.value > 0) {
       res.pct = Math.min(res.st.value / res.tg.value, 1);
       if (r.lvl === 0 && r.w > 0) res.score = r.w * res.pct;
+    } else if (res.tg.state === "notset" && moNoTargetFull() && !r.info) {
+      res.pct = 1; res.full = true;                                            // no target = fully achieved
+      if (r.lvl === 0 && r.w > 0) res.score = r.w;
     }
     return res;
   }
@@ -2280,7 +2340,9 @@
   function moGoalScore(g, rp) {
     if (g.key === "G4") { var e4 = moG4Eval(); return { score: e4.score, scored: e4.scored, total: e4.items.length }; }
     if (g.key === "G1") {
-      var ac = MVIEW.academic, gs = (ac && acadTotal(ac)) ? moPctScore(moG1Done(), acadTotal(ac), g.weight) : null;
+      var ac = MVIEW.academic;
+      if (ac && !acadTotal(ac)) return { score: g.weight, scored: 1, total: 1 };   // no exams planned = full score
+      var gs = (ac && acadTotal(ac)) ? moPctScore(moG1Done(), acadTotal(ac), g.weight) : null;
       return { score: gs ? gs.score : null, scored: gs ? 1 : 0, total: 1 };
     }
     var comps = g.rows.filter(function (r) { return r.lvl === 0 && r.w > 0; }), got = 0, n = 0;
@@ -2303,8 +2365,9 @@
     if (r.tsum) {
       var tot = 0;
       body = '<table class="pr-tbl"><thead><tr><th>Part</th><th class="pr-num">Target</th></tr></thead><tbody>'
-        + r.tsum.map(function (k) { var v = T.cols[k] && T.cols[k].value; if (v != null) tot += v;
-            return '<tr class="pr-row"><td>' + esc(TGT_LABEL[k]) + '</td><td class="pr-num">' + (v != null ? fmtNum(v) : '<span class="pr-mut">Not set</span>') + "</td></tr>"; }).join("")
+        + r.tsum.map(function (k) { var v = moTgtVal(k), typed = v != null && moTgtFile(k) == null; if (v != null) tot += v;
+            return '<tr class="pr-row"><td>' + esc(TGT_LABEL[k]) + (typed ? ' <span class="pr-mut">(typed on this page)</span>' : "") + '</td><td class="pr-num">'
+              + (v != null ? fmtNum(v) : '<span class="pr-mut">Not set</span>') + "</td></tr>"; }).join("")
         + '<tr class="pr-row pr-tgt-total"><td>Total</td><td class="pr-num">' + fmtNum(tot) + "</td></tr></tbody></table>";
       note = "Open each line's own target to see which POs and districts it comes from.";
     } else {
@@ -3104,138 +3167,5 @@
     }).catch(function (e) { toast(e.message || String(e)); });
   }
 
-  /* ---------- Export for Progress Tab (OLF Insight) ----------
-     Returns exact G1, G2, G3 target and achieved figures matching the Field Review System.
-  */
-  async function getMonthlyGoalNumbers(empId, month) {
-    await loadOrg();
-    month = String(month || "").replace(/-/g, "").substring(0, 6);
-    if (!month && state.base && state.base.months && state.base.months[0]) {
-      month = state.base.months[0].code;
-    }
-    if (!month) month = "202610";
-
-    var id = normId(empId);
-    var p = ORG.people.filter(function (x) { return normId(x.emp_id) === id; })[0];
-    if (!p) {
-      p = ORG.people.filter(function (x) {
-        return (x.name && x.name.toLowerCase() === String(empId).toLowerCase()) ||
-               (x.email && x.email.toLowerCase() === String(empId).toLowerCase());
-      })[0];
-    }
-    var unit = "PO", value = empId;
-    if (p) {
-      unit = p.designation === "PM" ? "PM" : p.designation === "DM" ? "DM" : "PO";
-      value = p.emp_id;
-    } else if (String(empId).startsWith("d-")) {
-      unit = "District";
-      value = String(empId).replace(/^d-/, "");
-    }
-
-    var savedMView = MVIEW;
-    try {
-      var res = await Promise.all([
-        sbGetWeeklyView(unit, value, month),
-        sbGetAcademic(unit, value, month).catch(function () { return null; }),
-        sbGetTargets(unit, value, month).catch(function () { return null; })
-      ]);
-      var v = res[0];
-      v.academic = res[1];
-      v.targets = res[2];
-      MVIEW = v;
-
-      var w0 = (v.weeks || []).filter(function (w) { return w.week === 0; })[0] || { week: 0, code: month + "00", sections: {}, readPoints: {} };
-      var rp = w0.readPoints || {};
-
-      var totalScore = 0, totalGoalsScored = 0;
-      MO_GOALS.forEach(function (g) {
-        var gs = moGoalScore(g, rp);
-        if (gs && gs.score != null) {
-          totalScore += gs.score;
-          totalGoalsScored++;
-        }
-      });
-      totalScore = Math.round(totalScore * 100) / 100;
-
-      var goalsData = [];
-      MO_GOALS.forEach(function (g) {
-        if (g.key !== "G1" && g.key !== "G2" && g.key !== "G3") return;
-        var gs = moGoalScore(g, rp);
-        var scoreVal = (gs && gs.score != null) ? Math.round(gs.score * 100) / 100 : null;
-
-        var foot = g.key === "G1"
-          ? ((v.academic ? acadTotal(v.academic) : 0) + " exam" + (acadTotal(v.academic) === 1 ? "" : "s") + " planned")
-          : (gs && gs.scored ? gs.scored + " of " + gs.total + " parts scored" : "Needs data or targets");
-
-        var goalItem = {
-          key: g.key,
-          title: g.title,
-          weight: g.weight,
-          score: scoreVal,
-          scored: gs ? gs.scored : 0,
-          totalParts: gs ? gs.total : 0,
-          foot: foot,
-          rows: []
-        };
-
-        g.rows.forEach(function (r) {
-          if (r.head) {
-            goalItem.rows.push({
-              label: r.label,
-              isHead: true,
-              lvl: r.lvl
-            });
-            return;
-          }
-
-          var targetVal = null;
-          var doneVal = null;
-
-          if (r.academic) {
-            var ac = v.academic;
-            targetVal = ac ? acadTotal(ac) : 0;
-            var dv = moG1Done();
-            doneVal = dv === "" ? 0 : dv;
-          } else {
-            var ev = moEval(g, r, rp);
-            if (ev.tg && ev.tg.state === "ok" && ev.tg.value != null) {
-              targetVal = ev.tg.value;
-            }
-            var st = ev.st;
-            if (st.kind === "num") {
-              doneVal = st.value;
-            } else if (st.kind === "yn") {
-              doneVal = st.yes ? "Yes" : "No";
-            } else if (st.kind === "ynentry") {
-              doneVal = st.value || "—";
-            } else if (st.value != null && st.value !== "") {
-              doneVal = st.value;
-            }
-          }
-
-          goalItem.rows.push({
-            label: r.label,
-            lvl: r.lvl,
-            target: targetVal,
-            done: doneVal,
-            note: r.note || ""
-          });
-        });
-
-        goalsData.push(goalItem);
-      });
-
-      return {
-        header: v.header,
-        month: month,
-        totalScore: totalScore,
-        totalGoalsScored: totalGoalsScored,
-        goals: goalsData
-      };
-    } finally {
-      MVIEW = savedMView;
-    }
-  }
-
-  window.FTRDashboard = { mount: mount, orgChanged: orgChanged, getMonthlyGoalNumbers: getMonthlyGoalNumbers };
-})();
+  window.FTRDashboard = { mount: mount, orgChanged: orgChanged };
+})();
