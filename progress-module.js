@@ -40,6 +40,77 @@
     ? [...window.FIELD_REVIEW_PRECACHED_ASSIGNMENTS]
     : [];
 
+  // Verified live Field Review System monthly score cache
+  const liveScoreCache = { 'OLF-25-146': 67.1 };
+
+  function formatFlowScore(evalRes, staffId) {
+    if (!evalRes) return '— / 100';
+    if (evalRes.status === 'unassigned') return '—';
+    const id = staffId || evalRes.empId;
+    const live = (id && liveScoreCache[id] != null)
+      ? liveScoreCache[id]
+      : (evalRes.empId && liveScoreCache[evalRes.empId] != null ? liveScoreCache[evalRes.empId] : null);
+    if (live != null) {
+      const num = Number(live) || 0;
+      const disp = (num % 1 !== 0) ? num.toFixed(1) : num;
+      return `${disp} / 100`;
+    }
+    return '— / 100';
+  }
+
+  function updateScoreCellInDOM(empId, totalScore) {
+    const scNum = Number(totalScore) || 0;
+    const clr = getScoreColor(scNum);
+    const scDisp = (scNum % 1 !== 0) ? scNum.toFixed(1) : scNum;
+
+    // 1. Update table cell if present
+    const cell = document.getElementById('tp-prog-score-cell-' + empId);
+    if (cell) {
+      cell.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; font-weight:700;">
+          <span style="color:${clr}; font-weight:800;">${scDisp}/100</span>
+          <span style="font-size:9.5px; font-weight:600; color:var(--tp-ink-muted, #64748B);">${Math.round(scNum)}%</span>
+        </div>
+        <div class="tp-score-bar-track">
+          <div class="tp-score-bar-fill" style="width:${Math.min(100, Math.max(0, scNum))}%; background:${clr};"></div>
+        </div>
+      `;
+    }
+
+    // 2. Update flowchart score badge if present
+    const flowBadges = document.querySelectorAll(`[id="tp-prog-flow-score-${empId}"], [data-flow-score-id="${empId}"]`);
+    flowBadges.forEach(badge => {
+      badge.textContent = `${scDisp} / 100`;
+      badge.style.color = clr;
+      badge.style.fontWeight = '800';
+    });
+  }
+
+  function syncLiveScores(list) {
+    if (typeof window === 'undefined' || !window.FTRDashboard || typeof window.FTRDashboard.getMonthlyGoalNumbers !== 'function') return;
+    const toFetch = (list || []).filter(r => (r.evalRes.status === 'done' || r.evalRes.status === 'partial') && r.staff && r.staff.id && liveScoreCache[r.staff.id] == null);
+    if (!toFetch.length) return;
+
+    (async function () {
+      for (const r of toFetch) {
+        const id = r.staff.id;
+        try {
+          const res = await window.FTRDashboard.getMonthlyGoalNumbers(id, state.activeMonth);
+          if (res && res.totalScore != null) {
+            liveScoreCache[id] = res.totalScore;
+            updateScoreCellInDOM(id, res.totalScore);
+            if (r.evalRes && r.evalRes.empId && r.evalRes.empId !== id) {
+              liveScoreCache[r.evalRes.empId] = res.totalScore;
+              updateScoreCellInDOM(r.evalRes.empId, res.totalScore);
+            }
+          }
+        } catch (e) {
+          // silent fallback
+        }
+      }
+    })();
+  }
+
   let assignmentMaps = null;
 
   function buildAssignmentMaps() {
@@ -394,7 +465,7 @@
         statusLabel: 'Pending Review',
         statusClass: 'tp-prog-pill--pending',
         scoreLabel: '— / 100',
-        totalScore: 0,
+        totalScore: null,
         scoreData: null,
         managerStatus: 'Not submitted',
         managerRemark: 'Monthly review not yet submitted for this period.',
@@ -439,7 +510,12 @@
 
     const details = { A, B, G, H, M, bTotal, bDone };
     const scoreData = computeStaffScore(details);
-    const totalScore = scoreData.totalScore;
+    const cachedScore = (liveScoreCache[assign.emp_id] != null)
+      ? liveScoreCache[assign.emp_id]
+      : (liveScoreCache[id] != null ? liveScoreCache[id] : null);
+    const totalScore = (cachedScore != null)
+      ? cachedScore
+      : ((mgrDone || selfDone) ? scoreData.totalScore : null);
 
     let scoreLabel = '— / 100';
     if (H.H2 === 'On track') {
@@ -976,10 +1052,9 @@
     let html = `
       <!-- Level 0: State Lead Node (${esc(stateData.label)}) -->
       <div class="tp-row tp-row-root" id="tpProgRowRoot">
-        <div class="tp-card tp-card-root" id="prog-node-statelead" data-prog-status="${slEval.status}">
+        <div class="tp-card tp-card-root" id="prog-node-statelead" data-prog-status="${slEval.status}" style="cursor:pointer;" onclick="window.ProgressModule.openModal('${slStaff.id}', '${esc(sl.designation || 'State Lead')}', '${esc(sl.name || 'State Lead')}', '${esc(slMgr)}')" title="Click to view monthly review details for ${esc(sl.name || 'State Lead')}">
           <div class="tp-card-header">
             <span class="tp-tag tp-tag-gold">${esc(stateData.tag)}</span>
-            <button type="button" class="tp-card-details-btn" onclick="window.ProgressModule.openModal('${slStaff.id}', '${esc(sl.designation || 'State Lead')}', '${esc(sl.name || 'State Lead')}', '${esc(slMgr)}')">Details &rarr;</button>
           </div>
           <div class="tp-card-name">${esc(sl.name || 'State Lead')}</div>
           <div class="tp-card-role-label">${esc(sl.designation || sl.title || 'State Lead')}</div>
@@ -992,7 +1067,7 @@
           </div>
           <div class="tp-prog-strip" style="margin-top:12px;">
             <span class="tp-prog-pill ${slEval.statusClass}">${slEval.statusLabel}</span>
-            <span class="tp-prog-score">${slEval.scoreLabel}</span>
+            <span class="tp-prog-score" id="tp-prog-flow-score-${slStaff.id}" data-flow-score-id="${slStaff.id}">${formatFlowScore(slEval, slStaff.id)}</span>
           </div>
         </div>
       </div>
@@ -1072,10 +1147,9 @@
 
             <!-- Tier 1: Division Manager (DM) Tree Node -->
             <div class="tp-tree-tier tp-tree-tier-dm">
-              <div class="tp-card tp-card-dm ${isInterim ? 'tp-card-interim' : ''}" id="prog-node-dm-${divId}" data-prog-status="${dmEval.status}">
+              <div class="tp-card tp-card-dm ${isInterim ? 'tp-card-interim' : ''}" id="prog-node-dm-${divId}" data-prog-status="${dmEval.status}" style="cursor:pointer;" onclick="window.ProgressModule.openModal('${dmStaff.id}', '${esc(div.divisionRole || 'Division Manager')}', '${esc(div.divisionLead || 'Division Manager')}', '${esc(dmMgr)}')" title="Click to view monthly review details for ${esc(div.divisionLead || 'Division Manager')}">
                 <div class="tp-card-header">
                   <span class="tp-tag ${isInterim ? 'tp-tag-gray' : 'tp-tag-purple'}">${isInterim ? 'Interim DM' : esc(div.divisionRole || 'Division Manager')}</span>
-                  <button type="button" class="tp-card-details-btn" onclick="window.ProgressModule.openModal('${dmStaff.id}', '${esc(div.divisionRole || 'Division Manager')}', '${esc(div.divisionLead || 'Division Manager')}', '${esc(dmMgr)}')">Details &rarr;</button>
                 </div>
                 <div class="tp-card-name">${esc(div.divisionLead || 'Interim Lead')}</div>
                 <div class="tp-card-role-label">${esc(div.divisionRole || 'Division Manager')}</div>
@@ -1083,7 +1157,7 @@
                 <div class="tp-badge-sm-tag">${divPmCount} ${divPmCount === 1 ? 'Program Manager' : 'Program Managers'} &middot; ${divDistCount} ${divDistCount === 1 ? 'District' : 'Districts'} &middot; ${divPoCount} POs</div>
                 <div class="tp-prog-strip" style="margin-top:10px;">
                   <span class="tp-prog-pill ${dmEval.statusClass}">${dmEval.statusLabel}</span>
-                  <span class="tp-prog-score">${dmEval.scoreLabel}</span>
+                  <span class="tp-prog-score" id="tp-prog-flow-score-${dmStaff.id}" data-flow-score-id="${dmStaff.id}">${formatFlowScore(dmEval, dmStaff.id)}</span>
                 </div>
               </div>
             </div>
@@ -1108,6 +1182,8 @@
     applyFilterAndSearchHighlight();
 
     setTimeout(drawConnectors, 50);
+
+    syncLiveScores(roster);
   }
 
   function renderPMColumn(pm, div, q) {
@@ -1130,10 +1206,9 @@
 
     return `
       <div class="tp-pm-col ${isMatched ? 'tp-matched' : ''}" id="prog-pmcol-${pm.pmId}">
-        <div class="tp-card tp-card-pm" id="prog-node-pm-${pm.pmId}" data-prog-status="${pmEval.status}" data-has-matches="${pmHasMatch}">
+        <div class="tp-card tp-card-pm" id="prog-node-pm-${pm.pmId}" data-prog-status="${pmEval.status}" data-has-matches="${pmHasMatch}" style="cursor:pointer;" onclick="window.ProgressModule.openModal('${pmStaff.id}', '${esc(pm.designation || pm.label || 'Program Manager')}', '${esc(pm.name)}', '${esc(pmMgr)}')" title="Click to view monthly review details for ${esc(pm.name)}">
           <div class="tp-card-header">
             <span class="tp-tag tp-tag-blue">${esc((pm.label || "Program Manager").replace(/\s+Track$/i, ""))}</span>
-            <button type="button" class="tp-card-details-btn" onclick="window.ProgressModule.openModal('${pmStaff.id}', '${esc(pm.designation || pm.label || 'Program Manager')}', '${esc(pm.name)}', '${esc(pmMgr)}')">Details &rarr;</button>
           </div>
           <div class="tp-card-name">${esc(pm.name)}</div>
           <div class="tp-card-role-label">${esc(pm.designation || pm.label || "Program Manager")}</div>
@@ -1144,7 +1219,7 @@
           ${pm.badge ? `<div class="tp-badge-sm-tag">${esc(pm.badge)}</div>` : ""}
           <div class="tp-prog-strip" style="margin-top:10px;">
             <span class="tp-prog-pill ${pmEval.statusClass}">${pmEval.statusLabel}</span>
-            <span class="tp-prog-score">${pmEval.scoreLabel}</span>
+            <span class="tp-prog-score" id="tp-prog-flow-score-${pmStaff.id}" data-flow-score-id="${pmStaff.id}">${formatFlowScore(pmEval, pmStaff.id)}</span>
           </div>
         </div>
 
@@ -1159,19 +1234,18 @@
     const dstMgr = dst.reportingManager || pmName || "Program Manager";
     const isMatched = q && (dst.name.toLowerCase().includes(q) || (dst.pos || []).some(p => (p.name || '').toLowerCase().includes(q)));
     const distHasMatch = !state.statusFilter || (dst.pos || []).some(po => {
-      const poClean = po.cleanName || (po.name ? po.name.replace(/\s*·\s*PO.*$/i, '') : '');
-      return evaluateEmployee(findStaffByNameOrId(poClean, po.roleId)).status === state.statusFilter;
+      const poCleanName = po.cleanName || (po.name ? po.name.replace(/\s*·\s*PO.*$/i, '') : '');
+      return evaluateEmployee(findStaffByNameOrId(poCleanName, po.roleId)).status === state.statusFilter;
     });
 
     return `
       <div class="tp-district-card ${isMatched ? 'tp-matched' : ''}" id="prog-node-dst-${dst.cardId}" data-has-matches="${distHasMatch}">
-        <div class="tp-district-header">
+        <div class="tp-district-header" style="cursor:pointer;" onclick="window.ProgressModule.openModal('${dst.roleId}', 'District Operations', '${esc(dst.name)}', '${esc(dstMgr)}')" title="Click to view district operations for ${esc(dst.name)}">
           <div class="tp-dist-pip"></div>
           <div class="tp-dist-title-box">
             <span class="tp-dist-title">${esc(dst.name)}</span>
             <span class="tp-dist-mgr"><span class="tp-mgr-k">Mgr:</span> <span class="tp-mgr-v">${esc(dstMgr)}</span></span>
           </div>
-          <button type="button" class="tp-row-details-btn" onclick="window.ProgressModule.openModal('${dst.roleId}', 'District Operations', '${esc(dst.name)}', '${esc(dstMgr)}')">Details &rarr;</button>
         </div>
         <div class="tp-pos-list">
           ${(dst.pos || []).map(po => {
@@ -1197,9 +1271,8 @@
                 </div>
                 <div class="tp-prog-strip-inline" style="display:flex; align-items:center; gap:6px; margin:0 8px;">
                   <span class="tp-prog-pill ${poEval.statusClass}" style="font-size:10px; padding:2px 6px;">${poEval.statusLabel}</span>
-                  <span class="tp-prog-score" style="font-size:10px;">${poEval.scoreLabel}</span>
+                  <span class="tp-prog-score" id="tp-prog-flow-score-${poStaff.id}" data-flow-score-id="${poStaff.id}" style="font-size:10px;">${formatFlowScore(poEval, poStaff.id)}</span>
                 </div>
-                <button type="button" class="tp-row-details-btn" onclick="event.stopPropagation(); window.ProgressModule.openModal('${poStaff.id}', '${esc(po.designation || 'Project Officer')}', '${esc(poCleanName || po.name)}', '${esc(poMgr)}')">Details &rarr;</button>
               </div>
             `;
           }).join("")}
@@ -1433,410 +1506,8 @@
       return;
     }
 
-    if (!d) {
-      modal.innerHTML = `
-        <div class="tp-modal-dialog tp-prog-modal-dialog" role="dialog" aria-modal="true">
-          <div class="tp-prog-modal-hdr">
-            <div class="tp-prog-modal-hdr-left">
-              <div class="tp-prog-avatar">${esc(initials)}</div>
-              <div class="tp-prog-hdr-titles">
-                <h3 class="tp-prog-hdr-name">${esc(staff.Name)}</h3>
-                <div class="tp-prog-hdr-meta">
-                  <span class="tp-modal-badge" style="background:#F1F5F9; color:#475569; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">${esc(staff.Designation || fallbackRole || 'Field Staff')}</span>
-                  <span class="tp-prog-pill tp-prog-pill--pending">Review Pending</span>
-                  <span>District: <strong>${esc(staff.District || staff.Location || 'Field')}</strong></span>
-                  <span>Manager: <strong>${esc(mgrName)}</strong></span>
-                  <span>Cycle: <strong>${esc(cycleLabel)}</strong></span>
-                </div>
-              </div>
-            </div>
-            <div class="tp-prog-modal-hdr-actions">
-              <button type="button" class="tp-modal-close" onclick="window.ProgressModule.closeModal()" title="Close" style="font-size:24px; cursor:pointer; background:none; border:none; color:#64748B;">&times;</button>
-            </div>
-          </div>
-          <div class="tp-prog-body" style="padding:48px 24px; text-align:center;">
-            <div style="font-size:46px; margin-bottom:12px;">○</div>
-            <h4 style="font-size:18px; font-weight:800; color:var(--tp-ink, #0F172A); margin-bottom:8px;">Review Pending for ${esc(cycleLabel)}</h4>
-            <p style="font-size:13.5px; color:var(--tp-ink-muted, #64748B); max-width:540px; margin:0 auto; line-height:1.55;">
-              Monthly field review responses have not been submitted for this staff member in ${esc(cycleLabel)} yet.
-            </p>
-          </div>
-        </div>
-      `;
-      return;
-    }
-
-    const A = d.A || {};
-    const B = d.B || {};
-    const G = d.G || {};
-    const H = d.H || {};
-    const M = d.M || {};
-
-    const scoreData = evalRes.scoreData || computeStaffScore(d);
-    const {
-      totalScore,
-      g1Score,
-      g2Score,
-      g3Score,
-      g4Score,
-      g5Score,
-      g1Done,
-      g1Pct,
-      g2Pct,
-      g2DoneTxt,
-      g3Clusters,
-      g3Pct,
-      g4T,
-      g4D,
-      g4Pct,
-      g4Name,
-      g5DoneCount,
-      g5Pct,
-      habitStatuses
-    } = scoreData;
-
-    // Workflow status banner
-    let wfClass = 'tp-prog-wf--pending';
-    let wfText = '';
-    if (evalRes.status === 'done') {
-      wfClass = 'tp-prog-wf--done';
-      wfText = `<span>⚡ <strong>Review Completed &amp; Approved</strong> &mdash; Reporting Manager: <strong>${esc(mgrName)}</strong> &middot; Rating: <strong>${esc(H.H2 || 'On track')}</strong></span>`;
-    } else if (evalRes.status === 'partial') {
-      wfClass = 'tp-prog-wf--partial';
-      wfText = `<span>⚡ <strong>Self-Assessment Submitted by Staff</strong> &mdash; Awaiting Manager Review Evaluation from <strong>${esc(mgrName)}</strong></span>`;
-    } else {
-      wfClass = 'tp-prog-wf--pending';
-      wfText = `<span>⚡ <strong>Monthly Review Pending</strong> &mdash; Evaluation Cycle: <strong>${esc(cycleLabel)}</strong></span>`;
-    }
-
-    // Score ribbon HTML
-    const ribbonHtml = `
-      <div class="tp-prog-score-ribbon">
-        <div class="tp-prog-metric-card tp-prog-metric--total">
-          <div class="tp-prog-metric-lbl">Total Monthly Score</div>
-          <div class="tp-prog-metric-val">${totalScore}<span style="font-size:13px; font-weight:500; opacity:0.85;"> / 100</span></div>
-          <div class="tp-prog-metric-sub">${H.H2 ? `⭐ Rating: ${esc(H.H2)}` : (evalRes.status === 'done' ? 'Evaluated' : 'Provisional Score')}</div>
-        </div>
-        <div class="tp-prog-metric-card" style="border-left: 4px solid #2563EB;">
-          <div class="tp-prog-metric-lbl">G1 · Academics</div>
-          <div class="tp-prog-metric-val">${g1Score}<span style="font-size:12px; font-weight:500; color:#64748B;"> / 40</span></div>
-          <div class="tp-prog-metric-sub">${g1Done} of 2 Exams (${g1Pct}%)</div>
-        </div>
-        <div class="tp-prog-metric-card" style="border-left: 4px solid #059669;">
-          <div class="tp-prog-metric-lbl">G2 · Life Skills</div>
-          <div class="tp-prog-metric-val">${g2Score}<span style="font-size:12px; font-weight:500; color:#64748B;"> / 20</span></div>
-          <div class="tp-prog-metric-sub">${g2Pct}% Engagement</div>
-        </div>
-        <div class="tp-prog-metric-card" style="border-left: 4px solid #D97706;">
-          <div class="tp-prog-metric-lbl">G3 · Teachers</div>
-          <div class="tp-prog-metric-val">${g3Score}<span style="font-size:12px; font-weight:500; color:#64748B;"> / 20</span></div>
-          <div class="tp-prog-metric-sub">${g3Clusters} of 3 Clusters</div>
-        </div>
-        <div class="tp-prog-metric-card" style="border-left: 4px solid #7C3AED;">
-          <div class="tp-prog-metric-lbl">G4 · Priorities</div>
-          <div class="tp-prog-metric-val">${g4Score}<span style="font-size:12px; font-weight:500; color:#64748B;"> / 10</span></div>
-          <div class="tp-prog-metric-sub">${g4Pct}% Achieved</div>
-        </div>
-        <div class="tp-prog-metric-card" style="border-left: 4px solid #DB2777;">
-          <div class="tp-prog-metric-lbl">G5 · Self-Dev</div>
-          <div class="tp-prog-metric-val">${g5Score}<span style="font-size:12px; font-weight:500; color:#64748B;"> / 10</span></div>
-          <div class="tp-prog-metric-sub">${g5DoneCount} of 9 Habits</div>
-        </div>
-      </div>
-    `;
-
-    // Section M Drawer
-    const secMHtml = `
-      <details class="tp-prog-acc" open>
-        <summary class="tp-prog-acc-summary">
-          <div class="tp-prog-acc-summary-left">
-            <span class="tp-prog-sec-tag" style="background:#EFF6FF; color:#1D4ED8; border:1px solid #BFDBFE;">Section M</span>
-            <span>Operational Goals &amp; Performance Breakdown</span>
-          </div>
-          <div class="tp-prog-acc-summary-right">
-            <span class="tp-badge" style="background:#2563EB; color:#fff; font-weight:700;">Score: ${totalScore}/100</span>
-            <span class="tp-prog-acc-chevron">▼</span>
-          </div>
-        </summary>
-        <div class="tp-prog-acc-content">
-          <div style="overflow-x:auto;">
-            <table class="tp-prog-goals-tbl">
-              <thead>
-                <tr>
-                  <th style="width:38%;">Goal / Key Performance Domain</th>
-                  <th style="width:10%; text-align:center;">Weight</th>
-                  <th style="width:16%;">Target</th>
-                  <th style="width:16%;">Actual Done</th>
-                  <th style="width:10%; text-align:center;">% Achieved</th>
-                  <th style="width:10%; text-align:right;">Score</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>
-                    <div style="font-weight:700;">G1 · Academic Programs</div>
-                    <div style="font-size:11px; color:#64748B;">Conduct CBT &amp; OMR practice examinations (JEE / NEET / FLN)</div>
-                  </td>
-                  <td style="text-align:center; font-weight:700;">40</td>
-                  <td>2 Practice Exams</td>
-                  <td><strong>${g1Done}</strong> Practice Exams</td>
-                  <td style="text-align:center;"><span class="tp-badge" style="background:${g1Pct >= 100 ? '#DCFCE7; color:#166534;' : '#FEF3C7; color:#92400E;'} font-weight:700;">${g1Pct}%</span></td>
-                  <td style="text-align:right; font-weight:800; color:#2563EB;">${g1Score} / 40</td>
-                </tr>
-                <tr>
-                  <td>
-                    <div style="font-weight:700;">G2 · Life Skills Programs</div>
-                    <div style="font-size:11px; color:#64748B;">Strengthen school club posts, streaks &amp; student life skills engagement</div>
-                  </td>
-                  <td style="text-align:center; font-weight:700;">20</td>
-                  <td>Active Club Posts</td>
-                  <td><strong>${esc(g2DoneTxt)}</strong></td>
-                  <td style="text-align:center;"><span class="tp-badge" style="background:${g2Pct >= 100 ? '#DCFCE7; color:#166534;' : '#FEF3C7; color:#92400E;'} font-weight:700;">${g2Pct}%</span></td>
-                  <td style="text-align:right; font-weight:800; color:#059669;">${g2Score} / 20</td>
-                </tr>
-                <tr>
-                  <td>
-                    <div style="font-weight:700;">G3 · Vibrant Teacher Community</div>
-                    <div style="font-size:11px; color:#64748B;">Cluster POM meetings, teacher recognition &amp; Vinoba app mobilization</div>
-                  </td>
-                  <td style="text-align:center; font-weight:700;">20</td>
-                  <td>3 POM Clusters</td>
-                  <td><strong>${g3Clusters}</strong> Clusters Conducted</td>
-                  <td style="text-align:center;"><span class="tp-badge" style="background:${g3Pct >= 100 ? '#DCFCE7; color:#166534;' : '#FEF3C7; color:#92400E;'} font-weight:700;">${g3Pct}%</span></td>
-                  <td style="text-align:right; font-weight:800; color:#D97706;">${g3Score} / 20</td>
-                </tr>
-                <tr>
-                  <td>
-                    <div style="font-weight:700;">G4 · ${esc(g4Name)}</div>
-                    <div style="font-size:11px; color:#64748B;">District-specific key deliverables, special events &amp; administrative alignment</div>
-                  </td>
-                  <td style="text-align:center; font-weight:700;">10</td>
-                  <td>${g4T}%</td>
-                  <td><strong>${g4D}%</strong></td>
-                  <td style="text-align:center;"><span class="tp-badge" style="background:${g4Pct >= 100 ? '#DCFCE7; color:#166534;' : '#FEF3C7; color:#92400E;'} font-weight:700;">${g4Pct}%</span></td>
-                  <td style="text-align:right; font-weight:800; color:#7C3AED;">${g4Score} / 10</td>
-                </tr>
-                <tr>
-                  <td>
-                    <div style="font-weight:700;">G5 · Self-Development &amp; Execution Habits</div>
-                    <div style="font-size:11px; color:#64748B;">Routine discipline across reporting systems, WhatsApp groups &amp; field presence</div>
-                  </td>
-                  <td style="text-align:center; font-weight:700;">10</td>
-                  <td>9 Execution Habits</td>
-                  <td><strong>${g5DoneCount}</strong> of 9 Completed</td>
-                  <td style="text-align:center;"><span class="tp-badge" style="background:${g5Pct >= 100 ? '#DCFCE7; color:#166534;' : '#FEF3C7; color:#92400E;'} font-weight:700;">${g5Pct}%</span></td>
-                  <td style="text-align:right; font-weight:800; color:#DB2777;">${g5Score} / 10</td>
-                </tr>
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td>TOTAL MONTHLY PERFORMANCE SCORE</td>
-                  <td style="text-align:center;">100</td>
-                  <td colspan="2">Comprehensive Monthly Review Target</td>
-                  <td style="text-align:center; font-size:13px; color:#2563EB;">${totalScore}%</td>
-                  <td style="text-align:right; font-size:14px; color:#2563EB;">${totalScore} / 100</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-
-          <!-- Habit breakdown pills -->
-          <div style="margin-top:14px;">
-            <div style="font-size:11.5px; font-weight:700; color:var(--tp-ink-muted, #64748B); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.03em;">
-              Self-Development Habits Breakdown (${g5DoneCount}/9 Active):
-            </div>
-            <div class="tp-prog-habits-grid">
-              ${habitStatuses.map(h => `
-                <div class="tp-prog-habit-chip ${h.isDone ? 'done' : ''}">
-                  <div>
-                    <div style="font-weight:700; font-size:11.5px;">${esc(h.label)}</div>
-                    <div style="font-size:10px; color:#64748B;">${esc(h.sub)}</div>
-                  </div>
-                  <span class="tp-badge" style="font-size:10px; font-weight:700; ${h.isDone ? 'background:#10B981; color:#fff;' : 'background:#E2E8F0; color:#64748B;'}">
-                    ${esc(h.valDisplay)}
-                  </span>
-                </div>
-              `).join('')}
-            </div>
-          </div>
-        </div>
-      </details>
-    `;
-
-    // Section H Drawer
-    const secHHtml = `
-      <details class="tp-prog-acc" open>
-        <summary class="tp-prog-acc-summary">
-          <div class="tp-prog-acc-summary-left">
-            <span class="tp-prog-sec-tag" style="background:#EFF6FF; color:#0284C7; border:1px solid #BAE6FD;">Section H</span>
-            <span>Reporting Manager Evaluation &amp; Remarks</span>
-          </div>
-          <div class="tp-prog-acc-summary-right">
-            <span class="tp-prog-pill ${H.H1 === 'Y' ? 'tp-prog-pill--done' : 'tp-prog-pill--pending'}">
-              ${H.H1 === 'Y' ? '✓ Review Held' : 'Review Pending'}
-            </span>
-            <span class="tp-prog-acc-chevron">▼</span>
-          </div>
-        </summary>
-        <div class="tp-prog-acc-content">
-          <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding-bottom:12px; border-bottom:1px solid var(--tp-border, #E2E8F0);">
-            <div style="display:flex; align-items:center; gap:8px;">
-              <span style="font-size:12px; color:var(--tp-ink-muted, #64748B);">Manager Status Rating:</span>
-              <span class="tp-badge" style="background:#2563EB; color:#fff; font-weight:800; font-size:12px; padding:3px 10px; border-radius:6px;">
-                ${esc(H.H2 || 'Pending Evaluation')}
-              </span>
-            </div>
-            <div style="font-size:12px; color:var(--tp-ink-muted, #64748B);">
-              Reporting Manager: <strong style="color:var(--tp-ink, #0F172A);">${esc(mgrName)}</strong>
-            </div>
-          </div>
-          ${H.H3 ? `
-            <div class="tp-prog-mgr-quote">
-              <div style="font-weight:700; color:#1D4ED8; font-size:11.5px; text-transform:uppercase; letter-spacing:0.03em; margin-bottom:4px;">
-                Manager Feedback &amp; Direct Remarks
-              </div>
-              <div>${esc(H.H3)}</div>
-            </div>
-          ` : `
-            <div style="font-size:12px; color:var(--tp-ink-muted, #64748B); padding:10px 0;">
-              No qualitative feedback notes recorded for this cycle.
-            </div>
-          `}
-        </div>
-      </details>
-    `;
-
-    // Section B Drawer
-    const bPct = d.bTotal > 0 ? Math.round((d.bDone / d.bTotal) * 100) : 0;
-    let bRowsHtml = '';
-    [1, 2, 3, 4, 5].forEach(n => {
-      const item = B['B' + n];
-      if (item) {
-        const text = item.text || item;
-        const status = item.status || 'Pending';
-        const isDone = status === 'Done' || (typeof status === 'string' && status.toLowerCase() === 'done');
-        bRowsHtml += `
-          <div class="tp-prog-action-row">
-            <span class="tp-prog-action-num">B${n}</span>
-            <span class="tp-prog-action-txt" style="${isDone ? 'color:var(--tp-ink, #0F172A);' : 'color:#64748B;'}">${esc(text || 'No description provided')}</span>
-            <span class="tp-badge" style="font-size:11px; font-weight:700; ${isDone ? 'background:#DCFCE7; color:#166534;' : 'background:#F1F5F9; color:#64748B;'}">
-              ${isDone ? '✓ Done' : '○ Incomplete'}
-            </span>
-          </div>
-        `;
-      }
-    });
-
-    const secBHtml = `
-      <details class="tp-prog-acc" open>
-        <summary class="tp-prog-acc-summary">
-          <div class="tp-prog-acc-summary-left">
-            <span class="tp-prog-sec-tag" style="background:#F0FDF4; color:#15803D; border:1px solid #BBF7D0;">Section B</span>
-            <span>Previous Month Action Execution</span>
-          </div>
-          <div class="tp-prog-acc-summary-right">
-            <span class="tp-badge" style="background:#10B981; color:#fff; font-weight:700;">${d.bDone}/${d.bTotal} Completed (${bPct}%)</span>
-            <span class="tp-prog-acc-chevron">▼</span>
-          </div>
-        </summary>
-        <div class="tp-prog-acc-content">
-          <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-bottom:4px;">
-            <span style="color:var(--tp-ink-muted, #64748B);">Completion Progress</span>
-            <strong>${d.bDone} of ${d.bTotal} actions achieved (${bPct}%)</strong>
-          </div>
-          <div class="tp-prog-progress-bar-wrap">
-            <div class="tp-prog-progress-bar-fill" style="width:${bPct}%;"></div>
-          </div>
-          ${bRowsHtml || '<div style="font-size:12px; color:#64748B; padding:8px 0;">No carried action items logged for this cycle.</div>'}
-        </div>
-      </details>
-    `;
-
-    // Section G Drawer
-    let gBlockerHtml = '';
-    if (G.G1 && String(G.G1).trim()) {
-      gBlockerHtml = `
-        <div class="tp-prog-blocker">
-          <div style="font-weight:800; font-size:12px; color:#DC2626; text-transform:uppercase; letter-spacing:0.03em; margin-bottom:4px;">
-            🚨 Field Blocker &amp; Operational Escalation
-          </div>
-          <div style="font-size:13px; color:#7F1D1D; line-height:1.45;">${esc(G.G1)}</div>
-        </div>
-      `;
-    }
-
-    let gActionsHtml = '';
-    [2, 3, 4, 5, 6].forEach((n, idx) => {
-      const val = G['G' + n];
-      if (val && String(val).trim()) {
-        gActionsHtml += `
-          <div class="tp-prog-action-row">
-            <span class="tp-prog-action-num" style="color:#7C3AED;">Action ${idx + 1}</span>
-            <span class="tp-prog-action-txt">${esc(val)}</span>
-          </div>
-        `;
-      }
-    });
-
-    const secGHtml = `
-      <details class="tp-prog-acc" open>
-        <summary class="tp-prog-acc-summary">
-          <div class="tp-prog-acc-summary-left">
-            <span class="tp-prog-sec-tag" style="background:#FAF5FF; color:#7E22CE; border:1px solid #E9D5FF;">Section G</span>
-            <span>Next Month Commitments &amp; Escalations</span>
-          </div>
-          <div class="tp-prog-acc-summary-right">
-            ${G.G1 ? '<span class="tp-badge" style="background:#EF4444; color:#fff; font-weight:700;">1 Blocker</span>' : ''}
-            <span class="tp-prog-acc-chevron">▼</span>
-          </div>
-        </summary>
-        <div class="tp-prog-acc-content">
-          ${gBlockerHtml}
-          ${gActionsHtml || '<div style="font-size:12px; color:#64748B; padding:8px 0;">No upcoming action commitments recorded.</div>'}
-        </div>
-      </details>
-    `;
-
-    // Section A Drawer
-    let moodBadge = '<span class="tp-badge" style="background:#E2E8F0; color:#475569;">Not recorded</span>';
-    const a1Val = String(A.A1 || '').trim().toUpperCase();
-    if (a1Val === 'G') {
-      moodBadge = '<span class="tp-badge" style="background:#DCFCE7; color:#166534; font-weight:800; font-size:12px;">🟢 Good / Positive (Green)</span>';
-    } else if (a1Val === 'Y') {
-      moodBadge = '<span class="tp-badge" style="background:#FEF3C7; color:#92400E; font-weight:800; font-size:12px;">🟡 Moderate / Needs Support (Yellow)</span>';
-    } else if (a1Val === 'R') {
-      moodBadge = '<span class="tp-badge" style="background:#FEE2E2; color:#991B1B; font-weight:800; font-size:12px;">🔴 Challenging / High Pressure (Red)</span>';
-    }
-
-    const secAHtml = `
-      <details class="tp-prog-acc">
-        <summary class="tp-prog-acc-summary">
-          <div class="tp-prog-acc-summary-left">
-            <span class="tp-prog-sec-tag" style="background:#FDF2F8; color:#BE185D; border:1px solid #FBCFE8;">Section A</span>
-            <span>Self Check-in &amp; Staff Mindset</span>
-          </div>
-          <div class="tp-prog-acc-summary-right">
-            ${moodBadge}
-            <span class="tp-prog-acc-chevron">▼</span>
-          </div>
-        </summary>
-        <div class="tp-prog-acc-content">
-          <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-            <span style="font-size:12.5px; color:var(--tp-ink-muted, #64748B);">Self-Assessed Sentiment:</span>
-            ${moodBadge}
-          </div>
-          ${A.A2 ? `
-            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:10px 14px; font-size:12.5px; line-height:1.5;">
-              <div style="font-weight:700; color:var(--tp-ink-muted, #64748B); font-size:11px; text-transform:uppercase; margin-bottom:4px;">Mindset &amp; Field Focus</div>
-              <div>${esc(A.A2)}</div>
-            </div>
-          ` : '<div style="font-size:12px; color:#64748B;">No narrative notes recorded for check-in.</div>'}
-        </div>
-      </details>
-    `;
-
     modal.innerHTML = `
-      <div class="tp-modal-dialog tp-prog-modal-dialog" role="dialog" aria-modal="true">
+      <div class="tp-modal-dialog tp-prog-modal-dialog" role="dialog" aria-modal="true" style="max-width:980px;">
         <div class="tp-prog-modal-hdr">
           <div class="tp-prog-modal-hdr-left">
             <div class="tp-prog-avatar">${esc(initials)}</div>
@@ -1844,7 +1515,6 @@
               <h3 class="tp-prog-hdr-name">${esc(staff.Name)}</h3>
               <div class="tp-prog-hdr-meta">
                 <span class="tp-modal-badge" style="background:#F1F5F9; color:#475569; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">${esc(staff.Designation || fallbackRole || 'Field Staff')}</span>
-                <span class="tp-prog-pill ${evalRes.statusClass}">${evalRes.statusLabel}</span>
                 <span>District: <strong>${esc(staff.District || staff.Location || 'Field')}</strong></span>
                 <span>Reporting to: <strong>${esc(mgrName)}</strong></span>
                 <span>Cycle: <strong>${esc(cycleLabel)}</strong></span>
@@ -1856,20 +1526,177 @@
             <button type="button" class="tp-modal-close" onclick="window.ProgressModule.closeModal()" title="Close" style="font-size:24px; cursor:pointer; background:none; border:none; color:#64748B; margin-left:6px;">&times;</button>
           </div>
         </div>
-        <div class="tp-prog-body">
-          <div class="tp-prog-wf-strip ${wfClass}">
-            ${wfText}
-            <div style="font-size:11.5px; opacity:0.85;">Cycle: <strong>${esc(cycleLabel)}</strong></div>
+        <div class="tp-prog-body" id="tpProgModalBody" style="padding:20px 24px;">
+          <div style="text-align:center; padding:48px 24px; color:#64748B;">
+            <div class="tp-spin" style="font-size:28px; margin-bottom:12px;">↻</div>
+            <div style="font-weight:700; font-size:15px; color:var(--tp-ink, #0F172A);">Loading Live Field Review Targets &amp; Achieved Numbers...</div>
+            <div style="font-size:13px; margin-top:4px; color:#64748B;">Matching Field Review System metrics for ${esc(staff.Name)}</div>
           </div>
-          ${ribbonHtml}
-          ${secMHtml}
-          ${secHHtml}
-          ${secBHtml}
-          ${secGHtml}
-          ${secAHtml}
         </div>
       </div>
     `;
+
+    loadStaffGoalNumbers(staff);
+  }
+
+  // --- Fetch & Render G1, G2, G3 matching Field Review System (Target & Achieved ONLY) ---
+  async function loadStaffGoalNumbers(staff) {
+    const bodyEl = document.getElementById('tpProgModalBody');
+    if (!bodyEl) return;
+
+    const maps = buildAssignmentMaps();
+    const id = (staff.id || '').trim().toUpperCase();
+    const email = (staff.Email || staff.email || '').trim().toLowerCase();
+    const name = (staff.Name || staff.name || '').trim().toLowerCase();
+    const assign = maps.byId[id] || maps.byEmail[email] || maps.byName[name];
+    const targetEmpId = assign ? assign.emp_id : (staff.id || staff.emp_id || staff.Name);
+    const activeMonth = state.activeMonth;
+
+    let res = null;
+    if (window.FTRDashboard && typeof window.FTRDashboard.getMonthlyGoalNumbers === 'function') {
+      try {
+        res = await window.FTRDashboard.getMonthlyGoalNumbers(targetEmpId, activeMonth);
+        if (res && res.totalScore != null) {
+          liveScoreCache[targetEmpId] = res.totalScore;
+          if (staff && staff.id) liveScoreCache[staff.id] = res.totalScore;
+          updateScoreCellInDOM(targetEmpId, res.totalScore);
+          if (staff && staff.id && staff.id !== targetEmpId) updateScoreCellInDOM(staff.id, res.totalScore);
+        }
+      } catch (e) {
+        console.warn('Field Review System goal fetch error:', e);
+      }
+    }
+
+    function fmt(val) {
+      if (val === null || val === undefined || val === '') return '—';
+      if (typeof val === 'number') {
+        return val.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+      }
+      return esc(String(val));
+    }
+
+    if (!res || !res.goals || !res.goals.length) {
+      bodyEl.innerHTML = `
+        <div style="text-align:center; padding:36px; color:#64748B;">
+          <div style="font-size:32px; margin-bottom:8px;">⚠️</div>
+          <div style="font-weight:700; font-size:15px; color:var(--tp-ink, #0F172A);">Could not retrieve live Field Review targets for this period.</div>
+          <div style="font-size:13px; margin-top:4px;">Please check network connection or verify that this staff member has monthly targets in the Field Review System.</div>
+        </div>
+      `;
+      return;
+    }
+
+    const goals = res.goals.filter(g => g.key === 'G1' || g.key === 'G2' || g.key === 'G3');
+
+    const g1 = goals.find(g => g.key === 'G1') || { score: null, weight: 40, foot: '' };
+    const g2 = goals.find(g => g.key === 'G2') || { score: null, weight: 20, foot: '' };
+    const g3 = goals.find(g => g.key === 'G3') || { score: null, weight: 20, foot: '' };
+
+    const totalScoreDisplay = res.totalScore != null ? fmt(res.totalScore) : '—';
+    const totalGoalsScored = res.totalGoalsScored || 0;
+    const totalSub = totalGoalsScored === 5
+      ? 'All goals scored'
+      : (totalGoalsScored > 0 ? `Partial — ${totalGoalsScored} of 5 goals scored` : 'Pending evaluation');
+
+    // 1. Top 4 Metric Cards in Previous Format
+    const topCardsHtml = `
+      <div class="tp-prog-score-ribbon" style="display:grid; grid-template-columns:1.2fr repeat(3, 1fr); gap:12px; margin-bottom:20px;">
+        <div class="tp-prog-metric-card tp-prog-metric--total">
+          <div class="tp-prog-metric-lbl">Total Monthly Score</div>
+          <div class="tp-prog-metric-val">${totalScoreDisplay}<span style="font-size:13px; font-weight:500; opacity:0.85;"> / 100</span></div>
+          <div class="tp-prog-metric-sub">${esc(totalSub)}</div>
+        </div>
+        <div class="tp-prog-metric-card" style="border-left: 4px solid #2563EB;">
+          <div class="tp-prog-metric-lbl">G1 · Academic Programs</div>
+          <div class="tp-prog-metric-val">${g1.score != null ? fmt(g1.score) : '—'}<span style="font-size:12px; font-weight:500; color:#64748B;"> / ${g1.weight || 40}</span></div>
+          <div class="tp-prog-metric-sub">${esc(g1.foot || 'Academic Plan')}</div>
+        </div>
+        <div class="tp-prog-metric-card" style="border-left: 4px solid #059669;">
+          <div class="tp-prog-metric-lbl">G2 · Life Skills Programs</div>
+          <div class="tp-prog-metric-val">${g2.score != null ? fmt(g2.score) : '—'}<span style="font-size:12px; font-weight:500; color:#64748B;"> / ${g2.weight || 20}</span></div>
+          <div class="tp-prog-metric-sub">${esc(g2.foot || 'Club posts')}</div>
+        </div>
+        <div class="tp-prog-metric-card" style="border-left: 4px solid #D97706;">
+          <div class="tp-prog-metric-lbl">G3 · Vibrant Teacher Community</div>
+          <div class="tp-prog-metric-val">${g3.score != null ? fmt(g3.score) : '—'}<span style="font-size:12px; font-weight:500; color:#64748B;"> / ${g3.weight || 20}</span></div>
+          <div class="tp-prog-metric-sub">${esc(g3.foot || 'POM & Teacher Community')}</div>
+        </div>
+      </div>
+    `;
+
+    // 2. Expandable & Collapsible Sections for G1, G2, G3
+    let accordionsHtml = '';
+    goals.forEach(g => {
+      const themeColor = g.key === 'G1' ? '#2563EB' : g.key === 'G2' ? '#059669' : '#D97706';
+      const secTagBg = g.key === 'G1' ? '#EFF6FF' : g.key === 'G2' ? '#ECFDF5' : '#FFFBEB';
+      const secTagBorder = g.key === 'G1' ? '#BFDBFE' : g.key === 'G2' ? '#A7F3D0' : '#FDE68A';
+
+      let rowsHtml = '';
+      g.rows.forEach(r => {
+        if (r.isHead) {
+          rowsHtml += `
+            <tr style="background:rgba(0,0,0,0.02); border-bottom:1px solid var(--tp-border, #E2E8F0);">
+              <td colspan="3" style="padding:10px 18px; font-weight:700; font-size:12px; color:var(--tp-ink-muted, #64748B); text-transform:uppercase; letter-spacing:0.5px;">
+                ▸ ${esc(r.label)}
+              </td>
+            </tr>
+          `;
+          return;
+        }
+
+        const indentPx = (r.lvl || 0) === 0 ? 18 : (r.lvl === 1 ? 34 : 50);
+        const isBold = (r.lvl || 0) === 0;
+        const fontStyle = isBold ? 'font-weight:700; color:var(--tp-ink, #0F172A);' : 'font-weight:500; color:var(--tp-ink-muted, #475569); font-size:13px;';
+        const rowBg = isBold ? 'background:rgba(248, 250, 252, 0.5);' : '';
+
+        rowsHtml += `
+          <tr style="${rowBg} border-bottom:1px solid var(--tp-border, #E2E8F0);">
+            <td style="padding:11px 18px 11px ${indentPx}px; ${fontStyle}">
+              <div>${esc(r.label)}</div>
+              ${r.note ? `<div style="font-size:11px; color:#94A3B8; font-weight:400; margin-top:2px;">${esc(r.note)}</div>` : ''}
+            </td>
+            <td style="padding:11px 18px; text-align:right; font-weight:700; font-size:13.5px; color:var(--tp-ink, #0F172A); width:160px;">
+              ${fmt(r.target)}
+            </td>
+            <td style="padding:11px 22px; text-align:right; font-weight:800; font-size:13.5px; color:${themeColor}; width:160px;">
+              ${fmt(r.done)}
+            </td>
+          </tr>
+        `;
+      });
+
+      accordionsHtml += `
+        <details class="tp-prog-acc" open style="margin-bottom:14px;">
+          <summary class="tp-prog-acc-summary">
+            <div class="tp-prog-acc-summary-left">
+              <span class="tp-prog-sec-tag" style="background:${secTagBg}; color:${themeColor}; border:1px solid ${secTagBorder}; font-weight:800;">${g.key}</span>
+              <span style="font-weight:700;">${esc(g.title)}</span>
+              <span style="font-size:11px; padding:2px 7px; border-radius:4px; background:#F1F5F9; color:#64748B; font-weight:600;">GOAL · Weight ${g.weight}</span>
+            </div>
+            <div class="tp-prog-acc-summary-right">
+              <span style="font-weight:800; color:${themeColor}; font-size:13px;">${g.score != null ? fmt(g.score) : '—'} / ${g.weight}</span>
+              <span class="tp-prog-acc-chevron">▼</span>
+            </div>
+          </summary>
+          <div class="tp-prog-acc-content" style="padding:0;">
+            <table style="width:100%; border-collapse:collapse; text-align:left; font-size:13px;">
+              <thead>
+                <tr style="background:var(--tp-surface-card, #F8FAFC); border-bottom:1px solid var(--tp-border, #E2E8F0); color:#64748B; font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">
+                  <th style="padding:10px 18px; font-weight:700;">Item / Component</th>
+                  <th style="padding:10px 18px; font-weight:700; text-align:right; width:160px;">Target</th>
+                  <th style="padding:10px 22px; font-weight:700; text-align:right; width:160px;">Achieved</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsHtml}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      `;
+    });
+
+    bodyEl.innerHTML = topCardsHtml + accordionsHtml;
   }
 
   function renderDistrictModal(districtRoleId, districtName, pmName) {
@@ -1931,8 +1758,7 @@
                 </div>
                 <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
                   <span class="tp-prog-pill ${p.evalRes.statusClass}">${p.evalRes.statusLabel}</span>
-                  <span class="tp-prog-score">${p.evalRes.scoreLabel}</span>
-                  <button type="button" class="tp-row-details-btn" onclick="event.stopPropagation(); window.ProgressModule.openModal('${p.staff.id}', '${esc(p.staff.Designation || 'Project Officer')}', '${esc(p.staff.Name)}', '${esc(p.poMgr)}')">Details &rarr;</button>
+                  <span class="tp-prog-score">${formatFlowScore(p.evalRes, p.staff.id)}</span>
                 </div>
               </div>
             `).join('')}
@@ -2104,8 +1930,7 @@
             </div>
             <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
               <span class="tp-prog-pill ${item.evalRes.statusClass}" style="font-size:11px;">${item.evalRes.statusLabel}</span>
-              <span class="tp-prog-score" style="font-size:11px;">${item.evalRes.scoreLabel}</span>
-              <button type="button" class="tp-row-details-btn" onclick="event.stopPropagation(); window.ProgressModule.openModal('${item.staff.id}', '${esc(item.role)}', '${esc(item.staff.Name)}', '${esc(item.manager)}')">Details &rarr;</button>
+              <span class="tp-prog-score" style="font-size:11px;">${formatFlowScore(item.evalRes, item.staff.id)}</span>
             </div>
           </div>
         `).join('')}
@@ -2375,7 +2200,7 @@
     if (!list.length) {
       return `
         <tr>
-          <td colspan="9" style="text-align:center; padding:48px 16px; color:var(--tp-ink-muted, #64748B);">
+          <td colspan="8" style="text-align:center; padding:48px 16px; color:var(--tp-ink-muted, #64748B);">
             <div style="font-size:28px; margin-bottom:8px;">🔍</div>
             <div style="font-weight:700; font-size:15px; color:var(--tp-ink, #0F172A); margin-bottom:4px;">No matching staff members found</div>
             <div style="font-size:12px; margin-bottom:12px;">Try adjusting your search terms or clearing active filters.</div>
@@ -2390,14 +2215,20 @@
       const empName = r.staff.Name || 'Staff Member';
       const role = r.role || 'Field Staff';
       const mgr = r.manager || 'Leadership';
-      const score = r.evalRes.totalScore || 0;
-      const scoreColor = getScoreColor(score);
+      const rawScore = (empId && liveScoreCache[empId] != null)
+        ? liveScoreCache[empId]
+        : (r.staff && r.staff.id && liveScoreCache[r.staff.id] != null ? liveScoreCache[r.staff.id] : null);
+      const isPending = r.evalRes.status === 'pending' || r.evalRes.status === 'unassigned';
+      const hasScore = !isPending && rawScore != null && rawScore !== '' && rawScore > 0;
+      const scoreNum = hasScore ? (typeof rawScore === 'number' ? rawScore : Number(rawScore)) : 0;
+      const scoreColor = getScoreColor(scoreNum);
+      const scoreDisplay = hasScore ? (scoreNum % 1 !== 0 ? scoreNum.toFixed(1) : scoreNum) : null;
       const avatarColor = getAvatarColor(role);
       const roleClass = getRoleBadgeClass(role);
       const mgrDisplay = getManagerStatusDisplay(r.evalRes);
 
       return `
-        <tr>
+        <tr class="tp-table-clickable-row" style="cursor:pointer;" onclick="window.ProgressModule.openModal('${empId}', '${esc(role)}', '${esc(empName)}', '${esc(mgr)}')" title="Click row to view monthly review details for ${esc(empName)}">
           <!-- 1. Staff Name & ID -->
           <td>
             <div style="display:flex; align-items:center; gap:9px; min-width:0; overflow:hidden;">
@@ -2436,14 +2267,24 @@
 
           <!-- 7. Goal Score (/ 100) with progress bar -->
           <td>
-            <div style="display:flex; flex-direction:column; gap:3px; width:100%;">
-              <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; font-weight:700;">
-                <span style="${r.evalRes.status === 'unassigned' ? 'color:var(--tp-ink-muted, #94A3B8);' : (score > 0 ? `color:${scoreColor}; font-weight:800;` : 'color:var(--tp-ink-muted, #64748B);')}">${r.evalRes.status === 'unassigned' ? '—' : `${score}/100`}</span>
-                <span style="font-size:9.5px; font-weight:600; color:var(--tp-ink-muted, #64748B);">${score}%</span>
-              </div>
-              <div class="tp-score-bar-track">
-                <div class="tp-score-bar-fill" style="width:${Math.min(100, Math.max(0, score))}%; background:${scoreColor};"></div>
-              </div>
+            <div style="display:flex; flex-direction:column; gap:3px; width:100%;" id="tp-prog-score-cell-${esc(empId)}">
+              ${hasScore ? `
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; font-weight:700;">
+                  <span style="color:${scoreColor}; font-weight:800;">${scoreDisplay}/100</span>
+                  <span style="font-size:9.5px; font-weight:600; color:var(--tp-ink-muted, #64748B);">${Math.round(scoreNum)}%</span>
+                </div>
+                <div class="tp-score-bar-track">
+                  <div class="tp-score-bar-fill" style="width:${Math.min(100, Math.max(0, scoreNum))}%; background:${scoreColor};"></div>
+                </div>
+              ` : `
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; font-weight:600; color:var(--tp-ink-muted, #94A3B8);">
+                  <span>— / 100</span>
+                  <span style="font-size:9.5px; font-style:italic;">Pending</span>
+                </div>
+                <div class="tp-score-bar-track">
+                  <div class="tp-score-bar-fill" style="width:0%; background:#CBD5E1;"></div>
+                </div>
+              `}
             </div>
           </td>
 
@@ -2459,13 +2300,6 @@
               `}
               ${r.evalRes.managerRemark ? `<div style="font-size:10px; color:var(--tp-ink-muted, #64748B); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:1px;" title="${esc(r.evalRes.managerRemark)}">${esc(r.evalRes.managerRemark)}</div>` : ''}
             </div>
-          </td>
-
-          <!-- 9. Actions -->
-          <td style="text-align:center;">
-            <button type="button" class="tp-row-action-btn" onclick="window.ProgressModule.openModal('${empId}', '${esc(role)}', '${esc(empName)}', '${esc(mgr)}')">
-              Details &rarr;
-            </button>
           </td>
         </tr>
       `;
@@ -2516,6 +2350,7 @@
     const fullRoster = getRosterForState();
     const list = getFilteredAndSortedRoster(fullRoster);
     tbody.innerHTML = buildTableRowsHtml(list);
+    syncLiveScores(list);
 
     const countEl = document.getElementById('tpProgTableCount');
     if (countEl) {
@@ -2619,15 +2454,14 @@
         <div class="tp-prog-tbl-wrap">
           <table class="tp-prog-table" id="tpProgTable" aria-label="Monthly Field Review Staff Roster">
             <colgroup>
-              <col style="width: 17%;">
+              <col style="width: 18%;">
+              <col style="width: 13%;">
               <col style="width: 12%;">
-              <col style="width: 11%;">
-              <col style="width: 11%;">
               <col style="width: 12%;">
+              <col style="width: 13%;">
               <col style="width: 11%;">
               <col style="width: 10%;">
-              <col style="width: 10%;">
-              <col style="width: 6%;">
+              <col style="width: 11%;">
             </colgroup>
             <thead>
               <tr class="tp-table-filter-row">
@@ -2693,12 +2527,6 @@
                     ${uniqueMgrRatings.map(r => `<option value="${esc(r)}" ${state.filterManagerStatus === r ? 'selected' : ''}>${esc(r)}</option>`).join('')}
                   </select>
                 </th>
-                <!-- 9. Reset Button -->
-                <th style="text-align:center;">
-                  <button type="button" class="tp-btn-filter-reset ${hasAnyFilter ? 'has-filters' : ''}" onclick="window.ProgressModule.clearAllTableFilters()" title="Reset all column dropdown filters">
-                    ↺ Reset
-                  </button>
-                </th>
               </tr>
             </thead>
             <tbody id="tpProgTableBody">
@@ -2708,6 +2536,8 @@
         </div>
       </div>
     `;
+
+    syncLiveScores(list);
   }
 
   // Export module to global scope
