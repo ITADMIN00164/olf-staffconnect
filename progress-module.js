@@ -87,26 +87,40 @@
   }
 
   function syncLiveScores(list) {
-    if (typeof window === 'undefined' || !window.FTRDashboard || typeof window.FTRDashboard.getMonthlyGoalNumbers !== 'function') return;
-    const toFetch = (list || []).filter(r => (r.evalRes.status === 'done' || r.evalRes.status === 'partial') && r.staff && r.staff.id && liveScoreCache[r.staff.id] == null);
+    if (typeof window === 'undefined') return;
+    const toFetch = (list || []).filter(r => r.evalRes && r.evalRes.status !== 'unassigned' && r.staff && r.staff.id && liveScoreCache[r.staff.id] == null);
     if (!toFetch.length) return;
 
     (async function () {
-      for (const r of toFetch) {
-        const id = r.staff.id;
-        try {
-          const res = await window.FTRDashboard.getMonthlyGoalNumbers(id, state.activeMonth);
-          if (res && res.totalScore != null) {
-            liveScoreCache[id] = res.totalScore;
-            updateScoreCellInDOM(id, res.totalScore);
-            if (r.evalRes && r.evalRes.empId && r.evalRes.empId !== id) {
-              liveScoreCache[r.evalRes.empId] = res.totalScore;
-              updateScoreCellInDOM(r.evalRes.empId, res.totalScore);
+      const concurrency = 5;
+      for (let i = 0; i < toFetch.length; i += concurrency) {
+        const chunk = toFetch.slice(i, i + concurrency);
+        await Promise.all(chunk.map(async r => {
+          const id = r.staff.id;
+          try {
+            let res = null;
+            if (window.FTRDashboard && typeof window.FTRDashboard.getMonthlyGoalNumbers === 'function') {
+              try {
+                res = await window.FTRDashboard.getMonthlyGoalNumbers(id, state.activeMonth);
+              } catch (e) {}
             }
+            if ((!res || res.totalScore == null) && typeof fetchDirectGoalNumbers === 'function') {
+              try {
+                res = await fetchDirectGoalNumbers(id, state.activeMonth, r.staff);
+              } catch (e) {}
+            }
+            if (res && res.totalScore != null) {
+              liveScoreCache[id] = res.totalScore;
+              updateScoreCellInDOM(id, res.totalScore);
+              if (r.evalRes && r.evalRes.empId && r.evalRes.empId !== id) {
+                liveScoreCache[r.evalRes.empId] = res.totalScore;
+                updateScoreCellInDOM(r.evalRes.empId, res.totalScore);
+              }
+            }
+          } catch (e) {
+            // silent fallback
           }
-        } catch (e) {
-          // silent fallback
-        }
+        }));
       }
     })();
   }
@@ -2364,9 +2378,11 @@
       const mgr = r.manager || 'Leadership';
       const rawScore = (empId && liveScoreCache[empId] != null)
         ? liveScoreCache[empId]
-        : (r.staff && r.staff.id && liveScoreCache[r.staff.id] != null ? liveScoreCache[r.staff.id] : null);
-      const isPending = r.evalRes.status === 'pending' || r.evalRes.status === 'unassigned';
-      const hasScore = !isPending && rawScore != null && rawScore !== '' && rawScore > 0;
+        : (r.staff && r.staff.id && liveScoreCache[r.staff.id] != null
+            ? liveScoreCache[r.staff.id]
+            : (r.evalRes && r.evalRes.totalScore != null ? r.evalRes.totalScore : null));
+      const isUnassigned = r.evalRes && r.evalRes.status === 'unassigned';
+      const hasScore = !isUnassigned && rawScore != null && rawScore !== '';
       const scoreNum = hasScore ? (typeof rawScore === 'number' ? rawScore : Number(rawScore)) : 0;
       const scoreColor = getScoreColor(scoreNum);
       const scoreDisplay = hasScore ? (scoreNum % 1 !== 0 ? scoreNum.toFixed(1) : scoreNum) : null;
