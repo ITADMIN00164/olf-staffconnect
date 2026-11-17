@@ -1636,7 +1636,7 @@ async function getPageHtml(page) {
     // which looks like a broken page rather than a cached one. Hosting already
     // sends no-cache for HTML, so in production this costs a 304 and nothing
     // more; locally it is the difference between seeing an edit and not.
-    const res  = await fetch(`pages/${page}.html?v=20261116h`, { cache: "no-cache" });
+    const res  = await fetch(`pages/${page}.html?v=20261117a`, { cache: "no-cache" });
     const html = await res.text();
     pageFragments.set(page, html);
     return html;
@@ -1941,7 +1941,7 @@ function applyAwardTabLocks() {
     // Users: never leave them on a tab they can no longer see.
     const page = nav.closest(".award-page");
     const visible = tabs.filter(t => !t.parentElement.hidden);
-    const views = ["aw-view-stock", "aw-view-award", "aw-view-dash", "aw-view-event", "aw-util-bar", "aw-stock-actions"]
+    const views = ["aw-view-stock", "aw-view-award", "aw-view-dash", "aw-view-event", "aw-view-evdash", "aw-util-bar", "aw-event-bar", "aw-stock-actions"]
         .map(id => document.getElementById(id)).filter(Boolean);
     let notice = page ? page.querySelector(".aw-alllocked") : null;
 

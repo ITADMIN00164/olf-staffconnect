@@ -13,12 +13,17 @@ const PAGE = 1000;                       // the most rows the database sends at 
 // The filters, parent first: choosing a community narrows the rest.
 const FILTERS = [
   { key: "community", label: "Community",      all: "All Communities", many: "Communities" },
+  { key: "dm",        label: "DM",             all: "All DMs",         many: "DMs" },
+  { key: "pm",        label: "PM",             all: "All PMs",         many: "PMs" },
   { key: "district",  label: "District",       all: "All Districts",   many: "Districts" },
   { key: "month",     label: "Month",          all: "All Months",      many: "Months" },
   { key: "category",  label: "Award Category", all: "All Categories",  many: "Categories" },
   { key: "award",     label: "Award Name",     all: "All Awards",      many: "Awards" }
 ];
-const BLANK = { community: "(Not set)", category: "(None)", award: "(None)" };
+const BLANK = { community: "(Not set)", category: "(None)", award: "(None)", dm: "(No DM)", pm: "(No PM)" };
+// Community -> DM -> PM -> District: a choice narrows the lists after it. Month, Award Category
+// and Award Name follow the Community choice only, as before.
+const CASCADE = ["community", "dm", "pm", "district"];
 
 const MONTHS = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
 
@@ -30,6 +35,7 @@ let lastRows = [];             // what the table shows now (for the Excel file)
 let lastTotals = null;
 let outsideClickBound = false;
 let loadedAt = 0;                // when the data last came in
+let org = null;                  // DMs and PMs per district, from the Employees list (award-evdash.js)
 
 // ── helpers ──
 function el(id) { return document.getElementById(id); }
@@ -116,6 +122,22 @@ function counts(recs) {
 
 function pct(num, den) { return den ? Math.round((num / den) * 100) + "%" : "0%"; }
 
+// The DMs and PMs a district has on the Staff Connect Employees list (Dept "Program
+// Implementation - Div" / "- PM", District column). A district nobody lists gets "(No DM)" / "(No PM)".
+function peopleOf(district, role) {
+  const key = window.awardDistrictKey ? window.awardDistrictKey(district) : String(district || "").toLowerCase();
+  const names = org ? org.people.filter(function (p) { return p.role === role && p.keys.has(key); }).map(function (p) { return p.name; }) : [];
+  return names.length ? names : [role === "DM" ? BLANK.dm : BLANK.pm];
+}
+function addPeople(list) {
+  const memo = {};
+  list.forEach(function (r) {
+    if (!memo[r.district]) memo[r.district] = { dm: peopleOf(r.district, "DM"), pm: peopleOf(r.district, "PM") };
+    r.dm = memo[r.district].dm; r.pm = memo[r.district].pm;
+  });
+  return list;
+}
+
 // ── data ──
 async function fetchAll() {
   const cols = "month_label,district_name,community,award_name,award_category,awarded,awarded_date,verified,rejected";
@@ -152,8 +174,12 @@ function start() {
   if (loaded || loading) return;
   loading = true;
   setLoadingUi(true);
-  fetchAll().then(function (data) {
-    rows = data;
+  const orgLoad = typeof window.awardOrgFromEmployees === "function"
+    ? window.awardOrgFromEmployees().catch(function (e) { console.warn("DM / PM list not loaded:", e); return null; })
+    : Promise.resolve(null);
+  Promise.all([fetchAll(), orgLoad]).then(function (res) {
+    org = res[1];
+    rows = addPeople(res[0]);
     loaded = true;
     loadedAt = Date.now();
     loading = false;
@@ -202,16 +228,34 @@ function setLoadingUi(on) {
 // ── filters ──
 function valueOf(r, key) { return r[key]; }
 
-function inCommunity() {
-  const c = new Set(sel.community || []);
-  return function (r) { return c.size === 0 || c.has(r.community); };
+// A row passes a filter when its value is chosen; DM and PM hold a list (a district can
+// have more than one), and pass when any of them is chosen. Nothing chosen lets all through.
+function hits(r, key, set) {
+  if (set.size === 0) return true;
+  const v = valueOf(r, key);
+  return Array.isArray(v) ? v.some(function (x) { return set.has(x); }) : set.has(v);
+}
+function passes(r, pick) {
+  return FILTERS.every(function (f) { return hits(r, f.key, pick[f.key]); });
 }
 
-// What a filter can offer: the values the chosen communities actually have.
+// What a filter can offer: the values the rows chosen by the filters above it actually have.
 function available(key) {
-  const pass = key === "community" ? function () { return true; } : inCommunity();
-  const set = Array.from(new Set(rows.filter(pass).map(function (r) { return valueOf(r, key); }).filter(Boolean)));
-  return key === "month" ? set.sort(byMonth) : set.sort(function (a, b) { return String(a).localeCompare(String(b)); });
+  const i = CASCADE.indexOf(key);
+  const above = i >= 0 ? CASCADE.slice(0, i) : ["community"];
+  const pick = {};
+  above.forEach(function (k) { pick[k] = new Set(sel[k] || []); });
+  const pass = function (r) { return above.every(function (k) { return hits(r, k, pick[k]); }); };
+  const seen = new Set();
+  rows.filter(pass).forEach(function (r) {
+    const v = valueOf(r, key);
+    (Array.isArray(v) ? v : [v]).forEach(function (x) { if (x) seen.add(x); });
+  });
+  const set = Array.from(seen);
+  return key === "month" ? set.sort(byMonth) : set.sort(function (a, b) {
+    const na = /^\(/.test(a), nb = /^\(/.test(b);          // "(No DM)" and the like go last
+    return na !== nb ? (na ? 1 : -1) : String(a).localeCompare(String(b));
+  });
 }
 
 function buildBar() {
@@ -341,9 +385,12 @@ function buildFilters() {
   });
 }
 
-// A new community choice changes what the others can offer: they start from everything again.
-function rebuildChildren() {
-  FILTERS.slice(1).forEach(function (f) {
+// A new choice changes what the filters after it can offer: they start from everything again.
+// Community resets every filter after it; DM resets PM and District; PM resets District.
+function rebuildChildren(key) {
+  const after = key === "community" ? FILTERS.slice(1).map(function (f) { return f.key; })
+              : CASCADE.slice(CASCADE.indexOf(key) + 1);
+  FILTERS.filter(function (f) { return after.indexOf(f.key) !== -1; }).forEach(function (f) {
     const items = available(f.key);
     sel[f.key] = items.slice();
     buildList(f, items, sel[f.key]);
@@ -354,9 +401,28 @@ function rebuildChildren() {
 function applyFilter(f) {
   sel[f.key] = checked(f);
   setLabel(f, sel[f.key]);
-  if (f.key === "community") rebuildChildren();
+  const total = document.querySelectorAll("#awd-" + f.key + "-items .awd-cb").length;
+  const narrowed = sel[f.key].length > 0 && sel[f.key].length < total;
+  if ((f.key === "dm" || f.key === "pm") && narrowed) resetAllBut(f.key);
+  else if (CASCADE.indexOf(f.key) !== -1 && f.key !== "district") rebuildChildren(f.key);
   closePanels();
   render();
+}
+
+// Picking particular DMs or PMs starts the view over from their districts: every other
+// filter goes back to its default (everything), and the lists after it narrow to them.
+function resetAllBut(key) {
+  FILTERS.forEach(function (f) {
+    if (f.key === key) return;
+    sel[f.key] = null;
+  });
+  FILTERS.forEach(function (f) {               // in order, so each list follows the ones above it
+    const items = available(f.key);
+    if (f.key === key) sel[f.key] = sel[f.key].filter(function (v) { return items.indexOf(v) !== -1; });
+    else sel[f.key] = items.slice();
+    buildList(f, items, sel[f.key]);
+    setLabel(f, sel[f.key]);
+  });
 }
 
 // ── table + chart ──
@@ -367,9 +433,7 @@ function render() {
 
   const pick = {};
   FILTERS.forEach(function (f) { pick[f.key] = new Set(sel[f.key] || []); });
-  const shown = rows.filter(function (r) {
-    return FILTERS.every(function (f) { return pick[f.key].size === 0 || pick[f.key].has(valueOf(r, f.key)); });
-  });
+  const shown = rows.filter(function (r) { return passes(r, pick); });
 
   const months = Array.from(new Set(shown.map(function (r) { return r.month; }))).sort(byMonth);
   const lines = months.map(function (m) {
@@ -522,7 +586,7 @@ async function downloadDetailedExcel() {
     const pick = {};
     FILTERS.forEach(function (f) { pick[f.key] = new Set(sel[f.key] || []); });
 
-    const recs = raw.map(function (row) {
+    let recs = raw.map(function (row) {
       const s = splitAward(row.award_name, row.award_category);
       const r = {
         month: row.month_label || "",
@@ -538,9 +602,9 @@ async function downloadDetailedExcel() {
       r.late = isLate(r);
       r.status = !r.awarded ? "Pending" : (r.late ? "Awarded Late" : "Awarded In Time");
       return r;
-    }).filter(function (r) {
-      return FILTERS.every(function (f) { return pick[f.key].size === 0 || pick[f.key].has(valueOf(r, f.key)); });
     });
+    addPeople(recs);
+    recs = recs.filter(function (r) { return passes(r, pick); });
     if (!recs.length) { toast("No records match the selected filters.", "info"); return; }
 
     const txtOf = function (v) { return v == null ? "" : String(v).trim(); };
@@ -554,13 +618,14 @@ async function downloadDetailedExcel() {
 
     const H = function (v) { return { s: 1, v: v }; };
     const s0 = function (v) { return (v === BLANK.category || v === BLANK.award) ? "" : v; };
-    const header = ["Month", "District", "Block", "Cluster", "Community", "School", "Full Name", "Mobile", "Email",
+    const header = ["Month", "DM", "PM", "District", "Block", "Cluster", "Community", "School", "Full Name", "Mobile", "Email",
       "PM", "Award Category", "Award Name", "Awarded", "Awarded Date", "Status", "Awarded By", "Verified",
       "Verified By", "Image Link", "Uploaded By", "Post Link", "Post Score", "Description"];
     const lines = recs.map(function (r) {
       const x = r.row;
       const score = x.post_score === null || x.post_score === undefined || x.post_score === "" ? "" : Number(x.post_score);
-      return [r.month, r.district, txtOf(x.block_name), txtOf(x.circle_name), x.community ? txtOf(x.community) : "",
+      const who = function (list) { return list.filter(function (n) { return !/^\(/.test(n); }).join(", "); };
+      return [r.month, who(r.dm), who(r.pm), r.district, txtOf(x.block_name), txtOf(x.circle_name), x.community ? txtOf(x.community) : "",
         txtOf(x.school_name), txtOf(x.full_name), txtOf(x.mobile), txtOf(x.email), txtOf(x.pm_name),
         s0(r.category), s0(r.award), r.awarded ? "Yes" : "No", formatDate(r.awardedDate), r.status, txtOf(x.awarded_by),
         x.rejected ? "Rejected" : (x.verified ? "Yes" : "No"), txtOf(x.verified_by), txtOf(x.image_url),
@@ -571,20 +636,21 @@ async function downloadDetailedExcel() {
     const groups = new Map();
     recs.forEach(function (r) {
       const key = r.district + "\u0001" + txtOf(r.row.block_name);
-      if (!groups.has(key)) groups.set(key, { district: r.district, block: txtOf(r.row.block_name), recs: [] });
+      if (!groups.has(key)) groups.set(key, { district: r.district, block: txtOf(r.row.block_name), dm: r.dm, pm: r.pm, recs: [] });
       groups.get(key).recs.push(r);
     });
-    const sumHead = ["District", "Block", "Total Awards", "Awarded In Time", "Awarded Late", "Pending",
+    const sumHead = ["DM", "PM", "District", "Block", "Total Awards", "Awarded In Time", "Awarded Late", "Pending",
       "Total Awarded", "Awarded %", "Verified", "Verified %"];
     const sumRows = Array.from(groups.values()).sort(function (a, b) {
       return a.district.localeCompare(b.district) || a.block.localeCompare(b.block);
     }).map(function (g) {
       const c = counts(g.recs);
-      return [g.district, g.block || "(No block)", c.total, c.awarded, c.late, c.pending, c.totalAwarded,
+      const who = function (list) { return list.filter(function (n) { return !/^\(/.test(n); }).join(", "); };
+      return [who(g.dm), who(g.pm), g.district, g.block || "(No block)", c.total, c.awarded, c.late, c.pending, c.totalAwarded,
         pct(c.totalAwarded, c.total), c.verified, pct(c.verified, c.total)];
     });
     const all = counts(recs);
-    sumRows.push([H("Total"), H(""), H(all.total), H(all.awarded), H(all.late), H(all.pending), H(all.totalAwarded),
+    sumRows.push([H("Total"), H(""), H(""), H(""), H(all.total), H(all.awarded), H(all.late), H(all.pending), H(all.totalAwarded),
       H(pct(all.totalAwarded, all.total)), H(all.verified), H(pct(all.verified, all.total))]);
 
     const styles = '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
@@ -599,9 +665,9 @@ async function downloadDetailedExcel() {
 
     const bytes = buildWorkbook([
       { name: "Award Records", rows: [header.map(H)].concat(lines), freeze: { rows: 1 },
-        widths: [14, 18, 20, 18, 16, 30, 26, 14, 26, 20, 26, 26, 10, 13, 17, 24, 10, 24, 40, 24, 40, 10, 40] },
+        widths: [14, 22, 22, 18, 20, 18, 16, 30, 26, 14, 26, 20, 26, 26, 10, 13, 17, 24, 10, 24, 40, 24, 40, 10, 40] },
       { name: "District-Block Summary", rows: [sumHead.map(H)].concat(sumRows), freeze: { rows: 1 },
-        widths: [20, 24, 12, 15, 13, 10, 13, 11, 10, 11] },
+        widths: [22, 22, 20, 24, 12, 15, 13, 10, 13, 11, 10, 11] },
       { name: "Filters", rows: [[H("Filter"), H("Selected")]].concat(FILTERS.map(function (f) {
           const arr = sel[f.key] || [];
           const total = document.querySelectorAll("#awd-" + f.key + "-items .awd-cb").length;

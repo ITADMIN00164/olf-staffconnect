@@ -12,7 +12,9 @@
      District level ("All blocks" picked)  -> Total District Events, Teachers
                     Felicitated (District Level), SU/NS Events, Teachers
                     Felicitated (SU/NS Events), Other Events, Teachers
-                    Felicitated (Other Events) and Cluster Heads are editable,
+                    Felicitated (Other Events) and Cluster Heads. Only the
+                    three event counts are typed; every Teachers Felicitated
+                    column and Cluster Heads are counted from verified awards,
                     while the two block-level columns show the sum of the
                     district's block rows, read-only.
    A block's figures are only ever written to its block row, and the district's
@@ -154,10 +156,10 @@ const COLUMNS = [
   { key: "districtEvents",   head: "Total<br>District Events",                 scope: "district", group: "district" },
   { key: "districtTeachers", head: "Teachers Felicitated<br>(District Level)", scope: "district", group: "district", auto: true },
   { key: "suNsEvents",       head: "SU/NS<br>Events",                          scope: "district", group: "suns"     },
-  { key: "suNsTeachers",     head: "Teachers Felicitated<br>(SU/NS Events)",   scope: "district", group: "suns"     },
+  { key: "suNsTeachers",     head: "Teachers Felicitated<br>(SU/NS Events)",   scope: "district", group: "suns",     auto: true },
   { key: "otherEvents",      head: "Other<br>Events",                          scope: "district", group: "other", tip: OTHER_MSG },
-  { key: "otherTeachers",    head: "Teachers Felicitated<br>(Other Events)",   scope: "district", group: "other", tip: OTHER_MSG },
-  { key: "clusterHeads",     head: "Total Cluster<br>Heads Recognised",        scope: "district", group: "cluster"  }
+  { key: "otherTeachers",    head: "Teachers Felicitated<br>(Other Events)",   scope: "district", group: "other",    auto: true },
+  { key: "clusterHeads",     head: "Total Cluster<br>Heads Recognised",        scope: "district", group: "cluster",  auto: true }
 ];
 
 const COLUMN_GROUPS = {
@@ -308,17 +310,41 @@ function blocksFor(district) {
 }
 
 // ── Teachers felicitated: filled from Award Management ──
-// The two "Teachers Felicitated" columns are not typed. They count the VERIFIED
+// The "Teachers Felicitated" columns and Cluster Heads are not typed. They count the VERIFIED
 // awards in Award Management (awarded, verified, not rejected), in the record's
 // own month (its POM month, e.g. a June-2026 winner counts in Jun-2026 even when
 // it is awarded, late, in October). A record whose month is not a calendar month
 // (e.g. "Pending 2025-26") counts in the month of its award date instead:
 //   Block level    = categories starting "Block Level"    (Block Level - POM)
 //   District level = categories starting "District Level" (POM and LIFESKILL)
+//   SU/NS          = Nanhe Sitare (NS) and Shikshan Utsav (SU)
+//   Other          = Other and Coffee With CEO
+//   Cluster heads  = Top Clusters
 // A block-level award counts under the block named on the record. A record whose
 // block is not one of the district's blocks still counts in the district's
 // Block Level total, and is listed in the notes above the table.
 const AUTO_MSG = "Filled automatically from verified awards in Award Management, in each award's own month.";
+const AUTO_FROM = {
+  blockTeachers:    "Block Level awards",
+  districtTeachers: "District Level awards (POM, Lifeskill, Academics)",
+  suNsTeachers:     "Nanhe Sitare (NS) and Shikshan Utsav (SU) awards",
+  otherTeachers:    "Other and Coffee With CEO awards",
+  clusterHeads:     "Top Clusters awards"
+};
+function autoMsg(key) {
+  return "Filled automatically from verified " + (AUTO_FROM[key] || "awards") + " in Award Management, in each award's own month.";
+}
+
+// Which Events column a verified award counts in, from its Award Category ("" = none).
+function felicKind(category) {
+  const c = str(category).toLowerCase().replace(/\s+/g, " ");
+  if (c.indexOf("block level") === 0) return "block";
+  if (c.indexOf("district level") === 0) return "district";
+  if (c.indexOf("nanhe sitare") >= 0 || c.indexOf("shikshan utsav") >= 0 || /\((ns|su)\)/.test(c)) return "suns";
+  if (c.indexOf("top cluster") === 0) return "cluster";
+  if (c === "other" || c.indexOf("coffee with ceo") >= 0) return "other";
+  return "";
+}
 
 function awardMonth(dateStr) {
   const m = /^(\d{4})-(\d{2})/.exec(str(dateStr));
@@ -338,7 +364,7 @@ async function loadFelicitated() {
       rows.push.apply(rows, page);
       if (page.length < 1000) break;
     }
-    // district -> month -> { district, block, blocks: { BLOCK NAME -> { n, raw } } }
+    // district -> month -> { district, block, suns, other, cluster, blocks: { BLOCK NAME -> { n, raw } } }
     const out = {};
     rows.forEach(r => {
       if (r.rejected === true) return;
@@ -346,14 +372,11 @@ async function loadFelicitated() {
       const month = /^[A-Z][a-z]{2}-\d{4}$/.test(label) && MONTH_NAMES.indexOf(label.slice(0, 3)) >= 0
         ? label : awardMonth(r.awarded_date);
       const district = str(r.district_name);
-      const cat = str(r.award_category).toLowerCase();
-      if (!month || !district) return;
-      const isBlock = cat.indexOf("block level") === 0;
-      const isDistrict = cat.indexOf("district level") === 0;
-      if (!isBlock && !isDistrict) return;
+      const kind = felicKind(r.award_category);
+      if (!month || !district || !kind) return;
       const d = (out[district] = out[district] || {});
-      const m = (d[month] = d[month] || { district: 0, block: 0, blocks: {} });
-      if (isDistrict) { m.district++; return; }
+      const m = (d[month] = d[month] || { district: 0, block: 0, suns: 0, other: 0, cluster: 0, blocks: {} });
+      if (kind !== "block") { m[kind]++; return; }
       m.block++;
       const key = blockName(r.block_name) || "(NO BLOCK)";
       const b = (m.blocks[key] = m.blocks[key] || { n: 0, raw: str(r.block_name) });
@@ -379,7 +402,8 @@ function autoValue(month, key) {
   const now = new Date();
   if (monthOrder(month) > now.getFullYear() * 12 + now.getMonth()) return "";   // a month still to come
   const m = felicMonth(aweDistrict, month);
-  if (key === "districtTeachers") return m ? m.district : 0;
+  const FIELD = { districtTeachers: "district", suNsTeachers: "suns", otherTeachers: "other", clusterHeads: "cluster" };
+  if (FIELD[key]) return m ? m[FIELD[key]] : 0;
   if (!isBlockView()) return m ? m.block : 0;
   const b = m && m.blocks[blockName(aweBlock)];
   return b ? b.n : 0;
@@ -558,7 +582,7 @@ function renderHead() {
   const cols = visibleColumns();
   const cells = cols.map((c, ci) => {
     const rollup = !c.auto && !isBlockView() && c.scope === "block";
-    const tip = c.auto ? AUTO_MSG : rollup ? ROLLUP_MSG : (c.tip || "");
+    const tip = c.auto ? autoMsg(c.key) : rollup ? ROLLUP_MSG : (c.tip || "");
     const cls = [rollup ? "pev-rollup-th" : "", c.auto ? "pev-auto-th" : "", c.tip ? "pev-tip-th" : "", groupClass(cols, ci)].filter(Boolean).join(" ");
     return "<th" + (cls ? ' class="' + cls + '"' : "") + (tip ? ' title="' + esc(tip) + '"' : "") + ">" + c.head + "</th>";
   }).join("");
@@ -648,7 +672,7 @@ function render() {
       if (c.auto) {
         const v = autoValue(r.month, c.key);
         const text = aweFelicState === "ready" ? (v === "" ? "—" : String(v)) : (aweFelicState === "failed" ? "!" : "…");
-        return '<td class="pev-auto ' + g + '" title="' + esc(AUTO_MSG) + '" role="button" tabindex="0" ' +
+        return '<td class="pev-auto ' + g + '" title="' + esc(autoMsg(c.key)) + '" role="button" tabindex="0" ' +
           'onclick="aweAutoHint(this)" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();aweAutoHint(this)}">' +
           '<span class="pev-auto-val' + (v ? " has" : "") + '">' + text + "</span></td>";
       }
@@ -1198,8 +1222,9 @@ function buildExportRows() {
     Object.keys(months).sort((a, b) => monthOrder(a) - monthOrder(b)).forEach(month => {
       const bucket = months[month];
       const dRow = bucket.district;
-      const felicDistrict = bucket.felic ? bucket.felic.district : 0;
-      const hasDistrict = !!dRow || felicDistrict > 0;
+      const fz = bucket.felic || {};
+      const felicDistrict = fz.district || 0;
+      const hasDistrict = !!dRow || felicDistrict > 0 || (fz.suns || 0) > 0 || (fz.other || 0) > 0 || (fz.cluster || 0) > 0;
 
       // The blocks that need a row this month: any with figures of their own, and
       // the default block when there are district figures to put somewhere.
@@ -1231,10 +1256,10 @@ function buildExportRows() {
           blockFelic || "",
           carriesDistrict && felicDistrict ? felicDistrict : "",
           carriesDistrict && dRow ? num(dRow.suNsEvents) : "",
-          carriesDistrict && dRow ? num(dRow.suNsTeachers) : "",
+          carriesDistrict && fz.suns ? fz.suns : "",
           carriesDistrict && dRow ? num(dRow.otherEvents) : "",
-          carriesDistrict && dRow ? num(dRow.otherTeachers) : "",
-          carriesDistrict && dRow ? num(dRow.clusterHeads) : ""
+          carriesDistrict && fz.other ? fz.other : "",
+          carriesDistrict && fz.cluster ? fz.cluster : ""
         ]);
       });
     });

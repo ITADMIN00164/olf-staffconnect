@@ -48,3 +48,12 @@
 .awe-view .pom-table.pev-tbl tbody td.pev-rollup { background: #fafbfc; }
 .awe-view .pom-table.pev-tbl tbody td.pev-updated { font-size: 10px; color: #9ca3af; line-height: 1.4; }
 .awe-view .pom-table.pev-tbl tbody tr.pev-totals td { background: #f8faff; font-weight: 700; color: #1a1d23; border-top: 2px solid #eef2ff; border-bottom: none; }
+
+/* Events > Dashboard (award-evdash.js): same table as Utilisations, read-only */
+.aed-view .aed-toolbar .pom-select { min-width: 150px; }
+.aed-view .aed-toolbar .aed-export { margin-left: auto; }
+.aed-view .aed-toolbar .aed-export:disabled { opacity: .6; cursor: default; }
+.aed-view .pev-tbl tbody td { padding-top: 11px; padding-bottom: 11px; font-weight: 600; }
+.aed-view .pev-tbl tbody tr.aed-future td { opacity: .55; }
+.aed-view .pev-tbl td.aed-rep { font-size: 12px; color: #6b7280; font-weight: 600; }
+.aed-view .pev-tbl tr.pev-totals td { font-weight: 800; }

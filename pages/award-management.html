@@ -57,6 +57,10 @@
           <button type="button" role="tab" class="aw-utiltab is-active" data-aw-util="award" aria-selected="true"><i class="aw-icon" data-aw-icon="utilise" aria-hidden="true"></i>Utilisations</button>
           <button type="button" role="tab" class="aw-utiltab" data-aw-util="dash" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="dashboard" aria-hidden="true"></i>Dashboard</button>
         </nav>
+        <nav class="aw-subtabs aw-utiltabs" id="aw-event-bar" role="tablist" aria-label="Events views" hidden>
+          <button type="button" role="tab" class="aw-utiltab is-active" data-aw-ev="event" aria-selected="true"><i class="aw-icon" data-aw-icon="utilise" aria-hidden="true"></i>Utilisations</button>
+          <button type="button" role="tab" class="aw-utiltab" data-aw-ev="evdash" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="dashboard" aria-hidden="true"></i>Dashboard</button>
+        </nav>
         <nav class="aw-subtabs aw-stocktabs" id="aw-stock-bar" role="tablist" aria-label="Gifts views">
           <button type="button" role="tab" id="aw-subtab-requisition" class="aw-subtab is-active"
                   data-aw-subtab="requisition" aria-controls="aw-subpanel-requisition"
@@ -540,6 +544,38 @@
           <div class="pom-modal-title" id="aweModalTitle"></div>
           <div class="pom-modal-msg" id="aweModalMsg"></div>
           <div class="pom-modal-actions" id="aweModalActions"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Events > Dashboard: read-only totals of Events > Utilisations for the districts the
+         filters pick, one row per month of the academic year. Behaviour: award-evdash.js;
+         it borrows the look of Utilisations (award-event.css, award-manage.css). -->
+    <div id="aw-view-evdash" class="awm-view awe-view aed-view" hidden>
+      <div class="pom-page">
+        <div class="awe-wrap">
+          <div class="pev-toolbar aed-toolbar">
+            <select id="aedState" class="pom-select" title="State" disabled><option value="">All States</option></select>
+            <select id="aedDm" class="pom-select" title="DM" disabled><option value="">All DMs</option></select>
+            <select id="aedPm" class="pom-select" title="PM" disabled><option value="">All PMs</option></select>
+            <select id="aedDistrict" class="pom-select" title="District" disabled><option value="">All Districts</option></select>
+            <select id="aedYear" class="pom-select pev-year" title="Academic year (June to May)" disabled></select>
+            <span class="pev-hint" id="aedInfo"></span>
+            <button id="aedExportBtn" class="pev-export-btn aed-export" title="Download every district and block record for the selected filters and year" disabled>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span>Download Detailed Excel</span>
+            </button>
+          </div>
+
+          <div class="pom-card scroll">
+            <table class="pom-table centered pev-tbl">
+              <colgroup id="aedColgroup"></colgroup>
+              <thead id="aedThead"></thead>
+              <tbody id="aedBody">
+                <tr><td colspan="11" class="pom-msg">Loading data…</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

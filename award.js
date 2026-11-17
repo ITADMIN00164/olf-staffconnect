@@ -794,11 +794,13 @@ window.AWARD_CONFIG = {
   var awardViewStarted = false;
   var dashViewStarted = false;
   var eventViewStarted = false;
+  var evDashStarted = false;
 
   /* The top tabs are Stock Management, Award Utilisation and Event Management.
      Award Utilisation holds two views of its own, Award Management and the Award
      Data Dashboard, chosen with the small tabs under it. */
   var utilView = "award";
+  var eventSub = "event";        // Events: "event" = Utilisations, "evdash" = Dashboard
   var currentTop = "util";       // the top tab on screen, for the page-wide Refresh data button
 
   function showTopView(which) {
@@ -809,11 +811,15 @@ window.AWARD_CONFIG = {
     var awardView = document.getElementById("aw-view-award");
     var dashView = document.getElementById("aw-view-dash");
     var eventView = document.getElementById("aw-view-event");
+    var evDashView = document.getElementById("aw-view-evdash");
     var utilBar = document.getElementById("aw-util-bar");
+    var eventBar = document.getElementById("aw-event-bar");
     if (!stock || !awardView || !dashView || !eventView || !utilBar) return;
 
     var award = util && utilView === "award";
     var dash = util && utilView === "dash";
+    var evDash = event && eventSub === "evdash" && !!evDashView;
+    var evUtil = event && !evDash;
 
     stock.hidden = util || event;
     var actions = document.getElementById("aw-stock-actions");
@@ -821,7 +827,9 @@ window.AWARD_CONFIG = {
     utilBar.hidden = !util;
     awardView.hidden = !award;
     dashView.hidden = !dash;
-    eventView.hidden = !event;
+    eventView.hidden = !evUtil;
+    if (evDashView) evDashView.hidden = !evDash;
+    if (eventBar) eventBar.hidden = !event;
     Array.prototype.forEach.call(
       document.querySelectorAll(".award-page .aw-toptab"),
       function (tab) {
@@ -832,7 +840,7 @@ window.AWARD_CONFIG = {
       }
     );
     Array.prototype.forEach.call(
-      document.querySelectorAll(".award-page .aw-utiltab"),
+      document.querySelectorAll(".award-page .aw-utiltab[data-aw-util]"),
       function (tab) {
         var on = tab.getAttribute("data-aw-util") === utilView;
         tab.classList.toggle("is-active", on);
@@ -851,9 +859,25 @@ window.AWARD_CONFIG = {
     } else if (dash && typeof window.awardDashShown === "function") {
       window.awardDashShown();
     }
-    if (event && !eventViewStarted && typeof window.initAwardEventUI === "function") {
+    Array.prototype.forEach.call(
+      document.querySelectorAll(".award-page .aw-utiltab[data-aw-ev]"),
+      function (tab) {
+        var on = tab.getAttribute("data-aw-ev") === (evDash ? "evdash" : "event");
+        tab.classList.toggle("is-active", on);
+        tab.setAttribute("aria-selected", on ? "true" : "false");
+        tab.tabIndex = on ? 0 : -1;
+      }
+    );
+
+    if (evUtil && !eventViewStarted && typeof window.initAwardEventUI === "function") {
       eventViewStarted = true;
       window.initAwardEventUI();
+    }
+    if (evDash && !evDashStarted && typeof window.initAwardEvDashUI === "function") {
+      evDashStarted = true;
+      window.initAwardEvDashUI();
+    } else if (evDash && typeof window.aedShown === "function") {
+      window.aedShown();
     }
   }
 
@@ -885,7 +909,8 @@ window.AWARD_CONFIG = {
 
   function refreshCurrentView() {
     if (currentTop === "event") {
-      return typeof window.aweRefresh === "function" ? window.aweRefresh() : Promise.resolve(false);
+      var evFn = eventSub === "evdash" ? window.aedRefresh : window.aweRefresh;
+      return typeof evFn === "function" ? evFn() : Promise.resolve(false);
     }
     if (currentTop === "util") {
       var fn = utilView === "dash" ? window.awardDashRefresh : window.awmRefreshAll;
@@ -927,6 +952,12 @@ window.AWARD_CONFIG = {
     showTopView("util");
   }
 
+  // Events holds two views: Utilisations (entering counts) and Dashboard (totals).
+  function showEventView(which) {
+    eventSub = which === "evdash" ? "evdash" : "event";
+    showTopView("event");
+  }
+
   function mount() {
     cacheElements();
     if (!el.form) return;        // the tab is not on screen
@@ -934,6 +965,8 @@ window.AWARD_CONFIG = {
     awardViewStarted = false;      // a fresh page has a fresh Award Management view
     dashViewStarted = false;       // and a fresh dashboard
     eventViewStarted = false;      // and fresh event counts
+    evDashStarted = false;         // and a fresh event dashboard
+    eventSub = "event";            // Events opens on Utilisations
     utilView = "award";            // Award Utilisation opens on Award Management
     stockScope = "awards";
 
@@ -1811,10 +1844,19 @@ window.AWARD_CONFIG = {
     );
 
     Array.prototype.forEach.call(
-      document.querySelectorAll(".award-page .aw-utiltab"),
+      document.querySelectorAll(".award-page .aw-utiltab[data-aw-util]"),
       function (tab) {
         tab.addEventListener("click", function () {
           showUtilView(tab.getAttribute("data-aw-util"));
+        });
+      }
+    );
+
+    Array.prototype.forEach.call(
+      document.querySelectorAll(".award-page .aw-utiltab[data-aw-ev]"),
+      function (tab) {
+        tab.addEventListener("click", function () {
+          showEventView(tab.getAttribute("data-aw-ev"));
         });
       }
     );
