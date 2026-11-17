@@ -845,12 +845,16 @@
       box-shadow: 0 14px 28px -6px rgba(15, 23, 42, 0.1), 0 2px 8px rgba(15, 23, 42, 0.04);
     }
     .tp-district-header {
-      padding: 8px 12px;
+      padding: 9px 12px;
       display: flex;
       align-items: center;
       gap: 8px;
       background: #F8FAFC;
       border-bottom: 1px solid var(--tp-border-subtle);
+      transition: background 0.15s ease;
+    }
+    .tp-district-header:hover {
+      background: #F1F5F9;
     }
     .tp-dist-pip {
       width: 7px;
@@ -863,6 +867,40 @@
       font-weight: 700;
       color: var(--tp-ink);
       flex: 1;
+    }
+    .tp-dist-modal-card {
+      cursor: pointer;
+      padding: 13px 18px;
+      border: 1px solid var(--tp-border, #E2E8F0);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      background: var(--tp-surface, #FFFFFF);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .tp-dist-modal-card:hover {
+      border-color: #3B82F6 !important;
+      box-shadow: 0 6px 18px -2px rgba(37, 99, 235, 0.12), 0 2px 6px rgba(15, 23, 42, 0.04) !important;
+      transform: translateY(-2px);
+    }
+    .tp-dist-modal-card:hover .tp-card-chevron {
+      color: #2563EB !important;
+      transform: translateX(3px);
+    }
+    .tp-card-chevron {
+      transition: transform 0.18s ease, color 0.18s ease;
+    }
+    html[data-theme="dark"] .tp-dist-modal-card {
+      background: #1E293B !important;
+      border-color: #334155 !important;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+    }
+    html[data-theme="dark"] .tp-dist-modal-card:hover {
+      border-color: #60A5FA !important;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5) !important;
     }
     .tp-row-details-btn {
       background: none;
