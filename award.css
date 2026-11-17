@@ -2587,6 +2587,7 @@
   margin: 0 0 16px; box-shadow: 0 2px 10px rgba(15,23,42,.05);
 }
 .award-page:has(#aw-util-bar:not([hidden])) .aw-topbar,
+.award-page:has(#aw-event-bar:not([hidden])) .aw-topbar,
 .award-page:has(#aw-view-stock:not([hidden])) .aw-topbar { border-radius: 18px 18px 0 0; margin-bottom: 0; box-shadow: none; }
 .award-page .aw-toptabs { background: transparent; border: 0; box-shadow: none; padding: 0; }
 .award-page .aw-utiltabs, .award-page #aw-view-stock .aw-body > .aw-subtabs {

@@ -1012,38 +1012,37 @@ async function markResigned(id) {
 // Column mapping: Excel header → DB column name.
 // Order matters — this is the canonical column list used to generate
 // the sample template and to map each Excel row during upload.
-// Vinoba Block Status Report (Oct 2026 format, 29 columns — Excel header = table column)
+// Vinoba Block Status Report — Nov 2026 format, 36 columns (Excel header = table column).
+// Spelling Bee became a core life-skill club (total_lifeskills now includes it) and every club has
+// a total and an improved streak. The old single streak columns (streaks, streak_*) are no longer in
+// the report; they stay in the table untouched so the months uploaded before keep their data.
+const _vc = n => ({ excel: n, db: n });
 const VINOBA_COLUMNS = [
-    { excel: "state_name",                 db: "state_name" },
-    { excel: "district_name",              db: "district_name" },
-    { excel: "block_name",                 db: "block_name" },
-    { excel: "total_teachers",             db: "total_teachers" },
-    { excel: "total_schools",              db: "total_schools" },
-    { excel: "unique_schools_posting",     db: "unique_schools_posting" },
-    { excel: "unique_teachers_posting",    db: "unique_teachers_posting" },
-    { excel: "total_posts",                db: "total_posts" },
-    { excel: "creative_writing",           db: "creative_writing" },
-    { excel: "storytelling",               db: "storytelling" },
-    { excel: "poetry_recitation",          db: "poetry_recitation" },
-    { excel: "spoken_english",             db: "spoken_english" },
-    { excel: "total_lifeskills",           db: "total_lifeskills" },
-    { excel: "morning_assembly",           db: "morning_assembly" },
-    { excel: "spelling_bee",               db: "spelling_bee" },
-    { excel: "total_other_posts",          db: "total_other_posts" },
-    { excel: "streaks",                    db: "streaks" },
-    { excel: "streak_creative_writing",    db: "streak_creative_writing" },
-    { excel: "streak_storytelling",        db: "streak_storytelling" },
-    { excel: "streak_poetry_recitation",   db: "streak_poetry_recitation" },
-    { excel: "streak_spoken_english",      db: "streak_spoken_english" },
-    { excel: "coupons_available",          db: "coupons_available" },
-    { excel: "coupons_given",              db: "coupons_given" },
-    { excel: "coupons_expired",            db: "coupons_expired" },
-    { excel: "coupons_outstanding",        db: "coupons_outstanding" },
-    { excel: "star_teachers",              db: "star_teachers" },
-    { excel: "post_per_month_per_teacher", db: "post_per_month_per_teacher" },
-    { excel: "block_pom_winners",          db: "block_pom_winners" },
-    { excel: "district_pom_winners",       db: "district_pom_winners" },
-];
+    "state_name", "district_name", "block_name", "total_teachers", "total_schools",
+    "unique_schools_posting", "unique_teachers_posting", "total_posts",
+    "creative_writing", "storytelling", "poetry_recitation", "spoken_english", "spelling_bee",
+    "total_lifeskills", "morning_assembly", "total_other_posts",
+    "total_improved_streaks",
+    "improved_streak_creative_writing", "improved_streak_storytelling", "improved_streak_poetry_recitation",
+    "improved_streak_spoken_english", "improved_streak_spelling_bee",
+    "total_streaks",
+    "total_streak_creative_writing", "total_streak_storytelling", "total_streak_poetry_recitation",
+    "total_streak_spoken_english", "total_streak_spelling_bee",
+    "coupons_available", "coupons_given", "coupons_expired", "coupons_outstanding",
+    "star_teachers", "post_per_month_per_teacher", "block_pom_winners", "district_pom_winners",
+].map(_vc);
+
+// The Oct 2026 format (29 columns) is still accepted, so an old month can be re-uploaded
+// with its original file. Its rows are stored exactly as before.
+const VINOBA_COLUMNS_OCT2026 = [
+    "state_name", "district_name", "block_name", "total_teachers", "total_schools",
+    "unique_schools_posting", "unique_teachers_posting", "total_posts",
+    "creative_writing", "storytelling", "poetry_recitation", "spoken_english",
+    "total_lifeskills", "morning_assembly", "spelling_bee", "total_other_posts",
+    "streaks", "streak_creative_writing", "streak_storytelling", "streak_poetry_recitation", "streak_spoken_english",
+    "coupons_available", "coupons_given", "coupons_expired", "coupons_outstanding",
+    "star_teachers", "post_per_month_per_teacher", "block_pom_winners", "district_pom_winners",
+].map(_vc);
 
 let vinobaLogLoaded = false;
 
@@ -1161,11 +1160,16 @@ async function uploadVinoba() {
         const headerRow = XLSX.utils.sheet_to_json(ws, { header: 1 })[0] || [];
         const fileHeaders = headerRow.map(h => String(h || "").trim());
         const expectedHeaders = VINOBA_COLUMNS.map(c => c.excel);
+        const sameSet = cols => cols.every(c => fileHeaders.includes(c.excel))
+            && fileHeaders.every(h => !h || cols.some(c => c.excel === h));
+        // Current format first; the Oct 2026 format is accepted for re-uploading old months.
+        const fileColumns = sameSet(VINOBA_COLUMNS) ? VINOBA_COLUMNS
+                          : sameSet(VINOBA_COLUMNS_OCT2026) ? VINOBA_COLUMNS_OCT2026 : null;
 
         const missing = expectedHeaders.filter(h => !fileHeaders.includes(h));
         const extra = fileHeaders.filter(h => h && !expectedHeaders.includes(h));
 
-        if (missing.length > 0 || extra.length > 0) {
+        if (!fileColumns) {
             let msg = "This file's columns don't match the expected Vinoba format.\n\n";
             if (missing.length > 0) msg += "Missing: " + missing.join(", ") + "\n";
             if (extra.length > 0) msg += "Unexpected: " + extra.join(", ") + "\n";
@@ -1206,7 +1210,7 @@ async function uploadVinoba() {
         // 3. Map Excel rows to DB rows
         const dbRows = jsonRows.map(row => {
             const mapped = { year, month, week };
-            for (const col of VINOBA_COLUMNS) {
+            for (const col of fileColumns) {
                 const val = row[col.excel];
                 mapped[col.db] = val !== undefined && val !== null && val !== "" ? val : null;
             }
@@ -2745,6 +2749,9 @@ const TGT_NUM = [
     { excel: "PR Streak", db: "pr_streak", short: "PR Streak" },
     { excel: "CW Streak", db: "cw_streak", short: "CW Streak" },
     { excel: "SE Streak", db: "se_streak", short: "SE Streak" },
+    // Spelling Bee became a core club (Nov 2026). Optional column: files without it are still accepted
+    // and the SB streak target then shows "Not set" on the Monthly tab.
+    { excel: "SB Streak", db: "sb_streak", short: "SB Streak", optional: true },
     { excel: "Kathawli", db: "kathawli", short: "Kathawli" },
     { excel: "Online Unique Tchrs", db: "online_unique_teachers", short: "Uniq. Tchrs" },
     { excel: "Online Unique Schs", db: "online_unique_schools", short: "Uniq. Schs" },
@@ -3060,7 +3067,8 @@ async function uploadTargets() {
         // 1. headers
         const fileHeaders = (XLSX.utils.sheet_to_json(ws, { header: 1 })[0] || []).map(h => String(h || "").trim()).filter(h => h);
         const expected = TGT_ALL.map(c => c.excel);
-        const missing = expected.filter(h => !fileHeaders.includes(h)), extra = fileHeaders.filter(h => !expected.includes(h));
+        const optional = TGT_ALL.filter(c => c.optional).map(c => c.excel);
+        const missing = expected.filter(h => !fileHeaders.includes(h) && !optional.includes(h)), extra = fileHeaders.filter(h => !expected.includes(h));
         if (missing.length || extra.length) {
             let msg = "This file's columns don't match the expected Targets format.\n\n";
             if (missing.length) msg += "Missing: " + missing.join(", ") + "\n";

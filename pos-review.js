@@ -75,22 +75,78 @@
   var MON_LONG  = ["January","February","March","April","May","June","July","August","September","October","November","December"];
   var MON_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-  // [label shown in the review, column in Supabase] — order = JsonCreator maps
+  // Vinoba rows shown in the review (order = row order on the Weekly tab).
+  // Each label is worked out per block row by vinobaRowVals() and then summed over the unit's blocks.
+  // Core life-skill clubs (Nov 2026): Creative Writing, Storytelling, Poetry Recitation, Spoken English
+  // and Spelling Bee. Morning Assembly stays outside the core.
+  var LS_CLUBS = [
+    ["Creative Writing", "creative_writing"], ["Storytelling", "storytelling"],
+    ["Poetry Recitation", "poetry_recitation"], ["Spoken English", "spoken_english"],
+    ["Spelling Bee", "spelling_bee"]
+  ];
+  // Streak columns per club: Nov 2026 report (total + improved) and the older report.
+  // The older report had one streak number per club for the first four clubs only; it counted
+  // IMPROVED streaks, so old uploads show it under "Improved" (the stored data is not changed).
+  var STREAK_COLS = {
+    creative_writing:  { total: "total_streak_creative_writing",  improved: "improved_streak_creative_writing",  old: "streak_creative_writing" },
+    storytelling:      { total: "total_streak_storytelling",      improved: "improved_streak_storytelling",      old: "streak_storytelling" },
+    poetry_recitation: { total: "total_streak_poetry_recitation", improved: "improved_streak_poetry_recitation", old: "streak_poetry_recitation" },
+    spoken_english:    { total: "total_streak_spoken_english",    improved: "improved_streak_spoken_english",    old: "streak_spoken_english" },
+    spelling_bee:      { total: "total_streak_spelling_bee",      improved: "improved_streak_spelling_bee",      old: null }
+  };
   var VINOBA_COLS = [
     ["Total Schools", "total_schools"], ["Total Teachers", "total_teachers"],
     ["Unique Schools Posting", "unique_schools_posting"], ["Unique Teachers Posting", "unique_teachers_posting"],
-    ["Total Posts", "total_posts"], ["Creative Writing", "creative_writing"], ["Storytelling", "storytelling"],
-    ["Poetry Recitation", "poetry_recitation"], ["Spoken English", "spoken_english"],
-    ["Total Lifeskills", "total_lifeskills"], ["Morning Assembly", "morning_assembly"], ["Spelling Bee", "spelling_bee"],
-    ["Other Activities Total", "total_other_posts"], ["Streaks", "streaks"],
-    ["Streak Storytelling", "streak_storytelling"], ["Streak Creative Writing", "streak_creative_writing"],
-    ["Streak Poetry Recitation", "streak_poetry_recitation"], ["Streak Spoken English", "streak_spoken_english"],
+    ["Total Posts", "total_posts"]]
+    .concat(LS_CLUBS)
+    .concat([["Total Lifeskills", "total_lifeskills"], ["Morning Assembly", "morning_assembly"],
+    ["Other Activities Total", "total_other_posts"],
+    ["Total Streaks", null], ["Improved Streaks", null]])
+    .concat([].concat.apply([], LS_CLUBS.map(function (c) {
+      return [["Total Streak \u00B7 " + c[0], null], ["Improved Streak \u00B7 " + c[0], null]]; })))
+    .concat([
     ["Expert Coupons Given", "coupons_given"], ["Expert Coupons Available", "coupons_available"],
     ["Expert Coupons Outstanding", "coupons_outstanding"], ["Expert Coupons Expired", "coupons_expired"],
     ["Star Teachers", "star_teachers"], ["Post Per Month Per Teacher", "post_per_month_per_teacher"]
     // POM Transformed Clusters / Block & District POM Winners are not shown (the winner columns are still
     // uploaded and stored in vinoba_data; POM transformed clusters is entered by the PO on the Monthly tab).
-  ];
+  ]);
+
+  // One vinoba_data row -> { label: number | null }  (null = not in that upload).
+  // Works the same for uploads in the older format and the Nov 2026 format, without changing stored data:
+  //  - Total Lifeskills = the 5 core clubs added up (older uploads did not count Spelling Bee in it).
+  //  - Other Activities Total moves by the same amount, so Total Posts = Lifeskills + Other still holds.
+  //  - Total / Improved Streaks = the 5 clubs' streaks added up.
+  function vinobaRowVals(r) {
+    var has = function (k) { return k && r[k] !== null && r[k] !== undefined && r[k] !== ""; };
+    var val = function (k) { return has(k) ? num(r[k]) : null; };
+    var add = function (vals) {
+      return vals.every(function (v) { return v === null; }) ? null : vals.reduce(function (a, v) { return a + (v || 0); }, 0);
+    };
+    var o = {};
+    VINOBA_COLS.forEach(function (c) { if (c[1]) o[c[0]] = val(c[1]); });
+
+    var ls = add(LS_CLUBS.map(function (c) { return val(c[1]); }));
+    var storedLs = val("total_lifeskills");
+    if (ls !== null) {
+      o["Total Lifeskills"] = ls;
+      if (o["Other Activities Total"] !== null && storedLs !== null) o["Other Activities Total"] -= (ls - storedLs);
+      else if (o["Other Activities Total"] === null && o["Total Posts"] !== null) o["Other Activities Total"] = o["Total Posts"] - ls;
+    }
+
+    var tot = [], imp = [];
+    LS_CLUBS.forEach(function (c) {
+      var sc = STREAK_COLS[c[1]];
+      var t = val(sc.total);
+      var i = has(sc.improved) ? val(sc.improved) : val(sc.old);
+      o["Total Streak \u00B7 " + c[0]] = t;
+      o["Improved Streak \u00B7 " + c[0]] = i;
+      tot.push(t); imp.push(i);
+    });
+    o["Total Streaks"] = add(tot);
+    o["Improved Streaks"] = add(imp);
+    return o;
+  }
   // Staff Connect event report. Only these two columns belong to the block on the row:
   // summed over the blocks in scope (a PO sees just their own blocks).
   var SC_BLOCK_COLS = [
@@ -441,15 +497,17 @@
     vin.filter(inWeek).forEach(function (r) {
       if (!bset[r.block_key]) return;
       anyRow = true;
+      var rv = vinobaRowVals(r);
       VINOBA_COLS.forEach(function (c) {
-        if (!c[1]) return;
-        if (r[c[1]] !== null && r[c[1]] !== undefined && r[c[1]] !== "") seen[c[0]] = 1;
-        vinoba[c[0]] += num(r[c[1]]);
+        var x = rv[c[0]];
+        if (x === null || x === undefined) return;
+        seen[c[0]] = 1;
+        vinoba[c[0]] += x;
       });
     });
-    // Columns added to the report later (e.g. Morning Assembly) are empty in uploads made
-    // with the older format: show them as blank ("—"), not as a misleading 0.
-    if (anyRow) VINOBA_COLS.forEach(function (c) { if (c[1] && !seen[c[0]]) vinoba[c[0]] = ""; });
+    // Columns added to the report later (e.g. Morning Assembly, Total Streaks) are empty in uploads made
+    // with an older format: show them as blank ("—"), not as a misleading 0.
+    if (anyRow) VINOBA_COLS.forEach(function (c) { if (!seen[c[0]]) vinoba[c[0]] = ""; });
 
     // Staff Connect: block metrics summed; district metrics once per district.
     // Only events for the month under review (the report can mix months).
@@ -1316,21 +1374,27 @@
         note: "Planned: from Admin \u2192 Academic Plan \u00B7 click the number to see the exams. Done: enter how many of them were completed." } ] },
 
     { key: "G2", title: "Life Skills Programs", weight: 20, rows: [
-      { lvl: 0, label: "LS Program Cycle (Core)", w: 10, v: A(function (rp) { return msum(rp, "vinoba", ["Storytelling", "Creative Writing", "Poetry Recitation", "Spoken English"]); }, "Vinoba \u00B7 sum of the four core programs") },
+      // Core = the 5 core clubs (Spelling Bee joined the core in Nov 2026), compared with the sum of their 5 targets.
+      { lvl: 0, label: "LS Program Cycle (Core)", w: 10, v: A(function (rp) { return msum(rp, "vinoba", ["Storytelling", "Creative Writing", "Poetry Recitation", "Spoken English", "Spelling Bee"]); }, "Vinoba \u00B7 sum of the five core clubs") },
       { lvl: 1, label: "Storytelling",     v: A(function (rp) { return mv(rp, "vinoba", "Storytelling"); }, "Vinoba") },
       { lvl: 1, label: "Creative Writing", v: A(function (rp) { return mv(rp, "vinoba", "Creative Writing"); }, "Vinoba") },
       { lvl: 1, label: "Poetry",           v: A(function (rp) { return mv(rp, "vinoba", "Poetry Recitation"); }, "Vinoba") },
       { lvl: 1, label: "Spoken English",   v: A(function (rp) { return mv(rp, "vinoba", "Spoken English"); }, "Vinoba") },
-      { lvl: 0, label: "LS Program Cycle (Non-core)", w: 0, v: A(function (rp) { return msum(rp, "vinoba", ["Morning Assembly", "Spelling Bee"]); }, "Vinoba \u00B7 Morning Assembly + Spelling Bee") },
+      { lvl: 1, label: "Spelling Bee",     v: A(function (rp) { return mv(rp, "vinoba", "Spelling Bee"); }, "Vinoba \u00B7 spelling_bee") },
+      { lvl: 0, label: "LS Program Cycle (Non-core)", w: 0, v: A(function (rp) { return mv(rp, "vinoba", "Morning Assembly"); }, "Vinoba \u00B7 Morning Assembly") },
       { lvl: 1, label: "Morning Assembly", v: A(function (rp) { return mv(rp, "vinoba", "Morning Assembly"); }, "Vinoba \u00B7 morning_assembly") },
-      { lvl: 1, label: "Spelling Bee", v: A(function (rp) { return mv(rp, "vinoba", "Spelling Bee"); }, "Vinoba \u00B7 spelling_bee") },
-      // Streak = the 4 programme streaks added up, compared with the sum of their 4 targets
-      // (the report's overall "streaks" also counts other programmes, so it isn't used here).
-      { lvl: 0, label: "Streak", w: 10, v: A(function (rp) { return msum(rp, "vinoba", ["Streak Storytelling", "Streak Creative Writing", "Streak Spoken English", "Streak Poetry Recitation"]); }, "Vinoba \u00B7 sum of the 4 programme streaks") },
-      { lvl: 1, label: "Streak \u00B7 Storytelling", v: A(function (rp) { return mv(rp, "vinoba", "Streak Storytelling"); }, "Vinoba \u00B7 streak_storytelling") },
-      { lvl: 1, label: "Streak \u00B7 Creative Writing", v: A(function (rp) { return mv(rp, "vinoba", "Streak Creative Writing"); }, "Vinoba \u00B7 streak_creative_writing") },
-      { lvl: 1, label: "Streak \u00B7 Spoken English", v: A(function (rp) { return mv(rp, "vinoba", "Streak Spoken English"); }, "Vinoba \u00B7 streak_spoken_english") },
-      { lvl: 1, label: "Streak \u00B7 Poetry", v: A(function (rp) { return mv(rp, "vinoba", "Streak Poetry Recitation"); }, "Vinoba \u00B7 streak_poetry_recitation") } ] },
+      // Streak is scored on IMPROVED streaks of the 5 core clubs, compared with the sum of their 5 streak targets.
+      // Total streaks are shown for information (no target, no score).
+      { lvl: 0, label: "Streak", w: 10, note: "Improved streaks of the 5 core clubs",
+        v: A(function (rp) { return mv(rp, "vinoba", "Improved Streaks"); }, "Vinoba \u00B7 improved streaks, sum of the 5 core clubs") },
+      { lvl: 1, label: "Total streaks", info: true, v: A(function (rp) { return mv(rp, "vinoba", "Total Streaks"); }, "Vinoba \u00B7 total streaks, sum of the 5 core clubs (information only)") }
+    ].concat([["Storytelling", "Storytelling"], ["Creative Writing", "Creative Writing"], ["Spoken English", "Spoken English"],
+              ["Poetry", "Poetry Recitation"], ["Spelling Bee", "Spelling Bee"]].map(function (c) {
+      return [
+        { lvl: 1, label: "Streak \u00B7 " + c[0], v: A(function (rp) { return mv(rp, "vinoba", "Improved Streak \u00B7 " + c[1]); }, "Vinoba \u00B7 improved streaks \u00B7 " + c[1]) },
+        { lvl: 2, label: "Total \u00B7 " + c[0], info: true, v: A(function (rp) { return mv(rp, "vinoba", "Total Streak \u00B7 " + c[1]); }, "Vinoba \u00B7 total streaks \u00B7 " + c[1] + " (information only)") }
+      ];
+    }).reduce(function (a, x) { return a.concat(x); }, [])) },
 
     { key: "G3", title: "Vibrant Teacher Community", weight: 20, rows: [
       { lvl: 0, label: "Vinoba Kathavli Stories", w: 5, v: A(function (rp) { return mv(rp, "visit", "Kathawli Yes"); }, "Visit & Activity \u00B7 Kathavli \u201CYes\u201D count") },
@@ -1944,6 +2008,7 @@
         if (!weighted) score = "";
         if (r.yn) { target = ""; pct = ""; score = ""; }
         if (!r.t && !r.tsum && !r.community && !r.v) pct = "";      // plain containers
+        if (r.info) { target = ""; pct = ""; score = ""; }            // information-only lines (e.g. total streaks)
       }
       row += moCell(r.w != null ? String(r.w) : "") + moCell(target) + moCell(done) + moCell(pct) + moCell(score) + "</tr>";
       out += rowOpen + (entIdx != null ? ' data-ent="' + entIdx + '"' : "") + ">" + row;
@@ -2081,7 +2146,7 @@
   var TGT_LABEL = {
     story_telling: "Story Telling", poetry_recitation: "Poetry Recitation", creative_writing: "Creative Writing",
     spoken_english: "Spoken English", spelling_bee: "Spelling Bee", morning_assembly: "Morning Assembly",
-    st_streak: "ST Streak", pr_streak: "PR Streak", cw_streak: "CW Streak", se_streak: "SE Streak",
+    st_streak: "ST Streak", pr_streak: "PR Streak", cw_streak: "CW Streak", se_streak: "SE Streak", sb_streak: "SB Streak",
     kathawli: "Kathawli", online_unique_teachers: "Online Unique Teachers", online_unique_schools: "Online Unique Schools",
     posts_per_teacher: "Posts per month / per teacher", star_teachers: "Star Teachers", teachers_using_expert_coupon: "Teachers using expert coupon",
     pom_transformed_clusters: "POM Transformed clusters", blocks_with_recognition_events: "Blocks with recognition events",
@@ -2160,14 +2225,15 @@
 
   // Which target each Monthly line uses: one column, or the sum of several.
   var MO_TMAP = {
-    "G2|LS Program Cycle (Core)": { tsum: ["story_telling", "creative_writing", "poetry_recitation", "spoken_english"] },
+    "G2|LS Program Cycle (Core)": { tsum: ["story_telling", "creative_writing", "poetry_recitation", "spoken_english", "spelling_bee"] },
     "G2|Storytelling": { t: "story_telling" }, "G2|Creative Writing": { t: "creative_writing" },
-    "G2|Poetry": { t: "poetry_recitation" }, "G2|Spoken English": { t: "spoken_english" },
-    "G2|LS Program Cycle (Non-core)": { tsum: ["morning_assembly", "spelling_bee"] },
-    "G2|Morning Assembly": { t: "morning_assembly" }, "G2|Spelling Bee": { t: "spelling_bee" },
-    "G2|Streak": { tsum: ["st_streak", "cw_streak", "se_streak", "pr_streak"] },
+    "G2|Poetry": { t: "poetry_recitation" }, "G2|Spoken English": { t: "spoken_english" }, "G2|Spelling Bee": { t: "spelling_bee" },
+    "G2|LS Program Cycle (Non-core)": { t: "morning_assembly" },
+    "G2|Morning Assembly": { t: "morning_assembly" },
+    "G2|Streak": { tsum: ["st_streak", "cw_streak", "se_streak", "pr_streak", "sb_streak"] },
     "G2|Streak \u00B7 Storytelling": { t: "st_streak" }, "G2|Streak \u00B7 Creative Writing": { t: "cw_streak" },
     "G2|Streak \u00B7 Spoken English": { t: "se_streak" }, "G2|Streak \u00B7 Poetry": { t: "pr_streak" },
+    "G2|Streak \u00B7 Spelling Bee": { t: "sb_streak" },
     "G3|Vinoba Kathavli Stories": { t: "kathawli" },
     "G3|Online + Offline community": { community: true },
     "G3|Unique teachers posting": { t: "online_unique_teachers" }, "G3|Unique schools posting": { t: "online_unique_schools" },
