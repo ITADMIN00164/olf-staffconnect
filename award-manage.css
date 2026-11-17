@@ -206,6 +206,23 @@
 .awm-view .awm-adm-pick input { accent-color: #b91c1c; width: 14px; height: 14px; margin: 0; cursor: pointer; }
 .awm-view .awm-adm-btn { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border: 1px solid #e5e7eb; background: #fff; border-radius: 7px; font-size: 11px; font-weight: 700; color: #374151; cursor: pointer; font-family: inherit; text-transform: none; letter-spacing: normal; }
 .awm-view .awm-adm-btn:hover { background: #f3f4f6; }
+.awm-view .awm-adm-btn[hidden] { display: none; }
+/* Verify SU awards: the one thing on this bar to act on, so it is solid, branded and counted. */
+.awm-view .awm-adm-btn.go {
+  gap: 8px; padding: 6px 8px 6px 12px; border: 0; border-radius: 10px; font-size: 12.5px; font-weight: 800; letter-spacing: .01em; color: #fff;
+  background: linear-gradient(135deg, #2f6fe4, #0b8f7a); box-shadow: 0 6px 14px rgba(36,87,197,.32), inset 0 1px 0 rgba(255,255,255,.28);
+  transition: transform .15s ease, box-shadow .2s ease, filter .15s ease;
+}
+.awm-view .awm-adm-btn.go:hover { background: linear-gradient(135deg, #2457c5, #0b7a69); transform: translateY(-1px); box-shadow: 0 10px 20px rgba(36,87,197,.38), inset 0 1px 0 rgba(255,255,255,.28); }
+.awm-view .awm-adm-btn.go:active { transform: scale(.97); }
+.awm-view .awm-adm-btn.go:focus-visible { outline: 3px solid #bfdbfe; outline-offset: 2px; }
+.awm-view .awm-adm-btn.go .awm-bulk-ico { flex: 0 0 auto; }
+.awm-view .awm-adm-btn.go .awm-bulk-n { min-width: 22px; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.95); color: #1d4ed8; font-size: 11.5px; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: no-preference) {
+  /* a soft ring a few times as the page opens, then still - enough to be noticed, not a flasher */
+  .awm-view .awm-adm-btn.go { animation: awm-bulk-ping 1.8s ease-out 3; }
+  @keyframes awm-bulk-ping { 0% { box-shadow: 0 6px 14px rgba(36,87,197,.32), 0 0 0 0 rgba(47,111,228,.55); } 70%, 100% { box-shadow: 0 6px 14px rgba(36,87,197,.32), 0 0 0 11px rgba(47,111,228,0); } }
+}
 .awm-view .awm-adm-btn.bad { color: #b91c1c; border-color: #fecaca; }
 .awm-view .awm-adm-btn.bad:hover { background: #fef2f2; }
 .awm-view .awm-adm-btn:disabled { opacity: .45; cursor: default; background: #fff; }
@@ -223,6 +240,29 @@
 .awm-view .awm-ef input, .awm-view .awm-ef select { padding: 8px 10px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 13px; font-family: inherit; outline: none; background: #fff; min-width: 0; }
 .awm-view .awm-ef input:focus, .awm-view .awm-ef select:focus { border-color: #4f8ef7; box-shadow: 0 0 0 3px rgba(79,142,247,.1); }
 .awm-view .awm-edit-err { min-height: 18px; margin: 10px 0 12px; font-size: 12px; color: #b91c1c; }
+/* Verify the Shikshan Utsav awards of the open month */
+.awm-view .awm-bulk-box { width: 520px; }
+.awm-view .awm-bulk-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.awm-view .awm-bulk-badge { flex: 0 0 auto; width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; font-size: 13px; font-weight: 800; letter-spacing: .04em; color: #fff; background: linear-gradient(135deg, #2f6fe4, #0b8f7a); box-shadow: 0 6px 14px rgba(36,87,197,.28); }
+.awm-view .awm-bulk-head .pom-modal-title { margin: 0 0 2px; }
+.awm-view .awm-bulk-where { font-size: 13px; font-weight: 600; color: #6b7280; }
+.awm-view .awm-bulk-count { display: flex; align-items: baseline; gap: 10px; margin: 0 0 16px; padding: 14px 16px; border-radius: 14px; background: #eff6ff; border: 1px solid #dbeafe; }
+.awm-view .awm-bulk-count b { font-size: 34px; line-height: 1; font-weight: 800; letter-spacing: -1px; color: #1d4ed8; font-variant-numeric: tabular-nums; }
+.awm-view .awm-bulk-count span { font-size: 14px; font-weight: 600; color: #374151; }
+.awm-view .awm-bulk-lab { display: block; margin: 0 0 7px; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #6b7280; }
+.awm-view .awm-bulk-lab i { font-style: normal; font-weight: 700; letter-spacing: .02em; text-transform: none; color: #b45309; }
+.awm-view .awm-bulk-set { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 16px; }
+.awm-view .awm-bulk-set > div { padding: 9px 12px; border: 1px solid #e5e7eb; border-radius: 11px; background: #fafbfd; }
+.awm-view .awm-bulk-set span { display: block; font-size: 11px; font-weight: 600; color: #6b7280; margin-bottom: 1px; }
+.awm-view .awm-bulk-set b { font-size: 13.5px; font-weight: 700; color: #111827; }
+.awm-view .awm-bulk-grid { display: grid; grid-template-columns: 1fr 1.25fr; gap: 12px; }
+.awm-view .awm-bulk-field input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 10px; font: inherit; font-size: 13px; background: #fff; }
+.awm-view .awm-bulk-field input:focus { outline: 2px solid #bfdbfe; border-color: #60a5fa; }
+.awm-view .awm-bulk-preview { display: block; max-width: 100%; max-height: 140px; margin: 10px 0 0; border-radius: 12px; border: 1px solid #e5e7eb; }
+.awm-view .awm-bulk-note { min-height: 18px; margin: 12px 0 0; font-size: 13px; font-weight: 600; color: #6b7280; }
+.awm-view .awm-bulk-note.is-bad { color: #b45309; }
+.awm-view .awm-bulk-fine { margin: 4px 0 0; font-size: 12px; line-height: 1.45; color: #9ca3af; }
+@media (max-width: 560px) { .awm-view .awm-bulk-grid, .awm-view .awm-bulk-set { grid-template-columns: 1fr; } .awm-view .awm-bulk-box { width: 100%; } }
 .awm-view .awm-trash-list { max-height: 340px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 10px; }
 .awm-view .awm-trash { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .awm-view .awm-trash th { position: sticky; top: 0; background: #fafafa; text-align: left; padding: 8px 10px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .4px; color: #6b7280; border-bottom: 1px solid #e5e7eb; }

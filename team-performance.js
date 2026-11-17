@@ -4408,6 +4408,9 @@
   }
 
   function switchView(viewName) {
+    if (viewName === "weekly-ops") {
+      viewName = "progress"; // Operation Tracker is temporarily on hold / disabled
+    }
     activeView = viewName;
     const isSmart = viewName === "smart-goals";
     const isProgress = viewName === "progress";
