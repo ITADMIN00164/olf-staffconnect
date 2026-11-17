@@ -1246,6 +1246,10 @@
             <span class="tp-dist-title">${esc(dst.name)}</span>
             <span class="tp-dist-mgr"><span class="tp-mgr-k">Mgr:</span> <span class="tp-mgr-v">${esc(dstMgr)}</span></span>
           </div>
+          <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+            <span style="font-size:10.5px; font-weight:700; background:#E2E8F0; color:#475569; padding:2px 7px; border-radius:6px;">${(dst.pos || []).length} POs</span>
+            <span style="color:#94A3B8; font-size:13px; font-weight:700;">&rsaquo;</span>
+          </div>
         </div>
         <div class="tp-pos-list">
           ${(dst.pos || []).map(po => {
@@ -1735,50 +1739,56 @@
 
     let poListHtml = '';
     if (distPOs.length === 0) {
-      poListHtml = `<div style="padding:32px 16px; text-align:center; color:#64748B; font-size:13px;">No Project Officers mapped to this district.</div>`;
+      poListHtml = `<div style="padding:36px 16px; text-align:center; color:#64748B; font-size:13px;">No Project Officers mapped to this district.</div>`;
     } else {
       poListHtml = `
-        <div class="tp-prog-acc" style="border:none; box-shadow:none; margin:0;">
-          <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-bottom:6px;">
-            <span style="color:var(--tp-ink-muted, #64748B); font-weight:700;">District Reviews Progress</span>
-            <strong>${doneCount} of ${distPOs.length} Reviews Completed (${distPct}%)</strong>
+        <div style="margin:0;">
+          <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:14px 16px; margin-bottom:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:12.5px; margin-bottom:8px;">
+              <span style="color:#475569; font-weight:700;">District Reviews Progress</span>
+              <strong style="color:#0F172A; font-size:12.5px;">${doneCount} of ${distPOs.length} Reviews Completed (${distPct}%)</strong>
+            </div>
+            <div class="tp-prog-progress-bar-wrap" style="height:8px; border-radius:999px; background:#E2E8F0; overflow:hidden;">
+              <div class="tp-prog-progress-bar-fill" style="width:${distPct}%; height:100%; border-radius:999px; background:linear-gradient(90deg, #10B981 0%, #059669 100%); transition:width 0.4s ease;"></div>
+            </div>
           </div>
-          <div class="tp-prog-progress-bar-wrap" style="margin-bottom:16px;">
-            <div class="tp-prog-progress-bar-fill" style="width:${distPct}%;"></div>
-          </div>
-          <div style="display:flex; flex-direction:column; gap:8px;">
-            ${distPOs.map(p => `
-              <div class="tp-po-row tp-roster-row" style="cursor:pointer; padding:10px 14px; border:1px solid var(--tp-border, #E2E8F0); border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--tp-surface, #FFFFFF);" onclick="window.ProgressModule.openModal('${p.staff.id}', '${esc(p.staff.Designation || 'Project Officer')}', '${esc(p.staff.Name)}', '${esc(p.poMgr)}')">
-                <div style="display:flex; align-items:center; gap:12px; min-width:0; flex:1;">
-                  <div class="tp-prog-avatar" style="width:36px; height:36px; font-size:13px; border-radius:8px;">${esc(getInitials(p.staff.Name))}</div>
-                  <div style="min-width:0;">
-                    <div style="font-weight:700; font-size:13.5px; color:var(--tp-ink, #0F172A); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(p.staff.Name)}</div>
-                    <div style="font-size:11.5px; color:#64748B; margin-top:1px;">${esc(p.staff.Designation || 'Project Officer')} &middot; Reporting to: <strong style="color:var(--tp-ink, #334155);">${esc(p.poMgr)}</strong></div>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            ${distPOs.map(p => {
+              const scDisp = formatFlowScore(p.evalRes, p.staff.id);
+              return `
+                <div class="tp-dist-modal-card" onclick="window.ProgressModule.openModal('${p.staff.id}', '${esc(p.staff.Designation || 'Project Officer')}', '${esc(p.staff.Name)}', '${esc(p.poMgr)}')" title="Click to view monthly review details for ${esc(p.staff.Name)}">
+                  <div style="display:flex; align-items:center; gap:12px; min-width:0; flex:1;">
+                    <div class="tp-prog-avatar" style="width:38px; height:38px; font-size:12.5px; font-weight:700; border-radius:10px; background:linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%); color:#FFFFFF; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${esc(getInitials(p.staff.Name))}</div>
+                    <div style="min-width:0;">
+                      <div style="font-weight:700; font-size:13.5px; color:var(--tp-ink, #0F172A); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(p.staff.Name)}</div>
+                      <div style="font-size:11.5px; color:#64748B; margin-top:2px;">${esc(p.staff.Designation || 'Project Officer')} &middot; Reporting to: <strong style="color:var(--tp-ink, #334155);">${esc(p.poMgr)}</strong></div>
+                    </div>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+                    <span class="tp-prog-pill ${p.evalRes.statusClass}" style="font-size:11px; padding:3px 9px; border-radius:6px; font-weight:700;">${p.evalRes.statusLabel}</span>
+                    <span class="tp-prog-score" style="font-size:12.5px; font-weight:800; min-width:65px; text-align:right;">${scDisp}</span>
+                    <span class="tp-card-chevron" style="color:#94A3B8; font-size:16px; margin-left:4px; font-weight:700;">&rsaquo;</span>
                   </div>
                 </div>
-                <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
-                  <span class="tp-prog-pill ${p.evalRes.statusClass}">${p.evalRes.statusLabel}</span>
-                  <span class="tp-prog-score">${formatFlowScore(p.evalRes, p.staff.id)}</span>
-                </div>
-              </div>
-            `).join('')}
+              `;
+            }).join('')}
           </div>
         </div>
       `;
     }
 
     modal.innerHTML = `
-      <div class="tp-modal-dialog tp-prog-modal-dialog" role="dialog" aria-modal="true">
-        <div class="tp-prog-modal-hdr">
+      <div class="tp-modal-dialog tp-prog-modal-dialog" role="dialog" aria-modal="true" style="max-width:760px; width:92vw;">
+        <div class="tp-prog-modal-hdr" style="padding:16px 20px;">
           <div class="tp-prog-modal-hdr-left">
-            <div class="tp-prog-avatar" style="background:linear-gradient(135deg, #0D9488 0%, #0F766E 100%);">📍</div>
+            <div class="tp-prog-avatar" style="width:42px; height:42px; border-radius:12px; background:linear-gradient(135deg, #0D9488 0%, #0F766E 100%); color:#fff; font-size:18px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 10px rgba(13,148,136,0.25); flex-shrink:0;">📍</div>
             <div class="tp-prog-hdr-titles">
-              <h3 class="tp-prog-hdr-name">${esc(cleanDist)} &mdash; District Operations</h3>
-              <div class="tp-prog-hdr-meta">
+              <h3 class="tp-prog-hdr-name" style="font-size:17px; font-weight:800;">${esc(cleanDist)} &mdash; District Operations</h3>
+              <div class="tp-prog-hdr-meta" style="margin-top:4px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
                 <span class="tp-modal-badge" style="background:#0D9488; color:#fff; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">District Operations</span>
-                <span class="tp-badge" style="background:#F1F5F9; color:#475569; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">${distPOs.length} POs</span>
-                <span>Program Manager: <strong>${esc(pmName || 'Program Manager')}</strong></span>
-                <span>Cycle: <strong>${esc(cycleLabel)}</strong></span>
+                <span class="tp-badge" style="background:#F1F5F9; color:#475569; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">${distPOs.length} ${distPOs.length === 1 ? 'PO' : 'POs'}</span>
+                <span style="font-size:12px; color:#64748B;">Program Manager: <strong style="color:#1E293B;">${esc(pmName || 'Program Manager')}</strong></span>
+                <span style="font-size:12px; color:#64748B;">Cycle: <strong style="color:#1E293B;">${esc(cycleLabel)}</strong></span>
               </div>
             </div>
           </div>
