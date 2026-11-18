@@ -5,13 +5,13 @@
    error. Everything else - every script, style and request for data - goes
    straight to the network exactly as before, so a new deploy reaches people at
    once and nothing stale is ever served. */
-var CACHE = "olf-offline-v1";
+var CACHE = "olf-offline-v2";
 var OFFLINE_URL = "/offline.html";
 
 self.addEventListener("install", function (event) {
   event.waitUntil(
     caches.open(CACHE).then(function (cache) {
-      return cache.addAll([OFFLINE_URL, "/icon-192.png"]);
+      return cache.addAll([OFFLINE_URL, "/icon-192.png?v=2"]);
     }).then(function () { return self.skipWaiting(); })
   );
 });
