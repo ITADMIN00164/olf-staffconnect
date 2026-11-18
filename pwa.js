@@ -68,7 +68,7 @@
     var sub = deferred ? "Add it to your home screen. It opens full screen, like an app."
                        : "Tap Share, then Add to Home Screen.";
     card.innerHTML =
-      '<img src="/icon-192.png" alt="" width="44" height="44">' +
+      '<img src="/icon-192.png?v=2" alt="" width="44" height="44">' +
       '<div class="olf-install-text"><div class="olf-install-title">Install OLF Staff Connect</div><div class="olf-install-sub">' + sub + "</div></div>" +
       (deferred ? '<button type="button" class="olf-install-go">Install</button>' : "") +
       '<button type="button" class="olf-install-x" aria-label="Not now">✕</button>';
