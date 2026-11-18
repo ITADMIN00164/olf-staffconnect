@@ -52,6 +52,15 @@
     return num.toLocaleString('en-IN', { maximumFractionDigits: 2 });
   }
 
+  function getStaffLiveScore(r) {
+    if (!r || !r.staff) return null;
+    const sId = r.staff.id;
+    const evId = r.evalRes ? r.evalRes.empId : null;
+    if (sId && liveScoreCache[sId] != null) return liveScoreCache[sId];
+    if (evId && liveScoreCache[evId] != null) return liveScoreCache[evId];
+    return null;
+  }
+
   function formatFlowScore(evalRes, staffId) {
     if (!evalRes) return '— / 100';
     if (evalRes.status === 'unassigned') return '—';
@@ -67,13 +76,14 @@
   }
 
   function updateScoreCellInDOM(empId, totalScore) {
+    if (!empId) return;
     const scNum = Number(totalScore) || 0;
     const clr = getScoreColor(scNum);
     const scDisp = formatScoreNumber(totalScore) || '0';
 
     // 1. Update table cell if present
-    const cell = document.getElementById('tp-prog-score-cell-' + empId);
-    if (cell) {
+    const cells = document.querySelectorAll(`[id="tp-prog-score-cell-${empId}"], [data-score-cell-id="${empId}"], [data-score-cell-alt="${empId}"]`);
+    cells.forEach(cell => {
       cell.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; font-weight:700;">
           <span style="color:${clr}; font-weight:800;">${scDisp}/100</span>
@@ -83,7 +93,7 @@
           <div class="tp-score-bar-fill" style="width:${Math.min(100, Math.max(0, scNum))}%; background:${clr};"></div>
         </div>
       `;
-    }
+    });
 
     // 2. Update flowchart score badge if present
     const flowBadges = document.querySelectorAll(`[id="tp-prog-flow-score-${empId}"], [data-flow-score-id="${empId}"]`);
@@ -556,22 +566,25 @@
     const cachedScore = (liveScoreCache[assign.emp_id] != null)
       ? liveScoreCache[assign.emp_id]
       : (liveScoreCache[id] != null ? liveScoreCache[id] : null);
-    const totalScore = (cachedScore != null)
-      ? cachedScore
-      : ((mgrDone || selfDone) ? scoreData.totalScore : null);
+    const totalScore = (cachedScore != null) ? cachedScore : null;
 
     let scoreLabel = '— / 100';
-    if (H.H2 === 'On track') {
-      scoreLabel = totalScore > 0 ? `⭐ ${totalScore}/100` : '⭐ On Track';
+    if (totalScore != null && totalScore > 0) {
+      if (H.H2 === 'On track') {
+        scoreLabel = `⭐ ${totalScore}/100`;
+      } else if (H.H2 === 'Needs support') {
+        scoreLabel = `⚠️ ${totalScore}/100`;
+      } else if (H.H2 === 'Critical') {
+        scoreLabel = `🚨 ${totalScore}/100`;
+      } else {
+        scoreLabel = `${totalScore} / 100`;
+      }
+    } else if (H.H2 === 'On track') {
+      scoreLabel = '⭐ On Track';
     } else if (H.H2 === 'Needs support') {
-      scoreLabel = totalScore > 0 ? `⚠️ ${totalScore}/100` : '⚠️ Needs Support';
+      scoreLabel = '⚠️ Needs Support';
     } else if (H.H2 === 'Critical') {
-      scoreLabel = totalScore > 0 ? `🚨 ${totalScore}/100` : '🚨 Critical';
-    } else if (totalScore > 0) {
-      scoreLabel = `${totalScore} / 100`;
-    } else if (bTotal > 0) {
-      const pct = Math.round((bDone / bTotal) * 100);
-      scoreLabel = `${pct}% Actions Done`;
+      scoreLabel = '🚨 Critical';
     } else if (selfDone) {
       scoreLabel = 'Submitted';
     }
@@ -2292,10 +2305,11 @@
     }
     if (fScore) {
       list = list.filter(r => {
-        const sc = Number(r.evalRes.totalScore) || 0;
+        const live = getStaffLiveScore(r);
+        const sc = live != null ? (Number(live) || 0) : null;
         const isUnassigned = r.evalRes.status === 'unassigned';
         if (fScore === 'unassigned') return isUnassigned;
-        if (isUnassigned) return false;
+        if (isUnassigned || sc == null) return false;
         if (fScore === '80+') return sc >= 80;
         if (fScore === '50-79') return sc >= 50 && sc < 80;
         if (fScore === '<50') return sc < 50;
@@ -2337,7 +2351,9 @@
         const bR = statusRank[b.evalRes.status] || 5;
         diff = aR - bR;
       } else if (col === 'score') {
-        diff = (Number(a.evalRes.totalScore) || 0) - (Number(b.evalRes.totalScore) || 0);
+        const scA = getStaffLiveScore(a);
+        const scB = getStaffLiveScore(b);
+        diff = (scA != null ? Number(scA) : -1) - (scB != null ? Number(scB) : -1);
       } else if (col === 'managerStatus') {
         diff = (a.evalRes.managerStatus || '').localeCompare(b.evalRes.managerStatus || '');
       }
@@ -2367,7 +2383,7 @@
       r.district || '',
       r.manager || '',
       r.evalRes.statusLabel || '',
-      r.evalRes.totalScore != null ? r.evalRes.totalScore : '',
+      getStaffLiveScore(r) != null ? getStaffLiveScore(r) : '',
       r.evalRes.managerStatus || '',
       r.evalRes.managerRemark || ''
     ]);
@@ -2408,11 +2424,7 @@
       const empName = r.staff.Name || 'Staff Member';
       const role = r.role || 'Field Staff';
       const mgr = r.manager || 'Leadership';
-      const rawScore = (empId && liveScoreCache[empId] != null)
-        ? liveScoreCache[empId]
-        : (r.staff && r.staff.id && liveScoreCache[r.staff.id] != null
-            ? liveScoreCache[r.staff.id]
-            : (r.evalRes && r.evalRes.totalScore != null ? r.evalRes.totalScore : null));
+      const rawScore = getStaffLiveScore(r);
       const isUnassigned = r.evalRes && r.evalRes.status === 'unassigned';
       const hasScore = !isUnassigned && rawScore != null && rawScore !== '';
       const scoreNum = hasScore ? (typeof rawScore === 'number' ? rawScore : Number(rawScore)) : 0;
@@ -2462,7 +2474,7 @@
 
           <!-- 7. Goal Score (/ 100) with progress bar -->
           <td>
-            <div style="display:flex; flex-direction:column; gap:3px; width:100%;" id="tp-prog-score-cell-${esc(empId)}">
+            <div style="display:flex; flex-direction:column; gap:3px; width:100%;" id="tp-prog-score-cell-${esc(empId)}" data-score-cell-id="${esc(empId)}" data-score-cell-alt="${esc(r.evalRes && r.evalRes.empId ? r.evalRes.empId : '')}">
               ${hasScore ? `
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; font-weight:700;">
                   <span style="color:${scoreColor}; font-weight:800;">${scoreDisplay}/100</span>
@@ -2474,7 +2486,7 @@
               ` : `
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; font-weight:600; color:var(--tp-ink-muted, #94A3B8);">
                   <span>— / 100</span>
-                  <span style="font-size:9.5px; font-style:italic;">Pending</span>
+                  <span style="font-size:9.5px; font-style:italic;">—</span>
                 </div>
                 <div class="tp-score-bar-track">
                   <div class="tp-score-bar-fill" style="width:0%; background:#CBD5E1;"></div>
