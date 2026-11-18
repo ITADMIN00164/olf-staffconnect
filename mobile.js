@@ -217,7 +217,11 @@
 
   function navSource() {
     return Array.prototype.filter.call(document.querySelectorAll("#appSidebar .sidebar-nav .nav-item[data-page]"), function (b) {
-      return !b.hidden && !b.closest("[hidden]");
+      // Pages that are switched off for people (closed to everyone but IT Admin) are not offered on a phone,
+      // and neither is anything the side menu itself does not show.
+      if (b.hidden || b.closest("[hidden]")) return false;
+      if (b.classList.contains("nav-item--locked-hidden") || b.classList.contains("nav-item--locked") || b.classList.contains("nav-item--locked-admin")) return false;
+      return getComputedStyle(b).display !== "none";
     });
   }
 
