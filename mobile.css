@@ -312,3 +312,52 @@
   .award-page .stock-controls { gap: 10px !important; }
   .award-page .stock-controls .btn, .award-page .stock-controls button { min-height: 44px; }
 }
+
+/* ==========================================================================
+   Bottom navigation on a phone: replaces the side menu
+   ========================================================================== */
+.m-nav { display: none; }
+
+@media (max-width: 768px) {
+  #appSidebar, .sidebar-edge, .tb-menu-btn, #tbMenuBtn { display: none !important; }
+  .app-body.sb-auto::after { display: none !important; }
+  .app-body > .content-area { margin-left: 0 !important; }
+  .content-area { padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px)) !important; }
+
+  #appShell.visible .m-nav {
+    display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 800;
+    padding: 8px 0 calc(8px + env(safe-area-inset-bottom, 0px));
+    background: color-mix(in srgb, var(--surface, #fff) 90%, transparent);
+    -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%);
+    border-top: 1px solid var(--hairline, rgba(15,23,42,.1)); box-shadow: 0 -8px 24px rgba(15,23,42,.08);
+  }
+  /* a soft fade on the side that has more icons */
+  .m-nav::before, .m-nav::after { content: ""; position: absolute; top: 0; bottom: 0; width: 26px; z-index: 2; pointer-events: none; opacity: 0; transition: opacity .2s ease; }
+  .m-nav::before { left: 0; background: linear-gradient(90deg, var(--surface, #fff), transparent); }
+  .m-nav::after { right: 0; background: linear-gradient(270deg, var(--surface, #fff), transparent); }
+  .m-nav.can-left::before, .m-nav.can-right::after { opacity: 1; }
+
+  .m-nav-scroll { display: flex; gap: 6px; padding: 0 14px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity; }
+  .m-nav-scroll::-webkit-scrollbar { display: none; }
+  .m-nav-item {
+    flex: none; display: flex; align-items: center; height: 48px; min-width: 48px; padding: 0 10px; border: 0; border-radius: 16px;
+    background: transparent; color: var(--text, #0F172A); cursor: pointer; scroll-snap-align: center; -webkit-tap-highlight-color: transparent;
+    transition: background .22s ease, padding .25s ease, transform .12s ease;
+  }
+  .m-nav-item:active { transform: scale(.92); }
+  .m-nav-item:focus-visible { outline: 2px solid var(--pg, #2F6FE4); outline-offset: 2px; }
+  .m-nav-ico { width: 28px; height: 28px; display: grid; place-items: center; flex: none; }
+  .m-nav-ico svg { width: 28px; height: 28px; display: block; }
+  .m-nav-label {
+    max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap; margin-left: 0; font-size: 13.5px; font-weight: 800; letter-spacing: -.1px;
+    color: var(--pg, #2F6FE4); transition: max-width .3s ease, opacity .2s ease, margin .3s ease;
+  }
+  .m-nav-item.is-active { background: color-mix(in srgb, var(--pg, #2F6FE4) 16%, transparent); padding-right: 15px; }
+  .m-nav-item.is-active .m-nav-label { max-width: 150px; opacity: 1; margin-left: 8px; }
+  .m-nav-item.is-locked { opacity: .5; }
+
+  /* things that sit at the bottom of the screen move up out of the bar's way */
+  #appShell.visible ~ .olf-install { bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important; }
+  #appShell.visible ~ #toastContainer { bottom: 90px; }
+}
+@media (prefers-reduced-motion: reduce) { .m-nav-item, .m-nav-label { transition: none; } }
