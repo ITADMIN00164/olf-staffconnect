@@ -448,3 +448,35 @@
   html[data-theme="dark"] .m-nav-item { color: #E8ECF2; }
   html[data-theme="dark"] .m-nav-track { background: rgba(255,255,255,.14); }
 }
+
+/* ==========================================================================
+   Smooth on a phone: gentle page changes, a gliding bottom-bar pill, a header
+   shadow while scrolled, quiet scrollbars, and a light press on what you tap.
+   ========================================================================== */
+@media (max-width: 768px) {
+  .content-area { overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; scrollbar-width: none; scroll-behavior: smooth; }
+  .content-area::-webkit-scrollbar { display: none; }
+  #appShell button, #appShell a, #appShell [role="button"] { -webkit-tap-highlight-color: transparent; }
+
+  html[data-theme] #appShell .topbar { transition: box-shadow .25s ease, margin-top .3s cubic-bezier(.2,.8,.2,1), opacity .22s ease !important; }
+  html[data-theme] #appShell .topbar.m-scrolled { box-shadow: 0 6px 18px -8px rgba(15,23,42,.28) !important; }
+  html[data-theme="dark"] #appShell .topbar.m-scrolled { box-shadow: 0 6px 18px -8px rgba(0,0,0,.7) !important; }
+
+  /* the pill grows and the label slides in, instead of snapping */
+  .m-nav-item { transition: background-color .32s cubic-bezier(.22,1,.36,1), padding .32s cubic-bezier(.22,1,.36,1), transform .15s ease !important; }
+  .m-nav-label { transition: max-width .36s cubic-bezier(.22,1,.36,1), opacity .24s ease .06s, margin .36s cubic-bezier(.22,1,.36,1) !important; }
+  .m-nav-item .m-nav-ico { transition: transform .32s cubic-bezier(.34,1.56,.64,1); }
+  .m-nav-item.is-active .m-nav-ico { transform: scale(1.08); }
+
+  /* a light press on cards and rows */
+  .upcoming-card, .m-list tbody tr.req-row, .employees-page tbody tr, #stock-table tbody tr.is-tellable, .pg-stat, .news-card {
+    transition: transform .14s ease, box-shadow .2s ease;
+  }
+  .upcoming-card:active, .m-list tbody tr.req-row:active, .employees-page tbody tr:active, #stock-table tbody tr.is-tellable:active, .news-card:active {
+    transform: scale(.985);
+  }
+}
+@media (max-width: 768px) and (prefers-reduced-motion: no-preference) {
+  .content-area.m-page-in > * { animation: m-page-in .38s cubic-bezier(.22,1,.36,1) both; }
+  @keyframes m-page-in { from { opacity: 0; transform: translateY(12px); } }
+}

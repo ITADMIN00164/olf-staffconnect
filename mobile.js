@@ -300,11 +300,24 @@
     NAV_FIRST.forEach(function (p) { items.forEach(function (b) { if (b.getAttribute("data-page") === p) order.push(b); }); });
     items.forEach(function (b) { if (order.indexOf(b) < 0) order.push(b); });
 
-    // Rebuild only when something it shows has changed.
+    // Rebuild only when the set of pages has changed. When only the page you are on changes,
+    // the same buttons stay and just swap their state, so the pill glides across smoothly.
     var sig = order.map(function (b) {
-      return b.getAttribute("data-page") + (b.classList.contains("active") ? "!" : "") + (b.classList.contains("nav-item--locked-admin") ? "L" : "");
+      return b.getAttribute("data-page") + (b.classList.contains("nav-item--locked-admin") ? "L" : "");
     }).join("|");
-    if (sig === navSig) return;
+    var activeNow = "";
+    order.forEach(function (b) { if (b.classList.contains("active")) activeNow = b.getAttribute("data-page"); });
+    if (sig === navSig) {
+      var moved = false;
+      Array.prototype.forEach.call(navScroll.querySelectorAll(".m-nav-item"), function (el) {
+        var on = el.getAttribute("data-page") === activeNow;
+        if (on !== el.classList.contains("is-active")) moved = true;
+        el.classList.toggle("is-active", on);
+        if (on) el.setAttribute("aria-current", "page"); else el.removeAttribute("aria-current");
+      });
+      if (moved) centreActive();
+      return;
+    }
     navSig = sig;
 
     navScroll.innerHTML = order.map(function (b) {
@@ -320,16 +333,19 @@
         '<span class="m-nav-label">' + esc(label) + "</span></button>";
     }).join("");
 
-    var on = navScroll.querySelector(".is-active");
-    if (on) {
-      // Bring the page you are on into view, in the middle of the bar.
-      setTimeout(function () {
-        var left = on.offsetLeft - (navScroll.clientWidth - on.offsetWidth) / 2;
-        navScroll.scrollTo({ left: Math.max(0, left), behavior: "smooth" });
-      }, 60);
-    }
+    centreActive();
     setTimeout(paintNavEdges, 120);
     setTimeout(nudgeNav, 400);
+  }
+
+  // Bring the page you are on into view, in the middle of the bar (after its pill has grown).
+  function centreActive() {
+    setTimeout(function () {
+      var on = navScroll && navScroll.querySelector(".is-active");
+      if (!on) return;
+      var left = on.offsetLeft - (navScroll.clientWidth - on.offsetWidth) / 2;
+      navScroll.scrollTo({ left: Math.max(0, left), behavior: "smooth" });
+    }, 180);
   }
 
   function watchSideMenu() {
@@ -355,8 +371,34 @@
     next.click();
   }, true);
 
+  /* ------------------------------------------------ 5. smooth pages
+     On a phone a new page fades in from just below and starts at the top; the
+     header gets a soft shadow once the page has scrolled under it. */
+  var smoothPagesOn = false;
+  function smoothPages() {
+    if (smoothPagesOn) return;
+    var area = document.getElementById("pageContent");
+    var bar = document.querySelector("#appShell .topbar");
+    if (!area || !bar) return;
+    smoothPagesOn = true;
+    new MutationObserver(function (list) {
+      if (!MQ || !MQ.matches) return;
+      var swapped = list.some(function (m) { return m.addedNodes.length && m.target === area; });
+      if (!swapped) return;
+      area.style.scrollBehavior = "auto";       // jump to the top, no long scroll up
+      area.scrollTop = 0;
+      area.style.scrollBehavior = "";
+      area.classList.remove("m-page-in");
+      void area.offsetWidth;                     // restart the animation
+      area.classList.add("m-page-in");
+    }).observe(area, { childList: true });
+    area.addEventListener("scroll", function () {
+      bar.classList.toggle("m-scrolled", area.scrollTop > 6);
+    }, { passive: true });
+  }
+
   /* ------------------------------------------------ keeping up with the page */
-  function run() { pending = false; labelLists(); filterToggles(); detailCards(); wrapWide(); watchSideMenu(); buildBottomNav(); }
+  function run() { pending = false; labelLists(); filterToggles(); detailCards(); wrapWide(); watchSideMenu(); buildBottomNav(); smoothPages(); }
   function schedule() {
     if (pending) return;
     pending = true;
