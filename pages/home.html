@@ -448,6 +448,33 @@ html[data-theme="dark"] .hm .upcoming-card { border-color: var(--hairline); box-
     .hm-fog .f3 { animation: hm-fog 12s ease-in-out infinite alternate; }
     @keyframes hm-fog { to { transform: translateX(-14px); } }
 }
+/* ── Phone (Home only) ─────────────────────────────────────────
+   The figures strip put its title beside a window only wide enough for half a
+   figure. On a phone the title takes its own row and the figures roll across
+   the full width beneath it. */
+@media (max-width: 640px) {
+    .hm-hero { padding: 18px 18px !important; margin-bottom: 14px; }
+    .hm-sky { opacity: .38; right: -14px; }
+
+    .hm-facts { flex-direction: column; align-items: stretch; min-height: 0; margin-bottom: 16px; border-radius: 16px; }
+    .hm-facts-lead { align-self: auto; padding: 10px 14px; border-right: 0; border-bottom: 1px solid rgba(15,23,42,.07); }
+    .hm-facts-title { flex-direction: row; align-items: baseline; gap: 8px; }
+    .hm-facts-title small { display: inline; font-size: 11px; }
+    .hm-facts-track { padding: 12px 0 12px 14px; }
+    .hm-fact b { font-size: 20px; }
+
+    .hm-section { margin-bottom: 18px; }
+    .hm-head { margin-bottom: 10px; }
+    .hm .upcoming-card { padding: 12px 14px 12px 16px; gap: 12px; }
+    .hm .upcoming-when { flex: 0 0 48px; }
+    .hm .upcoming-title { white-space: normal; }
+
+    .hm .news-section { padding: 14px 14px 16px; }
+    .hm .news-section .news-empty-state { padding: 16px 10px 12px; }
+    .hm .hm-empty-ico { width: 52px; height: 52px; border-radius: 16px; }
+    .hm .hm-empty-ico .hm-i { width: 26px; height: 26px; }
+}
+html[data-theme="dark"] .hm-facts-lead { border-bottom-color: var(--hairline); }
 </style>
 
 <!-- Local Live Server adds its reload script at the closing body tag; this gives it a safe place. -->
