@@ -394,9 +394,7 @@
 @media (max-width: 768px) {
   html[data-theme] #appShell .topbar {
     height: calc(58px + env(safe-area-inset-top, 0px)) !important; padding: env(safe-area-inset-top, 0px) 12px 0 14px !important; gap: 10px !important;
-    background: color-mix(in srgb, var(--surface, #fff) 88%, transparent) !important;
-    -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%);
-    border-bottom: 1px solid var(--hairline, rgba(15,23,42,.08)) !important; box-shadow: none !important; overflow: visible !important;
+    border-bottom: 1px solid var(--tb-line) !important; overflow: visible !important;
   }
   /* the app's mark in place of the slanted OLF block */
   html[data-theme] #appShell .topbar-logo {
@@ -410,19 +408,21 @@
   #appShell .tb-crumb-home, #appShell .tb-crumb-sep, #appShell .tb-crumb-ico { display: none !important; }
   #appShell .tb-crumb-page {
     min-width: 0; padding: 0 !important; background: none !important; border: 0 !important; box-shadow: none !important;
-    font-size: 19px; font-weight: 800; letter-spacing: -.5px; color: var(--text, #0F172A);
+    font-size: 19px; font-weight: 800; letter-spacing: -.5px; color: var(--tb-ink) !important;
   }
   #appShell .tp-group { gap: 6px !important; margin-left: auto; }
   /* the theme switch shows only the current choice; a tap moves to the next (mobile.js) */
-  #appShell .theme-switch { padding: 0 !important; background: none !important; box-shadow: none !important; }
+  html[data-theme] #appShell .theme-switch { padding: 0 !important; height: auto !important; background: none !important; border: 0 !important; box-shadow: none !important; }
+  html[data-theme] #appShell .theme-switch::before { display: none !important; }
   #appShell .theme-switch button:not([aria-checked="true"]) { display: none !important; }
-  #appShell .theme-switch button[aria-checked="true"] {
-    width: 38px; height: 38px; border-radius: 50%; color: var(--text, #0F172A);
-    background: var(--glass-strong, #fff); box-shadow: none; border: 1px solid var(--hairline, rgba(15,23,42,.1));
+  html[data-theme] #appShell .theme-switch button[aria-checked="true"] {
+    width: 38px !important; height: 38px !important; border-radius: 50% !important; color: #2F6FE4 !important;
+    background: var(--tb-card) !important; border: 1px solid var(--tb-line) !important; box-shadow: var(--tb-ctl-shadow) !important;
   }
+  html[data-theme="dark"] #appShell .theme-switch button[aria-checked="true"] { color: #8DB4FF !important; }
   #appShell .theme-switch button svg { width: 18px; height: 18px; }
-  html[data-theme] #appShell .tb-bell, html[data-theme] #appShell .topbar-profile, #appShell .tb-install { width: 38px; height: 38px; }
-  html[data-theme] #appShell .topbar-profile { padding: 0 !important; border-radius: 50%; justify-content: center; }
+  html[data-theme] #appShell .tb-bell, html[data-theme] #appShell .topbar-profile, html[data-theme] #appShell .tb-install { width: 38px !important; height: 38px !important; border-radius: 50% !important; }
+  html[data-theme] #appShell .topbar-profile { padding: 0 !important; margin-left: 0 !important; justify-content: center; }
 
   /* a floating bottom bar */
   #appShell.visible .m-nav {
@@ -434,4 +434,17 @@
   .m-nav-track { margin: 6px 24px 0 !important; }
   .content-area { padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px)) !important; }
   #appShell.visible ~ .olf-install { bottom: calc(104px + env(safe-area-inset-bottom, 0px)) !important; }
+}
+
+/* Bottom bar colours that follow the theme (light and dark) */
+@media (max-width: 768px) {
+  #appShell.visible .m-nav { background: rgba(255,255,255,.92) !important; }
+  html[data-theme="dark"] #appShell.visible .m-nav { background: rgba(24,30,40,.94) !important; border-color: rgba(255,255,255,.08) !important; box-shadow: 0 14px 34px rgba(0,0,0,.5) !important; }
+  .m-nav-arrow--l { background: linear-gradient(90deg, rgba(255,255,255,.96) 55%, transparent) !important; }
+  .m-nav-arrow--r { background: linear-gradient(270deg, rgba(255,255,255,.96) 55%, transparent) !important; }
+  html[data-theme="dark"] .m-nav-arrow--l { background: linear-gradient(90deg, rgba(24,30,40,.98) 55%, transparent) !important; }
+  html[data-theme="dark"] .m-nav-arrow--r { background: linear-gradient(270deg, rgba(24,30,40,.98) 55%, transparent) !important; }
+  html[data-theme="dark"] .m-nav-arrow { color: #E8ECF2; }
+  html[data-theme="dark"] .m-nav-item { color: #E8ECF2; }
+  html[data-theme="dark"] .m-nav-track { background: rgba(255,255,255,.14); }
 }
