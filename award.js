@@ -801,7 +801,7 @@ window.AWARD_CONFIG = {
      Data Dashboard, chosen with the small tabs under it. */
   var utilView = "award";
   var eventSub = "event";        // Events: "event" = Utilisations, "evdash" = Dashboard
-  var currentTop = "util";       // the top tab on screen, for the page-wide Refresh data button
+  var currentTop = "event";      // the top tab on screen, for the page-wide Refresh data button
 
   function showTopView(which) {
     currentTop = which;
@@ -1861,8 +1861,8 @@ window.AWARD_CONFIG = {
       }
     );
 
-    // The Test tab opens on its first tab, Award Utilisation.
-    showTopView("util");
+    // The page opens on its first tab, Events.
+    showTopView("event");
 
     var refreshAll = document.getElementById("aw-refresh-all");
     if (refreshAll) refreshAll.addEventListener("click", runRefreshAll);
