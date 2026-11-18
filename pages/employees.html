@@ -1288,6 +1288,83 @@ html[data-theme="dark"] .employees-page { --row-hover: #283042; --row-line: rgba
     @keyframes org-in { from { opacity: 0; transform: translateY(10px); } }
 }
 @media (prefers-reduced-motion: reduce) { .org-node, .org-node:hover, .org-av, .org-toggle { transition: none; animation: none; } }
+/* ── Phone (Employees only) ────────────────────────────────────
+   The toolbar's "grow to 360px" turned into 360px of height once the toolbar stacked,
+   which left the big gaps. The table becomes one card per person, each line
+   labelled, instead of a wide table you scroll sideways. */
+@media (max-width: 640px) {
+    .employees-page .pg-stats { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px; margin-bottom: 12px; }
+    .employees-page .pg-stat { padding: 10px 12px; gap: 10px; }
+    .employees-page .pg-stat-icon { width: 36px; height: 36px; border-radius: 11px; flex: none; }
+    .employees-page .pg-stat-icon svg { width: 22px; height: 22px; }
+    .employees-page .pg-stat-value { font-size: 20px; }
+    .employees-page .pg-stat-label { font-size: 11px; }
+    .employees-page .pg-stat::after { display: none; }
+
+    .employees-page .card { padding: 12px; border-radius: 18px; }
+    .employees-page .table-toolbar { flex-direction: column; align-items: stretch; gap: 10px; margin-bottom: 10px; }
+    .employees-page .toolbar-left { flex: 0 0 auto; width: 100%; gap: 8px; flex-wrap: nowrap; }
+    .employees-page .search-wrap { flex: 1 1 auto; min-width: 0; max-width: none; }
+    .employees-page .btn-filters { flex: none; padding: 0 14px; }
+    .employees-page .toolbar-right { flex: 0 0 auto; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .employees-page .btn-excel { padding: 0 14px; }
+
+    /* a slim list: a person is their name and ID; tapping opens the full record */
+    .employees-page .table-wrap { max-height: none !important; overflow: visible; border: 0; border-radius: 0; background: none; }
+    .employees-page table, .employees-page tbody { display: block; width: 100%; }
+    .employees-page thead { display: none; }
+    .employees-page tbody tr {
+        position: relative; display: flex; align-items: center; gap: 10px; margin: 0 0 8px; padding: 11px 14px;
+        border: 1px solid var(--row-line); border-radius: 14px; background: var(--glass-strong); box-shadow: var(--shadow-sm);
+        cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform .12s ease, background .15s ease;
+    }
+    .employees-page tbody tr:active { transform: scale(.985); background: var(--row-hover); }
+    .employees-page tbody tr::after {
+        content: ""; flex: none; order: 3; width: 8px; height: 8px; margin-left: 2px; border-right: 2px solid var(--text-faint, #94A3B8);
+        border-top: 2px solid var(--text-faint, #94A3B8); transform: rotate(45deg);
+    }
+    .employees-page tbody tr.row-inactive { opacity: .66; }
+    .employees-page tbody td { display: none !important; padding: 0 !important; border: 0 !important; }
+    .employees-page tbody td.col-name { display: block !important; flex: 1 1 auto; min-width: 0; font-size: 15px; font-weight: 700; }
+    .employees-page tbody td.col-name .emp-person { min-width: 0; }
+    .employees-page tbody td.col-id { display: block !important; flex: none; order: 2; }
+    .employees-page tbody td.col-id .emp-id { font-size: 11.5px; }
+    .employees-page tbody td[colspan] { display: block !important; width: 100%; }
+    .employees-page tbody tr:has(td[colspan]) { cursor: default; }
+    .employees-page tbody tr:has(td[colspan])::after { display: none; }
+    .employees-page tbody td .empty-state { width: 100%; text-align: center; }
+}
+
+/* The full record, as a sheet that slides up from the bottom (built by app.js on a phone). */
+.emp-sheet-overlay {
+    position: fixed; inset: 0; z-index: 2000; display: flex; align-items: flex-end; justify-content: center;
+    background: rgba(15,23,42,.5); animation: emp-sheet-fade .2s ease;
+}
+.emp-sheet {
+    width: 100%; max-width: 560px; max-height: 88dvh; display: flex; flex-direction: column;
+    background: var(--surface, #fff); color: var(--text, #0F172A); border-radius: 22px 22px 0 0;
+    box-shadow: 0 -12px 40px rgba(15,23,42,.25); animation: emp-sheet-up .28s cubic-bezier(.22,1,.36,1);
+    padding-bottom: env(safe-area-inset-bottom, 0);
+}
+@keyframes emp-sheet-up { from { transform: translateY(100%); } }
+@keyframes emp-sheet-fade { from { opacity: 0; } }
+.emp-sheet-grab { width: 40px; height: 4px; margin: 9px auto 2px; border-radius: 4px; background: rgba(100,116,139,.4); }
+.emp-sheet-head { display: flex; align-items: center; gap: 12px; padding: 10px 16px 12px; border-bottom: 1px solid rgba(100,116,139,.2); }
+.emp-sheet-av { width: 44px; height: 44px; flex: none; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 15px; color: #fff; background: linear-gradient(135deg, #4F8EF7, #7B5EA7); }
+.emp-sheet-title { flex: 1; min-width: 0; }
+.emp-sheet-name { font-size: 17px; font-weight: 800; letter-spacing: -.2px; line-height: 1.25; overflow-wrap: anywhere; }
+.emp-sheet-id { margin-top: 2px; font-family: var(--font-mono, monospace); font-size: 12px; color: var(--text-soft, #64748B); }
+.emp-sheet-x { width: 38px; height: 38px; flex: none; border: 0; border-radius: 50%; font-size: 16px; cursor: pointer; background: rgba(100,116,139,.14); color: inherit; }
+.emp-sheet-body { overflow-y: auto; padding: 4px 16px 8px; -webkit-overflow-scrolling: touch; }
+.emp-sheet-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 11px 0; border-bottom: 1px dashed rgba(100,116,139,.25); font-size: 14.5px; }
+.emp-sheet-row:last-child { border-bottom: 0; }
+.emp-sheet-row > span { flex: 0 0 36%; font-size: 10.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--text-soft, #64748B); padding-top: 3px; }
+.emp-sheet-row > div { flex: 1; min-width: 0; text-align: right; overflow-wrap: anywhere; }
+.emp-sheet-actions { display: flex; gap: 10px; padding: 12px 16px 16px; border-top: 1px solid rgba(100,116,139,.2); }
+.emp-sheet-actions button { flex: 1; min-height: 44px; border-radius: 12px; border: 1px solid rgba(100,116,139,.3); font: inherit; font-weight: 700; cursor: pointer; background: transparent; color: inherit; }
+.emp-sheet-actions .is-danger { color: #DC2626; border-color: rgba(220,38,38,.4); }
+@media (prefers-reduced-motion: reduce) { .emp-sheet, .emp-sheet-overlay { animation: none; } }
+
 </style>
 
 <!-- Local Live Server adds its reload script at the closing body tag; this gives it a safe place. -->

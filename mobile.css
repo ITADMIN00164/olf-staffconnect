@@ -1,0 +1,314 @@
+/* ==========================================================================
+   Phone layer - loaded last. Everything here is inside a max-width query, so
+   laptops and desktops are not touched. Pages inject their own <style> after
+   this file loads, which is why the rules below use !important: they must win
+   over a page rule of the same weight that comes later in the page.
+   ========================================================================== */
+
+@media (max-width: 768px) {
+
+  /* ---- the page itself ------------------------------------------------ */
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  body { overflow-x: hidden; }
+  .content-area { padding: 12px 12px 28px !important; }
+  .content-area img, .content-area video, .content-area canvas { max-width: 100%; }
+
+  /* Inputs at 16px: below that, iPhones zoom the page when a field is tapped. */
+  .content-area input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  .content-area select,
+  .content-area textarea,
+  .modal-box input, .modal-box select, .modal-box textarea { font-size: 16px !important; }
+
+  /* A fingertip is wider than a cursor: buttons and fields are at least 40px tall. */
+  .content-area .btn, .content-area .pg-btn,
+  .content-area button.btn-primary, .content-area button.btn-ghost,
+  .content-area select, .content-area input[type="text"], .content-area input[type="search"],
+  .content-area input[type="email"], .content-area input[type="number"],
+  .content-area input[type="date"], .content-area input[type="tel"] { min-height: 40px; }
+
+  /* The banner every page starts with. */
+  .pg-hero { padding: 20px 18px !important; border-radius: 20px !important; gap: 14px; }
+  .pg-hero-title { font-size: 24px !important; letter-spacing: -.6px !important; }
+  .pg-hero-actions { width: 100%; }
+  .pg-hero-actions > * { flex: 1 1 auto; justify-content: center; }
+
+  /* ---- dialogs: nearly the full screen, never wider than it ----------- */
+  .modal-box, .app-msg-box, .signin-card,
+  .org-person-box,
+  .award-page .aw-box-sm,
+  .awm-view .pom-confirm-box, .awm-view .pom-modal-box, .awm-view .pom-prompt-box,
+  .awm-view .awm-edit-box, .awm-view .awa-box,
+  .pom-confirm-box, .pom-modal-box, .pom-prompt-box,
+  #grPage .gr-modal-box, #grPage .gr-modal-box--sm, #grPage .gr-busy-box,
+  .tp-card-root {
+    width: calc(100vw - 20px) !important; max-width: calc(100vw - 20px) !important;
+    max-height: calc(100dvh - 20px); overflow-y: auto;
+  }
+
+  /* ---- two-up form rows become one column ----------------------------- */
+  .form-row, .pr-addform, #pcal-app .pcal-grid2, #pcal-app .pcal-rem-grid, #pcal-app .pcal-jump,
+  #pcal-app .form-row, #pcal-app .form-row.thirds, #pcal-app .settings-grid, #pcal-app .pcal-bulk-grid,
+  #grPage .gr-form-grid, .awm-view .awm-edit-grid, .awm-view .awm-bulk-set, .awm-view .awm-bulk-grid {
+    grid-template-columns: 1fr !important;
+  }
+  #pcal-app .pcal-rem-row { grid-template-columns: 1fr !important; }
+
+  /* ---- cards and figure rows ----------------------------------------- */
+  .stats-row, .er-cards-row, .awm-view .awa-stats { grid-template-columns: 1fr !important; }
+  .tp-card-stats, #grPage .gr-sum-cards, .pr-bars { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  #grPage .gr-sx-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .pos-tgt-grid { grid-template-columns: 1fr !important; }
+  .erd-grid { grid-template-columns: 1fr !important; }
+
+  /* ---- Awards & Gifts: the lines inside the dialogs ------------------- */
+  /* A gift line stacks: the type, then what it is for, then how many with the remove button. */
+  .award-page .award-line { grid-template-columns: minmax(0, 1fr) 40px !important; grid-template-areas: "type type" "qty remove" !important; }
+  .award-page .award-line.has-category { grid-template-areas: "type type" "cat cat" "qty remove" !important; }
+  .award-page .award-line.has-other { grid-template-areas: "type type" "cat cat" "other other" "qty remove" !important; }
+  .award-page .award-line.is-gift-other { grid-template-areas: "type type" "other other" "qty remove" !important; }
+  .award-page .stock-line, .award-page #ho-lines .stock-line { grid-template-columns: minmax(0, 1fr) 118px !important; }
+  .award-page .lvl-row { grid-template-columns: 56px minmax(0, 1fr) 52px !important; }
+  .award-page #levels-modal .lvl-row, .award-page .lvls-head { grid-template-columns: 86px minmax(0, 1fr) 64px !important; }
+
+  /* ---- Smart Goals ---------------------------------------------------- */
+  #sg-app .tf-kv { grid-template-columns: 92px minmax(0, 1fr) !important; }
+
+  /* ---- Field Review: ranked lists keep their figures, lose the squeeze */
+  #grPage .gr-sx-trow { grid-template-columns: 62px minmax(0, 1fr) 40px !important; }
+  #grPage .gr-sx-arow { grid-template-columns: 72px minmax(0, 1fr) 36px !important; }
+  #grPage .gr-sx-urow { grid-template-columns: 24px minmax(0, 1fr) 64px !important; }
+  #grPage .gr-sx-urow > :nth-child(3) { display: none; }
+  #grPage .gr-sx-dlegend li { grid-template-columns: 10px minmax(0, 1fr) auto 36px !important; }
+  #grPage .gr-sx-oldest li { grid-template-columns: 18px minmax(0, 1fr) auto 32px !important; }
+  .tp-pm-col { min-width: 0 !important; }
+
+  /* ---- Organisation chart: the stacked team view fits the screen ------ */
+  .org-vrow .org-node, .org-vhead .org-node { width: auto !important; max-width: 100%; }
+
+  /* ---- Calendar: the month still shows seven days, so keep cells tidy - */
+  #pcal-app .cal-grid { gap: 2px; }
+  #pcal-app .cal-grid .cal-cell, #pcal-app .cal-grid > div { min-width: 0; overflow: hidden; }
+
+  /* ---- Tabs and chip rows scroll sideways instead of wrapping into a mess */
+  .aw-subtabs, .gr-tabs, .gr-an-tabs, .pom-tabs, .pos-top-tabs, .pos-subtabs, .nav-tabs, .dash-subtabs,
+  .tf-tabs, .tp-view-tabs, .tp-modal-tabs {
+    max-width: 100%; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .aw-subtabs::-webkit-scrollbar, .gr-tabs::-webkit-scrollbar, .gr-an-tabs::-webkit-scrollbar,
+  .pom-tabs::-webkit-scrollbar, .pos-top-tabs::-webkit-scrollbar, .pos-subtabs::-webkit-scrollbar,
+  .nav-tabs::-webkit-scrollbar, .dash-subtabs::-webkit-scrollbar, .tf-tabs::-webkit-scrollbar,
+  .tp-view-tabs::-webkit-scrollbar, .tp-modal-tabs::-webkit-scrollbar { display: none; }
+  .aw-subtabs > *, .gr-tabs > *, .gr-an-tabs > *, .pom-tabs > *, .pos-top-tabs > *, .pos-subtabs > *,
+  .nav-tabs > *, .dash-subtabs > *, .tf-tabs > *, .tp-view-tabs > *, .tp-modal-tabs > * { flex: none; white-space: nowrap; }
+
+  /* ---- Tables that are wider than the screen scroll inside their own box.
+     mobile.js wraps them; this is the box. */
+  .m-scroll { width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch;
+              border-radius: 12px; }
+  .m-scroll > table { margin: 0; }
+  .m-scroll::after { content: ""; display: block; height: 1px; }
+  .awe-view .pev-tbl { min-width: 760px !important; }
+  #grPage table.gr-table { min-width: 640px !important; }
+  #grPage table.gr-table--detailed { min-width: 820px !important; }
+  #grPage table.gr-an-table { min-width: 560px !important; }
+}
+
+/* A narrower phone: the two-up figures go single-file. */
+@media (max-width: 400px) {
+  .tp-card-stats, #grPage .gr-sum-cards, .pr-bars, #grPage .gr-sx-kpis { grid-template-columns: 1fr !important; }
+  .pg-hero-title { font-size: 22px !important; }
+}
+
+/* ==========================================================================
+   Slim lists on a phone (Requisitions, Head Office's queue)
+   Name, requester and status on the card; the rest in the sheet a tap opens.
+   ========================================================================== */
+@media (max-width: 640px) {
+  .table-scroll:has(.m-list) { overflow: visible !important; border: 0 !important; background: none !important; max-height: none !important; }
+  .m-list, .m-list tbody { display: block; width: 100%; min-width: 0 !important; }
+  .m-list thead, .m-list tfoot { display: none !important; }
+
+  .m-list tbody tr.req-row {
+    position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px;
+    margin: 0 0 10px; padding: 12px 34px 12px 15px; border-radius: 14px;
+    border: 1px solid var(--hairline, rgba(15,23,42,.1)); border-left: 5px solid var(--tone, #94A3B8);
+    background: var(--glass-strong, #fff); box-shadow: var(--shadow-sm, 0 1px 3px rgba(15,23,42,.08));
+    cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform .12s ease;
+  }
+  .m-list tbody tr.req-row:active { transform: scale(.985); }
+  .m-list tbody tr.req-row::after {
+    content: ""; position: absolute; right: 15px; top: 50%; width: 8px; height: 8px; margin-top: -4px;
+    border-right: 2px solid var(--text-faint, #94A3B8); border-top: 2px solid var(--text-faint, #94A3B8); transform: rotate(45deg);
+  }
+  .m-list tbody tr.req-row > td { display: none !important; padding: 0 !important; border: 0 !important; }
+  .m-list tbody tr.req-row > td[data-label="District"],
+  .m-list tbody tr.req-row > td[data-label="Requester"],
+  .m-list tbody tr.req-row > td[data-label="Status"] { display: block !important; }
+  .m-list tbody tr.req-row > td[data-label="District"] { font-size: 15.5px; font-weight: 800; letter-spacing: -.2px; color: var(--text); }
+  .m-list tbody tr.req-row > td[data-label="Requester"] { font-size: 13px; color: var(--text-soft); }
+  .m-list tbody tr.req-row > td[data-label="Status"] { order: 3; margin-top: 6px; }
+  /* what is waiting for you shows as a flag across the top of the card */
+  .m-list tbody tr.req-row > td[data-label="State"]:has(.act-flag) { display: block !important; order: -1; margin-bottom: 4px; }
+  .m-list tbody tr.req-row > td[data-label="State"] .state-code { display: none; }
+  .m-list tbody tr.req-row.needs-me { background: color-mix(in srgb, var(--warn, #F59E0B) 8%, var(--glass-strong, #fff)); }
+
+  .m-list tbody tr.placeholder-row { display: block; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; cursor: default; }
+  .m-list tbody tr.placeholder-row::after { display: none; }
+  .m-list tbody tr.placeholder-row > td { display: block !important; width: 100%; padding: 22px 10px !important; text-align: center; }
+
+  /* an empty-table message sits at the left edge of the box, where it can be read */
+  .pom-msg { text-align: left !important; padding-left: 14px !important; }
+
+  /* the first column of a table that scrolls sideways stays in view */
+  .m-scroll table th:first-child, .m-scroll table td:first-child {
+    position: sticky; left: 0; z-index: 2; background: var(--surface, #fff); box-shadow: 1px 0 0 rgba(100,116,139,.2);
+  }
+  .m-scroll table thead th:first-child { z-index: 4; }
+}
+
+/* The sheet a tap on a slim row opens (built by mobile.js) */
+.m-sheet-overlay { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(15,23,42,.5); animation: m-sheet-fade .2s ease; }
+.m-sheet { width: 100%; max-width: 560px; max-height: 88dvh; display: flex; flex-direction: column;
+  background: var(--surface, #fff); color: var(--text, #0F172A); border-radius: 22px 22px 0 0;
+  box-shadow: 0 -12px 40px rgba(15,23,42,.25); animation: m-sheet-up .28s cubic-bezier(.22,1,.36,1);
+  padding-bottom: env(safe-area-inset-bottom, 0); }
+@keyframes m-sheet-up { from { transform: translateY(100%); } }
+@keyframes m-sheet-fade { from { opacity: 0; } }
+.m-sheet-grab { width: 40px; height: 4px; margin: 9px auto 2px; border-radius: 4px; background: rgba(100,116,139,.4); }
+.m-sheet-head { display: flex; align-items: flex-start; gap: 12px; padding: 10px 16px 12px; border-bottom: 1px solid rgba(100,116,139,.2); }
+.m-sheet-title { flex: 1; min-width: 0; }
+.m-sheet-name { font-size: 18px; font-weight: 800; letter-spacing: -.2px; line-height: 1.25; overflow-wrap: anywhere; }
+.m-sheet-sub { margin-top: 2px; font-size: 13.5px; color: var(--text-soft, #64748B); }
+.m-sheet-chip { margin-top: 8px; }
+.m-sheet-x { width: 38px; height: 38px; flex: none; border: 0; border-radius: 50%; font-size: 16px; cursor: pointer; background: rgba(100,116,139,.14); color: inherit; }
+.m-sheet-body { overflow-y: auto; padding: 4px 16px 18px; -webkit-overflow-scrolling: touch; }
+.m-sheet-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 11px 0; border-bottom: 1px dashed rgba(100,116,139,.25); font-size: 14.5px; }
+.m-sheet-row:last-child { border-bottom: 0; }
+.m-sheet-row > span { flex: 0 0 34%; font-size: 10.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--text-soft, #64748B); padding-top: 3px; }
+.m-sheet-row > div { flex: 1; min-width: 0; text-align: right; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { .m-sheet, .m-sheet-overlay { animation: none; } }
+
+/* ==========================================================================
+   Awards & Gifts on a phone
+   ========================================================================== */
+.m-filter-btn { display: none; }
+
+@media (max-width: 640px) {
+  /* The banner: a title row, one icon button, the tabs - no strap line. */
+  .award-page #awHero { padding: 14px 14px 12px !important; border-radius: 18px !important; gap: 10px !important; position: relative; }
+  .award-page #awHero .pg-hero-sub { display: none !important; }
+  .award-page #awHero .pg-hero-lead { gap: 12px !important; padding-right: 50px; }
+  .award-page #awHero .pg-hero-ico { width: 40px !important; height: 40px !important; border-radius: 13px !important; flex: none; }
+  .award-page #awHero .pg-hero-ico svg { width: 26px !important; height: 26px !important; }
+  .award-page #awHero .pg-hero-title { font-size: 20px !important; margin: 0 !important; }
+  .award-page #awHero .aw-refresh-all {
+    position: absolute; top: 12px; right: 12px; width: 40px; height: 40px; min-height: 0; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center; border-radius: 12px;
+  }
+  .award-page #awHero .aw-refresh-all > *:not(i) { display: none !important; }
+  .award-page #awHero .aw-top-right { width: 100%; gap: 8px; }
+  .award-page #awHero .aw-top-actions { width: 100%; display: flex; gap: 8px; padding-bottom: 0; }
+  .award-page #awHero .aw-top-actions > .btn { flex: 1 1 0; justify-content: center; }
+  .award-page #awHero .aw-hero-nav { gap: 8px; }
+
+  /* Figures: two across, the odd one out takes the full width. */
+  .award-page .pg-stats { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
+  .award-page .pg-stats > *:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .award-page .pg-stat { padding: 12px !important; gap: 10px !important; }
+  .award-page .pg-stat::after { display: none !important; }
+  .award-page .pg-stat-icon { width: 38px !important; height: 38px !important; flex: none; }
+  .award-page .pg-stat-value { font-size: 22px !important; }
+
+  /* Event and Awards filter bars: pairs of fields, not a tall stack. */
+  .award-page .pev-toolbar { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 8px !important; padding: 12px !important; align-items: stretch; }
+  .award-page .pev-toolbar > * { min-width: 0; width: 100% !important; max-width: none !important; margin: 0 !important; }
+  .award-page .pev-toolbar #aweDistrict, .award-page .pev-toolbar #aweBlock,
+  .award-page .pev-toolbar .pev-hint, .award-page .pev-toolbar .aed-export { grid-column: 1 / -1; }
+  .award-page .pev-toolbar .pev-hint:empty { display: none; }
+
+  /* Requisitions: the filters sit behind one button. */
+  .award-page .m-filter-btn {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 46px;
+    padding: 0 14px; margin: 0 0 10px; border-radius: 14px; font: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer;
+    color: var(--text); background: var(--glass-strong, #fff); border: 1px solid var(--hairline, rgba(15,23,42,.12));
+    box-shadow: var(--shadow-sm, 0 1px 3px rgba(15,23,42,.08));
+  }
+  .award-page .m-filter-btn .m-fb-count { margin-left: 8px; min-width: 22px; padding: 1px 8px; border-radius: 99px; font-size: 12px; background: var(--accent, #2F6FE4); color: #fff; }
+  .award-page .m-filter-btn .m-fb-count[hidden] { display: none; }
+  .award-page .m-filter-btn .m-fb-caret { width: 10px; height: 10px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform .2s ease; margin-top: -4px; }
+  .award-page .m-filter-btn[aria-expanded="true"] .m-fb-caret { transform: rotate(225deg); margin-top: 4px; }
+  .award-page .filters.m-collapsed { display: none !important; }
+  .award-page .filters { padding: 12px !important; gap: 10px !important; }
+
+  /* Gift inventory: a list of months per district; tap a month for its figures. */
+  .award-page #stock-table-wrap { overflow: visible !important; max-height: none !important; border: 0 !important; background: none !important; }
+  .award-page .stock-howto { display: none !important; }
+  .award-page #stock-table, .award-page #stock-table tbody { display: block; width: 100%; min-width: 0 !important; }
+  .award-page #stock-table thead { display: none !important; }
+  .award-page #stock-table tr.district-band { display: block; margin: 14px 0 8px; background: none; border: 0; box-shadow: none; }
+  .award-page #stock-table tr.district-band > td { display: block; padding: 0 !important; border: 0 !important; background: none !important; }
+  .award-page #stock-table tbody tr:not(.district-band) {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 10px;
+    margin: 0 0 6px; padding: 10px 14px; border-radius: 12px; background: var(--glass-strong, #fff);
+    border: 1px solid var(--hairline, rgba(15,23,42,.1));
+  }
+  .award-page #stock-table tbody tr:not(.district-band) > td { display: none !important; padding: 0 !important; border: 0 !important; }
+  .award-page #stock-table tbody tr:not(.district-band) > td.col-month { display: block !important; font-weight: 700; font-size: 14.5px; }
+  .award-page #stock-table tbody tr:not(.district-band) > td.col-act { display: flex !important; gap: 6px; justify-content: flex-end; }
+  .award-page #stock-table tbody tr.is-tellable { cursor: pointer; }
+  .award-page #stock-table tbody tr.is-carry > td.col-month { color: var(--accent-ink, #2457C5); }
+  .award-page #stock-table tbody tr:not(.is-tellable):not(.is-carry) { opacity: .6; }
+}
+
+/* ==========================================================================
+   Awards & Gifts on a phone, second pass
+   ========================================================================== */
+.m-detail { display: none; }
+
+@media (max-width: 640px) {
+  /* Every dialog on the page is a sheet from the bottom, as tall as it needs to be. */
+  .award-page .aw-overlay { align-items: flex-end !important; padding: 0 !important; }
+  .award-page .aw-box, .award-page .aw-box-sm {
+    width: 100% !important; max-width: 100% !important; min-height: 0 !important; max-height: 92dvh !important;
+    border-radius: 22px 22px 0 0 !important; overflow-y: auto; animation: m-sheet-up .28s cubic-bezier(.22,1,.36,1);
+  }
+  .award-page .aw-box-head, .award-page .aw-box > header { position: sticky; top: 0; z-index: 3; background: var(--surface, #fff); }
+  .award-page .aw-box .form-actions { position: sticky; bottom: 0; z-index: 3; background: var(--surface, #fff); padding: 10px 14px calc(12px + env(safe-area-inset-bottom, 0)) !important; border-top: 1px solid var(--hairline, rgba(15,23,42,.1)); }
+  .award-page .aw-box .form-actions .btn { min-height: 46px; flex: 1 1 0; justify-content: center; }
+
+  /* The month breakdown: figures as short lists, not a matrix to scroll. */
+  .award-page #detail-table { display: none !important; }
+  .award-page .m-detail { display: block; }
+  .m-detail .m-dcard { margin: 0 0 10px; border: 1px solid var(--hairline, rgba(15,23,42,.12)); border-radius: 14px; overflow: hidden; background: var(--surface, #fff); }
+  .m-detail .m-dcard.is-month { border-color: var(--accent-line, rgba(47,111,228,.45)); }
+  .m-detail .m-dtitle { padding: 10px 14px; font-size: 14px; font-weight: 700; background: var(--surface-alt, #F3F6FB); }
+  .m-detail .m-dtitle small { display: block; margin-top: 2px; font-size: 11.5px; font-weight: 500; color: var(--text-soft, #64748B); }
+  .m-detail .m-dgrp { padding: 8px 14px 2px; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--text-soft, #64748B); }
+  .m-detail .m-drow { display: flex; justify-content: space-between; gap: 12px; padding: 5px 14px; font-size: 14px; }
+  .m-detail .m-drow b { font-family: var(--font-mono, monospace); font-weight: 700; }
+  .m-detail .m-dempty { padding: 10px 14px 12px; font-size: 13px; color: var(--text-muted, #94A3B8); }
+
+  /* Gift inventory rows: the sheet's own sticky, fixed-width month cell is turned off. */
+  .award-page #stock-table tbody tr:not(.district-band) { height: auto !important; min-height: 0 !important; }
+  .award-page #stock-table tbody tr:not(.district-band) > td.col-month {
+    position: static !important; width: auto !important; min-width: 0 !important; left: auto !important;
+    height: auto !important; background: none !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; line-height: 1.3;
+  }
+  .award-page #stock-table tbody tr:not(.district-band) > td.col-act { height: auto !important; line-height: 1.3; background: none !important; }
+  .award-page #stock-table tbody tr.is-tellable:not(:has(.col-act button))::after {
+    content: ""; width: 8px; height: 8px; border-right: 2px solid var(--text-faint, #94A3B8); border-top: 2px solid var(--text-faint, #94A3B8); transform: rotate(45deg); justify-self: end;
+  }
+  /* the district heading above its months */
+  .award-page #stock-table tr.district-band > td { height: auto !important; border-top: 0 !important; border-bottom: 0 !important; background: none !important; }
+  .award-page #stock-table tr.district-band .db {
+    position: static !important; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; width: 100%; max-width: 100%;
+    padding: 10px 12px; border-radius: 12px; border-left: 4px solid var(--accent, #2F6FE4);
+    background: linear-gradient(90deg, var(--accent-soft, rgba(47,111,228,.1)), transparent 85%);
+  }
+  .award-page #stock-table tr.district-band .db-pm { flex-basis: 100%; width: fit-content; max-width: 100%; white-space: normal; }
+
+  /* the year / state / division / district controls on Gift Inventory */
+  .award-page .stock-controls { gap: 10px !important; }
+  .award-page .stock-controls .btn, .award-page .stock-controls button { min-height: 44px; }
+}
