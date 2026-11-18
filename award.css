@@ -2811,3 +2811,41 @@
   .award-page #awHero .aw-hero-nav .aw-toptab { flex: 1 1 0; justify-content: center; }
   .award-page #awHero .aw-hero-nav .aw-subtabs:not([hidden]) { flex: 1 1 100%; padding-left: 0; border-left: 0; }
 }
+
+/* One colour per requisition status, so they tell apart at a glance:
+   grey Requested, blue Mgr verified, indigo HO Approved, amber HO on hold,
+   purple HO dispatched, green Gift Received, orange Mgr Declined, red HO Rejected. */
+.award-page .chip-status.is-verified    { background: rgba(37,99,235,.12);  color: #2563EB; border-color: rgba(37,99,235,.35); }
+.award-page .chip-status.is-hoapproved  { background: rgba(79,70,229,.13);  color: #4F46E5; border-color: rgba(79,70,229,.38); }
+.award-page .chip-status.is-sent        { background: rgba(147,51,234,.13); color: #9333EA; border-color: rgba(147,51,234,.38); }
+.award-page .chip-status.is-mgrdeclined { background: rgba(234,88,12,.13);  color: #EA580C; border-color: rgba(234,88,12,.38); }
+.award-page tr.req-row.is-verified    { --tone: #2563EB; }
+.award-page tr.req-row.is-hoapproved  { --tone: #4F46E5; }
+.award-page tr.req-row.is-sent        { --tone: #9333EA; }
+.award-page tr.req-row.is-mgrdeclined { --tone: #EA580C; }
+
+/* Solid status chips: each status is a clearly different colour. */
+.award-page .chip-status.is-pending,
+.award-page .chip-status.is-verified,
+.award-page .chip-status.is-hoapproved,
+.award-page .chip-status.is-held,
+.award-page .chip-status.is-sent,
+.award-page .chip-status.is-done,
+.award-page .chip-status.is-mgrdeclined,
+.award-page .chip-status.is-declined { color: #fff; border-color: transparent; }
+.award-page .chip-status.is-pending      { background: #64748B; }
+.award-page .chip-status.is-verified     { background: #0284C7; }
+.award-page .chip-status.is-hoapproved   { background: #4F46E5; }
+.award-page .chip-status.is-held         { background: #F59E0B; color: #422006; }
+.award-page .chip-status.is-sent         { background: #9333EA; }
+.award-page .chip-status.is-done         { background: #16A34A; }
+.award-page .chip-status.is-mgrdeclined  { background: #EA580C; }
+.award-page .chip-status.is-declined     { background: #DC2626; }
+.award-page tr.req-row.is-pending     { --tone: #64748B; }
+.award-page tr.req-row.is-verified    { --tone: #0284C7; }
+.award-page tr.req-row.is-hoapproved  { --tone: #4F46E5; }
+.award-page tr.req-row.is-held        { --tone: #F59E0B; }
+.award-page tr.req-row.is-sent        { --tone: #9333EA; }
+.award-page tr.req-row.is-done        { --tone: #16A34A; }
+.award-page tr.req-row.is-mgrdeclined { --tone: #EA580C; }
+.award-page tr.req-row.is-declined    { --tone: #DC2626; }
