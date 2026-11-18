@@ -129,6 +129,7 @@ window.AWARD_CONFIG = {
     filterDivision: document.getElementById("filter-division"),
     filterDistrict: document.getElementById("filter-district"),
     filterType: document.getElementById("filter-type"),
+    filterManager: document.getElementById("filter-manager"),
     filterSearch: document.getElementById("filter-search"),
 
     tbody: document.getElementById("requisitions-body"),
@@ -166,17 +167,17 @@ window.AWARD_CONFIG = {
      to fulfil it. Dispatch and receipt are likewise two events: Head Office
      knows it sent the award, only the requester knows it arrived. */
   var STAGES = {
-    submitted:    { label: "Pending",      tone: "pending",  open: true  },
-    approved:     { label: "Verified",     tone: "approved", open: true  },
-    acknowledged: { label: "Acknowledged", tone: "progress", open: true  },
-    ho_approved:  { label: "Approved",     tone: "approved", open: true  },
-    on_hold:      { label: "On hold",      tone: "held",     open: true  },
-    dispatched:   { label: "Dispatched",   tone: "progress", open: true,
+    submitted:    { label: "Requested",    tone: "pending",  open: true  },
+    approved:     { label: "Mgr verified", tone: "verified", open: true  },
+    acknowledged: { label: "Mgr verified", tone: "verified", open: true  },   // old step, shown as verified
+    ho_approved:  { label: "HO Approved",  tone: "hoapproved", open: true },
+    on_hold:      { label: "HO on hold",   tone: "held",     open: true  },
+    dispatched:   { label: "HO dispatched", tone: "sent", open: true,
                     hoLabel: "Awaiting confirmation" },
-    received:     { label: "Received",     tone: "done",     open: false,
+    received:     { label: "Gift Received", tone: "done",   open: false,
                     hoLabel: "Delivered" },
-    declined:     { label: "Declined",     tone: "declined", open: false },
-    rejected:     { label: "Rejected",     tone: "declined", open: false }
+    declined:     { label: "Mgr Declined", tone: "mgrdeclined", open: false },
+    rejected:     { label: "HO Rejected",  tone: "declined", open: false }
   };
 
   // One state, two vantage points: receipt to the requester is delivery
@@ -213,7 +214,8 @@ window.AWARD_CONFIG = {
       // the division, which the row already shows - "With Manager" is enough here.
       case "submitted":    return "Manager";
 
-      case "approved":     return "Head Office, to acknowledge it";
+      // "acknowledged" is the old extra step; rows left there read as verified.
+      case "approved":
       case "acknowledged": return "Head Office, to approve it";
       case "ho_approved":  return "Head Office, to send it";
       case "on_hold":      return "Head Office, who are waiting on stock";
@@ -486,7 +488,9 @@ window.AWARD_CONFIG = {
   function hoActions(row) {
     if (!isHoAdmin()) return [];
     switch (stageOf(row)) {
-      case "approved":     return ["acknowledge", "reject"];
+      // Head Office goes straight from verified to approve. Rows still sitting
+      // at the old "acknowledged" step get the same buttons.
+      case "approved":
       case "acknowledged": return ["approve", "hold", "reject"];
       case "ho_approved":  return ["dispatch", "hold", "reject"];
       // On hold is waiting, not refusing. Nothing is sent from here: the
@@ -528,6 +532,7 @@ window.AWARD_CONFIG = {
      no address to look one up by) may the IT Admin do it, so nothing is left
      with nobody to act. */
   var managerByEmail = {};       // requester's email -> their reporting manager's email (all lower case)
+  var nameByEmail = {};          // anyone's email -> their name, to show a manager by name
   var managersAt = 0;            // when that list was last read
   var MANAGERS_FRESH_MS = 60000;
 
@@ -535,12 +540,16 @@ window.AWARD_CONFIG = {
     if (Date.now() - managersAt < MANAGERS_FRESH_MS) return Promise.resolve();
     if (typeof window.olfGetEmployees !== "function") return Promise.resolve();
     return window.olfGetEmployees().then(function (list) {
-      var map = {};
+      var map = {}, names = {};
       (list || []).forEach(function (e) {
         var mine = String(e["Email"] || "").trim().toLowerCase();
-        if (mine) map[mine] = String(e["Reporting manager"] || e["Reporting Manager"] || "").trim().toLowerCase();
+        if (mine) {
+          map[mine] = String(e["Reporting manager"] || e["Reporting Manager"] || "").trim().toLowerCase();
+          names[mine] = String(e["Name"] || "").trim();
+        }
       });
       managerByEmail = map;
+      nameByEmail = names;
       managersAt = Date.now();
       applyStanding();                 // the note under the heading depends on who reports to me
     }).catch(function (err) {
@@ -1633,7 +1642,7 @@ window.AWARD_CONFIG = {
       hoNote();
       patch.dispatched_items = going;       // what will go, which the stock sheet reads on receipt
       patch.status = "ho_approved";
-      from = "acknowledged";
+      from = stageOf(row);                 // approved, or the old acknowledged
 
     } else if (action === "hold") {
       hoNote();
@@ -1644,7 +1653,7 @@ window.AWARD_CONFIG = {
 
     } else if (action === "resume") {
       hoNote();
-      patch.status = "acknowledged";     // back to the start of Head Office's part
+      patch.status = "approved";         // back to the start of Head Office's part
       // held_by and held_at stay: it was on hold, and the trail should say so.
       from = "on_hold";
 
@@ -2126,6 +2135,7 @@ window.AWARD_CONFIG = {
     });
     el.filterDistrict.addEventListener("change", renderTableFresh);
     el.filterType.addEventListener("change", renderTableFresh);
+    el.filterManager.addEventListener("change", renderTableFresh);
     el.filterSearch.addEventListener("input", renderTableFresh);
     if (el.reqClear) el.reqClear.addEventListener("click", clearReqFilters);
 
@@ -2951,6 +2961,19 @@ window.AWARD_CONFIG = {
 
     fillSelect(el.filterType, Object.keys(types).sort(), "All gifts",
       function (name) { return name; }, function (name) { return name; });
+
+    // The requesters' reporting managers, by name.
+    var managers = {};
+    allRequisitions.forEach(function (row) {
+      var m = reportingManagerOf(row);
+      if (m) managers[m] = true;
+    });
+    var mgrLabel = function (m) { return nameByEmail[m] || m; };
+    fillSelect(el.filterManager,
+      Object.keys(managers).sort(function (a, b) {
+        return mgrLabel(a).toLowerCase() < mgrLabel(b).toLowerCase() ? -1 : 1;
+      }), "All managers",
+      function (m) { return m; }, mgrLabel);
   }
 
   // Both views of the same rows: the list, and Head Office's queue.
@@ -3158,6 +3181,7 @@ window.AWARD_CONFIG = {
     var divisionFilter = el.filterDivision.value;
     var districtFilter = el.filterDistrict.value;
     var typeFilter = el.filterType.value;
+    var managerFilter = el.filterManager.value;
     var statusFilter = el.filterStatus ? el.filterStatus.value : "";
     var search = el.filterSearch.value.trim().toLowerCase();
 
@@ -3166,6 +3190,7 @@ window.AWARD_CONFIG = {
       if (stateFilter && p.state !== stateFilter) return false;
       if (divisionFilter && p.division !== divisionFilter) return false;
       if (districtFilter && p.district !== districtFilter) return false;
+      if (managerFilter && reportingManagerOf(row) !== managerFilter) return false;
       if (typeFilter && awardsOf(row).every(function (a) {
         return a.name !== typeFilter;
       })) return false;
@@ -3174,7 +3199,11 @@ window.AWARD_CONFIG = {
       // Filtered on the stage itself. Going through statusOf collapsed
       // every stage after verifying into "approved", so choosing Dispatched
       // or Received could not tell them apart.
-      if (statusFilter && stageOf(row) !== statusFilter) return false;
+      if (statusFilter) {
+        var st = stageOf(row);
+        if (st === "acknowledged") st = "approved";      // the old step counts as verified
+        if (st !== statusFilter) return false;
+      }
       return true;
     });
   }
@@ -3185,12 +3214,12 @@ window.AWARD_CONFIG = {
 
   function anyReqFilter() {
     return !!(el.filterState.value || el.filterDivision.value || el.filterDistrict.value ||
-              el.filterType.value || (el.filterStatus && el.filterStatus.value) ||
+              el.filterManager.value || el.filterType.value || (el.filterStatus && el.filterStatus.value) ||
               el.filterSearch.value.trim());
   }
 
   function clearReqFilters() {
-    [el.filterState, el.filterDivision, el.filterDistrict, el.filterType, el.filterStatus].forEach(function (s) {
+    [el.filterState, el.filterDivision, el.filterDistrict, el.filterType, el.filterManager, el.filterStatus].forEach(function (s) {
       if (s) s.value = "";
     });
     el.filterSearch.value = "";
@@ -3625,7 +3654,7 @@ window.AWARD_CONFIG = {
      requisitions drop off - this is a list of work, not a record. */
   // Head Office's queue, in the order they have to act on it.
   function deliveryQueue() {
-    var ORDER = { approved: 0, acknowledged: 1, ho_approved: 2, on_hold: 3,
+    var ORDER = { approved: 0, acknowledged: 0, ho_approved: 2, on_hold: 3,
                   dispatched: 4, received: 5, rejected: 6 };
     return allRequisitions.filter(function (r) {
       return ORDER[stageOf(r)] !== undefined;
