@@ -1,5 +1,8 @@
-/* Install as an app: registers the offline page's service worker and offers an
-   "Install" card on phones and tablets, once the person has signed in.
+/* Install as an app: registers the offline page's service worker and shows an
+   "Install" card at the bottom on phones and tablets, every time the site is
+   opened in the browser, until the app is installed. Closing the card hides it for
+   that visit only. Once installed, the app opens on its own and no card shows; if it is
+   uninstalled, the browser offers the install again and the card comes back.
    Android (Chrome) installs with one tap. iPhone has no install prompt, so the
    card there says how: Share, then Add to Home Screen. */
 (function () {
@@ -13,27 +16,22 @@
   }
 
   /* ---- the install card -------------------------------------------------- */
-  var KEY = "olf-install-card-hidden-until";
-  var DAYS = 14;
+  var KEY = "olf-install-card-closed-this-visit";
   var deferred = null;
   var card = null;
 
   function standalone() {
     return (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true;
   }
-  function hiddenForNow() {
-    try { return Number(localStorage.getItem(KEY) || 0) > Date.now(); } catch (e) { return false; }
+  // Closed by the person for this visit only; the next time the site is opened it is back.
+  function closedThisVisit() {
+    try { return sessionStorage.getItem(KEY) === "1"; } catch (e) { return false; }
   }
-  function hideFor(days) {
-    try { localStorage.setItem(KEY, String(Date.now() + days * 86400000)); } catch (e) { /* private mode: it may show again, which is fine */ }
+  function closeThisVisit() {
+    try { sessionStorage.setItem(KEY, "1"); } catch (e) { /* fine: it simply may show again */ }
   }
   var isIos = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   var smallScreen = function () { return window.matchMedia && window.matchMedia("(max-width: 900px)").matches; };
-
-  function signedIn() {
-    var shell = document.getElementById("appShell");
-    return !!(shell && shell.offsetParent !== null && getComputedStyle(shell).visibility !== "hidden");
-  }
 
   function css() {
     if (document.getElementById("olf-install-css")) return;
@@ -55,13 +53,12 @@
     document.head.appendChild(s);
   }
 
-  function hideCard(days) {
+  function hideCard() {
     if (card) { card.remove(); card = null; }
-    if (days) hideFor(days);
   }
 
   function showCard() {
-    if (card || standalone() || hiddenForNow() || !smallScreen() || !signedIn()) return;
+    if (card || standalone() || closedThisVisit() || !smallScreen()) return;
     if (!deferred && !isIos) return;                          // nothing to offer on this browser
     css();
     card = document.createElement("div");
@@ -75,13 +72,17 @@
       '<div class="olf-install-text"><div class="olf-install-title">Install OLF Staff Connect</div><div class="olf-install-sub">' + sub + "</div></div>" +
       (deferred ? '<button type="button" class="olf-install-go">Install</button>' : "") +
       '<button type="button" class="olf-install-x" aria-label="Not now">✕</button>';
-    card.querySelector(".olf-install-x").addEventListener("click", function () { hideCard(DAYS); });
+    card.querySelector(".olf-install-x").addEventListener("click", function () { closeThisVisit(); hideCard(); });
     var go = card.querySelector(".olf-install-go");
     if (go) go.addEventListener("click", function () {
       var ev = deferred;
       deferred = null;
-      hideCard(0);
-      if (ev) { ev.prompt(); ev.userChoice.then(function (c) { if (c && c.outcome !== "accepted") hideFor(DAYS); }); }
+      hideCard();
+      if (ev) {
+        ev.prompt();
+        // Not installed after all: offer it again, on this page, a moment later.
+        ev.userChoice.then(function (c) { if (c && c.outcome !== "accepted") { deferred = ev; setTimeout(showCard, 4000); } });
+      }
     });
     document.body.appendChild(card);
   }
@@ -89,15 +90,10 @@
   window.addEventListener("beforeinstallprompt", function (e) {
     e.preventDefault();                                       // we show our own card
     deferred = e;
-    setTimeout(showCard, 3000);
+    setTimeout(showCard, 1500);
   });
-  window.addEventListener("appinstalled", function () { deferred = null; hideCard(365); });
+  window.addEventListener("appinstalled", function () { deferred = null; hideCard(); });
 
-  // iPhone has no install event, and every browser may not have signed in yet: look a few times.
-  var tries = 0;
-  var timer = setInterval(function () {
-    tries++;
-    showCard();
-    if (card || tries > 20 || standalone()) clearInterval(timer);
-  }, 2500);
+  // iPhone has no install event: show its how-to card shortly after the page opens.
+  if (isIos) setTimeout(showCard, 1500);
 })();
