@@ -3168,7 +3168,21 @@
   }
 
   /* ---------- Goal Numbers Fetcher for Progress Tab ---------- */
-  async function getMonthlyGoalNumbers(empId, month) {
+  var _goalFetchChain = Promise.resolve();
+  function getMonthlyGoalNumbers(empId, month) {
+    return new Promise(function (resolve, reject) {
+      _goalFetchChain = _goalFetchChain.then(async function () {
+        try {
+          var res = await _getMonthlyGoalNumbersInternal(empId, month);
+          resolve(res);
+        } catch (err) {
+          reject(err);
+        }
+      });
+    });
+  }
+
+  async function _getMonthlyGoalNumbersInternal(empId, month) {
     await loadOrg();
     month = String(month || "").replace(/-/g, "").substring(0, 6);
     if (!month && state.base && state.base.months && state.base.months[0]) {

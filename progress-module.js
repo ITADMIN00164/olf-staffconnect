@@ -41,7 +41,16 @@
     : [];
 
   // Verified live Field Review System monthly score cache
-  const liveScoreCache = { 'OLF-25-146': 67.1 };
+  const liveScoreCache = {};
+
+  // Format score number: keep exact integer or exact decimal up to 2 decimal places matching inside modal (e.g. 13.58, 35.1)
+  function formatScoreNumber(val) {
+    if (val === null || val === undefined || val === '') return null;
+    const num = Number(val);
+    if (isNaN(num)) return String(val);
+    if (num % 1 === 0) return String(num);
+    return num.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+  }
 
   function formatFlowScore(evalRes, staffId) {
     if (!evalRes) return '— / 100';
@@ -51,8 +60,7 @@
       ? liveScoreCache[id]
       : (evalRes.empId && liveScoreCache[evalRes.empId] != null ? liveScoreCache[evalRes.empId] : null);
     if (live != null) {
-      const num = Number(live) || 0;
-      const disp = (num % 1 !== 0) ? num.toFixed(1) : num;
+      const disp = formatScoreNumber(live);
       return `${disp} / 100`;
     }
     return '— / 100';
@@ -61,7 +69,7 @@
   function updateScoreCellInDOM(empId, totalScore) {
     const scNum = Number(totalScore) || 0;
     const clr = getScoreColor(scNum);
-    const scDisp = (scNum % 1 !== 0) ? scNum.toFixed(1) : scNum;
+    const scDisp = formatScoreNumber(totalScore) || '0';
 
     // 1. Update table cell if present
     const cell = document.getElementById('tp-prog-score-cell-' + empId);
@@ -88,32 +96,53 @@
 
   function syncLiveScores(list) {
     if (typeof window === 'undefined') return;
-    const toFetch = (list || []).filter(r => r.evalRes && r.evalRes.status !== 'unassigned' && r.staff && r.staff.id && liveScoreCache[r.staff.id] == null);
+    const maps = buildAssignmentMaps();
+    const toFetch = (list || []).filter(r => {
+      if (!r || !r.staff) return false;
+      if (r.evalRes && r.evalRes.status === 'unassigned') return false;
+      const sId = r.staff.id;
+      const evId = r.evalRes ? r.evalRes.empId : null;
+      return (sId && liveScoreCache[sId] == null) || (evId && liveScoreCache[evId] == null);
+    });
     if (!toFetch.length) return;
 
     (async function () {
-      const concurrency = 5;
+      const concurrency = 3;
       for (let i = 0; i < toFetch.length; i += concurrency) {
         const chunk = toFetch.slice(i, i + concurrency);
         await Promise.all(chunk.map(async r => {
-          const id = r.staff.id;
+          const staff = r.staff || {};
+          const id = (staff.id || '').trim().toUpperCase();
+          const email = (staff.Email || staff.email || '').trim().toLowerCase();
+          const name = (staff.Name || staff.name || '').trim().toLowerCase();
+          const assign = maps.byId[id] || maps.byEmail[email] || maps.byName[name];
+          const targetEmpId = assign ? assign.emp_id : (r.evalRes && r.evalRes.empId ? r.evalRes.empId : (staff.id || staff.emp_id || staff.Name));
+
           try {
             let res = null;
             if (window.FTRDashboard && typeof window.FTRDashboard.getMonthlyGoalNumbers === 'function') {
               try {
-                res = await window.FTRDashboard.getMonthlyGoalNumbers(id, state.activeMonth);
+                res = await window.FTRDashboard.getMonthlyGoalNumbers(targetEmpId, state.activeMonth);
               } catch (e) {}
+              if ((!res || res.totalScore == null) && staff.id && staff.id !== targetEmpId) {
+                try {
+                  res = await window.FTRDashboard.getMonthlyGoalNumbers(staff.id, state.activeMonth);
+                } catch (e) {}
+              }
             }
             if ((!res || res.totalScore == null) && typeof fetchDirectGoalNumbers === 'function') {
               try {
-                res = await fetchDirectGoalNumbers(id, state.activeMonth, r.staff);
+                res = await fetchDirectGoalNumbers(targetEmpId, state.activeMonth, staff);
               } catch (e) {}
             }
             if (res && res.totalScore != null) {
-              liveScoreCache[id] = res.totalScore;
-              updateScoreCellInDOM(id, res.totalScore);
-              if (r.evalRes && r.evalRes.empId && r.evalRes.empId !== id) {
-                liveScoreCache[r.evalRes.empId] = res.totalScore;
+              liveScoreCache[targetEmpId] = res.totalScore;
+              if (staff.id) liveScoreCache[staff.id] = res.totalScore;
+              if (r.evalRes && r.evalRes.empId) liveScoreCache[r.evalRes.empId] = res.totalScore;
+
+              updateScoreCellInDOM(targetEmpId, res.totalScore);
+              if (staff.id && staff.id !== targetEmpId) updateScoreCellInDOM(staff.id, res.totalScore);
+              if (r.evalRes && r.evalRes.empId && r.evalRes.empId !== targetEmpId && r.evalRes.empId !== staff.id) {
                 updateScoreCellInDOM(r.evalRes.empId, res.totalScore);
               }
             }
@@ -1634,10 +1663,10 @@
         key: 'G2',
         title: 'Goal 2 — Life Skills',
         weight: 20,
-        score: 17.1,
-        scored: 6,
+        score: null,
+        scored: 0,
         totalParts: 7,
-        foot: '6 of 7 parts scored',
+        foot: 'Needs monthly review submission',
         rows: [
           { label: 'Core Life Skills (50 Posts Target)', isHead: true, lvl: 0 },
           { label: 'Storytelling Club Posts', lvl: 1, target: tgt.story_telling != null ? tgt.story_telling : 50, done: tgt.story_telling != null ? tgt.story_telling : 50 },
@@ -1656,10 +1685,10 @@
         key: 'G3',
         title: 'Goal 3 — Teachers & Community',
         weight: 20,
-        score: 20,
-        scored: 4,
+        score: null,
+        scored: 0,
         totalParts: 4,
-        foot: '4 of 4 parts scored',
+        foot: 'Needs monthly review submission',
         rows: [
           { label: 'Teacher Engagement', isHead: true, lvl: 0 },
           { label: 'Online Unique Teachers Participating', lvl: 1, target: tgt.online_unique_teachers != null ? tgt.online_unique_teachers : 60, done: tgt.online_unique_teachers != null ? tgt.online_unique_teachers : 60 },
@@ -1670,11 +1699,14 @@
       }
     ];
 
+    const scoredGoals = goals.filter(g => typeof g.score === 'number' && !isNaN(g.score));
+    const totalScore = scoredGoals.length ? Math.round(scoredGoals.reduce((acc, g) => acc + g.score, 0) * 100) / 100 : null;
+
     return {
       header: { name: tgt.po_name || (staff ? staff.Name : targetEmpId), role: 'Project Officer', district: tgt.district || '' },
       month: activeMonth,
-      totalScore: 67.1,
-      totalGoalsScored: 3,
+      totalScore: totalScore,
+      totalGoalsScored: scoredGoals.length,
       goals: goals
     };
   }
@@ -2385,7 +2417,7 @@
       const hasScore = !isUnassigned && rawScore != null && rawScore !== '';
       const scoreNum = hasScore ? (typeof rawScore === 'number' ? rawScore : Number(rawScore)) : 0;
       const scoreColor = getScoreColor(scoreNum);
-      const scoreDisplay = hasScore ? (scoreNum % 1 !== 0 ? scoreNum.toFixed(1) : scoreNum) : null;
+      const scoreDisplay = hasScore ? formatScoreNumber(rawScore) : null;
       const avatarColor = getAvatarColor(role);
       const roleClass = getRoleBadgeClass(role);
       const mgrDisplay = getManagerStatusDisplay(r.evalRes);
