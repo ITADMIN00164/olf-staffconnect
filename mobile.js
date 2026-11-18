@@ -202,8 +202,203 @@
     if (cfg) openSheet(tr, cfg);
   });
 
+  /* ------------------------------------------------ 3. bottom navigation
+     On a phone the side menu is replaced by a bar along the bottom: one icon for
+     every page the person can open, sliding sideways. The page you are on shows its
+     name beside its icon. The bar is built from the side menu's own buttons, so who
+     can see what, locks and the page you are on all stay exactly as they are there. */
+  var NAV_FIRST = ["home", "award-management", "calendar", "employees"];
+  var NAV_LABEL = {
+    "home": "Home", "employees": "Employees", "er-dashboards": "Dashboards", "award-management": "Awards & Gifts",
+    "calendar": "Calendar", "smart-goals": "HO Plan", "pos": "Field Review", "gr": "GRs", "forms": "Forms",
+    "pom": "Old POM", "team-performance": "Insight"
+  };
+  var navBar = null, navScroll = null, navSig = "", navLearned = false, navNudged = false;
+
+  function navSource() {
+    return Array.prototype.filter.call(document.querySelectorAll("#appSidebar .sidebar-nav .nav-item[data-page]"), function (b) {
+      // Pages that are switched off for people (closed to everyone but IT Admin) are not offered on a phone,
+      // and neither is anything the side menu itself does not show.
+      if (b.hidden || b.closest("[hidden]")) return false;
+      if (b.classList.contains("nav-item--locked-hidden") || b.classList.contains("nav-item--locked") || b.classList.contains("nav-item--locked-admin")) return false;
+      return getComputedStyle(b).display !== "none";
+    });
+  }
+
+  function ensureNav() {
+    if (navBar) return;
+    var shell = document.getElementById("appShell");
+    if (!shell) return;
+    navBar = document.createElement("nav");
+    navBar.className = "m-nav";
+    navBar.setAttribute("aria-label", "Pages");
+    var chev = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
+    navBar.innerHTML =
+      '<button type="button" class="m-nav-arrow m-nav-arrow--l" aria-label="Show pages to the left" hidden>' + chev + "</button>" +
+      '<div class="m-nav-scroll"></div>' +
+      '<button type="button" class="m-nav-arrow m-nav-arrow--r" aria-label="Show more pages" hidden>' + chev + "</button>" +
+      '<div class="m-nav-track" aria-hidden="true"><span class="m-nav-thumb"></span></div>';
+    shell.appendChild(navBar);
+    navScroll = navBar.querySelector(".m-nav-scroll");
+    navScroll.addEventListener("scroll", paintNavEdges, { passive: true });
+    // Once the person has scrolled, touched or used an arrow, they know it slides: the hints calm down.
+    var learned = function () { navLearned = true; navBar.classList.add("is-learned"); };
+    navScroll.addEventListener("touchstart", learned, { passive: true });
+    navScroll.addEventListener("pointerdown", learned, { passive: true });
+    navBar.querySelector(".m-nav-arrow--l").addEventListener("click", function () { learned(); navScroll.scrollBy({ left: -navScroll.clientWidth * 0.7, behavior: "smooth" }); });
+    navBar.querySelector(".m-nav-arrow--r").addEventListener("click", function () { learned(); navScroll.scrollBy({ left: navScroll.clientWidth * 0.7, behavior: "smooth" }); });
+    navScroll.addEventListener("click", function (e) {
+      var b = e.target.closest(".m-nav-item");
+      if (!b) return;
+      var src = document.querySelector('#appSidebar .nav-item[data-page="' + b.getAttribute("data-page") + '"]');
+      if (src) src.click();
+    });
+  }
+
+  function paintNavEdges() {
+    if (!navScroll) return;
+    var max = navScroll.scrollWidth - navScroll.clientWidth;
+    var left = navScroll.scrollLeft > 6, right = navScroll.scrollLeft < max - 6;
+    navBar.classList.toggle("can-left", left);
+    navBar.classList.toggle("can-right", right);
+    navBar.classList.toggle("m-nav--scrolls", max > 8);
+    navBar.querySelector(".m-nav-arrow--l").hidden = !left;
+    navBar.querySelector(".m-nav-arrow--r").hidden = !right;
+    // where you are along the bar, and how much of it you are looking at
+    var thumb = navBar.querySelector(".m-nav-thumb");
+    if (thumb && max > 8) {
+      var w = Math.max(18, (navScroll.clientWidth / navScroll.scrollWidth) * 100);
+      thumb.style.width = w + "%";
+      thumb.style.left = ((navScroll.scrollLeft / max) * (100 - w)) + "%";
+    }
+  }
+
+  /* A hint the first time the bar shows in a visit: it slides along a little and comes back,
+     so it is clear that it moves. Skipped when the person has asked for less motion, or has
+     already touched the bar. */
+  function nudgeNav() {
+    if (navNudged || navLearned || !navScroll) return;
+    var max = navScroll.scrollWidth - navScroll.clientWidth;
+    if (max < 40) return;
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    try { if (sessionStorage.getItem("olf-nav-nudged") === "1") { navNudged = true; return; } } catch (e) { /* fine */ }
+    navNudged = true;
+    try { sessionStorage.setItem("olf-nav-nudged", "1"); } catch (e) { /* fine */ }
+    var home = navScroll.scrollLeft;
+    setTimeout(function () {
+      if (navLearned) return;
+      navScroll.scrollTo({ left: Math.min(max, home + 90), behavior: "smooth" });
+      setTimeout(function () { if (!navLearned) navScroll.scrollTo({ left: home, behavior: "smooth" }); }, 750);
+    }, 1400);
+  }
+
+  function buildBottomNav() {
+    ensureNav();
+    if (!navBar) return;
+    var items = navSource();
+    var order = [];
+    NAV_FIRST.forEach(function (p) { items.forEach(function (b) { if (b.getAttribute("data-page") === p) order.push(b); }); });
+    items.forEach(function (b) { if (order.indexOf(b) < 0) order.push(b); });
+
+    // Rebuild only when the set of pages has changed. When only the page you are on changes,
+    // the same buttons stay and just swap their state, so the pill glides across smoothly.
+    var sig = order.map(function (b) {
+      return b.getAttribute("data-page") + (b.classList.contains("nav-item--locked-admin") ? "L" : "");
+    }).join("|");
+    var activeNow = "";
+    order.forEach(function (b) { if (b.classList.contains("active")) activeNow = b.getAttribute("data-page"); });
+    if (sig === navSig) {
+      var moved = false;
+      Array.prototype.forEach.call(navScroll.querySelectorAll(".m-nav-item"), function (el) {
+        var on = el.getAttribute("data-page") === activeNow;
+        if (on !== el.classList.contains("is-active")) moved = true;
+        el.classList.toggle("is-active", on);
+        if (on) el.setAttribute("aria-current", "page"); else el.removeAttribute("aria-current");
+      });
+      if (moved) centreActive();
+      return;
+    }
+    navSig = sig;
+
+    navScroll.innerHTML = order.map(function (b) {
+      var page = b.getAttribute("data-page");
+      var label = NAV_LABEL[page] || (b.getAttribute("title") || page);
+      var icon = b.querySelector(".icon");
+      var color = (getComputedStyle(b).getPropertyValue("--pg") || "").trim() || "#2F6FE4";
+      var active = b.classList.contains("active");
+      return '<button type="button" class="m-nav-item' + (active ? " is-active" : "") +
+        (b.classList.contains("nav-item--locked-admin") ? " is-locked" : "") + '" data-page="' + esc(page) + '"' +
+        ' style="--pg:' + esc(color) + '" aria-label="' + esc(label) + '"' + (active ? ' aria-current="page"' : "") + ">" +
+        '<span class="m-nav-ico">' + (icon ? icon.innerHTML : "") + "</span>" +
+        '<span class="m-nav-label">' + esc(label) + "</span></button>";
+    }).join("");
+
+    centreActive();
+    setTimeout(paintNavEdges, 120);
+    setTimeout(nudgeNav, 400);
+  }
+
+  // Bring the page you are on into view, in the middle of the bar (after its pill has grown).
+  function centreActive() {
+    setTimeout(function () {
+      var on = navScroll && navScroll.querySelector(".is-active");
+      if (!on) return;
+      var left = on.offsetLeft - (navScroll.clientWidth - on.offsetWidth) / 2;
+      navScroll.scrollTo({ left: Math.max(0, left), behavior: "smooth" });
+    }, 180);
+  }
+
+  function watchSideMenu() {
+    var side = document.querySelector("#appSidebar .sidebar-nav");
+    if (!side || side.__mNavWatched) return;
+    side.__mNavWatched = true;
+    new MutationObserver(function () { buildBottomNav(); })
+      .observe(side, { attributes: true, subtree: true, childList: true, attributeFilter: ["class", "hidden"] });
+  }
+
+  /* ------------------------------------------------ 4. theme on a phone
+     The header shows only the current theme (light, dark or system); a tap
+     moves to the next one. On a laptop all three show as before. */
+  document.addEventListener("click", function (e) {
+    if (!MQ || !MQ.matches) return;
+    var on = e.target.closest && e.target.closest("#appShell .theme-switch button[aria-checked='true']");
+    if (!on) return;
+    var all = Array.prototype.slice.call(on.parentNode.querySelectorAll("button[data-theme-choice]"));
+    var next = all[(all.indexOf(on) + 1) % all.length];
+    if (!next || next === on) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    next.click();
+  }, true);
+
+  /* ------------------------------------------------ 5. smooth pages
+     On a phone a new page fades in from just below and starts at the top; the
+     header gets a soft shadow once the page has scrolled under it. */
+  var smoothPagesOn = false;
+  function smoothPages() {
+    if (smoothPagesOn) return;
+    var area = document.getElementById("pageContent");
+    var bar = document.querySelector("#appShell .topbar");
+    if (!area || !bar) return;
+    smoothPagesOn = true;
+    new MutationObserver(function (list) {
+      if (!MQ || !MQ.matches) return;
+      var swapped = list.some(function (m) { return m.addedNodes.length && m.target === area; });
+      if (!swapped) return;
+      area.style.scrollBehavior = "auto";       // jump to the top, no long scroll up
+      area.scrollTop = 0;
+      area.style.scrollBehavior = "";
+      area.classList.remove("m-page-in");
+      void area.offsetWidth;                     // restart the animation
+      area.classList.add("m-page-in");
+    }).observe(area, { childList: true });
+    area.addEventListener("scroll", function () {
+      bar.classList.toggle("m-scrolled", area.scrollTop > 6);
+    }, { passive: true });
+  }
+
   /* ------------------------------------------------ keeping up with the page */
-  function run() { pending = false; labelLists(); filterToggles(); detailCards(); wrapWide(); }
+  function run() { pending = false; labelLists(); filterToggles(); detailCards(); wrapWide(); watchSideMenu(); buildBottomNav(); smoothPages(); }
   function schedule() {
     if (pending) return;
     pending = true;

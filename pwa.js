@@ -57,8 +57,24 @@
     if (card) { card.remove(); card = null; }
   }
 
-  function showCard() {
-    if (card || standalone() || closedThisVisit() || !smallScreen()) return;
+  // The browser's own install dialog. It can be used once per offer; if it is cancelled the
+  // browser offers again later, and the banner and the button come back with it.
+  function install() {
+    var ev = deferred;
+    if (!ev) return false;
+    deferred = null;
+    hideCard();
+    syncTopButton();
+    try { ev.prompt(); } catch (e) { return false; }
+    ev.userChoice.then(function (c) {
+      if (!c || c.outcome !== "accepted") { deferred = ev; syncTopButton(); setTimeout(showCard, 4000); }
+    });
+    return true;
+  }
+
+  function showCard(force) {
+    if (card || standalone()) return;
+    if (force !== true && (closedThisVisit() || !smallScreen())) return;
     if (!deferred && !isIos) return;                          // nothing to offer on this browser
     css();
     card = document.createElement("div");
@@ -74,26 +90,66 @@
       '<button type="button" class="olf-install-x" aria-label="Not now">✕</button>';
     card.querySelector(".olf-install-x").addEventListener("click", function () { closeThisVisit(); hideCard(); });
     var go = card.querySelector(".olf-install-go");
-    if (go) go.addEventListener("click", function () {
-      var ev = deferred;
-      deferred = null;
-      hideCard();
-      if (ev) {
-        ev.prompt();
-        // Not installed after all: offer it again, on this page, a moment later.
-        ev.userChoice.then(function (c) { if (c && c.outcome !== "accepted") { deferred = ev; setTimeout(showCard, 4000); } });
-      }
-    });
+    if (go) go.addEventListener("click", install);
     document.body.appendChild(card);
   }
 
+  /* ---- the Install button in the top bar ------------------------------
+     Shown whenever the site is open in a browser and the app can be installed;
+     gone once it is installed (the installed app opens without it). */
+  var topBtn = null;
+  function topCss() {
+    if (document.getElementById("olf-install-top-css")) return;
+    var s = document.createElement("style");
+    s.id = "olf-install-top-css";
+    s.textContent =
+      ".tb-install{display:inline-flex;align-items:center;gap:7px;height:var(--tb-ctl,38px);padding:0 15px 0 12px;border:0;border-radius:999px;flex:none;" +
+      "font:inherit;font-size:13px;font-weight:700;letter-spacing:-.1px;color:#fff;cursor:pointer;white-space:nowrap;" +
+      "background:linear-gradient(135deg,#2F6FE4,#0B8F7A);box-shadow:0 4px 12px rgba(47,111,228,.35);transition:transform .15s ease,box-shadow .15s ease}" +
+      ".tb-install:hover{transform:translateY(-1px);box-shadow:0 8px 18px rgba(47,111,228,.4)}" +
+      ".tb-install:active{transform:scale(.96)}" +
+      ".tb-install:focus-visible{outline:2px solid #2F6FE4;outline-offset:2px}" +
+      ".tb-install svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}" +
+      ".tb-install[hidden]{display:none}" +
+      "@media (max-width:768px){.tb-install{width:var(--tb-ctl,36px);padding:0;justify-content:center}.tb-install span{display:none}}";
+    document.head.appendChild(s);
+  }
+  function buildTopButton() {
+    if (topBtn) return;
+    var group = document.querySelector(".topbar .tp-group");
+    if (!group) return;
+    topCss();
+    topBtn = document.createElement("button");
+    topBtn.type = "button";
+    topBtn.className = "tb-install";
+    topBtn.hidden = true;
+    topBtn.title = "Install OLF Staff Connect as an app";
+    topBtn.setAttribute("aria-label", "Install app");
+    topBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v11m0 0 4-4m-4 4-4-4"/><path d="M4.5 15.5v3a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-3"/></svg><span>Install app</span>';
+    topBtn.addEventListener("click", function () {
+      if (!install()) { hideCard(); showCard(true); }          // iPhone: show how, since there is no install dialog
+    });
+    group.insertBefore(topBtn, group.querySelector(".tb-bell") || group.firstChild);
+    syncTopButton();
+  }
+  function syncTopButton() {
+    if (!topBtn) return;
+    topBtn.hidden = standalone() || !(deferred || isIos);
+  }
+
   window.addEventListener("beforeinstallprompt", function (e) {
-    e.preventDefault();                                       // we show our own card
+    e.preventDefault();                                       // we show our own card and button
     deferred = e;
+    buildTopButton();
+    syncTopButton();
     setTimeout(showCard, 1500);
   });
-  window.addEventListener("appinstalled", function () { deferred = null; hideCard(); });
+  window.addEventListener("appinstalled", function () { deferred = null; hideCard(); syncTopButton(); });
 
   // iPhone has no install event: show its how-to card shortly after the page opens.
   if (isIos) setTimeout(showCard, 1500);
+
+  // The button lives in the top bar, which is part of the page from the start (shown after sign-in).
+  buildTopButton();
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", buildTopButton);
 })();
