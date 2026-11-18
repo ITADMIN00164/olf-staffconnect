@@ -2136,6 +2136,7 @@ window.AWARD_CONFIG = {
     el.filterDistrict.addEventListener("change", renderTableFresh);
     el.filterType.addEventListener("change", renderTableFresh);
     el.filterManager.addEventListener("change", renderTableFresh);
+    enhanceFilterDropdowns();
     el.filterSearch.addEventListener("input", renderTableFresh);
     if (el.reqClear) el.reqClear.addEventListener("click", clearReqFilters);
 
@@ -2974,7 +2975,167 @@ window.AWARD_CONFIG = {
         return mgrLabel(a).toLowerCase() < mgrLabel(b).toLowerCase() ? -1 : 1;
       }), "All managers",
       function (m) { return m; }, mgrLabel);
+    syncFilterDropdowns();
   }
+
+  /* The filter dropdowns. The real <select> stays as the source of truth (the
+     rest of this file reads and fills it) and is hidden; a nicer control is drawn
+     in front of it: grouped, searchable when the list is long, with a count
+     against every choice and the status colours. */
+  var filterDrops = [];
+
+  function enhanceFilterDropdowns() {
+    [
+      { select: el.filterState,    noun: "states" },
+      { select: el.filterDivision, noun: "divisions" },
+      { select: el.filterDistrict, noun: "districts" },
+      { select: el.filterManager,  noun: "managers" },
+      { select: el.filterStatus,   noun: "statuses", dots: true },
+      { select: el.filterType,     noun: "gifts" }
+    ].forEach(function (cfg) { if (cfg.select) buildFilterDrop(cfg); });
+
+    document.addEventListener("click", function (e) {
+      filterDrops.forEach(function (d) { if (!d.wrap.contains(e.target)) closeFilterDrop(d); });
+    });
+  }
+
+  function dropKey(select) { return select.id.replace("filter-", ""); }
+
+  function buildFilterDrop(cfg) {
+    var select = cfg.select;
+    var wrap = document.createElement("div");
+    wrap.className = "dd";
+    wrap.innerHTML =
+      '<button type="button" class="dd-btn" aria-haspopup="listbox" aria-expanded="false">' +
+        '<span class="dd-dot" hidden></span><span class="dd-label"></span>' +
+        '<svg class="dd-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4.5 6 8.5 10 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+      '</button>' +
+      '<div class="dd-panel" hidden>' +
+        '<input type="search" class="dd-search" placeholder="Type to search" aria-label="Search ' + cfg.noun + '" autocomplete="off" />' +
+        '<ul class="dd-list" role="listbox"></ul>' +
+      '</div>';
+    select.classList.add("dd-native");
+    select.parentNode.insertBefore(wrap, select.nextSibling);
+
+    var d = { cfg: cfg, select: select, wrap: wrap, active: -1, items: [],
+      btn: wrap.querySelector(".dd-btn"), panel: wrap.querySelector(".dd-panel"),
+      search: wrap.querySelector(".dd-search"), list: wrap.querySelector(".dd-list"),
+      dot: wrap.querySelector(".dd-dot"), label: wrap.querySelector(".dd-label") };
+    filterDrops.push(d);
+
+    d.btn.addEventListener("click", function () {
+      if (d.panel.hidden) openFilterDrop(d); else closeFilterDrop(d);
+    });
+    d.search.addEventListener("input", function () { paintFilterDrop(d); });
+    d.wrap.addEventListener("keydown", function (e) { filterDropKey(d, e); });
+    d.list.addEventListener("click", function (e) {
+      var li = e.target.closest("li[data-value]");
+      if (li) chooseFilterDrop(d, li.getAttribute("data-value"));
+    });
+    syncFilterDrop(d);
+  }
+
+  function openFilterDrop(d) {
+    filterDrops.forEach(function (o) { if (o !== d) closeFilterDrop(o); });
+    d.panel.hidden = false;
+    d.btn.setAttribute("aria-expanded", "true");
+    d.wrap.classList.add("is-open");
+    d.search.value = "";
+    d.search.hidden = d.select.options.length <= 10;     // only a long list needs searching
+    paintFilterDrop(d);
+    if (!d.search.hidden) d.search.focus();
+  }
+
+  function closeFilterDrop(d) {
+    if (d.panel.hidden) return;
+    d.panel.hidden = true;
+    d.btn.setAttribute("aria-expanded", "false");
+    d.wrap.classList.remove("is-open");
+  }
+
+  function chooseFilterDrop(d, value) {
+    d.select.value = value;
+    closeFilterDrop(d);
+    d.select.dispatchEvent(new Event("change", { bubbles: true }));
+    syncFilterDrop(d);
+    d.btn.focus();
+  }
+
+  // How many requisitions each choice would show, given every other filter.
+  function paintFilterDrop(d) {
+    var key = dropKey(d.select);
+    var rows = filteredRequisitions(key);
+    var counts = {};
+    rows.forEach(function (row) {
+      filterValuesOf(row, key).forEach(function (v) { counts[v] = (counts[v] || 0) + 1; });
+    });
+
+    var q = d.search.hidden ? "" : d.search.value.trim().toLowerCase();
+    var html = "", items = [], lastGroup = null;
+    Array.prototype.forEach.call(d.select.options, function (opt) {
+      var label = opt.textContent;
+      if (q && (!opt.value || label.toLowerCase().indexOf(q) === -1)) return;
+      var group = opt.parentNode.tagName === "OPTGROUP" ? opt.parentNode.label : "";
+      if (group !== lastGroup) {
+        if (group) html += '<li class="dd-group" role="presentation">' + escapeHtml(group) + "</li>";
+        lastGroup = group;
+      }
+      var n = opt.value ? (counts[opt.value] || 0) : rows.length;
+      var dot = "";
+      if (d.cfg.dots && opt.value && STAGES[opt.value]) {
+        dot = '<span class="dd-dot is-' + STAGES[opt.value].tone + '"></span>';
+      }
+      var cls = "dd-item" + (opt.value === d.select.value ? " is-selected" : "") +
+                (opt.value && !n ? " is-empty" : "");
+      html += '<li class="' + cls + '" role="option" data-value="' + escapeHtml(opt.value) + '"' +
+              ' aria-selected="' + (opt.value === d.select.value) + '">' + dot +
+              '<span class="dd-text">' + escapeHtml(label) + '</span>' +
+              '<span class="dd-n">' + n + "</span></li>";
+      items.push(opt.value);
+    });
+    if (!items.length) html = '<li class="dd-none" role="presentation">Nothing matches</li>';
+    d.list.innerHTML = html;
+    d.items = items;
+    d.active = Math.max(0, items.indexOf(d.select.value));
+    markActiveFilterItem(d);
+  }
+
+  function markActiveFilterItem(d) {
+    var lis = d.list.querySelectorAll("li.dd-item");
+    Array.prototype.forEach.call(lis, function (li, i) {
+      li.classList.toggle("is-active", i === d.active);
+      if (i === d.active) li.scrollIntoView({ block: "nearest" });
+    });
+  }
+
+  function filterDropKey(d, e) {
+    var isOpen = !d.panel.hidden;
+    if (e.key === "Escape" && isOpen) { closeFilterDrop(d); d.btn.focus(); e.preventDefault(); return; }
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!isOpen) { openFilterDrop(d); return; }
+      var step = e.key === "ArrowDown" ? 1 : -1;
+      d.active = Math.min(d.items.length - 1, Math.max(0, d.active + step));
+      markActiveFilterItem(d);
+      return;
+    }
+    if (e.key === "Enter" && isOpen && e.target !== d.btn) {
+      e.preventDefault();
+      if (d.items.length) chooseFilterDrop(d, d.items[d.active]);
+    }
+  }
+
+  // The closed control: what is picked, with its colour for a status.
+  function syncFilterDrop(d) {
+    var opt = d.select.options[d.select.selectedIndex];
+    d.label.textContent = opt ? opt.textContent : "";
+    d.wrap.classList.toggle("is-set", !!d.select.value);
+    var stage = d.cfg.dots && d.select.value ? STAGES[d.select.value] : null;
+    d.dot.hidden = !stage;
+    d.dot.className = "dd-dot" + (stage ? " is-" + stage.tone : "");
+  }
+
+  function syncFilterDropdowns() { filterDrops.forEach(syncFilterDrop); }
 
   // Both views of the same rows: the list, and Head Office's queue.
   function renderRows() {
@@ -3175,35 +3336,43 @@ window.AWARD_CONFIG = {
     runCounters(box);
   }
 
-  // The requisitions the filters leave, which is what the list shows.
-  function filteredRequisitions() {
-    var stateFilter = el.filterState.value;
-    var divisionFilter = el.filterDivision.value;
-    var districtFilter = el.filterDistrict.value;
-    var typeFilter = el.filterType.value;
-    var managerFilter = el.filterManager.value;
-    var statusFilter = el.filterStatus ? el.filterStatus.value : "";
+  // What a row answers to for each filter. Status goes by the stage itself: the
+  // old "acknowledged" step counts as verified.
+  function filterValuesOf(row, key) {
+    var p;
+    switch (key) {
+      case "state":    return [placeOf(row).state];
+      case "division": return [placeOf(row).division];
+      case "district": return [placeOf(row).district];
+      case "manager":  return [reportingManagerOf(row)];
+      case "type":     return awardsOf(row).map(function (a) { return a.name; });
+      case "status":
+        p = stageOf(row);
+        return [p === "acknowledged" ? "approved" : p];
+    }
+    return [];
+  }
+
+  function filterChoices() {
+    return {
+      state: el.filterState.value, division: el.filterDivision.value,
+      district: el.filterDistrict.value, manager: el.filterManager.value,
+      type: el.filterType.value, status: el.filterStatus ? el.filterStatus.value : ""
+    };
+  }
+
+  // The requisitions the filters leave, which is what the list shows. "except"
+  // leaves one filter out, which is how each dropdown counts its own choices.
+  function filteredRequisitions(except) {
+    var want = filterChoices();
     var search = el.filterSearch.value.trim().toLowerCase();
 
     return allRequisitions.filter(function (row) {
-      var p = placeOf(row);
-      if (stateFilter && p.state !== stateFilter) return false;
-      if (divisionFilter && p.division !== divisionFilter) return false;
-      if (districtFilter && p.district !== districtFilter) return false;
-      if (managerFilter && reportingManagerOf(row) !== managerFilter) return false;
-      if (typeFilter && awardsOf(row).every(function (a) {
-        return a.name !== typeFilter;
-      })) return false;
+      for (var key in want) {
+        if (want[key] && key !== except && filterValuesOf(row, key).indexOf(want[key]) === -1) return false;
+      }
       if (search && String(row.requester_name || "").toLowerCase()
                       .indexOf(search) === -1) return false;
-      // Filtered on the stage itself. Going through statusOf collapsed
-      // every stage after verifying into "approved", so choosing Dispatched
-      // or Received could not tell them apart.
-      if (statusFilter) {
-        var st = stageOf(row);
-        if (st === "acknowledged") st = "approved";      // the old step counts as verified
-        if (st !== statusFilter) return false;
-      }
       return true;
     });
   }
