@@ -522,11 +522,44 @@ window.AWARD_CONFIG = {
     return stageOf(row) === "dispatched" && isMine(row);
   }
 
+  /* Who may verify a requisition: the requester's Reporting Manager, as written
+     in the Employees tab - and nobody else. No level, no division, no department.
+     Only when the requester has no manager on record (or the requisition carries
+     no address to look one up by) may the IT Admin do it, so nothing is left
+     with nobody to act. */
+  var managerByEmail = {};       // requester's email -> their reporting manager's email (all lower case)
+  var managersAt = 0;            // when that list was last read
+  var MANAGERS_FRESH_MS = 60000;
+
+  function ensureManagers() {
+    if (Date.now() - managersAt < MANAGERS_FRESH_MS) return Promise.resolve();
+    if (typeof window.olfGetEmployees !== "function") return Promise.resolve();
+    return window.olfGetEmployees().then(function (list) {
+      var map = {};
+      (list || []).forEach(function (e) {
+        var mine = String(e["Email"] || "").trim().toLowerCase();
+        if (mine) map[mine] = String(e["Reporting manager"] || e["Reporting Manager"] || "").trim().toLowerCase();
+      });
+      managerByEmail = map;
+      managersAt = Date.now();
+      applyStanding();                 // the note under the heading depends on who reports to me
+    }).catch(function (err) {
+      console.warn("Could not read the reporting managers from Employees:", err);
+    });
+  }
+
+  function reportingManagerOf(row) {
+    var em = String((row && row.requester_email) || "").trim().toLowerCase();
+    return em ? (managerByEmail[em] || "") : "";
+  }
+
   function canDecide(standing, row) {
-    if (!standing) return false;
     if (statusOf(row).decision) return false;        // already settled
-    if (standing.level <= levelRaisedAt(row)) return false;
-    return coversDivision(standing, row);
+    var me = myEmail();
+    if (!me) return false;
+    var manager = reportingManagerOf(row);
+    if (manager) return manager === me;
+    return isAppAdmin();                             // no manager on record: IT Admin
   }
 
   /* The name on a requisition comes from the signed-in user, preferring their
@@ -1279,7 +1312,7 @@ window.AWARD_CONFIG = {
         decision_remark: remark || null,
         decided_by: (signedInUser() || {}).name || "",
         decided_by_email: myEmail() || null,
-        decided_by_role: standing.role,
+        decided_by_role: (standing && standing.role) || (isAppAdmin() ? "IT Admin" : "Manager"),
         decided_at: new Date().toISOString()
       }))
       .eq("id", reviewing.id)
@@ -1355,7 +1388,7 @@ window.AWARD_CONFIG = {
       el.newReqBtn.hidden = false;
       el.standingNote.textContent =
         "You are filing as " + (ROLE_TITLES[standing.role] || standing.role) + "." +
-        decidingNote(standing);
+        decidingNote();
       el.standingNote.hidden = false;
       return;
     }
@@ -1364,23 +1397,18 @@ window.AWARD_CONFIG = {
     el.standingNote.hidden = false;
     el.standingNote.textContent = standing
       ? "As " + (ROLE_TITLES[standing.role] || standing.role) +
-        " you decide on requisitions rather than raise them." + decidingNote(standing)
+        " you decide on requisitions rather than raise them." + decidingNote()
       : "Requisitions are raised by Programme Implementation staff. " +
-        "You can see them here but not add one.";
+        "You can see them here but not add one." + decidingNote();
   }
 
   /* Said under the heading, because the alternative is someone who can
      verify seeing no Review buttons and concluding the page is broken. */
-  function decidingNote(standing) {
-    if (!standing || standing.level < 2) return "";
-    if (standing.level >= 4) return " You decide on any division.";
-
-    var divs = standing.divisions || [];
-    if (!divs.length) {
-      return " No division is recorded against you, so there is nothing you " +
-             "can verify yet — ask for it to be filled in on the Employees tab.";
-    }
-    return " You decide on " + divs.join(" and ") + ".";
+  function decidingNote() {
+    var me = myEmail();
+    if (!me) return "";
+    var reports = Object.keys(managerByEmail).filter(function (k) { return managerByEmail[k] === me; }).length;
+    return reports ? " You verify the requisitions of the people who report to you." : "";
   }
 
   /* Head Office's moves. Acknowledging and dispatching take a note only if
@@ -2864,13 +2892,15 @@ window.AWARD_CONFIG = {
         }
 
         allRequisitions = res.data || [];
-        buildFilterOptions();
-        renderTable();
-        // Their own tables, and renderTable returns early when the list is
-        // empty - which is exactly when they need their empty states.
-        renderDelivery();
-        refreshStockControls();
-        renderStock();
+        return ensureManagers().then(function () {
+          buildFilterOptions();
+          renderTable();
+          // Their own tables, and renderTable returns early when the list is
+          // empty - which is exactly when they need their empty states.
+          renderDelivery();
+          refreshStockControls();
+          renderStock();
+        });
       })
       .catch(function (err) {
         el.refreshBtn.disabled = false;
