@@ -166,17 +166,17 @@ window.AWARD_CONFIG = {
      to fulfil it. Dispatch and receipt are likewise two events: Head Office
      knows it sent the award, only the requester knows it arrived. */
   var STAGES = {
-    submitted:    { label: "Pending",      tone: "pending",  open: true  },
-    approved:     { label: "Verified",     tone: "approved", open: true  },
+    submitted:    { label: "Requested",    tone: "pending",  open: true  },
+    approved:     { label: "Mgr verified", tone: "approved", open: true  },
     acknowledged: { label: "Acknowledged", tone: "progress", open: true  },
-    ho_approved:  { label: "Approved",     tone: "approved", open: true  },
-    on_hold:      { label: "On hold",      tone: "held",     open: true  },
-    dispatched:   { label: "Dispatched",   tone: "progress", open: true,
+    ho_approved:  { label: "HO Approved",  tone: "approved", open: true  },
+    on_hold:      { label: "HO on hold",   tone: "held",     open: true  },
+    dispatched:   { label: "HO dispatched", tone: "progress", open: true,
                     hoLabel: "Awaiting confirmation" },
-    received:     { label: "Received",     tone: "done",     open: false,
+    received:     { label: "Gift Received", tone: "done",   open: false,
                     hoLabel: "Delivered" },
-    declined:     { label: "Declined",     tone: "declined", open: false },
-    rejected:     { label: "Rejected",     tone: "declined", open: false }
+    declined:     { label: "Mgr Declined", tone: "declined", open: false },
+    rejected:     { label: "HO Rejected",  tone: "declined", open: false }
   };
 
   // One state, two vantage points: receipt to the requester is delivery
