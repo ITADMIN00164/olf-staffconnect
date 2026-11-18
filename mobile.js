@@ -213,7 +213,7 @@
     "calendar": "Calendar", "smart-goals": "HO Plan", "pos": "Field Review", "gr": "GRs", "forms": "Forms",
     "pom": "Old POM", "team-performance": "Insight"
   };
-  var navBar = null, navScroll = null, navSig = "";
+  var navBar = null, navScroll = null, navSig = "", navLearned = false, navNudged = false;
 
   function navSource() {
     return Array.prototype.filter.call(document.querySelectorAll("#appSidebar .sidebar-nav .nav-item[data-page]"), function (b) {
@@ -232,10 +232,21 @@
     navBar = document.createElement("nav");
     navBar.className = "m-nav";
     navBar.setAttribute("aria-label", "Pages");
-    navBar.innerHTML = '<div class="m-nav-scroll"></div>';
+    var chev = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
+    navBar.innerHTML =
+      '<button type="button" class="m-nav-arrow m-nav-arrow--l" aria-label="Show pages to the left" hidden>' + chev + "</button>" +
+      '<div class="m-nav-scroll"></div>' +
+      '<button type="button" class="m-nav-arrow m-nav-arrow--r" aria-label="Show more pages" hidden>' + chev + "</button>" +
+      '<div class="m-nav-track" aria-hidden="true"><span class="m-nav-thumb"></span></div>';
     shell.appendChild(navBar);
     navScroll = navBar.querySelector(".m-nav-scroll");
     navScroll.addEventListener("scroll", paintNavEdges, { passive: true });
+    // Once the person has scrolled, touched or used an arrow, they know it slides: the hints calm down.
+    var learned = function () { navLearned = true; navBar.classList.add("is-learned"); };
+    navScroll.addEventListener("touchstart", learned, { passive: true });
+    navScroll.addEventListener("pointerdown", learned, { passive: true });
+    navBar.querySelector(".m-nav-arrow--l").addEventListener("click", function () { learned(); navScroll.scrollBy({ left: -navScroll.clientWidth * 0.7, behavior: "smooth" }); });
+    navBar.querySelector(".m-nav-arrow--r").addEventListener("click", function () { learned(); navScroll.scrollBy({ left: navScroll.clientWidth * 0.7, behavior: "smooth" }); });
     navScroll.addEventListener("click", function (e) {
       var b = e.target.closest(".m-nav-item");
       if (!b) return;
@@ -247,8 +258,38 @@
   function paintNavEdges() {
     if (!navScroll) return;
     var max = navScroll.scrollWidth - navScroll.clientWidth;
-    navBar.classList.toggle("can-left", navScroll.scrollLeft > 6);
-    navBar.classList.toggle("can-right", navScroll.scrollLeft < max - 6);
+    var left = navScroll.scrollLeft > 6, right = navScroll.scrollLeft < max - 6;
+    navBar.classList.toggle("can-left", left);
+    navBar.classList.toggle("can-right", right);
+    navBar.classList.toggle("m-nav--scrolls", max > 8);
+    navBar.querySelector(".m-nav-arrow--l").hidden = !left;
+    navBar.querySelector(".m-nav-arrow--r").hidden = !right;
+    // where you are along the bar, and how much of it you are looking at
+    var thumb = navBar.querySelector(".m-nav-thumb");
+    if (thumb && max > 8) {
+      var w = Math.max(18, (navScroll.clientWidth / navScroll.scrollWidth) * 100);
+      thumb.style.width = w + "%";
+      thumb.style.left = ((navScroll.scrollLeft / max) * (100 - w)) + "%";
+    }
+  }
+
+  /* A hint the first time the bar shows in a visit: it slides along a little and comes back,
+     so it is clear that it moves. Skipped when the person has asked for less motion, or has
+     already touched the bar. */
+  function nudgeNav() {
+    if (navNudged || navLearned || !navScroll) return;
+    var max = navScroll.scrollWidth - navScroll.clientWidth;
+    if (max < 40) return;
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    try { if (sessionStorage.getItem("olf-nav-nudged") === "1") { navNudged = true; return; } } catch (e) { /* fine */ }
+    navNudged = true;
+    try { sessionStorage.setItem("olf-nav-nudged", "1"); } catch (e) { /* fine */ }
+    var home = navScroll.scrollLeft;
+    setTimeout(function () {
+      if (navLearned) return;
+      navScroll.scrollTo({ left: Math.min(max, home + 90), behavior: "smooth" });
+      setTimeout(function () { if (!navLearned) navScroll.scrollTo({ left: home, behavior: "smooth" }); }, 750);
+    }, 1400);
   }
 
   function buildBottomNav() {
@@ -288,6 +329,7 @@
       }, 60);
     }
     setTimeout(paintNavEdges, 120);
+    setTimeout(nudgeNav, 400);
   }
 
   function watchSideMenu() {

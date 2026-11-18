@@ -361,3 +361,28 @@
   #appShell.visible ~ #toastContainer { bottom: 90px; }
 }
 @media (prefers-reduced-motion: reduce) { .m-nav-item, .m-nav-label { transition: none; } }
+
+/* The bar says it slides: arrows on the side that has more, a position line beneath, and a nudge on first show. */
+.m-nav-arrow, .m-nav-track { display: none; }
+@media (max-width: 768px) {
+  .content-area { padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px)) !important; }
+  .m-nav-arrow {
+    position: absolute; top: 8px; z-index: 3; width: 30px; height: 48px; padding: 0; border: 0; cursor: pointer; display: grid; place-items: center;
+    color: var(--text, #0F172A); background: transparent; -webkit-tap-highlight-color: transparent;
+  }
+  .m-nav-arrow[hidden] { display: none; }
+  .m-nav-arrow--l { left: 0; background: linear-gradient(90deg, var(--surface, #fff) 55%, transparent); }
+  .m-nav-arrow--r { right: 0; background: linear-gradient(270deg, var(--surface, #fff) 55%, transparent); }
+  .m-nav-arrow svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; opacity: .75; }
+  .m-nav-arrow--l svg { transform: rotate(180deg); }
+  /* until the person has used the bar, the right arrow nudges to catch the eye */
+  .m-nav:not(.is-learned) .m-nav-arrow--r svg { animation: m-arrow-nudge 1.3s ease-in-out infinite; opacity: 1; color: var(--accent, #2F6FE4); }
+  @keyframes m-arrow-nudge { 0%, 100% { transform: translateX(-2px); } 50% { transform: translateX(4px); } }
+
+  .m-nav--scrolls .m-nav-track { display: block; height: 3px; margin: 7px 18px 0; border-radius: 3px; background: rgba(100,116,139,.2); position: relative; overflow: hidden; }
+  .m-nav-thumb { position: absolute; top: 0; bottom: 0; left: 0; width: 30%; border-radius: 3px; background: linear-gradient(90deg, #2F6FE4, #0B8F7A); transition: left .12s linear; }
+  /* the old edge fades are replaced by the arrows' own fade */
+  .m-nav::before, .m-nav::after { display: none; }
+  #appShell.visible ~ .olf-install { bottom: calc(92px + env(safe-area-inset-bottom, 0px)) !important; }
+}
+@media (prefers-reduced-motion: reduce) { .m-nav:not(.is-learned) .m-nav-arrow--r svg { animation: none; } }
