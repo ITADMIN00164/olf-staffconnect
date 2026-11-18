@@ -12,6 +12,12 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
     <meta name="theme-color" content="#E0E8F6">
+    <!-- Install as an app (see manifest.json, sw.js, pwa.js) -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="OLF Connect">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <!-- Light / Dark / System theme. Loaded first so the right theme is
          applied before anything paints (no white flash in dark mode). -->
     <script src="theme.js?v=2026-10-28b"></script>
@@ -4057,5 +4063,6 @@
 <script src="team-performance-data.js?v=20261106a"></script>
 <script src="team-performance.js?v=20261117j"></script>
 <script src="insight-icons.js?v=20261106a"></script>
+<script src="pwa.js?v=2026-11-19a"></script>
 </body>
 </html>
