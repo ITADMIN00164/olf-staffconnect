@@ -202,8 +202,100 @@
     if (cfg) openSheet(tr, cfg);
   });
 
+  /* ------------------------------------------------ 3. bottom navigation
+     On a phone the side menu is replaced by a bar along the bottom: one icon for
+     every page the person can open, sliding sideways. The page you are on shows its
+     name beside its icon. The bar is built from the side menu's own buttons, so who
+     can see what, locks and the page you are on all stay exactly as they are there. */
+  var NAV_FIRST = ["home", "award-management", "calendar", "employees"];
+  var NAV_LABEL = {
+    "home": "Home", "employees": "Employees", "er-dashboards": "Dashboards", "award-management": "Awards & Gifts",
+    "calendar": "Calendar", "smart-goals": "HO Plan", "pos": "Field Review", "gr": "GRs", "forms": "Forms",
+    "pom": "Old POM", "team-performance": "Insight"
+  };
+  var navBar = null, navScroll = null, navSig = "";
+
+  function navSource() {
+    return Array.prototype.filter.call(document.querySelectorAll("#appSidebar .sidebar-nav .nav-item[data-page]"), function (b) {
+      return !b.hidden && !b.closest("[hidden]");
+    });
+  }
+
+  function ensureNav() {
+    if (navBar) return;
+    var shell = document.getElementById("appShell");
+    if (!shell) return;
+    navBar = document.createElement("nav");
+    navBar.className = "m-nav";
+    navBar.setAttribute("aria-label", "Pages");
+    navBar.innerHTML = '<div class="m-nav-scroll"></div>';
+    shell.appendChild(navBar);
+    navScroll = navBar.querySelector(".m-nav-scroll");
+    navScroll.addEventListener("scroll", paintNavEdges, { passive: true });
+    navScroll.addEventListener("click", function (e) {
+      var b = e.target.closest(".m-nav-item");
+      if (!b) return;
+      var src = document.querySelector('#appSidebar .nav-item[data-page="' + b.getAttribute("data-page") + '"]');
+      if (src) src.click();
+    });
+  }
+
+  function paintNavEdges() {
+    if (!navScroll) return;
+    var max = navScroll.scrollWidth - navScroll.clientWidth;
+    navBar.classList.toggle("can-left", navScroll.scrollLeft > 6);
+    navBar.classList.toggle("can-right", navScroll.scrollLeft < max - 6);
+  }
+
+  function buildBottomNav() {
+    ensureNav();
+    if (!navBar) return;
+    var items = navSource();
+    var order = [];
+    NAV_FIRST.forEach(function (p) { items.forEach(function (b) { if (b.getAttribute("data-page") === p) order.push(b); }); });
+    items.forEach(function (b) { if (order.indexOf(b) < 0) order.push(b); });
+
+    // Rebuild only when something it shows has changed.
+    var sig = order.map(function (b) {
+      return b.getAttribute("data-page") + (b.classList.contains("active") ? "!" : "") + (b.classList.contains("nav-item--locked-admin") ? "L" : "");
+    }).join("|");
+    if (sig === navSig) return;
+    navSig = sig;
+
+    navScroll.innerHTML = order.map(function (b) {
+      var page = b.getAttribute("data-page");
+      var label = NAV_LABEL[page] || (b.getAttribute("title") || page);
+      var icon = b.querySelector(".icon");
+      var color = (getComputedStyle(b).getPropertyValue("--pg") || "").trim() || "#2F6FE4";
+      var active = b.classList.contains("active");
+      return '<button type="button" class="m-nav-item' + (active ? " is-active" : "") +
+        (b.classList.contains("nav-item--locked-admin") ? " is-locked" : "") + '" data-page="' + esc(page) + '"' +
+        ' style="--pg:' + esc(color) + '" aria-label="' + esc(label) + '"' + (active ? ' aria-current="page"' : "") + ">" +
+        '<span class="m-nav-ico">' + (icon ? icon.innerHTML : "") + "</span>" +
+        '<span class="m-nav-label">' + esc(label) + "</span></button>";
+    }).join("");
+
+    var on = navScroll.querySelector(".is-active");
+    if (on) {
+      // Bring the page you are on into view, in the middle of the bar.
+      setTimeout(function () {
+        var left = on.offsetLeft - (navScroll.clientWidth - on.offsetWidth) / 2;
+        navScroll.scrollTo({ left: Math.max(0, left), behavior: "smooth" });
+      }, 60);
+    }
+    setTimeout(paintNavEdges, 120);
+  }
+
+  function watchSideMenu() {
+    var side = document.querySelector("#appSidebar .sidebar-nav");
+    if (!side || side.__mNavWatched) return;
+    side.__mNavWatched = true;
+    new MutationObserver(function () { buildBottomNav(); })
+      .observe(side, { attributes: true, subtree: true, childList: true, attributeFilter: ["class", "hidden"] });
+  }
+
   /* ------------------------------------------------ keeping up with the page */
-  function run() { pending = false; labelLists(); filterToggles(); detailCards(); wrapWide(); }
+  function run() { pending = false; labelLists(); filterToggles(); detailCards(); wrapWide(); watchSideMenu(); buildBottomNav(); }
   function schedule() {
     if (pending) return;
     pending = true;
