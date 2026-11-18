@@ -340,6 +340,21 @@
       .observe(side, { attributes: true, subtree: true, childList: true, attributeFilter: ["class", "hidden"] });
   }
 
+  /* ------------------------------------------------ 4. theme on a phone
+     The header shows only the current theme (light, dark or system); a tap
+     moves to the next one. On a laptop all three show as before. */
+  document.addEventListener("click", function (e) {
+    if (!MQ || !MQ.matches) return;
+    var on = e.target.closest && e.target.closest("#appShell .theme-switch button[aria-checked='true']");
+    if (!on) return;
+    var all = Array.prototype.slice.call(on.parentNode.querySelectorAll("button[data-theme-choice]"));
+    var next = all[(all.indexOf(on) + 1) % all.length];
+    if (!next || next === on) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    next.click();
+  }, true);
+
   /* ------------------------------------------------ keeping up with the page */
   function run() { pending = false; labelLists(); filterToggles(); detailCards(); wrapWide(); watchSideMenu(); buildBottomNav(); }
   function schedule() {

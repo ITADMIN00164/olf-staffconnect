@@ -386,3 +386,52 @@
   #appShell.visible ~ .olf-install { bottom: calc(92px + env(safe-area-inset-bottom, 0px)) !important; }
 }
 @media (prefers-reduced-motion: reduce) { .m-nav:not(.is-learned) .m-nav-arrow--r svg { animation: none; } }
+
+/* ==========================================================================
+   App shell on a phone: a clean app header (the app's mark, the page name,
+   a few round buttons), and a floating bottom bar.
+   ========================================================================== */
+@media (max-width: 768px) {
+  html[data-theme] #appShell .topbar {
+    height: calc(58px + env(safe-area-inset-top, 0px)) !important; padding: env(safe-area-inset-top, 0px) 12px 0 14px !important; gap: 10px !important;
+    background: color-mix(in srgb, var(--surface, #fff) 88%, transparent) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%);
+    border-bottom: 1px solid var(--hairline, rgba(15,23,42,.08)) !important; box-shadow: none !important; overflow: visible !important;
+  }
+  /* the app's mark in place of the slanted OLF block */
+  html[data-theme] #appShell .topbar-logo {
+    order: 0 !important; flex: none; width: 36px; height: 36px; align-self: center !important; padding: 0 !important; margin: 0 !important;
+    clip-path: none !important; border-radius: 11px; font-size: 0 !important; color: transparent !important;
+    background: url("/logo-mark.svg?v=2") center / cover no-repeat !important; box-shadow: 0 4px 12px rgba(47,111,228,.3);
+  }
+  #appShell .topbar-logo > *, #appShell .topbar-logo::before, #appShell .topbar-logo::after { display: none !important; }
+  /* the page you are on, as the header's title */
+  #appShell .tb-crumb { display: flex !important; flex: 1 1 auto; min-width: 0; margin: 0; }
+  #appShell .tb-crumb-home, #appShell .tb-crumb-sep, #appShell .tb-crumb-ico { display: none !important; }
+  #appShell .tb-crumb-page {
+    min-width: 0; padding: 0 !important; background: none !important; border: 0 !important; box-shadow: none !important;
+    font-size: 19px; font-weight: 800; letter-spacing: -.5px; color: var(--text, #0F172A);
+  }
+  #appShell .tp-group { gap: 6px !important; margin-left: auto; }
+  /* the theme switch shows only the current choice; a tap moves to the next (mobile.js) */
+  #appShell .theme-switch { padding: 0 !important; background: none !important; box-shadow: none !important; }
+  #appShell .theme-switch button:not([aria-checked="true"]) { display: none !important; }
+  #appShell .theme-switch button[aria-checked="true"] {
+    width: 38px; height: 38px; border-radius: 50%; color: var(--text, #0F172A);
+    background: var(--glass-strong, #fff); box-shadow: none; border: 1px solid var(--hairline, rgba(15,23,42,.1));
+  }
+  #appShell .theme-switch button svg { width: 18px; height: 18px; }
+  html[data-theme] #appShell .tb-bell, html[data-theme] #appShell .topbar-profile, #appShell .tb-install { width: 38px; height: 38px; }
+  html[data-theme] #appShell .topbar-profile { padding: 0 !important; border-radius: 50%; justify-content: center; }
+
+  /* a floating bottom bar */
+  #appShell.visible .m-nav {
+    left: 10px !important; right: 10px !important; bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+    padding: 7px 0 8px !important; border-radius: 24px; border: 1px solid var(--hairline, rgba(15,23,42,.1)) !important;
+    box-shadow: 0 14px 34px rgba(15,23,42,.18), 0 2px 6px rgba(15,23,42,.06) !important; overflow: hidden;
+  }
+  .m-nav-arrow { top: 7px !important; }
+  .m-nav-track { margin: 6px 24px 0 !important; }
+  .content-area { padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px)) !important; }
+  #appShell.visible ~ .olf-install { bottom: calc(104px + env(safe-area-inset-bottom, 0px)) !important; }
+}
