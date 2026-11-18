@@ -2849,3 +2849,75 @@
 .award-page tr.req-row.is-done        { --tone: #16A34A; }
 .award-page tr.req-row.is-mgrdeclined { --tone: #EA580C; }
 .award-page tr.req-row.is-declined    { --tone: #DC2626; }
+
+/* Requisition filters: three labelled groups - Where, Who, Requisition. */
+.award-page .filters { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: flex-start; }
+.award-page .filters .filter-group { flex: 1 1 auto; min-width: 0; }
+.award-page .filters .filter-group:first-child { flex-grow: 3; }
+.award-page .filters .filter-group-title {
+  font-size: .68rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--accent-ink); margin-bottom: 8px; padding-bottom: 6px;
+  border-bottom: 2px solid var(--accent-soft-border);
+}
+.award-page .filters .filter-group-fields { display: flex; flex-wrap: wrap; gap: 10px; }
+.award-page .filters .filter-group-fields .field { flex: 1 1 150px; min-width: 140px; margin: 0; }
+@media (max-width: 640px) {
+  .award-page .filters .filter-group { flex-basis: 100%; }
+}
+
+/* Filter dropdowns: the real <select> is hidden, this is drawn in its place. */
+.award-page .filters .dd-native { display: none; }
+.award-page .dd { position: relative; }
+.award-page .dd-btn {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px;
+  padding: 8px 10px 8px 12px; font: inherit; font-size: .9rem; text-align: left;
+  color: var(--text); background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: 10px; cursor: pointer;
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+.award-page .dd-btn:hover { border-color: var(--accent-line); }
+.award-page .dd-btn:focus-visible, .award-page .dd.is-open .dd-btn {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft-border);
+}
+.award-page .dd.is-set .dd-btn { border-color: var(--accent-line); background: var(--accent-soft); font-weight: 600; }
+.award-page .dd-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.award-page .dd-caret { width: 12px; height: 12px; flex: none; color: var(--text-muted); transition: transform .15s ease; }
+.award-page .dd.is-open .dd-caret { transform: rotate(180deg); }
+.award-page .dd-panel {
+  position: absolute; z-index: 60; left: 0; right: 0; top: calc(100% + 6px); min-width: 200px;
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: 12px;
+  box-shadow: 0 14px 34px rgba(15,23,42,.18); padding: 6px;
+}
+.award-page .dd-search {
+  width: 100%; margin: 0 0 6px; padding: 8px 10px; font: inherit; font-size: .86rem;
+  color: var(--text); background: var(--surface-alt); border: 1px solid var(--border); border-radius: 8px;
+}
+.award-page .dd-search:focus { outline: none; border-color: var(--accent); }
+.award-page .dd-list { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow-y: auto; }
+.award-page .dd-group {
+  padding: 8px 10px 4px; font-size: .64rem; font-weight: 800; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.award-page .dd-item {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px;
+  font-size: .9rem; color: var(--text); cursor: pointer;
+}
+.award-page .dd-item.is-active { background: var(--surface-alt); }
+.award-page .dd-item:hover { background: var(--accent-soft); }
+.award-page .dd-item.is-selected { background: var(--accent-soft); color: var(--accent-ink); font-weight: 700; }
+.award-page .dd-item.is-empty { color: var(--text-muted); }
+.award-page .dd-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.award-page .dd-n {
+  flex: none; min-width: 24px; padding: 1px 8px; border-radius: 99px; text-align: center;
+  font-family: var(--font-mono); font-size: .74rem; background: var(--surface-alt); color: var(--text-soft);
+}
+.award-page .dd-none { padding: 12px; font-size: .86rem; color: var(--text-muted); }
+.award-page .dd-dot { width: 10px; height: 10px; flex: none; border-radius: 50%; background: #94A3B8; }
+.award-page .dd-dot.is-pending     { background: #64748B; }
+.award-page .dd-dot.is-verified    { background: #0284C7; }
+.award-page .dd-dot.is-hoapproved  { background: #4F46E5; }
+.award-page .dd-dot.is-held        { background: #F59E0B; }
+.award-page .dd-dot.is-sent        { background: #9333EA; }
+.award-page .dd-dot.is-done        { background: #16A34A; }
+.award-page .dd-dot.is-mgrdeclined { background: #EA580C; }
+.award-page .dd-dot.is-declined    { background: #DC2626; }
