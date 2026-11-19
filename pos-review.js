@@ -710,6 +710,7 @@
   }
   function resetDropdowns() {
     var v = $("prValue"), m = $("prMonth");
+    if (!v || !m) return;                                    // Field Review is not the page on screen
     v.innerHTML = '<option value="">—</option>'; v.disabled = true;
     m.innerHTML = '<option value="">—</option>'; m.disabled = true;
   }

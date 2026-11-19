@@ -508,6 +508,7 @@
   }
 
   function renderCalendar() {
+    if (!$('pcal-sel-month')) return;                        // the calendar is not the page on screen
     $('pcal-sel-month').value = viewMonth;
     populateYearSelect('pcal-sel-year', viewYear);
     $('pcal-cal-month-label').textContent = MONTHS[viewMonth] + ' ' + viewYear;
