@@ -792,7 +792,7 @@
       if (r.actual.getFullYear() === y && r.actual.getMonth() === m) {
         no++;
         var end = calAdd(mon, 6), lockDate = calNextMonday(r.actual), past = today >= lockDate;
-        CAL[no] = { label: calDM(mon) + " \u2013 " + calDM(end), reviewLabel: calWD(r.actual),
+        CAL[no] = { from: new Date(mon), to: new Date(end), label: calDM(mon) + " \u2013 " + calDM(end), reviewLabel: calWD(r.actual),
                     moved: r.moved, locked: false, adminUnlock: false };
       }
     }
@@ -808,7 +808,7 @@
     computeCalendar();
     Object.keys(CELL_VALS).forEach(function (k) { if (!/00\|/.test(k)) delete CELL_VALS[k]; });   // keep Monthly's
     var h = VIEW.header || {};
-    var html = renderHeader(h) + renderBlocks(h) + renderCards() + renderTable();
+    var html = renderHeader(h) + renderBlocks(h) + phoneWeekBarHtml() + renderCards() + renderTable();
     var canEdit = canEditSelf() || canEditManager();
     if (canEdit) html += '<div class="pr-savebar"><span class="pr-savehint">You can edit the sections your role owns.</span>'
       + '<button class="pr-btn pr-btn-primary" id="prSave">Save review</button></div>';
@@ -939,6 +939,7 @@
     document.querySelectorAll('#prBody [data-wkdate="' + n + '"]').forEach(function (el) { el.textContent = t; });
     var b = document.querySelector('#prBody [data-wkdatebtn="' + n + '"]');
     if (b) b.textContent = t ? "Edit dates" : "Set dates";
+    if (typeof paintPhoneWeekBar === "function") paintPhoneWeekBar();
   }
   var WD_WEEK = 0;
   function wdMsg(s, bad) { var el = $("prWdMsg"); if (el) { el.textContent = s || ""; el.classList.toggle("is-over", !!bad); } }
@@ -1015,8 +1016,85 @@
     });
     var all = $("prWkAll");
     if (all) all.addEventListener("click", function () { SELWK = { 1: true, 2: true, 3: true, 4: true, 5: true }; applyWeekSel(); });
-    applyWeekSel();
+    bindPhoneWeekBar();
+    applyPhoneWeeks();
   }
+
+  /* ---------- phone: one week at a time ----------
+     A phone has no room for five week columns side by side, and sliding sideways
+     to find one is awkward. So on a phone a week bar picks ONE week (today's week
+     to begin with) and the table shows just that week - the same single-column
+     view the "show or hide a week" cards give on a laptop. */
+  var MQ_PHONE = window.matchMedia ? window.matchMedia("(max-width: 640px)") : null;
+  var PHONE_WK = 0, PHONE_FORCED = false;
+  function onPhone() { return !!(MQ_PHONE && MQ_PHONE.matches); }
+  function weekState(w) {
+    var n = ["A", "B", "G", "H"].filter(function (k) { return secFilled(w, k); }).length;
+    return n === 4 ? "complete" : n > 0 ? "partial" : "";
+  }
+  function defaultPhoneWeek() {
+    var live = liveWeekNums(), today = new Date();
+    for (var i = 0; i < live.length; i++) {
+      var c = CAL[live[i]];
+      if (c && c.from && c.to && today >= c.from && today < calAdd(c.to, 1)) return live[i];   // this week
+    }
+    var started = live.filter(function (n) { return weekState(weekByNum(n)) !== ""; });
+    return started.length ? started[started.length - 1] : (live[0] || 1);                          // else the latest one with entries
+  }
+  function phoneWeekBarHtml() {
+    var weeks = calWeeks();
+    if (!weeks.length) return "";
+    var btns = weeks.map(function (w) {
+      return '<button type="button" role="tab" class="pr-wkpick ' + weekState(w) + '" data-pw="' + w.week + '" aria-label="Week ' + w.week + '">'
+        + '<span class="pr-wkpick-w">Week</span><b>' + w.week + '</b><i></i></button>';
+    }).join("");
+    return '<div class="pr-wkbar" id="prWkBar"><div class="pr-wkseg" role="tablist" aria-label="Week">' + btns + '</div>'
+      + '<div class="pr-wkinfo" id="prWkInfo"></div></div>';
+  }
+  function paintPhoneWeekBar() {
+    var bar = $("prWkBar");
+    if (!bar) return;
+    var n = PHONE_WK, w = weekByNum(n);
+    if (!w) return;
+    Array.prototype.forEach.call(bar.querySelectorAll(".pr-wkpick"), function (b) {
+      var on = Number(b.dataset.pw) === n;
+      b.classList.toggle("is-on", on);
+      b.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    var dt = weekDateText(n) || (CAL[n] && CAL[n].label) || "";
+    var st = weekState(w), remark = st === "complete" ? "Completed" : st === "partial" ? "Partially completed" : "Not started yet";
+    var flags = ["A", "B", "G", "H"].map(function (k) {
+      return '<span class="pr-bar ' + (secFilled(w, k) ? "on" : "off") + '" title="' + k + '"></span>';
+    }).join("");
+    $("prWkInfo").innerHTML = '<div class="pr-wkinfo-top"><b>Week ' + n + '</b><span>' + esc(dt) + '</span></div>'
+      + '<div class="pr-wkinfo-foot"><span class="pr-wkstate ' + st + '">' + remark + '</span><span class="pr-bars">' + flags + '</span>'
+      + (prIsAdmin() ? '<button type="button" class="pr-wkdate-btn" data-pwdates="' + n + '">' + (weekDateText(n) ? "Edit dates" : "Set dates") + '</button>' : "")
+      + '</div>';
+  }
+  function applyPhoneWeeks() {
+    if (onPhone()) {
+      if (liveWeekNums().indexOf(PHONE_WK) < 0) PHONE_WK = defaultPhoneWeek();
+      SELWK = { 1: false, 2: false, 3: false, 4: false, 5: false };
+      SELWK[PHONE_WK] = true;
+      PHONE_FORCED = true;
+    } else if (PHONE_FORCED) {
+      SELWK = { 1: true, 2: true, 3: true, 4: true, 5: true };
+      PHONE_FORCED = false;
+    }
+    applyWeekSel();
+    paintPhoneWeekBar();
+  }
+  function bindPhoneWeekBar() {
+    var bar = $("prWkBar");
+    if (!bar) return;
+    bar.addEventListener("click", function (e) {
+      var pick = e.target.closest && e.target.closest(".pr-wkpick");
+      if (pick) { PHONE_WK = Number(pick.dataset.pw); applyPhoneWeeks(); return; }
+      var d = e.target.closest && e.target.closest("[data-pwdates]");
+      if (d) openWeekDates(Number(d.dataset.pwdates));
+    });
+  }
+  if (MQ_PHONE && MQ_PHONE.addEventListener) MQ_PHONE.addEventListener("change", function () { if (VIEW && $("prWkBar")) applyPhoneWeeks(); });
 
   /* Remove / restore a week for the whole month (itadmin only). It applies to every PO, PM
      and DM, because weeks are the month's calendar slots, not one person's. Saved entries
