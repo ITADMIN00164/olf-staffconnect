@@ -413,6 +413,28 @@
     }, { passive: true });
   }
 
+  /* ------------------------------------------------ 6. the phone's own bars
+     The colour of the status bar at the top (and the navigation bar on some phones) follows the
+     app: the header's colour inside the app (light or dark), the sign-in colour before it, so the
+     bars and the screen read as one. */
+  function syncBarColour() {
+    var m = document.querySelector('meta[name="theme-color"]');
+    if (!m) return;
+    var dark = document.documentElement.getAttribute("data-theme") === "dark";
+    var shell = document.getElementById("appShell");
+    var inApp = !!(shell && shell.classList.contains("visible"));
+    var c = inApp ? (dark ? "#151A22" : "#F4F7FC") : "#0F1522";
+    if (m.getAttribute("content") !== c) m.setAttribute("content", c);
+  }
+  function watchBarColour() {
+    syncBarColour();
+    new MutationObserver(syncBarColour).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    var shell = document.getElementById("appShell");
+    if (shell) new MutationObserver(syncBarColour).observe(shell, { attributes: true, attributeFilter: ["class"] });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", watchBarColour);
+  else watchBarColour();
+
   /* ------------------------------------------------ keeping up with the page */
   function run() { pending = false; labelLists(); labelPrTables(); filterToggles(); detailCards(); wrapWide(); watchSideMenu(); buildBottomNav(); smoothPages(); }
   function schedule() {
