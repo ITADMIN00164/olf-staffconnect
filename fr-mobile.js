@@ -109,24 +109,22 @@
   }
 
   /* ------------------------------------------------ 3. Save shows only when there is something to save */
-  function markDirty(target) {
-    if (!phone() || !target || !target.closest) return;
-    var area = target.closest("#prBody, #prMoBody");
-    if (!area) return;
-    var bar = area.querySelector(".pr-savebar");
-    if (bar && !bar.classList.contains("is-dirty")) {
+  // pos-review.js announces every change it records ("pr-dirty"), so Save shows exactly when it should,
+  // whatever kind of control was used (buttons, boxes, lists, notes, the monthly figures).
+  function showSave() {
+    if (!phone()) return;
+    Array.prototype.forEach.call(document.querySelectorAll("#prBody .pr-savebar, #prMoBody .pr-savebar"), function (bar) {
+      if (bar.classList.contains("is-dirty")) return;
       bar.classList.add("is-dirty");
       var hint = bar.querySelector(".pr-savehint");
       if (hint && !hint.classList.contains("is-fail")) hint.textContent = "You have changes that are not saved yet.";
-    }
+    });
   }
+  window.addEventListener("pr-dirty", showSave);
+
   document.addEventListener("click", function (e) {
     var t = e.target;
     if (!t || !t.closest) return;
-    if (t.closest(".pr-segbtn")) markDirty(t);
-    if (t.closest("#prModalSave")) {             // a note written in the sheet
-      markDirty(document.querySelector("#prBody .pr-tbl, #prMoBody .pr-tbl"));
-    }
     var pick = t.closest(".pr-wkpick");           // a different week: the list eases in
     if (pick) {
       var wrap = document.querySelector("#prBody .pr-tablewrap");
@@ -134,8 +132,7 @@
     }
     schedule();
   }, true);
-  document.addEventListener("change", function (e) { if (e.target.closest && e.target.closest("table.pr-tbl")) markDirty(e.target); schedule(); }, true);
-  document.addEventListener("input", function (e) { if (e.target.closest && e.target.closest("table.pr-tbl")) markDirty(e.target); }, true);
+  document.addEventListener("change", function () { schedule(); }, true);
 
   /* ------------------------------------------------ 4. summary cards: a bar for done / partly / not */
   function summaryBars() {

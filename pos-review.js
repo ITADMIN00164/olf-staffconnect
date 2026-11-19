@@ -648,6 +648,9 @@
     if ($("prModalSave")) $("prModalSave").addEventListener("click", saveTextModal);
     wireWeekDates();
     if ($("prModalClose")) $("prModalClose").addEventListener("click", closeTextModal);
+    // Tapping outside the note box, or pressing Escape, closes it - unless there is text typed that would be lost.
+    if ($("prModal")) $("prModal").addEventListener("click", function (e) { if (e.target === $("prModal")) leaveTextModal(); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && $("prModal") && !$("prModal").hidden) leaveTextModal(); });
     if ($("prModalText")) $("prModalText").addEventListener("input", updateModalMsg);
     if ($("prListClose")) $("prListClose").addEventListener("click", closeAcadList);
     if ($("prListModal")) $("prListModal").addEventListener("click", function (e) { if (e.target === $("prListModal")) closeAcadList(); });
@@ -1305,6 +1308,13 @@
     closeTextModal();
   }
   function closeTextModal() { $("prModal").hidden = true; }
+  function leaveTextModal() {
+    var sb = $("prModalSave"), changed = sb && !sb.hidden && $("prModalText").value !== (CELL_VALS[sb.dataset.key] || "");
+    if (!changed) { closeTextModal(); return; }
+    var m = $("prModalMsg");
+    m.textContent = "You have text that is not saved. Tap Save, or Close to discard it.";
+    m.className = "pr-modal-msg is-over";
+  }
   function renderCell(S, r, w, editable) {
     var sec = (w.sections || {})[S.k] || {};
     var stored = sec[r.id];
@@ -1385,6 +1395,7 @@
   function markDirty(wc, fid, val) {
     var map = /00$/.test(wc) ? MDIRTY : DIRTY;   // YYYYMM00 = Monthly tab, weeks 01-05 = Weekly
     (map[wc] = map[wc] || {})[fid] = val;
+    try { window.dispatchEvent(new Event("pr-dirty")); } catch (e) { /* older browsers: the phone layer simply keeps Save visible */ }
   }
 
   function saveAll() {

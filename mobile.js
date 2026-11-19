@@ -435,6 +435,26 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", watchBarColour);
   else watchBarColour();
 
+  /* ------------------------------------------------ 7. keyboard
+     While you type, the bottom bar would ride up above the keyboard and cover the box
+     you are typing in. It steps aside until you finish. */
+  var typingTimer = 0;
+  document.addEventListener("focusin", function (e) {
+    var t = e.target;
+    if (!t || !t.matches) return;
+    if (t.matches("textarea, select, input:not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]):not([type=range])")) {
+      clearTimeout(typingTimer);
+      document.documentElement.classList.add("m-typing");
+    }
+  });
+  document.addEventListener("focusout", function () {
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(function () {
+      var a = document.activeElement;
+      if (!a || !a.matches || !a.matches("textarea, select, input")) document.documentElement.classList.remove("m-typing");
+    }, 250);
+  });
+
   /* ------------------------------------------------ keeping up with the page */
   function run() { pending = false; labelLists(); labelPrTables(); filterToggles(); detailCards(); wrapWide(); watchSideMenu(); buildBottomNav(); smoothPages(); }
   function schedule() {
