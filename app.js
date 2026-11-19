@@ -893,8 +893,13 @@ function showAccessDenied(email) {
 ==================================== */
 
 function hideLoading() {
-    loadingScreen.classList.add("hidden");
-    setTimeout(() => loadingScreen.style.display = "none", 300);
+    // The opening screen plays through (about 1.6 seconds) before it lets go,
+    // so a fast sign-in does not flash it away mid-animation.
+    const wait = Math.max(0, 1600 - performance.now());
+    setTimeout(() => {
+        loadingScreen.classList.add("hidden");
+        setTimeout(() => loadingScreen.style.display = "none", 850);
+    }, wait);
 }
 
 function showSignin() {
