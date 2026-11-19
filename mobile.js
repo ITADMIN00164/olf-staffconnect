@@ -144,6 +144,19 @@
     holder.setAttribute("data-sig", sig);
   }
 
+  // Field Review's list tables (summary and the pop-up lists): each cell learns its column name
+  function labelPrTables() {
+    Array.prototype.forEach.call(document.querySelectorAll("#prSumBody table, .pr-list-body table"), function (t) {
+      var heads = Array.prototype.map.call(t.querySelectorAll("thead th"), function (th) { return th.textContent.trim(); });
+      if (!heads.length) return;
+      Array.prototype.forEach.call(t.querySelectorAll("tbody tr"), function (tr) {
+        Array.prototype.forEach.call(tr.children, function (td, i) {
+          if (heads[i] && td.getAttribute("data-label") !== heads[i]) td.setAttribute("data-label", heads[i]);
+        });
+      });
+    });
+  }
+
   function closeSheet() {
     Array.prototype.forEach.call(document.querySelectorAll(".m-sheet-overlay"), function (n) { n.remove(); });
     document.removeEventListener("keydown", sheetKey);
@@ -340,12 +353,15 @@
 
   // Bring the page you are on into view, in the middle of the bar (after its pill has grown).
   function centreActive() {
-    setTimeout(function () {
+    var go = function () {
       var on = navScroll && navScroll.querySelector(".is-active");
       if (!on) return;
-      var left = on.offsetLeft - (navScroll.clientWidth - on.offsetWidth) / 2;
-      navScroll.scrollTo({ left: Math.max(0, left), behavior: "smooth" });
-    }, 180);
+      var box = navScroll.getBoundingClientRect(), it = on.getBoundingClientRect();
+      var delta = (it.left + it.width / 2) - (box.left + box.width / 2);
+      if (Math.abs(delta) > 4) navScroll.scrollTo({ left: Math.max(0, navScroll.scrollLeft + delta), behavior: "smooth" });
+    };
+    setTimeout(go, 120);
+    setTimeout(go, 520);          // again once the pill has finished growing
   }
 
   function watchSideMenu() {
@@ -398,7 +414,7 @@
   }
 
   /* ------------------------------------------------ keeping up with the page */
-  function run() { pending = false; labelLists(); filterToggles(); detailCards(); wrapWide(); watchSideMenu(); buildBottomNav(); smoothPages(); }
+  function run() { pending = false; labelLists(); labelPrTables(); filterToggles(); detailCards(); wrapWide(); watchSideMenu(); buildBottomNav(); smoothPages(); }
   function schedule() {
     if (pending) return;
     pending = true;

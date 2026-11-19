@@ -477,7 +477,9 @@
   }
 }
 @media (max-width: 768px) and (prefers-reduced-motion: no-preference) {
-  .content-area.m-page-in > * { animation: m-page-in .38s cubic-bezier(.22,1,.36,1) both; }
+  /* "backwards", not "both": once it has played nothing is left running, so pop-ups and sheets
+     inside the page are placed against the screen, not against the page. */
+  .content-area.m-page-in > * { animation: m-page-in .38s cubic-bezier(.22,1,.36,1) backwards; }
   @keyframes m-page-in { from { opacity: 0; transform: translateY(12px); } }
 }
 

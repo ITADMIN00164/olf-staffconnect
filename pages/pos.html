@@ -1540,6 +1540,48 @@
           .pr-savebar .pr-btn{width:100%;height:48px;font-size:15px;border-radius:12px;}
           .pr-savehint{text-align:center;font-size:12px;}
         }
+        @media (max-width:640px){
+          /* pickers two to a row (a lone last one takes the full width); search always full width */
+          .pr-filters{display:flex;flex-wrap:wrap;gap:10px;}
+          .pr-filters > .pr-field{flex:1 1 calc(50% - 5px);min-width:0 !important;}
+          .pr-filters > .pr-field:nth-child(odd):nth-last-child(2),
+          .pr-filters > .pr-field:has(input[type="search"],input[type="text"]),
+          .pr-filters > .pr-field.pr-sum-search-field{flex-basis:100%;}
+          .pr-field select{padding-left:12px;padding-right:30px;text-overflow:ellipsis;}
+          .pr-field>span{font-size:10.5px;}
+
+          /* Summary: the heading, then the period and Download on a row of their own */
+          .pr-sum-head{flex-wrap:wrap;gap:8px 10px;}
+          .pr-sum-head .pr-blocks-h{flex:1 1 100%;display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;}
+          .pr-sum-head .pr-sum-period{margin-left:0;}
+          .pr-sum-head .pr-sum-dl{margin-left:auto;}
+
+          /* Summary by review unit: a card each, the three counts side by side beneath its name */
+          #prSumBody .pr-sum-tbl tr.pr-row:not(.pr-hidden){display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 8px;align-items:start;
+                                                          padding:13px 14px;background:#fff;border:1px solid rgba(15,23,42,.08);border-radius:16px;margin-bottom:8px;}
+          #prSumBody .pr-sum-tbl tr.pr-row > td.pr-item{grid-column:1 / -1;font-size:15px;}
+          #prSumBody .pr-sum-tbl tr.pr-row > td.pr-num{display:flex;flex-direction:column;align-items:flex-start;gap:5px;width:auto !important;text-align:left !important;}
+          #prSumBody .pr-sum-tbl tr.pr-row > td.pr-num::before{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);}
+          #prSumBody .pr-sum-tbl tr.pr-row > td.pr-num:nth-child(2)::before{content:"Review done";}
+          #prSumBody .pr-sum-tbl tr.pr-row > td.pr-num:nth-child(3)::before{content:"Partly done";}
+          #prSumBody .pr-sum-tbl tr.pr-row > td.pr-num:nth-child(4)::before{content:"Not done";}
+          #prSumBody .pr-sum-tbl tr.pr-sum-total{background:#F1F6FE !important;}
+          .pr-sum-drill{min-width:50px;height:34px;font-size:14px;}
+
+          /* the lists that pop up (who is in a group, why Yes or No ...): one card per line */
+          .pr-list-body .pr-tbl,.pr-list-body .pr-tbl tbody{display:block;width:100%;}
+          .pr-list-body .pr-tbl thead{display:none;}
+          .pr-list-body .pr-tbl tr.pr-row{display:block;padding:11px 13px;margin-bottom:8px;background:#fff;border:1px solid rgba(15,23,42,.08);border-radius:14px;}
+          .pr-list-body .pr-tbl tr.pr-row > td{display:flex;justify-content:space-between;gap:12px;padding:3px 0 !important;border:0 !important;background:none !important;
+                                               text-align:right !important;white-space:normal;font-size:13.5px;min-width:0 !important;}
+          .pr-list-body .pr-tbl tr.pr-row > td[data-label]::before{content:attr(data-label);flex:0 0 36%;text-align:left;font-size:10.5px;font-weight:700;
+                                                                  letter-spacing:.06em;text-transform:uppercase;color:var(--mut);padding-top:2px;}
+          .pr-list-body .pr-tbl tr.pr-row > td[data-label="#"]{display:none;}
+          .pr-list-body .pr-tbl tr.pr-row > td.pr-item{font-size:15px;font-weight:700;color:var(--ink);justify-content:flex-start;text-align:left !important;padding-bottom:6px !important;}
+          .pr-list-body .pr-tbl tr.pr-row > td.pr-item::before{display:none;}
+          .pr-list-body .pr-tbl:not(:has(td[data-label])) tr.pr-row > td:first-child{text-align:left !important;}
+          .pr-list-body{max-height:62dvh;overflow-y:auto;}
+        }
         html[data-theme="dark"] .pr-wkbar,html[data-theme="dark"] .pr-savebar{background:rgba(29,36,48,.96);border-color:rgba(255,255,255,.08);}
         html[data-theme="dark"] .pr-wkpick{background:#232B38;border-color:rgba(255,255,255,.1);color:#E8ECF2;}
         html[data-theme="dark"] .pr-wkpick.is-on{background:linear-gradient(135deg,#2F6FE4,#0B8F7A);color:#fff;}
