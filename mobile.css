@@ -782,3 +782,151 @@
   .m-pbar { display: block; flex: none; width: 100%; height: 8px; margin-top: 10px; border-radius: 6px; overflow: hidden; background: #E6EBF2; }
   .m-pbar i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, #1DBA85, #16A34A); transition: width .5s cubic-bezier(.22,1,.36,1); }
 }
+
+/* ==========================================================================
+   GRs & Circulars on a phone: a slim banner, four evenly shared tabs, filters in
+   pairs, the three status counters in one row, and every record as a card
+   (gr-mobile.js gives each cell its column's name).
+   ========================================================================== */
+@media (max-width: 640px) {
+  /* banner: one line about the page and a refresh button; the header already names the page */
+  #appShell #grPage .pg-hero { position: relative; padding: 12px 64px 12px 14px !important; min-height: 0; margin-bottom: 12px; }
+  #appShell #grPage .pg-hero .pg-hero-ico, #appShell #grPage .pg-hero .pg-hero-title, #appShell #grPage .gr-whoami { display: none !important; }
+  #appShell #grPage .pg-hero .pg-hero-lead { min-height: 40px; display: flex; align-items: center; }
+  #appShell #grPage .pg-hero .pg-hero-sub { margin: 0; font-size: 12.5px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  #appShell #grPage .pg-hero-actions { position: absolute; top: 12px; right: 12px; margin: 0; width: auto; }
+  #appShell #grPage .gr-refresh-top { width: 40px; height: 40px; min-height: 0; padding: 0; font-size: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; }
+  #appShell #grPage .gr-refresh-top .gr-ricon { font-size: 18px; display: inline-flex; }
+  #appShell #grPage .gr-refresh-top .gr-i { width: 18px; height: 18px; }
+
+  /* the four tabs share the width */
+  #appShell #grPage .gr-tabs { display: grid; width: 100%; box-sizing: border-box; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 6px; overflow: visible; margin-bottom: 14px; }
+  #appShell #grPage .gr-tab { min-width: 0; justify-content: center; flex-direction: column; gap: 3px; padding: 8px 2px; font-size: 11.5px; line-height: 1.15; white-space: normal; text-align: center; }
+  #appShell #grPage .gr-tab .gr-i { width: 17px; height: 17px; margin: 0; }
+
+  /* Add New: the main action, full width */
+  #appShell #grPage .gr-myups-head { flex-direction: column; align-items: stretch; gap: 12px; }
+  #appShell #grPage .gr-myups-head .gr-btn-primary { width: 100%; min-height: 46px; justify-content: center; border-radius: 14px; font-size: 15px; }
+
+  /* filters in pairs */
+  #appShell #grPage .gr-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 10px; padding: 12px !important; margin-bottom: 12px !important; }
+  #appShell #grPage .gr-filter { min-width: 0; }
+  #appShell #grPage .gr-filter select, #appShell #grPage .gr-filter input, #appShell #grPage .gr-ms-btn { width: 100%; min-width: 0; min-height: 44px; font-size: 16px; border-radius: 12px; }
+  #appShell #grPage .gr-filter-clear { grid-column: 1 / -1; }
+  #appShell #grPage .gr-an-actions { display: flex; gap: 8px; width: 100%; }
+  #appShell #grPage .gr-an-actions > button { flex: 1 1 0; justify-content: center; min-height: 44px; }
+  #appShell #grPage .gr-date-input { width: 100%; }
+  #appShell #grPage .gr-filter-clear .gr-clear-btn { width: 100%; justify-content: center; min-height: 44px; }
+
+  /* Total / Validated / Not validated: one row of three */
+  #appShell #grPage .gr-mystat-row { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px !important; margin-bottom: 12px !important; padding: 0 !important; flex-direction: row !important; }
+  #appShell #grPage .gr-mystat { min-width: 0; padding: 12px 10px !important; display: flex; flex-direction: column; align-items: flex-start; gap: 5px; border-radius: 16px; }
+  #appShell #grPage .gr-mystat-val { font-size: 22px; }
+  #appShell #grPage .gr-mystat-label { font-size: 11px; line-height: 1.2; }
+  #appShell #grPage .gr-meta { margin: 2px 2px 10px; }
+
+  /* ---- records as cards ---- */
+  #appShell #grPage .gr-table-wrap:has(table.m-gr) {
+    overflow: visible !important; max-height: none !important; height: auto !important; min-height: 0 !important; padding: 0 !important;
+    background: none !important; border: 0 !important; box-shadow: none !important; border-radius: 0 !important;
+  }
+  #appShell #grPage .m-scroll:has(table.m-gr) { overflow: visible !important; border-radius: 0; }
+  #appShell #grPage table.m-gr, #appShell #grPage table.m-gr tbody, #appShell #grPage table.m-gr tfoot { display: block; width: 100% !important; min-width: 0 !important; }
+  #appShell #grPage table.m-gr colgroup { display: none !important; }
+  #appShell #grPage table.m-gr thead { display: block; }
+  #appShell #grPage table.m-gr thead tr:not(.gr-filter-row) { display: none; }
+
+  /* the column filters of My uploads: a tidy block of pickers above the cards */
+  #appShell #grPage table.m-gr tr.gr-filter-row {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0 0 12px; padding: 12px; border-radius: 16px;
+    background: var(--glass-strong, #fff); border: 1px solid var(--hairline, rgba(15,23,42,.1));
+  }
+  #appShell #grPage table.m-gr tr.gr-filter-row th { display: block; position: static; padding: 0 !important; border: 0 !important; background: none !important; min-width: 0; }
+  #appShell #grPage table.m-gr tr.gr-filter-row th:empty { display: none; }
+  #appShell #grPage table.m-gr tr.gr-filter-row th[data-label]::before { content: attr(data-label); display: block; margin-bottom: 4px; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-soft, #64748B); }
+  #appShell #grPage table.m-gr tr.gr-filter-row th:has(input) { grid-column: 1 / -1; order: -1; }
+  #appShell #grPage table.m-gr tr.gr-filter-row select, #appShell #grPage table.m-gr tr.gr-filter-row input { width: 100%; min-width: 0; min-height: 44px; font-size: 16px; border-radius: 12px; }
+
+  #appShell #grPage table.m-gr tbody tr {
+    position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 12px; align-items: start;
+    margin: 0 0 10px; padding: 14px 14px 14px 17px; border-radius: 16px; overflow: hidden;
+    background: var(--glass-strong, #fff); border: 1px solid var(--hairline, rgba(15,23,42,.1)); box-shadow: var(--shadow-sm, 0 1px 3px rgba(15,23,42,.08));
+  }
+  #appShell #grPage table.m-gr tbody tr:hover { background: var(--glass-strong, #fff); }
+  #appShell #grPage table.m-gr tbody tr[data-s]::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: #D97706; }
+  #appShell #grPage table.m-gr tbody tr[data-s="ok"]::before { background: #16A34A; }
+  #appShell #grPage table.m-gr tbody tr[data-s="rej"]::before { background: #DC2626; }
+  #appShell #grPage table.m-gr tbody td {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; padding: 0 !important; border: 0 !important;
+    background: none !important; text-align: left !important; white-space: normal !important; overflow-wrap: anywhere; word-break: normal !important;
+    font-size: 14px; font-weight: 600; color: var(--text, #0F172A);
+  }
+  #appShell #grPage table.m-gr tbody td[data-label]::before {
+    content: attr(data-label); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; line-height: 1.25; color: var(--text-soft, #64748B);
+  }
+  /* order of the card: title first, then where and when, then the small icons, then who */
+  #appShell #grPage table.m-gr td[data-label="Sr."] { display: none; }
+  #appShell #grPage table.m-gr td[data-label="Title"] { order: 0; grid-column: 1 / -1; padding: 0 44px 2px 40px !important; min-height: 32px; font-size: 15px; font-weight: 800; line-height: 1.35; letter-spacing: -.1px; justify-content: center; }
+  #appShell #grPage table.m-gr td[data-label="Title"]::before { display: none; }
+  #appShell #grPage table.m-gr td[data-label="Type"] { position: absolute; left: 17px; top: 14px; width: 30px; }
+  #appShell #grPage table.m-gr td[data-label="Type"]::before { display: none; }
+  #appShell #grPage table.m-gr td[data-label="Status"] { position: absolute; right: 14px; top: 14px; align-items: flex-end; }
+  #appShell #grPage table.m-gr td[data-label="Status"]::before { display: none; }
+  #appShell #grPage table.m-gr td[data-label="Status"] .gr-chip { width: 30px; height: 30px; display: inline-grid; place-items: center; border-radius: 50%; font-size: 14px; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="Date"] { order: 1; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="District"] { order: 2; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="State"] { order: 3; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="Desc."] { order: 4; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="File"] { order: 5; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="Remark"] { order: 6; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="Uploaded By"], #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="Uploaded on"] { order: 7; grid-column: 1 / -1; font-size: 13px; font-weight: 600; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="Validated By"] { order: 8; grid-column: 1 / -1; font-size: 13px; font-weight: 600; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="Action"] { order: 9; grid-column: 1 / -1; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="Action"]::before { display: none; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="Action"]:has(> .gr-muted:only-child) { display: none; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="Action"] .gr-row-actions { display: flex; gap: 8px; width: 100%; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="Action"] .gr-row-actions button { flex: 1 1 0; min-height: 44px; border-radius: 12px; justify-content: center; font-size: 14px; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="Action"] .gr-row-actions .gr-btn-icon .gr-i { width: 18px; height: 18px; }
+  #appShell #grPage table.m-gr .gr-ts, #appShell #grPage table.m-gr .gr-uploaded { font-size: 13px; font-weight: 600; }
+  #appShell #grPage table.m-gr .gr-ts { color: var(--text-soft, #64748B); font-weight: 500; }
+  #appShell #grPage table.m-gr .gr-desc-btn, #appShell #grPage table.m-gr .gr-file-icon { width: 38px; height: 38px; display: inline-grid; place-items: center; border-radius: 12px; }
+  #appShell #grPage table.m-gr .gr-desc-btn .gr-i, #appShell #grPage table.m-gr .gr-file-icon .gr-i { width: 18px; height: 18px; }
+
+  /* loading and empty messages: one calm card */
+  #appShell #grPage table.m-gr tbody tr:has(> td[colspan]), #appShell #grPage table.m-gr tbody tr:has(> td.gr-empty-cell) { display: block; padding: 0; background: none; border: 0; box-shadow: none; overflow: visible; }
+  #appShell #grPage table.m-gr td.gr-empty-cell { display: block; align-items: center; text-align: center !important; padding: 28px 14px !important; }
+  #appShell #grPage table.m-gr td.gr-empty-cell::before { display: none; }
+  #appShell #grPage table.m-gr .gr-empty-icon { width: 46px; height: 46px; border-radius: 15px; margin-bottom: 10px; }
+  #appShell #grPage table.m-gr .gr-empty-icon .gr-i { width: 22px; height: 22px; }
+
+  /* ---- Analytics: the district grid as cards ---- */
+  #appShell #grPage .gr-an-tabs { padding: 0 0 10px; margin-bottom: 4px; }
+  #appShell #grPage table.m-gr.gr-an-table tbody tr, #appShell #grPage table.m-gr.gr-an-table tfoot tr {
+    grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 14px 16px 16px; border-radius: 16px;
+    background: var(--glass-strong, #fff); border: 1px solid var(--hairline, rgba(15,23,42,.1));
+  }
+  #appShell #grPage table.m-gr.gr-an-table tfoot { display: block; }
+  #appShell #grPage table.m-gr.gr-an-table tfoot tr { position: static; display: grid; gap: 12px 14px; margin: 0 0 10px; background: color-mix(in srgb, var(--accent, #2F6FE4) 8%, var(--glass-strong, #fff)); box-shadow: none; }
+  #appShell #grPage table.m-gr.gr-an-table tfoot td {
+    position: static !important; display: flex; flex-direction: column; gap: 3px; padding: 0 !important; border: 0 !important; background: none !important;
+    text-align: left !important; font-size: 15px; font-weight: 800; color: var(--text, #0F172A); box-shadow: none !important; border-top: 0 !important;
+  }
+  #appShell #grPage table.m-gr.gr-an-table tfoot td[data-label]::before {
+    content: attr(data-label); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-soft, #64748B);
+  }
+  #appShell #grPage table.m-gr.gr-an-table tr > td:first-child { grid-column: 1 / -1; position: relative !important; display: block; padding: 0 0 10px !important; border-bottom: 1px solid var(--hairline, rgba(15,23,42,.1)) !important; box-shadow: none !important; font-size: 16px; font-weight: 800; }
+  #appShell #grPage table.m-gr.gr-an-table tr > td:first-child::before { display: none; }
+  #appShell #grPage table.m-gr.gr-an-table tfoot tr > td:first-child { font-size: 15px; }
+  #appShell #grPage table.m-gr.gr-an-table .gr-an-dbar { display: none; }
+  #appShell #grPage table.m-gr.gr-an-table .gr-an-dname { font-size: 16px; }
+  #appShell #grPage table.m-gr.gr-an-table .gr-an-comm { display: block; margin-top: 3px; }
+  #appShell #grPage table.m-gr.gr-an-table .gr-an-rank { display: inline-grid; place-items: center; width: 24px; height: 24px; min-width: 0; margin-right: 8px; border-radius: 50%; font-size: 11px; background: rgba(100,116,139,.14); }
+  #appShell #grPage table.m-gr.gr-an-table td.gr-an-num, #appShell #grPage table.m-gr.gr-an-table td.gr-an-total, #appShell #grPage table.m-gr.gr-an-table td.gr-an-fnum { border-left: 0 !important; font-size: 17px; font-weight: 800; }
+  #appShell #grPage table.m-gr.gr-an-table tr.gr-an-zero { background: color-mix(in srgb, #DC2626 8%, var(--glass-strong, #fff)); }
+  #appShell #grPage table.m-gr.gr-an-table tr.gr-an-zero td { background: none !important; }
+  #appShell #grPage table.m-gr.gr-an-table tbody tr::before { display: none; }
+
+  /* the Summary tab's charts and lists use the full width */
+  #appShell #grPage .gr-sx-panel { padding: 16px 14px; }
+  #appShell #grPage .gr-sx-tablewrap { margin: 0; }
+}
