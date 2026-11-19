@@ -1637,7 +1637,7 @@ async function getPageHtml(page) {
     // which looks like a broken page rather than a cached one. Hosting already
     // sends no-cache for HTML, so in production this costs a 304 and nothing
     // more; locally it is the difference between seeing an edit and not.
-    const res  = await fetch(`pages/${page}.html?v=20261119S`, { cache: "no-cache" });
+    const res  = await fetch(`pages/${page}.html?v=20261119T`, { cache: "no-cache" });
     const html = await res.text();
     return html;
 }
@@ -2959,6 +2959,12 @@ async function initEmployeesPage() {
     if (table) {
         table.addEventListener("click", (e) => {
             const btn = e.target.closest("button");
+            // On a phone the list shows only name and ID; tapping a person opens their full record.
+            if (!btn && !e.target.closest("a") && window.matchMedia("(max-width: 640px)").matches) {
+                const tr = e.target.closest("tr");
+                if (tr && !tr.querySelector("td[colspan]")) openEmpSheet(tr);
+                return;
+            }
             if (!btn) return;
             if (btn.dataset.action === "edit")   editEmployee(btn.dataset.id);
             if (btn.dataset.action === "delete") deleteEmployeeRecord(btn.dataset.id);
@@ -2967,6 +2973,54 @@ async function initEmployeesPage() {
     }
 
     await loadEmployees();
+}
+
+/* The full record of one person, as a sheet sliding up from the bottom. It is
+   built from the row that was tapped, so it shows exactly what the table shows. */
+function closeEmpSheet() {
+    document.querySelectorAll(".emp-sheet-overlay").forEach(n => n.remove());
+    document.removeEventListener("keydown", empSheetKey);
+}
+function empSheetKey(e) { if (e.key === "Escape") closeEmpSheet(); }
+
+function openEmpSheet(tr) {
+    closeEmpSheet();
+    const nameCell = tr.querySelector("td.col-name");
+    const idText   = (tr.querySelector(".emp-id") || {}).textContent || "";
+    const name     = nameCell ? nameCell.textContent.trim() : idText;
+    const rows = Array.from(tr.querySelectorAll("td[data-label]"))
+        .filter(td => !td.classList.contains("col-name") && !td.classList.contains("col-actions") && !td.classList.contains("col-id"))
+        .map(td => `<div class="emp-sheet-row"><span>${escHtml(td.getAttribute("data-label"))}</span><div>${td.innerHTML}</div></div>`)
+        .join("");
+    const editBtn = tr.querySelector("button[data-action='edit']");
+    const id = editBtn ? editBtn.dataset.id : "";
+    const actions = id ? `<div class="emp-sheet-actions">
+            <button type="button" data-sheet="edit">Edit</button>
+            <button type="button" data-sheet="delete" class="is-danger">Delete</button></div>` : "";
+
+    const wrap = document.createElement("div");
+    wrap.className = "emp-sheet-overlay";
+    wrap.innerHTML = `<div class="emp-sheet" role="dialog" aria-modal="true" aria-label="${escHtml(name)}">
+        <div class="emp-sheet-grab"></div>
+        <div class="emp-sheet-head">
+            <span class="emp-sheet-av" aria-hidden="true">${escHtml(initialsFrom(name))}</span>
+            <div class="emp-sheet-title"><div class="emp-sheet-name">${escHtml(name)}</div><div class="emp-sheet-id">${escHtml(idText)}</div></div>
+            <button type="button" class="emp-sheet-x" data-sheet="close" aria-label="Close">\u2715</button>
+        </div>
+        <div class="emp-sheet-body">${rows}</div>
+        ${actions}
+    </div>`;
+    wrap.addEventListener("click", (e) => {
+        if (e.target === wrap) return closeEmpSheet();
+        const b = e.target.closest("button");
+        if (!b) return;
+        if (b.dataset.sheet === "close") return closeEmpSheet();
+        if (b.dataset.sheet === "edit")   { closeEmpSheet(); editEmployee(id); return; }
+        if (b.dataset.sheet === "delete") { closeEmpSheet(); deleteEmployeeRecord(id); return; }
+        if (b.dataset.action === "multi") { closeEmpSheet(); showMultiFor(b.dataset.id, b.dataset.key); }
+    });
+    document.body.appendChild(wrap);
+    document.addEventListener("keydown", empSheetKey);
 }
 
 async function loadEmployees() {
@@ -3342,6 +3396,16 @@ function renderEmployees() {
             }).join("")}
         </tr>
     `).join("");
+
+    // Each cell carries its column name, so a phone can show a person as a labelled card.
+    const labels = Array.from(tableHead.querySelectorAll("th")).map(th => {
+        const c = th.cloneNode(true);
+        c.querySelectorAll(".sort-mark").forEach(n => n.remove());
+        return c.textContent.trim();
+    });
+    tableEl.querySelectorAll("tr").forEach(tr => {
+        Array.from(tr.children).forEach((td, i) => { if (labels[i] && !td.hasAttribute("colspan")) td.setAttribute("data-label", labels[i]); });
+    });
 }
 
 /* ====================================

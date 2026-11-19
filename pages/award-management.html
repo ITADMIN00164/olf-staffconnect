@@ -49,8 +49,8 @@
            views of the section you are on (only the open section shows its row). -->
       <div class="aw-hero-nav">
         <nav class="aw-toptabs" role="tablist" aria-label="Award Management">
-          <button type="button" role="tab" class="aw-toptab" data-aw-top="event" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="event" aria-hidden="true"></i>Events</button>
-          <button type="button" role="tab" class="aw-toptab is-active" data-aw-top="util" aria-selected="true"><i class="aw-icon" data-aw-icon="medal" aria-hidden="true"></i>Awards</button>
+          <button type="button" role="tab" class="aw-toptab is-active" data-aw-top="event" aria-selected="true"><i class="aw-icon" data-aw-icon="event" aria-hidden="true"></i>Events</button>
+          <button type="button" role="tab" class="aw-toptab" data-aw-top="util" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="medal" aria-hidden="true"></i>Awards</button>
           <button type="button" role="tab" class="aw-toptab" data-aw-top="stock" aria-selected="false" tabindex="-1"><i class="aw-icon" data-aw-icon="gift" aria-hidden="true"></i>Gifts<span class="act-count" id="top-tab-count" hidden></span></button>
         </nav>
         <nav class="aw-subtabs aw-utiltabs" id="aw-util-bar" role="tablist" aria-label="Awards views" hidden>
@@ -115,40 +115,64 @@
         <button type="button" class="btn btn-primary btn-sm" id="act-show">Show me</button>
       </div>
       <div class="filters">
-        <div class="field field-sm">
-          <label for="filter-state">Filter by state</label>
-          <select id="filter-state"><option value="">All states</option></select>
+        <div class="filter-group" role="group" aria-label="Where">
+          <div class="filter-group-title">Where</div>
+          <div class="filter-group-fields">
+            <div class="field field-sm">
+              <label for="filter-state">State</label>
+              <select id="filter-state"><option value="">All states</option></select>
+            </div>
+            <div class="field field-sm">
+              <label for="filter-division">Division</label>
+              <select id="filter-division"><option value="">All divisions</option></select>
+            </div>
+            <div class="field field-sm">
+              <label for="filter-district">District</label>
+              <select id="filter-district"><option value="">All districts</option></select>
+            </div>
+          </div>
         </div>
-        <div class="field field-sm">
-          <label for="filter-division">Filter by division</label>
-          <select id="filter-division"><option value="">All divisions</option></select>
+        <div class="filter-group" role="group" aria-label="Who">
+          <div class="filter-group-title">Who</div>
+          <div class="filter-group-fields">
+            <div class="field field-sm">
+              <label for="filter-manager">Manager</label>
+              <select id="filter-manager"><option value="">All managers</option></select>
+            </div>
+            <div class="field field-sm">
+              <label for="filter-search">Requester</label>
+              <input type="search" id="filter-search" placeholder="Name contains…" />
+            </div>
+          </div>
         </div>
-        <div class="field field-sm">
-          <label for="filter-district">Filter by district</label>
-          <select id="filter-district"><option value="">All districts</option></select>
-        </div>
-        <div class="field field-sm">
-          <label for="filter-status">Filter by status</label>
-          <select id="filter-status">
-            <option value="">All statuses</option>
-            <option value="submitted">Pending</option>
-            <option value="approved">Verified</option>
-            <option value="acknowledged">Acknowledged</option>
-            <option value="ho_approved">Approved</option>
-            <option value="on_hold">On hold</option>
-            <option value="dispatched">Dispatched</option>
-            <option value="received">Received</option>
-            <option value="declined">Declined</option>
-            <option value="rejected">Rejected</option>
-          </select>
-        </div>
-        <div class="field field-sm">
-          <label for="filter-type">Filter by gift</label>
-          <select id="filter-type"><option value="">All gifts</option></select>
-        </div>
-        <div class="field field-sm">
-          <label for="filter-search">Search requester</label>
-          <input type="search" id="filter-search" placeholder="Name contains…" />
+        <div class="filter-group" role="group" aria-label="Requisition">
+          <div class="filter-group-title">Requisition</div>
+          <div class="filter-group-fields">
+            <div class="field field-sm">
+              <label for="filter-status">Status</label>
+              <select id="filter-status">
+                <option value="">All statuses</option>
+                <optgroup label="Manager">
+                  <option value="submitted">Requested</option>
+                  <option value="approved">Mgr verified</option>
+                  <option value="declined">Mgr Declined</option>
+                </optgroup>
+                <optgroup label="Head Office">
+                  <option value="ho_approved">HO Approved</option>
+                  <option value="on_hold">HO on hold</option>
+                  <option value="dispatched">HO dispatched</option>
+                  <option value="rejected">HO Rejected</option>
+                </optgroup>
+                <optgroup label="Delivered">
+                  <option value="received">Gift Received</option>
+                </optgroup>
+              </select>
+            </div>
+            <div class="field field-sm">
+              <label for="filter-type">Gift</label>
+              <select id="filter-type"><option value="">All gifts</option></select>
+            </div>
+          </div>
         </div>
       </div>
       <div class="req-toolbar">

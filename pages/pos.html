@@ -1409,6 +1409,234 @@
           .pr *{animation:none !important;transition:none !important;}
           .pr-toast,.pr-modal,.pr-modal-box{animation:none !important;}
         }
+
+        /* ==================================================================
+           Field Review on a phone
+           One week at a time (a week bar picks it), sections that open like
+           cards, big touch controls, a bottom sheet for writing, and a save bar
+           that stays in reach. No sideways scrolling anywhere in the reviews.
+           ================================================================== */
+        .pr-wkbar{display:none;}
+        @media (max-width:640px){
+          /* the header already names the page: keep only the Dashboard / Admin switch when it is there */
+          #posPage .pg-hero .pg-hero-lead{display:none !important;}
+          #posPage .pg-hero:not(:has(#posAdminTabBtn:not([hidden]))){display:none !important;}
+          #posPage .pg-hero{padding:10px 12px !important;margin-bottom:12px !important;min-height:0 !important;}
+
+          /* the four views as one tidy switch */
+          #posPage .pr-head{padding:5px !important;border-radius:18px;margin-bottom:12px;}
+          #ftrRoot .pr-nav{display:grid !important;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;width:100%;overflow:visible !important;}
+          #ftrRoot .pr-navbtn{flex-direction:column;justify-content:center;height:auto;min-height:56px;padding:8px 2px 7px;gap:4px;border-radius:13px;
+                              font-size:11.5px;font-weight:700;line-height:1.15;text-align:center;white-space:normal;}
+          #ftrRoot .pr-navbtn .fr-ico{width:20px;height:20px;}
+          #posPage .pr-navbtn.is-active::after{display:none;}
+          #ftrRoot .pr-navbtn.is-active{background:linear-gradient(135deg,#2F6FE4,#0B8F7A) !important;color:#fff !important;box-shadow:0 8px 16px -8px rgba(47,111,228,.6);}
+          #ftrRoot .pr-navbtn.is-active .fr-ico{color:#fff !important;}
+
+          /* who / month pickers: comfortable to tap */
+          .pr-filters{gap:10px;padding:14px;}
+          .pr-field{min-width:100%;}
+          .pr-field select,.pr-ms-btn{height:48px;font-size:16px;border-radius:12px;}
+          .pr-filters .pr-btn{width:100%;height:48px;font-size:15px;border-radius:12px;}
+
+          /* the week bar: five weeks, one picked, what that week looks like */
+          .pr-wkbar{display:block;position:sticky;top:0;z-index:25;margin:0 0 12px;padding:10px;border-radius:18px;
+                    background:rgba(255,255,255,.96);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+                    border:1px solid rgba(15,23,42,.08);box-shadow:0 10px 22px -14px rgba(15,23,42,.35);}
+          .pr-wkseg{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:6px;}
+          .pr-wkpick{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;height:56px;
+                     border:1px solid var(--l);border-radius:14px;background:#fff;color:var(--ink2);font:inherit;cursor:pointer;
+                     transition:background .25s ease,color .25s ease,box-shadow .25s ease,transform .12s ease;-webkit-tap-highlight-color:transparent;}
+          .pr-wkpick:active{transform:scale(.95);}
+          .pr-wkpick-w{font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);}
+          .pr-wkpick b{font-size:20px;line-height:1.1;font-weight:800;}
+          .pr-wkpick i{position:absolute;top:7px;right:8px;width:7px;height:7px;border-radius:50%;background:#CBD5E1;}
+          .pr-wkpick.partial i{background:#F59E0B;}
+          .pr-wkpick.complete i{background:#16A34A;}
+          .pr-wkpick.is-on{background:linear-gradient(135deg,#2F6FE4,#0B8F7A);border-color:transparent;color:#fff;box-shadow:0 10px 20px -10px rgba(47,111,228,.7);}
+          .pr-wkpick.is-on .pr-wkpick-w{color:rgba(255,255,255,.85);}
+          .pr-wkpick.is-on i{box-shadow:0 0 0 2px #fff;}
+          .pr-wkinfo{display:grid;gap:7px;margin-top:10px;}
+          .pr-wkinfo-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px;}
+          .pr-wkinfo-top b{font-size:15px;color:var(--ink);}
+          .pr-wkinfo-top span{font-size:12.5px;color:var(--mut);}
+          .pr-wkinfo-foot{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;}
+          .pr-wkstate{font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;background:#F1F5F9;color:#64748B;}
+          .pr-wkstate.partial{background:#FEF3C7;color:#92400E;}
+          .pr-wkstate.complete{background:#DCFCE7;color:#166534;}
+          .pr-wkinfo .pr-bars{display:flex !important;gap:4px;margin:0 0 0 auto;padding:0;width:96px;}
+          .pr-wkinfo .pr-bar{flex:1;height:7px;}
+          .pr-cards-hint,.pr-wkcards{display:none !important;}
+
+          /* the review table as a list of section cards (the week columns are gone, so it fits) */
+          .pr-tablewrap{max-height:none !important;overflow:visible !important;background:none !important;border:0 !important;border-radius:0 !important;box-shadow:none !important;}
+          .pr-tbl{display:block;width:100%;}
+          .pr-tbl thead{display:none;}
+          .pr-tbl tbody{display:block;}
+          .pr-tbl tr.pr-grp{display:block;margin-top:10px;}
+          .pr-tbl tr.pr-grp > td{display:flex;align-items:center;flex-wrap:wrap;gap:4px 0;min-height:54px;padding:12px 14px;
+                                 border:1px solid rgba(15,23,42,.08);border-radius:16px;box-shadow:inset 4px 0 0 var(--acc);font-size:14px;}
+          .pr-tbl tr.pr-grp.is-open > td{border-radius:16px 16px 0 0;border-bottom-color:var(--acc-line);}
+          .pr-tbl tr.pr-row:not(.pr-hidden){display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:13px 14px;background:#fff;
+                                            border:1px solid rgba(15,23,42,.08);border-top:0;}
+          .pr-tbl tr.pr-row:not(.pr-hidden):last-child,
+          .pr-tbl tr.pr-row:not(.pr-hidden):has(+ tr.pr-grp){border-radius:0 0 16px 16px;}
+          .pr-tbl tr.pr-row > td{display:block;padding:0 !important;border:0 !important;background:none !important;box-shadow:none !important;}
+          .pr-tbl td.pr-item{position:static !important;min-width:0 !important;flex:1 1 0;font-size:14px;font-weight:600;color:var(--ink);}
+          .pr-tbl td.pr-wkc{flex:0 0 auto;text-align:right !important;}
+          .pr-tbl td.pr-wkc.pr-wkhide{display:none !important;}
+          /* a row you fill in: the name on top, a full-width control under it */
+          .pr-tbl tr.pr-row:has(.pr-seg,.pr-sel,.pr-bcell,.pr-iconbtn) td.pr-item{flex:1 1 100%;}
+          .pr-tbl tr.pr-row:has(.pr-seg,.pr-sel,.pr-bcell,.pr-iconbtn) td.pr-wkc{flex:1 1 100%;text-align:left !important;}
+
+          .pr-seg{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:6px;width:100%;}
+          .pr-segbtn{height:46px;justify-content:center;padding:0 6px;font-size:14px;border-radius:12px;}
+          .pr-sel{width:100%;height:48px;font-size:16px;border-radius:12px;}
+          .pr-bcell{display:grid;gap:10px;width:100%;}
+          .pr-viewbtn{width:100%;height:46px;border-radius:12px;font-size:14px;}
+          #ftrRoot .pr-iconbtn{width:100%;height:48px;justify-content:flex-start;gap:10px;padding:0 14px;border-radius:12px;font-size:14px;font-weight:600;}
+          #ftrRoot .pr-iconbtn::after{content:"Nothing written";position:static;width:auto;height:auto;border:0;border-radius:0;background:none;
+                                      font:inherit;color:var(--mut);font-weight:500;}
+          #ftrRoot .pr-iconbtn.has-val::after{content:"Written \2014  tap to read";position:static;width:auto;height:auto;border:0;border-radius:0;background:none;color:var(--good-ink);}
+          #ftrRoot .pr-iconbtn.editable::after{content:"Tap to write";}
+          #ftrRoot .pr-iconbtn.editable.has-val::after{content:"Written \2014  tap to edit";}
+
+          /* the monthly scorecard: each line a card, its figures in a row beneath */
+          .pr-mo-tbl tr.pr-row:not(.pr-hidden):not(:has(td[colspan="5"])){display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px 4px;}
+          .pr-mo-tbl tr.pr-row:not(.pr-hidden):not(:has(td[colspan="5"])) > td.pr-item{grid-column:1 / -1;}
+          .pr-mo-tbl tr.pr-row:not(.pr-hidden):not(:has(td[colspan="5"])) > td:not(.pr-item){display:flex;flex-direction:column;align-items:flex-start;gap:3px;
+                                                                                              text-align:left !important;font-size:14px;font-weight:700;}
+          .pr-mo-tbl tr.pr-row > td:not(.pr-item):not([colspan])::before{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);}
+          .pr-mo-tbl tr.pr-row > td:nth-child(2):not([colspan])::before{content:"Weight";}
+          .pr-mo-tbl tr.pr-row > td:nth-child(3):not([colspan])::before{content:"Target";}
+          .pr-mo-tbl tr.pr-row > td:nth-child(4):not([colspan])::before{content:"Done";}
+          .pr-mo-tbl tr.pr-row > td:nth-child(5):not([colspan])::before{content:"% done";}
+          .pr-mo-tbl tr.pr-row > td:nth-child(6):not([colspan])::before{content:"Score";}
+          .pr-mo-tbl tr.pr-row > td:empty::after{content:"\2013";color:#CBD5E1;}
+          .pr-mo-tbl tr.pr-mo-head:not(.pr-hidden){background:#F8FAFC;}
+          .pr-mo-tbl input.pr-mo-num,.pr-mo-tbl input.pr-mo-ent,.pr-mo-tbl select.pr-mo-yn{width:100%;min-width:0;height:42px;font-size:16px;border-radius:10px;}
+          .pr-mo-tbl tr.pr-mo-l1 td.pr-item,.pr-mo-tbl tr.pr-mo-l2 td.pr-item{padding-left:0 !important;}
+          .pr-mo-tbl tr.pr-mo-l1 td.pr-item::before,.pr-mo-tbl tr.pr-mo-l2 td.pr-item::before{display:none;}
+          .pr-mo-tbl td:not(.pr-item){white-space:normal;}
+          .pr-mo-tbl tr.pr-row:has(td[colspan="5"]) > td.pr-item,.pr-mo-tbl tr.pr-row > td[colspan="5"]{flex:1 1 100%;text-align:left !important;}
+
+          /* the summary tables fit the width */
+          .pr-sum-tbl td.pr-item,.pr-sum-tbl th{min-width:0 !important;}
+          .pr-sum-tbl th,.pr-sum-tbl td{padding:10px 8px !important;font-size:12.5px;white-space:normal;}
+          .pr-sum-tbl th{display:table-cell;position:static;}
+
+          /* writing a note or reading an action: a sheet from the bottom */
+          .pr-modal{align-items:flex-end !important;padding:0 !important;z-index:2100 !important;}
+          .pr-modal-box{width:100% !important;max-width:none !important;max-height:92dvh;overflow-y:auto;border-radius:24px 24px 0 0 !important;
+                        padding:10px 18px calc(18px + env(safe-area-inset-bottom,0px)) !important;animation:pr-sheet-up .3s cubic-bezier(.22,1,.36,1);}
+          .pr-modal-box::before{content:"";display:block;width:40px;height:4px;border-radius:4px;background:rgba(100,116,139,.4);margin:2px auto 14px;}
+          .pr-modal-ta{min-height:34dvh;font-size:16px;}
+          .pr-modal-foot .pr-btn{height:48px;flex:1;border-radius:12px;font-size:15px;}
+          @keyframes pr-sheet-up{from{transform:translateY(100%);}}
+
+          /* Save stays in reach, above the bottom bar */
+          .pr-savebar{position:sticky;bottom:96px;z-index:30;display:grid;gap:8px;margin-top:14px;padding:10px 12px;border-radius:18px;
+                      background:rgba(255,255,255,.96);box-shadow:0 12px 28px -12px rgba(15,23,42,.4);border:1px solid rgba(15,23,42,.08);}
+          .pr-savebar .pr-btn{width:100%;height:48px;font-size:15px;border-radius:12px;}
+          .pr-savehint{text-align:center;font-size:12px;}
+        }
+        @media (max-width:640px){
+          /* pickers two to a row (a lone last one takes the full width); search always full width */
+          .pr-filters{display:flex;flex-wrap:wrap;gap:10px;}
+          .pr-filters > .pr-field{flex:1 1 calc(50% - 5px);min-width:0 !important;}
+          .pr-filters > .pr-field:nth-child(odd):nth-last-child(2),
+          .pr-filters > .pr-field:has(input[type="search"],input[type="text"]),
+          .pr-filters > .pr-field.pr-sum-search-field{flex-basis:100%;}
+          .pr-field select{padding-left:12px;padding-right:30px;text-overflow:ellipsis;}
+          .pr-field>span{font-size:10.5px;}
+
+          /* Summary: the heading, then the period and Download on a row of their own */
+          .pr-sum-head{flex-wrap:wrap;gap:8px 10px;}
+          .pr-sum-head .pr-blocks-h{flex:1 1 100%;display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;}
+          .pr-sum-head .pr-sum-period{margin-left:0;}
+          .pr-sum-head .pr-sum-dl{margin-left:auto;}
+
+          /* Summary by review unit: a card each, the three counts side by side beneath its name */
+          #prSumBody .pr-sum-tbl tr.pr-row:not(.pr-hidden){display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 8px;align-items:start;
+                                                          padding:13px 14px;background:#fff;border:1px solid rgba(15,23,42,.08);border-radius:16px;margin-bottom:8px;}
+          #prSumBody .pr-sum-tbl tr.pr-row > td.pr-item{grid-column:1 / -1;font-size:15px;}
+          #prSumBody .pr-sum-tbl tr.pr-row > td.pr-num{display:flex;flex-direction:column;align-items:flex-start;gap:5px;width:auto !important;text-align:left !important;}
+          #prSumBody .pr-sum-tbl tr.pr-row > td.pr-num::before{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);}
+          #prSumBody .pr-sum-tbl tr.pr-row > td.pr-num:nth-child(2)::before{content:"Review done";}
+          #prSumBody .pr-sum-tbl tr.pr-row > td.pr-num:nth-child(3)::before{content:"Partly done";}
+          #prSumBody .pr-sum-tbl tr.pr-row > td.pr-num:nth-child(4)::before{content:"Not done";}
+          #prSumBody .pr-sum-tbl tr.pr-sum-total{background:#F1F6FE !important;}
+          .pr-sum-drill{min-width:50px;height:34px;font-size:14px;}
+
+          /* the lists that pop up (who is in a group, why Yes or No ...): one card per line */
+          .pr-list-body .pr-tbl,.pr-list-body .pr-tbl tbody{display:block;width:100%;}
+          .pr-list-body .pr-tbl thead{display:none;}
+          .pr-list-body .pr-tbl tr.pr-row{display:block;padding:11px 13px;margin-bottom:8px;background:#fff;border:1px solid rgba(15,23,42,.08);border-radius:14px;}
+          .pr-list-body .pr-tbl tr.pr-row > td{display:flex;justify-content:space-between;gap:12px;padding:3px 0 !important;border:0 !important;background:none !important;
+                                               text-align:right !important;white-space:normal;font-size:13.5px;min-width:0 !important;}
+          .pr-list-body .pr-tbl tr.pr-row > td[data-label]::before{content:attr(data-label);flex:0 0 36%;text-align:left;font-size:10.5px;font-weight:700;
+                                                                  letter-spacing:.06em;text-transform:uppercase;color:var(--mut);padding-top:2px;}
+          .pr-list-body .pr-tbl tr.pr-row > td[data-label="#"]{display:none;}
+          .pr-list-body .pr-tbl tr.pr-row > td.pr-item{font-size:15px;font-weight:700;color:var(--ink);justify-content:flex-start;text-align:left !important;padding-bottom:6px !important;}
+          .pr-list-body .pr-tbl tr.pr-row > td.pr-item::before{display:none;}
+          .pr-list-body .pr-tbl:not(:has(td[data-label])) tr.pr-row > td:first-child{text-align:left !important;}
+          .pr-list-body{max-height:62dvh;overflow-y:auto;}
+        }
+        /* ---- The finishing touches (phone) ---- */
+        .m-ctx{display:none;}
+        @media (max-width:640px){
+          /* the pickers fold into one line once a review is open (fr-mobile.js) */
+          .m-ctx{display:flex;align-items:center;gap:12px;width:100%;padding:11px 12px 11px 12px;margin:0 0 10px;border-radius:16px;
+                 border:1px solid rgba(15,23,42,.08);background:#fff;font:inherit;color:var(--ink);text-align:left;cursor:pointer;
+                 box-shadow:0 8px 18px -12px rgba(15,23,42,.35);-webkit-tap-highlight-color:transparent;transition:transform .12s ease;}
+          .m-ctx:active{transform:scale(.985);}
+          .m-ctx[hidden]{display:none;}
+          .m-ctx-ico{width:36px;height:36px;flex:none;border-radius:12px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M4 7h9M17 7h3M4 17h3M11 17h9'/%3E%3Ccircle cx='15' cy='7' r='2.2'/%3E%3Ccircle cx='9' cy='17' r='2.2'/%3E%3C/svg%3E") center/20px no-repeat,linear-gradient(135deg,#2F6FE4,#0B8F7A);}
+          .m-ctx-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;}
+          .m-ctx-text small{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--mut);}
+          .m-ctx-text b{font-size:14.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+          .m-ctx-go{flex:none;font-size:0;padding:7px 13px;border-radius:999px;background:var(--acc-soft,#E8F0FE);}
+          .m-ctx-go::before{content:"Change";font-size:12.5px;font-weight:700;color:#2457C5;}
+          .m-ctx.is-open .m-ctx-go::before{content:"Hide";}
+          .pr-filters.m-ctx-closed{display:none !important;}
+
+          /* how far along each section is */
+          .m-prog{margin-left:auto;font-size:11px;font-weight:800;letter-spacing:.02em;padding:4px 10px;border-radius:999px;background:#F1F5F9;color:#64748B;}
+          .m-prog.is-part{background:#FEF3C7;color:#92400E;}
+          .m-prog.is-done{background:#DCFCE7;color:#166534;}
+
+          /* Save appears only when there is something to save */
+          .pr-savebar{display:none !important;}
+          .pr-savebar.is-dirty{display:grid !important;}
+
+          /* summary cards: done / partly / not at a glance */
+          .m-bar{display:flex;gap:3px;height:7px;margin-top:11px;border-radius:6px;overflow:hidden;background:#E6EBF2;}
+          .m-bar i{display:block;height:100%;transition:width .5s cubic-bezier(.22,1,.36,1);}
+          .m-bar i.g{background:linear-gradient(90deg,#1DBA85,#16A34A);}
+          .m-bar i.a{background:#F5B544;}
+          .m-bar i.n{background:#CBD5E1;}
+
+          /* loading shows soft placeholders, not a spinner and a line of text */
+          .pr-empty.pr-loading{position:relative;min-height:200px;border:0 !important;border-radius:18px;color:transparent !important;overflow:hidden;
+                               background:linear-gradient(100deg,#EEF2F8 30%,#F8FAFD 50%,#EEF2F8 70%) 0 0/200% 100% !important;}
+          .pr-empty.pr-loading::before,.pr-empty.pr-loading::after{display:none !important;}
+        }
+        @media (max-width:640px) and (prefers-reduced-motion:no-preference){
+          .pr-empty.pr-loading{animation:m-shimmer 1.3s linear infinite;}
+          @keyframes m-shimmer{to{background-position:-200% 0;}}
+          .pr-view:not([hidden]){animation:m-view-in .32s cubic-bezier(.22,1,.36,1) backwards;}
+          .pr-tablewrap.m-swap{animation:m-view-in .3s cubic-bezier(.22,1,.36,1) backwards;}
+          @keyframes m-view-in{from{opacity:0;transform:translateY(10px);}}
+          .pr-tbl tr.pr-row:not(.pr-hidden){animation:m-row-in .26s ease backwards;}
+          @keyframes m-row-in{from{opacity:0;transform:translateY(-6px);}}
+          .pr-savebar.is-dirty{animation:m-pop-in .3s cubic-bezier(.34,1.56,.64,1) backwards;}
+          @keyframes m-pop-in{from{opacity:0;transform:translateY(14px) scale(.97);}}
+        }
+        html[data-theme="dark"] .m-ctx{background:#1D2430;border-color:rgba(255,255,255,.08);color:#E8ECF2;}
+        html[data-theme="dark"] .pr-empty.pr-loading{background:linear-gradient(100deg,#232B38 30%,#2C3646 50%,#232B38 70%) 0 0/200% 100% !important;}
+        html[data-theme="dark"] .pr-wkbar,html[data-theme="dark"] .pr-savebar{background:rgba(29,36,48,.96);border-color:rgba(255,255,255,.08);}
+        html[data-theme="dark"] .pr-wkpick{background:#232B38;border-color:rgba(255,255,255,.1);color:#E8ECF2;}
+        html[data-theme="dark"] .pr-wkpick.is-on{background:linear-gradient(135deg,#2F6FE4,#0B8F7A);color:#fff;}
       </style>
     </div>
 

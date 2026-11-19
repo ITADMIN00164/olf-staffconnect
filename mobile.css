@@ -1,0 +1,1017 @@
+/* ==========================================================================
+   Phone layer - loaded last. Everything here is inside a max-width query, so
+   laptops and desktops are not touched. Pages inject their own <style> after
+   this file loads, which is why the rules below use !important: they must win
+   over a page rule of the same weight that comes later in the page.
+   ========================================================================== */
+
+@media (max-width: 768px) {
+
+  /* ---- the page itself ------------------------------------------------ */
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  body { overflow-x: hidden; }
+  .content-area { padding: 12px 12px 28px !important; }
+  .content-area img, .content-area video, .content-area canvas { max-width: 100%; }
+
+  /* Inputs at 16px: below that, iPhones zoom the page when a field is tapped. */
+  .content-area input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  .content-area select,
+  .content-area textarea,
+  .modal-box input, .modal-box select, .modal-box textarea { font-size: 16px !important; }
+
+  /* A fingertip is wider than a cursor: buttons and fields are at least 40px tall. */
+  .content-area .btn, .content-area .pg-btn,
+  .content-area button.btn-primary, .content-area button.btn-ghost,
+  .content-area select, .content-area input[type="text"], .content-area input[type="search"],
+  .content-area input[type="email"], .content-area input[type="number"],
+  .content-area input[type="date"], .content-area input[type="tel"] { min-height: 40px; }
+
+  /* The banner every page starts with. */
+  .pg-hero { padding: 20px 18px !important; border-radius: 20px !important; gap: 14px; }
+  .pg-hero-title { font-size: 24px !important; letter-spacing: -.6px !important; }
+  .pg-hero-actions { width: 100%; }
+  .pg-hero-actions > * { flex: 1 1 auto; justify-content: center; }
+
+  /* ---- dialogs: nearly the full screen, never wider than it ----------- */
+  .modal-box, .app-msg-box, .signin-card,
+  .org-person-box,
+  .award-page .aw-box-sm,
+  .awm-view .pom-confirm-box, .awm-view .pom-modal-box, .awm-view .pom-prompt-box,
+  .awm-view .awm-edit-box, .awm-view .awa-box,
+  .pom-confirm-box, .pom-modal-box, .pom-prompt-box,
+  #grPage .gr-modal-box, #grPage .gr-modal-box--sm, #grPage .gr-busy-box,
+  .tp-card-root {
+    width: calc(100vw - 20px) !important; max-width: calc(100vw - 20px) !important;
+    max-height: calc(100dvh - 20px); overflow-y: auto;
+  }
+
+  /* ---- two-up form rows become one column ----------------------------- */
+  .form-row, .pr-addform, #pcal-app .pcal-grid2, #pcal-app .pcal-rem-grid, #pcal-app .pcal-jump,
+  #pcal-app .form-row, #pcal-app .form-row.thirds, #pcal-app .settings-grid, #pcal-app .pcal-bulk-grid,
+  #grPage .gr-form-grid, .awm-view .awm-edit-grid, .awm-view .awm-bulk-set, .awm-view .awm-bulk-grid {
+    grid-template-columns: 1fr !important;
+  }
+  #pcal-app .pcal-rem-row { grid-template-columns: 1fr !important; }
+
+  /* ---- cards and figure rows ----------------------------------------- */
+  .stats-row, .er-cards-row, .awm-view .awa-stats { grid-template-columns: 1fr !important; }
+  .tp-card-stats, #grPage .gr-sum-cards, .pr-bars { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  #grPage .gr-sx-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .pos-tgt-grid { grid-template-columns: 1fr !important; }
+  .erd-grid { grid-template-columns: 1fr !important; }
+
+  /* ---- Awards & Gifts: the lines inside the dialogs ------------------- */
+  /* A gift line stacks: the type, then what it is for, then how many with the remove button. */
+  .award-page .award-line { grid-template-columns: minmax(0, 1fr) 40px !important; grid-template-areas: "type type" "qty remove" !important; }
+  .award-page .award-line.has-category { grid-template-areas: "type type" "cat cat" "qty remove" !important; }
+  .award-page .award-line.has-other { grid-template-areas: "type type" "cat cat" "other other" "qty remove" !important; }
+  .award-page .award-line.is-gift-other { grid-template-areas: "type type" "other other" "qty remove" !important; }
+  .award-page .stock-line, .award-page #ho-lines .stock-line { grid-template-columns: minmax(0, 1fr) 118px !important; }
+  .award-page .lvl-row { grid-template-columns: 56px minmax(0, 1fr) 52px !important; }
+  .award-page #levels-modal .lvl-row, .award-page .lvls-head { grid-template-columns: 86px minmax(0, 1fr) 64px !important; }
+
+  /* ---- Smart Goals ---------------------------------------------------- */
+  #sg-app .tf-kv { grid-template-columns: 92px minmax(0, 1fr) !important; }
+
+  /* ---- Field Review: ranked lists keep their figures, lose the squeeze */
+  #grPage .gr-sx-trow { grid-template-columns: 62px minmax(0, 1fr) 40px !important; }
+  #grPage .gr-sx-arow { grid-template-columns: 72px minmax(0, 1fr) 36px !important; }
+  #grPage .gr-sx-urow { grid-template-columns: 24px minmax(0, 1fr) 64px !important; }
+  #grPage .gr-sx-urow > :nth-child(3) { display: none; }
+  #grPage .gr-sx-dlegend li { grid-template-columns: 10px minmax(0, 1fr) auto 36px !important; }
+  #grPage .gr-sx-oldest li { grid-template-columns: 18px minmax(0, 1fr) auto 32px !important; }
+  .tp-pm-col { min-width: 0 !important; }
+
+  /* ---- Organisation chart: the stacked team view fits the screen ------ */
+  .org-vrow .org-node, .org-vhead .org-node { width: auto !important; max-width: 100%; }
+
+  /* ---- Calendar: the month still shows seven days, so keep cells tidy - */
+  #pcal-app .cal-grid { gap: 2px; }
+  #pcal-app .cal-grid .cal-cell, #pcal-app .cal-grid > div { min-width: 0; overflow: hidden; }
+
+  /* ---- Tabs and chip rows scroll sideways instead of wrapping into a mess */
+  .aw-subtabs, .gr-tabs, .gr-an-tabs, .pom-tabs, .pos-top-tabs, .pos-subtabs, .nav-tabs, .dash-subtabs,
+  .tf-tabs, .tp-view-tabs, .tp-modal-tabs {
+    max-width: 100%; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .aw-subtabs::-webkit-scrollbar, .gr-tabs::-webkit-scrollbar, .gr-an-tabs::-webkit-scrollbar,
+  .pom-tabs::-webkit-scrollbar, .pos-top-tabs::-webkit-scrollbar, .pos-subtabs::-webkit-scrollbar,
+  .nav-tabs::-webkit-scrollbar, .dash-subtabs::-webkit-scrollbar, .tf-tabs::-webkit-scrollbar,
+  .tp-view-tabs::-webkit-scrollbar, .tp-modal-tabs::-webkit-scrollbar { display: none; }
+  .aw-subtabs > *, .gr-tabs > *, .gr-an-tabs > *, .pom-tabs > *, .pos-top-tabs > *, .pos-subtabs > *,
+  .nav-tabs > *, .dash-subtabs > *, .tf-tabs > *, .tp-view-tabs > *, .tp-modal-tabs > * { flex: none; white-space: nowrap; }
+
+  /* ---- Tables that are wider than the screen scroll inside their own box.
+     mobile.js wraps them; this is the box. */
+  .m-scroll { width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch;
+              border-radius: 12px; }
+  .m-scroll > table { margin: 0; }
+  .m-scroll::after { content: ""; display: block; height: 1px; }
+  .awe-view .pev-tbl { min-width: 760px !important; }
+  #grPage table.gr-table { min-width: 640px !important; }
+  #grPage table.gr-table--detailed { min-width: 820px !important; }
+  #grPage table.gr-an-table { min-width: 560px !important; }
+}
+
+/* A narrower phone: the two-up figures go single-file. */
+@media (max-width: 400px) {
+  .tp-card-stats, #grPage .gr-sum-cards, .pr-bars, #grPage .gr-sx-kpis { grid-template-columns: 1fr !important; }
+  .pg-hero-title { font-size: 22px !important; }
+}
+
+/* ==========================================================================
+   Slim lists on a phone (Requisitions, Head Office's queue)
+   Name, requester and status on the card; the rest in the sheet a tap opens.
+   ========================================================================== */
+@media (max-width: 640px) {
+  .table-scroll:has(.m-list) { overflow: visible !important; border: 0 !important; background: none !important; max-height: none !important; }
+  .m-list, .m-list tbody { display: block; width: 100%; min-width: 0 !important; }
+  .m-list thead, .m-list tfoot { display: none !important; }
+
+  .m-list tbody tr.req-row {
+    position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px;
+    margin: 0 0 10px; padding: 12px 34px 12px 15px; border-radius: 14px;
+    border: 1px solid var(--hairline, rgba(15,23,42,.1)); border-left: 5px solid var(--tone, #94A3B8);
+    background: var(--glass-strong, #fff); box-shadow: var(--shadow-sm, 0 1px 3px rgba(15,23,42,.08));
+    cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform .12s ease;
+  }
+  .m-list tbody tr.req-row:active { transform: scale(.985); }
+  .m-list tbody tr.req-row::after {
+    content: ""; position: absolute; right: 15px; top: 50%; width: 8px; height: 8px; margin-top: -4px;
+    border-right: 2px solid var(--text-faint, #94A3B8); border-top: 2px solid var(--text-faint, #94A3B8); transform: rotate(45deg);
+  }
+  .m-list tbody tr.req-row > td { display: none !important; padding: 0 !important; border: 0 !important; }
+  .m-list tbody tr.req-row > td[data-label="District"],
+  .m-list tbody tr.req-row > td[data-label="Requester"],
+  .m-list tbody tr.req-row > td[data-label="Status"] { display: block !important; }
+  .m-list tbody tr.req-row > td[data-label="District"] { font-size: 15.5px; font-weight: 800; letter-spacing: -.2px; color: var(--text); }
+  .m-list tbody tr.req-row > td[data-label="Requester"] { font-size: 13px; color: var(--text-soft); }
+  .m-list tbody tr.req-row > td[data-label="Status"] { order: 3; margin-top: 6px; }
+  /* what is waiting for you shows as a flag across the top of the card */
+  .m-list tbody tr.req-row > td[data-label="State"]:has(.act-flag) { display: block !important; order: -1; margin-bottom: 4px; }
+  .m-list tbody tr.req-row > td[data-label="State"] .state-code { display: none; }
+  .m-list tbody tr.req-row.needs-me { background: color-mix(in srgb, var(--warn, #F59E0B) 8%, var(--glass-strong, #fff)); }
+
+  .m-list tbody tr.placeholder-row { display: block; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; cursor: default; }
+  .m-list tbody tr.placeholder-row::after { display: none; }
+  .m-list tbody tr.placeholder-row > td { display: block !important; width: 100%; padding: 22px 10px !important; text-align: center; }
+
+  /* an empty-table message sits at the left edge of the box, where it can be read */
+  .pom-msg { text-align: left !important; padding-left: 14px !important; }
+
+  /* the first column of a table that scrolls sideways stays in view */
+  .m-scroll table th:first-child, .m-scroll table td:first-child {
+    position: sticky; left: 0; z-index: 2; background: var(--surface, #fff); box-shadow: 1px 0 0 rgba(100,116,139,.2);
+  }
+  .m-scroll table thead th:first-child { z-index: 4; }
+}
+
+/* The sheet a tap on a slim row opens (built by mobile.js) */
+.m-sheet-overlay { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(15,23,42,.5); animation: m-sheet-fade .2s ease; }
+.m-sheet { width: 100%; max-width: 560px; max-height: 88dvh; display: flex; flex-direction: column;
+  background: var(--surface, #fff); color: var(--text, #0F172A); border-radius: 22px 22px 0 0;
+  box-shadow: 0 -12px 40px rgba(15,23,42,.25); animation: m-sheet-up .28s cubic-bezier(.22,1,.36,1);
+  padding-bottom: env(safe-area-inset-bottom, 0); }
+@keyframes m-sheet-up { from { transform: translateY(100%); } }
+@keyframes m-sheet-fade { from { opacity: 0; } }
+.m-sheet-grab { width: 40px; height: 4px; margin: 9px auto 2px; border-radius: 4px; background: rgba(100,116,139,.4); }
+.m-sheet-head { display: flex; align-items: flex-start; gap: 12px; padding: 10px 16px 12px; border-bottom: 1px solid rgba(100,116,139,.2); }
+.m-sheet-title { flex: 1; min-width: 0; }
+.m-sheet-name { font-size: 18px; font-weight: 800; letter-spacing: -.2px; line-height: 1.25; overflow-wrap: anywhere; }
+.m-sheet-sub { margin-top: 2px; font-size: 13.5px; color: var(--text-soft, #64748B); }
+.m-sheet-chip { margin-top: 8px; }
+.m-sheet-x { width: 38px; height: 38px; flex: none; border: 0; border-radius: 50%; font-size: 16px; cursor: pointer; background: rgba(100,116,139,.14); color: inherit; }
+.m-sheet-body { overflow-y: auto; padding: 4px 16px 18px; -webkit-overflow-scrolling: touch; }
+.m-sheet-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 11px 0; border-bottom: 1px dashed rgba(100,116,139,.25); font-size: 14.5px; }
+.m-sheet-row:last-child { border-bottom: 0; }
+.m-sheet-row > span { flex: 0 0 34%; font-size: 10.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--text-soft, #64748B); padding-top: 3px; }
+.m-sheet-row > div { flex: 1; min-width: 0; text-align: right; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { .m-sheet, .m-sheet-overlay { animation: none; } }
+
+/* ==========================================================================
+   Awards & Gifts on a phone
+   ========================================================================== */
+.m-filter-btn { display: none; }
+
+@media (max-width: 640px) {
+  /* The banner: a title row, one icon button, the tabs - no strap line. */
+  .award-page #awHero { padding: 14px 14px 12px !important; border-radius: 18px !important; gap: 10px !important; position: relative; }
+  .award-page #awHero .pg-hero-sub { display: none !important; }
+  .award-page #awHero .pg-hero-lead { gap: 12px !important; padding-right: 50px; }
+  .award-page #awHero .pg-hero-ico { width: 40px !important; height: 40px !important; border-radius: 13px !important; flex: none; }
+  .award-page #awHero .pg-hero-ico svg { width: 26px !important; height: 26px !important; }
+  .award-page #awHero .pg-hero-title { font-size: 20px !important; margin: 0 !important; }
+  .award-page #awHero .aw-refresh-all {
+    position: absolute; top: 12px; right: 12px; width: 40px; height: 40px; min-height: 0; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center; border-radius: 12px;
+  }
+  .award-page #awHero .aw-refresh-all > *:not(i) { display: none !important; }
+  .award-page #awHero .aw-top-right { width: 100%; gap: 8px; }
+  .award-page #awHero .aw-top-actions { width: 100%; display: flex; gap: 8px; padding-bottom: 0; }
+  .award-page #awHero .aw-top-actions > .btn { flex: 1 1 0; justify-content: center; }
+  .award-page #awHero .aw-hero-nav { gap: 8px; }
+
+  /* Figures: two across, the odd one out takes the full width. */
+  .award-page .pg-stats { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
+  .award-page .pg-stats > *:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .award-page .pg-stat { padding: 12px !important; gap: 10px !important; }
+  .award-page .pg-stat::after { display: none !important; }
+  .award-page .pg-stat-icon { width: 38px !important; height: 38px !important; flex: none; }
+  .award-page .pg-stat-value { font-size: 22px !important; }
+
+  /* Event and Awards filter bars: pairs of fields, not a tall stack. */
+  .award-page .pev-toolbar { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 8px !important; padding: 12px !important; align-items: stretch; }
+  .award-page .pev-toolbar > * { min-width: 0; width: 100% !important; max-width: none !important; margin: 0 !important; }
+  .award-page .pev-toolbar #aweDistrict, .award-page .pev-toolbar #aweBlock,
+  .award-page .pev-toolbar .pev-hint, .award-page .pev-toolbar .aed-export { grid-column: 1 / -1; }
+  .award-page .pev-toolbar .pev-hint:empty { display: none; }
+
+  /* Requisitions: the filters sit behind one button. */
+  .award-page .m-filter-btn {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 46px;
+    padding: 0 14px; margin: 0 0 10px; border-radius: 14px; font: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer;
+    color: var(--text); background: var(--glass-strong, #fff); border: 1px solid var(--hairline, rgba(15,23,42,.12));
+    box-shadow: var(--shadow-sm, 0 1px 3px rgba(15,23,42,.08));
+  }
+  .award-page .m-filter-btn .m-fb-count { margin-left: 8px; min-width: 22px; padding: 1px 8px; border-radius: 99px; font-size: 12px; background: var(--accent, #2F6FE4); color: #fff; }
+  .award-page .m-filter-btn .m-fb-count[hidden] { display: none; }
+  .award-page .m-filter-btn .m-fb-caret { width: 10px; height: 10px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform .2s ease; margin-top: -4px; }
+  .award-page .m-filter-btn[aria-expanded="true"] .m-fb-caret { transform: rotate(225deg); margin-top: 4px; }
+  .award-page .filters.m-collapsed { display: none !important; }
+  .award-page .filters { padding: 12px !important; gap: 10px !important; }
+
+  /* Gift inventory: a list of months per district; tap a month for its figures. */
+  .award-page #stock-table-wrap { overflow: visible !important; max-height: none !important; border: 0 !important; background: none !important; }
+  .award-page .stock-howto { display: none !important; }
+  .award-page #stock-table, .award-page #stock-table tbody { display: block; width: 100%; min-width: 0 !important; }
+  .award-page #stock-table thead { display: none !important; }
+  .award-page #stock-table tr.district-band { display: block; margin: 14px 0 8px; background: none; border: 0; box-shadow: none; }
+  .award-page #stock-table tr.district-band > td { display: block; padding: 0 !important; border: 0 !important; background: none !important; }
+  .award-page #stock-table tbody tr:not(.district-band) {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 10px;
+    margin: 0 0 6px; padding: 10px 14px; border-radius: 12px; background: var(--glass-strong, #fff);
+    border: 1px solid var(--hairline, rgba(15,23,42,.1));
+  }
+  .award-page #stock-table tbody tr:not(.district-band) > td { display: none !important; padding: 0 !important; border: 0 !important; }
+  .award-page #stock-table tbody tr:not(.district-band) > td.col-month { display: block !important; font-weight: 700; font-size: 14.5px; }
+  .award-page #stock-table tbody tr:not(.district-band) > td.col-act { display: flex !important; gap: 6px; justify-content: flex-end; }
+  .award-page #stock-table tbody tr.is-tellable { cursor: pointer; }
+  .award-page #stock-table tbody tr.is-carry > td.col-month { color: var(--accent-ink, #2457C5); }
+  .award-page #stock-table tbody tr:not(.is-tellable):not(.is-carry) { opacity: .6; }
+}
+
+/* ==========================================================================
+   Awards & Gifts on a phone, second pass
+   ========================================================================== */
+.m-detail { display: none; }
+
+@media (max-width: 640px) {
+  /* Every dialog on the page is a sheet from the bottom, as tall as it needs to be. */
+  .award-page .aw-overlay { align-items: flex-end !important; padding: 0 !important; }
+  .award-page .aw-box, .award-page .aw-box-sm {
+    width: 100% !important; max-width: 100% !important; min-height: 0 !important; max-height: 92dvh !important;
+    border-radius: 22px 22px 0 0 !important; overflow-y: auto; animation: m-sheet-up .28s cubic-bezier(.22,1,.36,1);
+  }
+  .award-page .aw-box-head, .award-page .aw-box > header { position: sticky; top: 0; z-index: 3; background: var(--surface, #fff); }
+  .award-page .aw-box .form-actions { position: sticky; bottom: 0; z-index: 3; background: var(--surface, #fff); padding: 10px 14px calc(12px + env(safe-area-inset-bottom, 0)) !important; border-top: 1px solid var(--hairline, rgba(15,23,42,.1)); }
+  .award-page .aw-box .form-actions .btn { min-height: 46px; flex: 1 1 0; justify-content: center; }
+
+  /* The month breakdown: figures as short lists, not a matrix to scroll. */
+  .award-page #detail-table { display: none !important; }
+  .award-page .m-detail { display: block; }
+  .m-detail .m-dcard { margin: 0 0 10px; border: 1px solid var(--hairline, rgba(15,23,42,.12)); border-radius: 14px; overflow: hidden; background: var(--surface, #fff); }
+  .m-detail .m-dcard.is-month { border-color: var(--accent-line, rgba(47,111,228,.45)); }
+  .m-detail .m-dtitle { padding: 10px 14px; font-size: 14px; font-weight: 700; background: var(--surface-alt, #F3F6FB); }
+  .m-detail .m-dtitle small { display: block; margin-top: 2px; font-size: 11.5px; font-weight: 500; color: var(--text-soft, #64748B); }
+  .m-detail .m-dgrp { padding: 8px 14px 2px; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--text-soft, #64748B); }
+  .m-detail .m-drow { display: flex; justify-content: space-between; gap: 12px; padding: 5px 14px; font-size: 14px; }
+  .m-detail .m-drow b { font-family: var(--font-mono, monospace); font-weight: 700; }
+  .m-detail .m-dempty { padding: 10px 14px 12px; font-size: 13px; color: var(--text-muted, #94A3B8); }
+
+  /* Gift inventory rows: the sheet's own sticky, fixed-width month cell is turned off. */
+  .award-page #stock-table tbody tr:not(.district-band) { height: auto !important; min-height: 0 !important; }
+  .award-page #stock-table tbody tr:not(.district-band) > td.col-month {
+    position: static !important; width: auto !important; min-width: 0 !important; left: auto !important;
+    height: auto !important; background: none !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; line-height: 1.3;
+  }
+  .award-page #stock-table tbody tr:not(.district-band) > td.col-act { height: auto !important; line-height: 1.3; background: none !important; }
+  .award-page #stock-table tbody tr.is-tellable:not(:has(.col-act button))::after {
+    content: ""; width: 8px; height: 8px; border-right: 2px solid var(--text-faint, #94A3B8); border-top: 2px solid var(--text-faint, #94A3B8); transform: rotate(45deg); justify-self: end;
+  }
+  /* the district heading above its months */
+  .award-page #stock-table tr.district-band > td { height: auto !important; border-top: 0 !important; border-bottom: 0 !important; background: none !important; }
+  .award-page #stock-table tr.district-band .db {
+    position: static !important; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; width: 100%; max-width: 100%;
+    padding: 10px 12px; border-radius: 12px; border-left: 4px solid var(--accent, #2F6FE4);
+    background: linear-gradient(90deg, var(--accent-soft, rgba(47,111,228,.1)), transparent 85%);
+  }
+  .award-page #stock-table tr.district-band .db-pm { flex-basis: 100%; width: fit-content; max-width: 100%; white-space: normal; }
+
+  /* the year / state / division / district controls on Gift Inventory */
+  .award-page .stock-controls { gap: 10px !important; }
+  .award-page .stock-controls .btn, .award-page .stock-controls button { min-height: 44px; }
+}
+
+/* ==========================================================================
+   Bottom navigation on a phone: replaces the side menu
+   ========================================================================== */
+.m-nav { display: none; }
+
+@media (max-width: 768px) {
+  #appSidebar, .sidebar-edge, .tb-menu-btn, #tbMenuBtn { display: none !important; }
+  .app-body.sb-auto::after { display: none !important; }
+  .app-body > .content-area { margin-left: 0 !important; }
+  .content-area { padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px)) !important; }
+
+  #appShell.visible .m-nav {
+    display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 800;
+    padding: 8px 0 calc(8px + env(safe-area-inset-bottom, 0px));
+    background: color-mix(in srgb, var(--surface, #fff) 90%, transparent);
+    -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%);
+    border-top: 1px solid var(--hairline, rgba(15,23,42,.1)); box-shadow: 0 -8px 24px rgba(15,23,42,.08);
+  }
+  /* a soft fade on the side that has more icons */
+  .m-nav::before, .m-nav::after { content: ""; position: absolute; top: 0; bottom: 0; width: 26px; z-index: 2; pointer-events: none; opacity: 0; transition: opacity .2s ease; }
+  .m-nav::before { left: 0; background: linear-gradient(90deg, var(--surface, #fff), transparent); }
+  .m-nav::after { right: 0; background: linear-gradient(270deg, var(--surface, #fff), transparent); }
+  .m-nav.can-left::before, .m-nav.can-right::after { opacity: 1; }
+
+  .m-nav-scroll { display: flex; gap: 6px; padding: 0 14px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity; }
+  .m-nav-scroll::-webkit-scrollbar { display: none; }
+  .m-nav-item {
+    flex: none; display: flex; align-items: center; height: 48px; min-width: 48px; padding: 0 10px; border: 0; border-radius: 16px;
+    background: transparent; color: var(--text, #0F172A); cursor: pointer; scroll-snap-align: center; -webkit-tap-highlight-color: transparent;
+    transition: background .22s ease, padding .25s ease, transform .12s ease;
+  }
+  .m-nav-item:active { transform: scale(.92); }
+  .m-nav-item:focus-visible { outline: 2px solid var(--pg, #2F6FE4); outline-offset: 2px; }
+  .m-nav-ico { width: 28px; height: 28px; display: grid; place-items: center; flex: none; }
+  .m-nav-ico svg { width: 28px; height: 28px; display: block; }
+  .m-nav-label {
+    max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap; margin-left: 0; font-size: 13.5px; font-weight: 800; letter-spacing: -.1px;
+    color: var(--pg, #2F6FE4); transition: max-width .3s ease, opacity .2s ease, margin .3s ease;
+  }
+  .m-nav-item.is-active { background: color-mix(in srgb, var(--pg, #2F6FE4) 16%, transparent); padding-right: 15px; }
+  .m-nav-item.is-active .m-nav-label { max-width: 150px; opacity: 1; margin-left: 8px; }
+  .m-nav-item.is-locked { opacity: .5; }
+
+  /* things that sit at the bottom of the screen move up out of the bar's way */
+  #appShell.visible ~ .olf-install { bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important; }
+  #appShell.visible ~ #toastContainer { bottom: 90px; }
+}
+@media (prefers-reduced-motion: reduce) { .m-nav-item, .m-nav-label { transition: none; } }
+
+/* The bar says it slides: arrows on the side that has more, a position line beneath, and a nudge on first show. */
+.m-nav-arrow, .m-nav-track { display: none; }
+@media (max-width: 768px) {
+  .content-area { padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px)) !important; }
+  .m-nav-arrow {
+    position: absolute; top: 8px; z-index: 3; width: 30px; height: 48px; padding: 0; border: 0; cursor: pointer; display: grid; place-items: center;
+    color: var(--text, #0F172A); background: transparent; -webkit-tap-highlight-color: transparent;
+  }
+  .m-nav-arrow[hidden] { display: none; }
+  .m-nav-arrow--l { left: 0; background: linear-gradient(90deg, var(--surface, #fff) 55%, transparent); }
+  .m-nav-arrow--r { right: 0; background: linear-gradient(270deg, var(--surface, #fff) 55%, transparent); }
+  .m-nav-arrow svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; opacity: .75; }
+  .m-nav-arrow--l svg { transform: rotate(180deg); }
+  /* until the person has used the bar, the right arrow nudges to catch the eye */
+  .m-nav:not(.is-learned) .m-nav-arrow--r svg { animation: m-arrow-nudge 1.3s ease-in-out infinite; opacity: 1; color: var(--accent, #2F6FE4); }
+  @keyframes m-arrow-nudge { 0%, 100% { transform: translateX(-2px); } 50% { transform: translateX(4px); } }
+
+  .m-nav--scrolls .m-nav-track { display: block; height: 3px; margin: 7px 18px 0; border-radius: 3px; background: rgba(100,116,139,.2); position: relative; overflow: hidden; }
+  .m-nav-thumb { position: absolute; top: 0; bottom: 0; left: 0; width: 30%; border-radius: 3px; background: linear-gradient(90deg, #2F6FE4, #0B8F7A); transition: left .12s linear; }
+  /* the old edge fades are replaced by the arrows' own fade */
+  .m-nav::before, .m-nav::after { display: none; }
+  #appShell.visible ~ .olf-install { bottom: calc(92px + env(safe-area-inset-bottom, 0px)) !important; }
+}
+@media (prefers-reduced-motion: reduce) { .m-nav:not(.is-learned) .m-nav-arrow--r svg { animation: none; } }
+
+/* ==========================================================================
+   App shell on a phone: a clean app header (the app's mark, the page name,
+   a few round buttons), and a floating bottom bar.
+   ========================================================================== */
+@media (max-width: 768px) {
+  html[data-theme] #appShell .topbar {
+    height: calc(58px + env(safe-area-inset-top, 0px)) !important; padding: env(safe-area-inset-top, 0px) 12px 0 14px !important; gap: 10px !important;
+    border-bottom: 1px solid var(--tb-line) !important; overflow: visible !important;
+  }
+  /* the app's mark in place of the slanted OLF block */
+  html[data-theme] #appShell .topbar-logo {
+    order: 0 !important; flex: none; width: 36px; height: 36px; align-self: center !important; padding: 0 !important; margin: 0 !important;
+    clip-path: none !important; border-radius: 11px; font-size: 0 !important; color: transparent !important;
+    background: url("/logo-mark.svg?v=2") center / cover no-repeat !important; box-shadow: 0 4px 12px rgba(47,111,228,.3);
+  }
+  #appShell .topbar-logo > *, #appShell .topbar-logo::before, #appShell .topbar-logo::after { display: none !important; }
+  /* the page you are on, as the header's title */
+  #appShell .tb-crumb { display: flex !important; flex: 1 1 auto; min-width: 0; margin: 0; }
+  #appShell .tb-crumb-home, #appShell .tb-crumb-sep, #appShell .tb-crumb-ico { display: none !important; }
+  #appShell .tb-crumb-page {
+    min-width: 0; padding: 0 !important; background: none !important; border: 0 !important; box-shadow: none !important;
+    font-size: 19px; font-weight: 800; letter-spacing: -.5px; color: var(--tb-ink) !important;
+  }
+  #appShell .tp-group { gap: 6px !important; margin-left: auto; }
+  /* the theme switch shows only the current choice; a tap moves to the next (mobile.js) */
+  html[data-theme] #appShell .theme-switch { padding: 0 !important; height: auto !important; background: none !important; border: 0 !important; box-shadow: none !important; }
+  html[data-theme] #appShell .theme-switch::before { display: none !important; }
+  #appShell .theme-switch button:not([aria-checked="true"]) { display: none !important; }
+  html[data-theme] #appShell .theme-switch button[aria-checked="true"] {
+    width: 38px !important; height: 38px !important; border-radius: 50% !important; color: #2F6FE4 !important;
+    background: var(--tb-card) !important; border: 1px solid var(--tb-line) !important; box-shadow: var(--tb-ctl-shadow) !important;
+  }
+  html[data-theme="dark"] #appShell .theme-switch button[aria-checked="true"] { color: #8DB4FF !important; }
+  #appShell .theme-switch button svg { width: 18px; height: 18px; }
+  html[data-theme] #appShell .tb-bell, html[data-theme] #appShell .topbar-profile, html[data-theme] #appShell .tb-install { width: 38px !important; height: 38px !important; border-radius: 50% !important; }
+  html[data-theme] #appShell .topbar-profile { padding: 0 !important; margin-left: 0 !important; justify-content: center; }
+
+  /* a floating bottom bar */
+  #appShell.visible .m-nav {
+    left: 10px !important; right: 10px !important; bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+    padding: 7px 0 8px !important; border-radius: 24px; border: 1px solid var(--hairline, rgba(15,23,42,.1)) !important;
+    box-shadow: 0 14px 34px rgba(15,23,42,.18), 0 2px 6px rgba(15,23,42,.06) !important; overflow: hidden;
+  }
+  .m-nav-arrow { top: 7px !important; }
+  .m-nav-track { margin: 6px 24px 0 !important; }
+  .content-area { padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px)) !important; }
+  #appShell.visible ~ .olf-install { bottom: calc(104px + env(safe-area-inset-bottom, 0px)) !important; }
+}
+
+/* Bottom bar colours that follow the theme (light and dark) */
+@media (max-width: 768px) {
+  #appShell.visible .m-nav { background: rgba(255,255,255,.92) !important; }
+  html[data-theme="dark"] #appShell.visible .m-nav { background: rgba(24,30,40,.94) !important; border-color: rgba(255,255,255,.08) !important; box-shadow: 0 14px 34px rgba(0,0,0,.5) !important; }
+  .m-nav-arrow--l { background: linear-gradient(90deg, rgba(255,255,255,.96) 55%, transparent) !important; }
+  .m-nav-arrow--r { background: linear-gradient(270deg, rgba(255,255,255,.96) 55%, transparent) !important; }
+  html[data-theme="dark"] .m-nav-arrow--l { background: linear-gradient(90deg, rgba(24,30,40,.98) 55%, transparent) !important; }
+  html[data-theme="dark"] .m-nav-arrow--r { background: linear-gradient(270deg, rgba(24,30,40,.98) 55%, transparent) !important; }
+  html[data-theme="dark"] .m-nav-arrow { color: #E8ECF2; }
+  html[data-theme="dark"] .m-nav-item { color: #E8ECF2; }
+  html[data-theme="dark"] .m-nav-track { background: rgba(255,255,255,.14); }
+}
+
+/* ==========================================================================
+   Smooth on a phone: gentle page changes, a gliding bottom-bar pill, a header
+   shadow while scrolled, quiet scrollbars, and a light press on what you tap.
+   ========================================================================== */
+@media (max-width: 768px) {
+  .content-area { overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; scrollbar-width: none; scroll-behavior: smooth; }
+  .content-area::-webkit-scrollbar { display: none; }
+  #appShell button, #appShell a, #appShell [role="button"] { -webkit-tap-highlight-color: transparent; }
+
+  html[data-theme] #appShell .topbar { transition: box-shadow .25s ease, margin-top .3s cubic-bezier(.2,.8,.2,1), opacity .22s ease !important; }
+  html[data-theme] #appShell .topbar.m-scrolled { box-shadow: 0 6px 18px -8px rgba(15,23,42,.28) !important; }
+  html[data-theme="dark"] #appShell .topbar.m-scrolled { box-shadow: 0 6px 18px -8px rgba(0,0,0,.7) !important; }
+
+  /* the pill grows and the label slides in, instead of snapping */
+  .m-nav-item { transition: background-color .32s cubic-bezier(.22,1,.36,1), padding .32s cubic-bezier(.22,1,.36,1), transform .15s ease !important; }
+  .m-nav-label { transition: max-width .36s cubic-bezier(.22,1,.36,1), opacity .24s ease .06s, margin .36s cubic-bezier(.22,1,.36,1) !important; }
+  .m-nav-item .m-nav-ico { transition: transform .32s cubic-bezier(.34,1.56,.64,1); }
+  .m-nav-item.is-active .m-nav-ico { transform: scale(1.08); }
+
+  /* a light press on cards and rows */
+  .upcoming-card, .m-list tbody tr.req-row, .employees-page tbody tr, #stock-table tbody tr.is-tellable, .pg-stat, .news-card {
+    transition: transform .14s ease, box-shadow .2s ease;
+  }
+  .upcoming-card:active, .m-list tbody tr.req-row:active, .employees-page tbody tr:active, #stock-table tbody tr.is-tellable:active, .news-card:active {
+    transform: scale(.985);
+  }
+}
+@media (max-width: 768px) and (prefers-reduced-motion: no-preference) {
+  /* "backwards", not "both": once it has played nothing is left running, so pop-ups and sheets
+     inside the page are placed against the screen, not against the page. */
+  .content-area.m-page-in > * { animation: m-page-in .38s cubic-bezier(.22,1,.36,1) backwards; }
+  @keyframes m-page-in { from { opacity: 0; transform: translateY(12px); } }
+}
+
+/* ==========================================================================
+   Nicer names on a phone: the header title with a small "OLF Staff Connect"
+   line above it, and a filled, coloured pill for the page you are on.
+   ========================================================================== */
+@media (max-width: 768px) {
+  #appShell #tbCrumbName {
+    display: flex; flex-direction: column; min-width: 0; line-height: 1.05; font-size: 19px; font-weight: 800; letter-spacing: -.5px;
+    background: linear-gradient(90deg, var(--tb-ink) 30%, #2F6FE4 120%); -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  html[data-theme="dark"] #appShell #tbCrumbName { background-image: linear-gradient(90deg, #FFFFFF 30%, #8DB4FF 120%); }
+  #appShell #tbCrumbName::before {
+    content: "OLF Staff Connect"; margin-bottom: 3px; font-size: 9.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase;
+    -webkit-text-fill-color: var(--tb-faint); color: var(--tb-faint);
+  }
+
+  /* the page you are on: a filled pill in its own colour, its icon on a white tile */
+  .m-nav-item.is-active {
+    padding: 0 16px 0 6px !important;
+    background: linear-gradient(135deg, var(--pg, #2F6FE4), color-mix(in srgb, var(--pg, #2F6FE4) 72%, #1E293B)) !important;
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--pg, #2F6FE4) 38%, transparent);
+  }
+  .m-nav-item .m-nav-ico { border-radius: 12px; transition: background-color .3s ease, width .3s ease, height .3s ease, transform .32s cubic-bezier(.34,1.56,.64,1); }
+  .m-nav-item.is-active .m-nav-ico { width: 36px; height: 36px; background: rgba(255,255,255,.96); transform: none; box-shadow: 0 2px 6px rgba(15,23,42,.15); }
+  .m-nav-item.is-active .m-nav-ico svg { width: 24px; height: 24px; }
+  .m-nav-item.is-active .m-nav-label { color: #fff !important; font-size: 14px; letter-spacing: -.2px; text-shadow: 0 1px 2px rgba(15,23,42,.18); margin-left: 9px; }
+}
+
+/* The bottom bar steps aside while you type (see mobile.js) */
+@media (max-width: 768px) {
+  html.m-typing #appShell.visible .m-nav { display: none !important; }
+  html.m-typing .content-area { padding-bottom: 28px !important; }
+}
+
+/* ==========================================================================
+   Awards & Gifts, third pass: a navigation-only banner, a floating New
+   requisition button, compact figures, and every month-by-column table laid out
+   as one card per row (aw-mobile.js gives each cell its column's name).
+   ========================================================================== */
+@media (max-width: 640px) {
+  /* The header already names the page, so the banner is just the navigation. */
+  .award-page #awHero .pg-hero-lead { display: none !important; }
+  .award-page #awHero { padding: 12px !important; gap: 8px !important; }
+  .award-page #awHero .aw-toptabs { margin-right: 52px; }
+  .award-page #awHero #refresh-btn {
+    position: absolute; top: 12px; right: 12px; width: 40px; height: 40px; min-height: 0; padding: 0; font-size: 0;
+    display: inline-flex; align-items: center; justify-content: center; border-radius: 12px;
+  }
+  .award-page #awHero #refresh-btn .aw-icon { font-size: 18px; }
+  .award-page #awHero .aw-top-actions { display: block; width: 0; height: 0; padding: 0; margin: 0; overflow: visible; }
+  /* the views inside a section share the row evenly, so nothing slides sideways */
+  .award-page #awHero .aw-subtabs { overflow: visible !important; flex-wrap: nowrap !important; gap: 4px !important; width: 100%; }
+  .award-page #awHero .aw-subtabs > * {
+    flex: 1 1 0 !important; min-width: 0; justify-content: center; text-align: center; white-space: normal !important;
+    padding: 7px 4px !important; font-size: 12px !important; line-height: 1.2;
+  }
+  .award-page #awHero .aw-subtabs > * .aw-icon { display: none; }
+  /* New requisition lives in a floating button instead (made by aw-mobile.js) */
+  .award-page #awHero #new-req-btn { display: none !important; }
+
+  /* Figures above the requisition list: two across, the delivery ring full width, no decoration */
+  .award-page .kpis { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
+  .award-page .kpis .kpi { min-width: 0; padding: 12px !important; }
+  .award-page .kpis .kpi::after, .award-page .kpis .kpi::before { display: none !important; }
+  .award-page .kpis .kpi.kpi-ring { grid-column: 1 / -1; }
+
+  /* ---- grids of numbers as cards ---- */
+  .award-page .pom-card:has(table.m-matrix), .award-page .pom-card.scroll:has(table.m-matrix),
+  .award-page .awm-view .pom-card:has(table.m-matrix), .award-page .awm-view .pom-card.scroll:has(table.m-matrix) {
+    overflow: visible !important; max-height: none !important; background: none !important; border: 0 !important; box-shadow: none !important; padding: 0 !important;
+  }
+  .award-page .m-scroll:has(table.m-matrix) { overflow: visible !important; border-radius: 0; }
+  .award-page table.m-matrix, .award-page table.m-matrix tbody, .award-page table.m-matrix tfoot { display: block; width: 100% !important; min-width: 0 !important; }
+  .award-page table.m-matrix thead, .award-page table.m-matrix colgroup { display: none !important; }
+  .award-page table.m-matrix tr {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; align-items: start;
+    margin: 0 0 10px; padding: 14px 16px 16px; border-radius: 16px; background: var(--glass-strong, #fff);
+    border: 1px solid var(--hairline, rgba(15,23,42,.1)); box-shadow: var(--shadow-sm, 0 1px 3px rgba(15,23,42,.08));
+  }
+  .award-page table.m-matrix tfoot tr { background: color-mix(in srgb, var(--accent, #2F6FE4) 8%, var(--glass-strong, #fff)); }
+  .award-page table.m-matrix td {
+    display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 0 !important; border: 0 !important; background: none !important;
+    position: static !important; box-shadow: none !important; text-align: left !important; white-space: normal !important;
+    font-size: 15px; font-weight: 700; color: var(--text, #0F172A);
+  }
+  .award-page table.m-matrix td[data-label]::before {
+    content: attr(data-label); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    line-height: 1.25; color: var(--text-soft, #64748B);
+  }
+  /* the month (or the first column) is the card's title */
+  .award-page table.m-matrix td:first-child[data-label] {
+    grid-column: 1 / -1; padding-bottom: 8px !important; font-size: 17px; font-weight: 800; letter-spacing: -.2px;
+    border-bottom: 1px solid var(--hairline, rgba(15,23,42,.1)) !important;
+  }
+  .award-page table.m-matrix td:first-child[data-label]::before { display: none; }
+  /* Save sits under the figures, full width; "last updated" is a quiet line */
+  .award-page table.m-matrix td[data-label="Save"] { grid-column: 1 / -1; }
+  .award-page table.m-matrix td[data-label="Save"]::before { display: none; }
+  .award-page table.m-matrix td[data-label="Save"] .rowsave-btn { width: 100%; min-height: 44px; justify-content: center; border-radius: 12px; font-size: 14.5px; }
+  .award-page table.m-matrix td[data-label="Last Updated"] { grid-column: 1 / -1; font-size: 12.5px; font-weight: 500; color: var(--text-soft, #64748B); }
+  .award-page table.m-matrix td:empty { display: none; }
+  .award-page table.m-matrix input[type="number"], .award-page table.m-matrix input[type="text"] {
+    width: 100%; min-width: 0; height: 46px; font-size: 16px; border-radius: 12px;
+  }
+  /* "choose a district to begin" and other messages: a quiet, centred card */
+  .award-page table.m-matrix tr:has(td[colspan]) { display: block; padding: 0; background: none; border: 0; box-shadow: none; }
+  .award-page table.m-matrix td[colspan] { display: block; text-align: center !important; padding: 30px 16px !important; }
+  .award-page table.m-matrix td.pom-msg { text-align: center !important; padding: 30px 16px !important; }
+}
+
+/* the floating New requisition button */
+.m-fab { display: none; }
+@media (max-width: 640px) {
+  #appShell .m-fab:not([hidden]) {
+    position: fixed; right: 16px; bottom: calc(106px + env(safe-area-inset-bottom, 0px)); z-index: 700;
+    display: inline-flex; align-items: center; gap: 8px; height: 54px; padding: 0 20px 0 16px; border: 0; border-radius: 18px; cursor: pointer;
+    font: inherit; font-size: 15px; font-weight: 800; letter-spacing: -.1px; color: #fff; -webkit-tap-highlight-color: transparent;
+    background: linear-gradient(135deg, #2F6FE4, #0B8F7A);
+    box-shadow: 0 16px 30px -10px rgba(47,111,228,.6), 0 4px 10px rgba(15,23,42,.2);
+    transition: transform .15s ease, box-shadow .2s ease;
+  }
+  #appShell .m-fab:active { transform: scale(.95); }
+  .m-fab svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; }
+  html.m-typing .m-fab { display: none !important; }
+}
+
+/* ==========================================================================
+   Awards & Gifts, fourth pass: a clear hierarchy. This month stands out, months with
+   nothing yet fold down to one slim line, award cards carry a bar, the dashboard
+   opens with one big summary, loading shows soft placeholders, and pulling down
+   reloads the page.
+   ========================================================================== */
+@media (max-width: 640px) {
+  /* months with nothing in them yet: one slim line */
+  .award-page table.m-matrix tr.m-empty { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; box-shadow: none; background: transparent; border-style: dashed; }
+  .award-page table.m-matrix tr.m-empty > td:not(:first-child) { display: none !important; }
+  .award-page table.m-matrix tr.m-empty > td:first-child { padding: 0 !important; border: 0 !important; font-size: 14.5px; font-weight: 700; color: var(--text-soft, #64748B); }
+  .award-page table.m-matrix tr.m-empty::after { content: "No data yet"; font-size: 11.5px; font-weight: 700; color: var(--text-muted, #94A3B8); padding: 3px 10px; border-radius: 99px; background: rgba(100,116,139,.12); }
+
+  /* the month we are in */
+  .award-page table.m-matrix tr.m-now { border-color: var(--accent, #2F6FE4); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #2F6FE4) 14%, transparent), var(--shadow-sm, 0 1px 3px rgba(15,23,42,.08)); }
+  .award-page table.m-matrix tr.m-now > td:first-child { flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .award-page table.m-matrix tr.m-now > td:first-child::after {
+    content: "This month"; font-size: 10.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 99px; color: #fff; background: linear-gradient(135deg, #2F6FE4, #0B8F7A);
+  }
+
+  /* the on time / late / still to do bar */
+  .m-abar { display: flex; flex: none; gap: 3px; width: 100%; height: 8px; margin-top: 10px; border-radius: 6px; overflow: hidden; background: #E6EBF2; }
+  .m-abar i { display: block; height: 100%; transition: width .5s cubic-bezier(.22,1,.36,1); }
+  .m-abar i.g { background: linear-gradient(90deg, #1DBA85, #16A34A); }
+  .m-abar i.r { background: #EF4444; }
+  .m-abar i.a { background: #F5B544; }
+
+  /* the dashboard's summary card */
+  .award-page .m-sum {
+    margin: 0 0 12px; padding: 18px 18px 16px; border-radius: 20px; color: #fff;
+    background: linear-gradient(135deg, #2457C5, #2F6FE4 55%, #0B8F7A); box-shadow: 0 16px 30px -16px rgba(47,111,228,.6);
+  }
+  .m-sum-main { display: flex; align-items: baseline; gap: 10px; }
+  .m-sum-main b { font-size: 38px; font-weight: 800; letter-spacing: -1.4px; line-height: 1; }
+  .m-sum-main span { font-size: 13px; font-weight: 600; opacity: .9; }
+  .m-sum .m-abar { margin-top: 14px; background: rgba(255,255,255,.25); }
+  .m-sum .m-abar i.g { background: #5EEAD4; }
+  .m-sum .m-abar i.r { background: #FCA5A5; }
+  .m-sum .m-abar i.a { background: #FDE68A; }
+  .m-sum-key { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 12px; font-size: 12.5px; }
+  .m-sum-key span { display: inline-flex; align-items: center; gap: 6px; }
+  .m-sum-key i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .m-sum-key i.g { background: #5EEAD4; } .m-sum-key i.r { background: #FCA5A5; } .m-sum-key i.a { background: #FDE68A; }
+  .m-sum-key b { font-weight: 800; }
+  .m-sum-key em { font-style: normal; opacity: .8; }
+
+  /* loading: soft placeholders, not a line of text */
+  .award-page table.m-matrix td.m-loading {
+    min-height: 190px; border-radius: 16px; color: transparent !important; font-size: 0 !important; padding: 0 !important;
+    background: linear-gradient(100deg, #EEF2F8 30%, #F8FAFD 50%, #EEF2F8 70%) 0 0 / 200% 100% !important;
+  }
+  .award-page table.m-matrix td.m-loading::before { display: none !important; }
+
+  /* pull down to reload */
+  .m-ptr { display: none; }
+}
+@media (max-width: 640px) and (prefers-reduced-motion: no-preference) {
+  .award-page table.m-matrix td.m-loading { animation: m-shimmer 1.3s linear infinite; }
+  @keyframes m-shimmer { to { background-position: -200% 0; } }
+}
+@media (max-width: 640px) {
+  #appShell .m-ptr {
+    position: fixed; left: 50%; top: calc(64px + env(safe-area-inset-top, 0px)); z-index: 600; display: grid; place-items: center; width: 40px; height: 40px;
+    margin-left: -20px; border-radius: 50%; background: var(--glass-strong, #fff); color: #2F6FE4; opacity: 0; pointer-events: none;
+    box-shadow: 0 8px 20px rgba(15,23,42,.2); transform: translateY(calc(var(--d, 0px) - 40px)) scale(.7); transition: opacity .15s ease, transform .2s ease;
+  }
+  #appShell .m-ptr.is-pulling { opacity: 1; transition: none; transform: translateY(var(--d, 0px)) scale(1); }
+  #appShell .m-ptr.is-ready { color: #fff; background: #2F6FE4; }
+  #appShell .m-ptr.is-busy { opacity: 1; transform: translateY(40px) scale(1); }
+  .m-ptr svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  .m-ptr.is-busy svg { animation: m-ptr-spin .8s linear infinite; }
+  @keyframes m-ptr-spin { to { transform: rotate(360deg); } }
+}
+
+@media (max-width: 640px) {
+  .award-page table.m-matrix td.m-merged { display: none !important; }
+  .award-page table.m-matrix tr.m-covered { display: none !important; }
+  /* a percentage sits beside its figure */
+  .award-page table.m-matrix td[data-pct] { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 8px; }
+  .award-page table.m-matrix td[data-pct]::before { flex: 0 0 100%; }
+  .award-page table.m-matrix td[data-pct]::after { content: attr(data-pct); font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 99px; color: var(--text-soft, #64748B); background: rgba(100,116,139,.12); }
+  /* this month: the name and its tag on one line, the bar beneath */
+  .award-page table.m-matrix tr.m-now > td:first-child::after { order: 2; }
+  .award-page table.m-matrix tr.m-now > td:first-child .m-abar { order: 3; }
+}
+
+/* Requisition and delivery cards: no table striping behind the lines of a card */
+@media (max-width: 640px) {
+  .award-page #requisitions-table tbody tr.req-row > td,
+  .award-page #delivery-table tbody tr.req-row > td,
+  .award-page #requisitions-table tbody tr:nth-child(even) td,
+  .award-page #delivery-table tbody tr:nth-child(even) td { background: none !important; box-shadow: none !important; }
+}
+
+/* ==========================================================================
+   HO Plan & Review on a phone: a description-and-refresh row, five evenly shared
+   tabs, filters in pairs, figures two across, and every table as cards.
+   ========================================================================== */
+@media (max-width: 640px) {
+  /* banner */
+  #sg-app #sgHero.app-nav { position: relative; padding: 12px !important; gap: 10px !important; }
+  #sg-app #sgHero .sg-hero-ico, #sg-app #sgHero .sg-hero-title { display: none !important; }
+  #sg-app #sgHero .sg-hero-lead { flex: 1 1 100%; display: flex; align-items: center; min-height: 40px; padding-right: 50px; }
+  #sg-app #sgHero .sg-hero-sub { margin: 0; font-size: 12px; line-height: 1.35; opacity: .92; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  #sg-app #sgHero .nav-right { position: absolute; top: 10px; right: 10px; flex: none !important; width: auto; }
+  #sg-app #sgHero #sg-refresh-btn { width: 40px; height: 40px; min-height: 0; padding: 0; font-size: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; }
+  #sg-app #sgHero #sg-refresh-btn .sg-i { width: 18px; height: 18px; }
+  #sg-app #sgHero #nav-dept-label, #sg-app #sgHero #user-badge { display: none !important; }
+  #sg-app #sgHero .sg-hero-nav { flex: 1 1 100%; display: grid; gap: 8px; width: 100%; }
+  #sg-app #sgHero .nav-tabs { display: flex; flex-wrap: nowrap; gap: 3px; width: 100%; overflow: visible; }
+  #sg-app #sgHero .nav-tab { flex: 1 1 0 !important; min-width: 0; padding: 9px 2px !important; font-size: 11.5px !important; line-height: 1.15; text-align: center; white-space: normal !important; justify-content: center; }
+  #sg-app #sgHero .dash-subtabs { display: flex; gap: 4px; width: 100%; overflow: visible; padding: 0 !important; border: 0 !important; }
+  #sg-app #sgHero .dash-subtab-btn { flex: 1 1 0; min-width: 0; padding: 8px 4px !important; font-size: 12px !important; line-height: 1.2; text-align: center; white-space: normal; justify-content: center; }
+
+  /* filters: pairs of pickers, full-width search and buttons */
+  #sg-app .filter-bar { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px !important; padding: 12px !important; }
+  #sg-app .filter-bar select, #sg-app .filter-bar input { width: 100% !important; min-width: 0; height: 46px; font-size: 16px !important; border-radius: 12px; }
+  #sg-app .filter-bar > select:last-of-type:nth-child(odd), #sg-app .filter-bar > input { grid-column: 1 / -1; }
+  #sg-app .filter-bar .sg-fb-actions { grid-column: 1 / -1; margin: 0 !important; display: flex; gap: 8px; }
+  #sg-app .filter-bar .sg-fb-actions .btn { flex: 1 1 0; min-height: 46px; justify-content: center; }
+
+  /* figures */
+  #sg-app .metrics-row { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
+  #sg-app .metrics-row .metric-card { padding: 12px !important; min-width: 0; }
+  #sg-app .metrics-row .metric-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  #sg-app .card-header { padding: 12px 14px !important; }
+  #sg-app .card-body { padding: 14px !important; }
+  #sg-app #page-settings > div[style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+
+  /* tables as cards (aw-mobile.js gives each cell its column's name) */
+  #sg-app .tbl-wrap, #sg-app .plan-tbl-wrap, #sg-app .m-scroll:has(table.m-matrix) {
+    overflow: visible !important; max-height: none !important; min-height: 0 !important; resize: none !important; background: none !important; border: 0 !important; box-shadow: none !important; border-radius: 0;
+  }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl), #sg-app table:is(.m-matrix, .tbl, .plan-tbl) tbody, #sg-app table:is(.m-matrix, .tbl, .plan-tbl) tfoot { display: block; width: 100% !important; min-width: 0 !important; }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) thead, #sg-app table:is(.m-matrix, .tbl, .plan-tbl) colgroup { display: none !important; }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) tr {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; align-items: start;
+    margin: 0 0 10px; padding: 14px 16px 16px; border-radius: 16px; background: var(--surface, #fff);
+    border: 1px solid var(--sg-edge, rgba(15,23,42,.1)); box-shadow: 0 2px 8px rgba(15,23,42,.05);
+  }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) td {
+    display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 0 !important; border: 0 !important; background: none !important;
+    position: static !important; box-shadow: none !important; text-align: left !important; white-space: normal !important; overflow-wrap: anywhere;
+    font-size: 14.5px; font-weight: 600; color: var(--text, #0F172A); filter: none !important;
+  }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) td[data-label]::before {
+    content: attr(data-label); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; line-height: 1.25; color: var(--text-soft, var(--text3, #64748B));
+  }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) td:first-child[data-label] {
+    grid-column: 1 / -1; padding-bottom: 8px !important; font-size: 16px; font-weight: 800; letter-spacing: -.2px;
+    border-bottom: 1px solid var(--sg-hair, rgba(15,23,42,.1)) !important;
+  }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) td:first-child[data-label]::before { display: none; }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) td:empty, #sg-app table:is(.m-matrix, .tbl, .plan-tbl) td.m-merged { display: none !important; }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) td[data-pct] { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 8px; }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) td[data-pct]::before { flex: 0 0 100%; }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) td[data-pct]::after { content: attr(data-pct); font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 99px; color: var(--text-soft, #64748B); background: rgba(100,116,139,.12); }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) input, #sg-app table:is(.m-matrix, .tbl, .plan-tbl) select, #sg-app table:is(.m-matrix, .tbl, .plan-tbl) textarea { width: 100%; min-width: 0; min-height: 44px; font-size: 16px; border-radius: 10px; }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) tr:has(td[colspan]) { display: block; padding: 0; background: none; border: 0; box-shadow: none; }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) td[colspan] { display: block; text-align: center !important; padding: 26px 14px !important; color: var(--text3, #94A3B8); }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) tr.m-empty { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: transparent; box-shadow: none; border-style: dashed; }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) tr.m-empty > td:not(:first-child) { display: none !important; }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) tr.m-empty > td:first-child { padding: 0 !important; border: 0 !important; font-size: 14px; color: var(--text-soft, #64748B); }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) tr.m-empty::after { content: "No data yet"; font-size: 11.5px; font-weight: 700; color: #94A3B8; padding: 3px 10px; border-radius: 99px; background: rgba(100,116,139,.12); }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) tr.plan-total-row { background: color-mix(in srgb, var(--accent, #2F6FE4) 8%, var(--surface, #fff)); }
+}
+
+/* a completion bar under the title of a card */
+@media (max-width: 640px) {
+  .m-pbar { display: block; flex: none; width: 100%; height: 8px; margin-top: 10px; border-radius: 6px; overflow: hidden; background: #E6EBF2; }
+  .m-pbar i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, #1DBA85, #16A34A); transition: width .5s cubic-bezier(.22,1,.36,1); }
+}
+
+/* ==========================================================================
+   GRs & Circulars on a phone: a slim banner, four evenly shared tabs, filters in
+   pairs, the three status counters in one row, and every record as a card
+   (gr-mobile.js gives each cell its column's name).
+   ========================================================================== */
+@media (max-width: 640px) {
+  /* banner: one line about the page and a refresh button; the header already names the page */
+  #appShell #grPage .pg-hero { position: relative; padding: 12px 64px 12px 14px !important; min-height: 0; margin-bottom: 12px; }
+  #appShell #grPage .pg-hero .pg-hero-ico, #appShell #grPage .pg-hero .pg-hero-title, #appShell #grPage .gr-whoami { display: none !important; }
+  #appShell #grPage .pg-hero .pg-hero-lead { min-height: 40px; display: flex; align-items: center; }
+  #appShell #grPage .pg-hero .pg-hero-sub { margin: 0; font-size: 12.5px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  #appShell #grPage .pg-hero-actions { position: absolute; top: 12px; right: 12px; margin: 0; width: auto; }
+  #appShell #grPage .gr-refresh-top { width: 40px; height: 40px; min-height: 0; padding: 0; font-size: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; }
+  #appShell #grPage .gr-refresh-top .gr-ricon { font-size: 18px; display: inline-flex; }
+  #appShell #grPage .gr-refresh-top .gr-i { width: 18px; height: 18px; }
+
+  /* the four tabs share the width */
+  #appShell #grPage .gr-tabs { display: grid; width: 100%; box-sizing: border-box; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 6px; overflow: visible; margin-bottom: 14px; }
+  #appShell #grPage .gr-tab { min-width: 0; justify-content: center; flex-direction: column; gap: 3px; padding: 8px 2px; font-size: 11.5px; line-height: 1.15; white-space: normal; text-align: center; }
+  #appShell #grPage .gr-tab .gr-i { width: 17px; height: 17px; margin: 0; }
+
+  /* Add New: the main action, full width */
+  #appShell #grPage .gr-myups-head { flex-direction: column; align-items: stretch; gap: 12px; }
+  #appShell #grPage .gr-myups-head .gr-btn-primary { width: 100%; min-height: 46px; justify-content: center; border-radius: 14px; font-size: 15px; }
+
+  /* filters in pairs */
+  #appShell #grPage .gr-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 10px; padding: 12px !important; margin-bottom: 12px !important; }
+  #appShell #grPage .gr-filter { min-width: 0; }
+  #appShell #grPage .gr-filter select, #appShell #grPage .gr-filter input, #appShell #grPage .gr-ms-btn { width: 100%; min-width: 0; min-height: 44px; font-size: 16px; border-radius: 12px; }
+  #appShell #grPage .gr-filter-clear { grid-column: 1 / -1; }
+  #appShell #grPage .gr-an-actions { display: flex; gap: 8px; width: 100%; }
+  #appShell #grPage .gr-an-actions > button { flex: 1 1 0; justify-content: center; min-height: 44px; }
+  #appShell #grPage .gr-date-input { width: 100%; }
+  #appShell #grPage .gr-filter-clear .gr-clear-btn { width: 100%; justify-content: center; min-height: 44px; }
+
+  /* Total / Validated / Not validated: one row of three */
+  #appShell #grPage .gr-mystat-row { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px !important; margin-bottom: 12px !important; padding: 0 !important; flex-direction: row !important; }
+  #appShell #grPage .gr-mystat { min-width: 0; padding: 12px 10px !important; display: flex; flex-direction: column; align-items: flex-start; gap: 5px; border-radius: 16px; }
+  #appShell #grPage .gr-mystat-val { font-size: 22px; }
+  #appShell #grPage .gr-mystat-label { font-size: 11px; line-height: 1.2; }
+  #appShell #grPage .gr-meta { margin: 2px 2px 10px; }
+
+  /* ---- records as cards ---- */
+  #appShell #grPage .gr-table-wrap:has(table.m-gr) {
+    overflow: visible !important; max-height: none !important; height: auto !important; min-height: 0 !important; padding: 0 !important;
+    background: none !important; border: 0 !important; box-shadow: none !important; border-radius: 0 !important;
+  }
+  #appShell #grPage .m-scroll:has(table.m-gr) { overflow: visible !important; border-radius: 0; }
+  #appShell #grPage table.m-gr, #appShell #grPage table.m-gr tbody, #appShell #grPage table.m-gr tfoot { display: block; width: 100% !important; min-width: 0 !important; }
+  #appShell #grPage table.m-gr colgroup { display: none !important; }
+  #appShell #grPage table.m-gr thead { display: block; }
+  #appShell #grPage table.m-gr thead tr:not(.gr-filter-row) { display: none; }
+
+  /* the column filters of My uploads: a tidy block of pickers above the cards */
+  #appShell #grPage table.m-gr tr.gr-filter-row {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0 0 12px; padding: 12px; border-radius: 16px;
+    background: var(--glass-strong, #fff); border: 1px solid var(--hairline, rgba(15,23,42,.1));
+  }
+  #appShell #grPage table.m-gr tr.gr-filter-row th { display: block; position: static; padding: 0 !important; border: 0 !important; background: none !important; min-width: 0; }
+  #appShell #grPage table.m-gr tr.gr-filter-row th:empty { display: none; }
+  #appShell #grPage table.m-gr tr.gr-filter-row th[data-label]::before { content: attr(data-label); display: block; margin-bottom: 4px; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-soft, #64748B); }
+  #appShell #grPage table.m-gr tr.gr-filter-row th:has(input) { grid-column: 1 / -1; order: -1; }
+  #appShell #grPage table.m-gr tr.gr-filter-row select, #appShell #grPage table.m-gr tr.gr-filter-row input { width: 100%; min-width: 0; min-height: 44px; font-size: 16px; border-radius: 12px; }
+
+  #appShell #grPage table.m-gr tbody tr {
+    position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 12px; align-items: start;
+    margin: 0 0 10px; padding: 14px 14px 14px 17px; border-radius: 16px; overflow: hidden;
+    background: var(--glass-strong, #fff); border: 1px solid var(--hairline, rgba(15,23,42,.1)); box-shadow: var(--shadow-sm, 0 1px 3px rgba(15,23,42,.08));
+  }
+  #appShell #grPage table.m-gr tbody tr:hover { background: var(--glass-strong, #fff); }
+  #appShell #grPage table.m-gr tbody tr[data-s]::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: #D97706; }
+  #appShell #grPage table.m-gr tbody tr[data-s="ok"]::before { background: #16A34A; }
+  #appShell #grPage table.m-gr tbody tr[data-s="rej"]::before { background: #DC2626; }
+  #appShell #grPage table.m-gr tbody td {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; padding: 0 !important; border: 0 !important;
+    background: none !important; text-align: left !important; white-space: normal !important; overflow-wrap: anywhere; word-break: normal !important;
+    font-size: 14px; font-weight: 600; color: var(--text, #0F172A);
+  }
+  #appShell #grPage table.m-gr tbody td[data-label]::before {
+    content: attr(data-label); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; line-height: 1.25; color: var(--text-soft, #64748B);
+  }
+  /* order of the card: title first, then where and when, then the small icons, then who */
+  #appShell #grPage table.m-gr td[data-label="Sr."] { display: none; }
+  #appShell #grPage table.m-gr td[data-label="Title"] { order: 0; grid-column: 1 / -1; padding: 0 44px 2px 40px !important; min-height: 32px; font-size: 15px; font-weight: 800; line-height: 1.35; letter-spacing: -.1px; justify-content: center; }
+  #appShell #grPage table.m-gr td[data-label="Title"]::before { display: none; }
+  #appShell #grPage table.m-gr td[data-label="Type"] { position: absolute; left: 17px; top: 14px; width: 30px; }
+  #appShell #grPage table.m-gr td[data-label="Type"]::before { display: none; }
+  #appShell #grPage table.m-gr td[data-label="Status"] { position: absolute; right: 14px; top: 14px; align-items: flex-end; }
+  #appShell #grPage table.m-gr td[data-label="Status"]::before { display: none; }
+  #appShell #grPage table.m-gr td[data-label="Status"] .gr-chip { width: 30px; height: 30px; display: inline-grid; place-items: center; border-radius: 50%; font-size: 14px; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="Date"] { order: 1; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="District"] { order: 2; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="State"] { order: 3; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="Desc."] { order: 4; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="File"] { order: 5; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="Remark"] { order: 6; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="Uploaded By"], #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="Uploaded on"] { order: 7; grid-column: 1 / -1; font-size: 13px; font-weight: 600; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="Validated By"] { order: 8; grid-column: 1 / -1; font-size: 13px; font-weight: 600; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="Action"] { order: 9; grid-column: 1 / -1; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="Action"]::before { display: none; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="Action"]:has(> .gr-muted:only-child) { display: none; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="Action"] .gr-row-actions { display: flex; gap: 8px; width: 100%; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="Action"] .gr-row-actions button { flex: 1 1 0; min-height: 44px; border-radius: 12px; justify-content: center; font-size: 14px; }
+  #appShell #grPage table.m-gr:not(.gr-an-table) td[data-label="Action"] .gr-row-actions .gr-btn-icon .gr-i { width: 18px; height: 18px; }
+  #appShell #grPage table.m-gr .gr-ts, #appShell #grPage table.m-gr .gr-uploaded { font-size: 13px; font-weight: 600; }
+  #appShell #grPage table.m-gr .gr-ts { color: var(--text-soft, #64748B); font-weight: 500; }
+  #appShell #grPage table.m-gr .gr-desc-btn, #appShell #grPage table.m-gr .gr-file-icon { width: 38px; height: 38px; display: inline-grid; place-items: center; border-radius: 12px; }
+  #appShell #grPage table.m-gr .gr-desc-btn .gr-i, #appShell #grPage table.m-gr .gr-file-icon .gr-i { width: 18px; height: 18px; }
+
+  /* loading and empty messages: one calm card */
+  #appShell #grPage table.m-gr tbody tr:has(> td[colspan]), #appShell #grPage table.m-gr tbody tr:has(> td.gr-empty-cell) { display: block; padding: 0; background: none; border: 0; box-shadow: none; overflow: visible; }
+  #appShell #grPage table.m-gr td.gr-empty-cell { display: block; align-items: center; text-align: center !important; padding: 28px 14px !important; }
+  #appShell #grPage table.m-gr td.gr-empty-cell::before { display: none; }
+  #appShell #grPage table.m-gr .gr-empty-icon { width: 46px; height: 46px; border-radius: 15px; margin-bottom: 10px; }
+  #appShell #grPage table.m-gr .gr-empty-icon .gr-i { width: 22px; height: 22px; }
+
+  /* ---- Analytics: the district grid as cards ---- */
+  #appShell #grPage .gr-an-tabs { padding: 0 0 10px; margin-bottom: 4px; }
+  #appShell #grPage table.m-gr.gr-an-table tbody tr, #appShell #grPage table.m-gr.gr-an-table tfoot tr {
+    grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 14px 16px 16px; border-radius: 16px;
+    background: var(--glass-strong, #fff); border: 1px solid var(--hairline, rgba(15,23,42,.1));
+  }
+  #appShell #grPage table.m-gr.gr-an-table tfoot { display: block; }
+  #appShell #grPage table.m-gr.gr-an-table tfoot tr { position: static; display: grid; gap: 12px 14px; margin: 0 0 10px; background: color-mix(in srgb, var(--accent, #2F6FE4) 8%, var(--glass-strong, #fff)); box-shadow: none; }
+  #appShell #grPage table.m-gr.gr-an-table tfoot td {
+    position: static !important; display: flex; flex-direction: column; gap: 3px; padding: 0 !important; border: 0 !important; background: none !important;
+    text-align: left !important; font-size: 15px; font-weight: 800; color: var(--text, #0F172A); box-shadow: none !important; border-top: 0 !important;
+  }
+  #appShell #grPage table.m-gr.gr-an-table tfoot td[data-label]::before {
+    content: attr(data-label); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-soft, #64748B);
+  }
+  #appShell #grPage table.m-gr.gr-an-table tr > td:first-child { grid-column: 1 / -1; position: relative !important; display: block; padding: 0 0 10px !important; border-bottom: 1px solid var(--hairline, rgba(15,23,42,.1)) !important; box-shadow: none !important; font-size: 16px; font-weight: 800; }
+  #appShell #grPage table.m-gr.gr-an-table tr > td:first-child::before { display: none; }
+  #appShell #grPage table.m-gr.gr-an-table tfoot tr > td:first-child { font-size: 15px; }
+  #appShell #grPage table.m-gr.gr-an-table .gr-an-dbar { display: none; }
+  #appShell #grPage table.m-gr.gr-an-table .gr-an-dname { font-size: 16px; }
+  #appShell #grPage table.m-gr.gr-an-table .gr-an-comm { display: block; margin-top: 3px; }
+  #appShell #grPage table.m-gr.gr-an-table .gr-an-rank { display: inline-grid; place-items: center; width: 24px; height: 24px; min-width: 0; margin-right: 8px; border-radius: 50%; font-size: 11px; background: rgba(100,116,139,.14); }
+  #appShell #grPage table.m-gr.gr-an-table td.gr-an-num, #appShell #grPage table.m-gr.gr-an-table td.gr-an-total, #appShell #grPage table.m-gr.gr-an-table td.gr-an-fnum { border-left: 0 !important; font-size: 17px; font-weight: 800; }
+  #appShell #grPage table.m-gr.gr-an-table tr.gr-an-zero { background: color-mix(in srgb, #DC2626 8%, var(--glass-strong, #fff)); }
+  #appShell #grPage table.m-gr.gr-an-table tr.gr-an-zero td { background: none !important; }
+  #appShell #grPage table.m-gr.gr-an-table tbody tr::before { display: none; }
+
+  /* the Summary tab's charts and lists use the full width */
+  #appShell #grPage .gr-sx-panel { padding: 16px 14px; }
+  #appShell #grPage .gr-sx-tablewrap { margin: 0; }
+}
+
+/* ==========================================================================
+   OLF Forms on a phone: a slim banner, tabs sharing the width, forms as cards,
+   a one-row save bar, and pop-ups above the bottom bar (forms-mobile.js names
+   each cell).
+   ========================================================================== */
+@media (max-width: 640px) {
+  #appShell #page-forms .frm-head { position: relative; padding: 12px 64px 12px 14px !important; min-height: 0; margin-bottom: 12px; }
+  #appShell #page-forms .frm-head .pg-hero-ico, #appShell #page-forms .frm-head .pg-hero-title, #appShell #page-forms #frmStatus { display: none !important; }
+  #appShell #page-forms .frm-head .pg-hero-lead { min-height: 40px; display: flex; align-items: center; }
+  #appShell #page-forms .frm-head .pg-hero-sub { margin: 0; font-size: 12.5px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  #appShell #page-forms .frm-head__side { position: absolute; top: 12px; right: 12px; margin: 0; width: auto; }
+  #appShell #page-forms .frm-head__side .pg-btn { width: 40px; height: 40px; min-height: 0; padding: 0; font-size: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; }
+  #appShell #page-forms .frm-head__side .pg-btn .frm-i { width: 18px; height: 18px; }
+
+  #appShell #page-forms .frm-tabs { display: flex; width: 100%; box-sizing: border-box; gap: 4px; padding: 6px; }
+  #appShell #page-forms .frm-tab { flex: 1 1 0; min-width: 0; padding: 11px 6px; text-align: center; }
+
+  #appShell #page-forms .frm-input, #appShell #page-forms .frm-field select, #appShell #page-forms .frm-field input:not([type=checkbox]):not([type=radio]), #appShell #page-forms .frm-field textarea { font-size: 16px; min-height: 46px; border-radius: 12px; }
+  #appShell #page-forms .frm-field textarea { min-height: 84px; }
+  #appShell #page-forms .frm-btn { min-height: 44px; border-radius: 12px; font-size: 14.5px; }
+  #appShell #page-forms .frm-btn--tiny { min-height: 40px; padding: 8px 12px; font-size: 13.5px; border-radius: 10px; }
+  #appShell #page-forms .frm-opt { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+  #appShell #page-forms .frm-opt input[type=checkbox], #appShell #page-forms .frm-opt input[type=radio] { width: 20px; height: 20px; margin: 0; flex: none; }
+  #appShell #page-forms .frm-field--mid { padding-bottom: 0; align-items: center; }
+  #appShell #page-forms .frm-qcard__head .frm-rowacts { padding: 0 10px 10px; }
+
+  /* the save bar: one row, pinned just above the bottom bar */
+  #appShell #page-forms .frm-acts--sticky { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 8px; padding: 10px !important; border-radius: 16px; margin-top: 8px; }
+  #appShell #page-forms .frm-acts--sticky .frm-btn { width: 100%; padding-left: 6px; padding-right: 6px; justify-content: center; min-height: 46px; }
+  #appShell #page-forms .frm-acts--sticky .frm-hint { grid-column: 1 / -1; order: -1; margin: 0; width: auto; }
+  #appShell #page-forms .frm-acts--sticky .frm-hint:empty { display: none; }
+
+  /* pop-ups above the bottom bar, from the bottom edge */
+  #appShell #page-forms .frm-modal { z-index: 2100; align-items: flex-end; padding: 0; }
+  #appShell #page-forms .frm-modal__sheet { width: 100%; max-width: none; max-height: 88dvh; overflow-y: auto; border-radius: 22px 22px 0 0; padding: 20px 18px calc(20px + env(safe-area-inset-bottom, 0px)); }
+  #appShell #page-forms .frm-veil { z-index: 2100; }
+  #appShell #page-forms .frm-toasts { bottom: calc(104px + env(safe-area-inset-bottom, 0px)); }
+
+  /* ---- tables as cards ---- */
+  #appShell #page-forms .frm-scroll:has(table.m-frm) { overflow: visible !important; border: 0 !important; background: none !important; box-shadow: none !important; border-radius: 0 !important; }
+  #appShell #page-forms table.m-frm, #appShell #page-forms table.m-frm tbody { display: block; width: 100% !important; min-width: 0 !important; }
+  #appShell #page-forms table.m-frm thead { display: none; }
+  #appShell #page-forms table.m-frm.frm-grid tbody > tr {
+    position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; align-items: start;
+    margin: 0 0 10px; padding: 14px 14px 14px 18px; border-radius: 16px; overflow: hidden;
+    background: var(--glass-strong, #fff); border: 1px solid var(--hairline, rgba(15,23,42,.1)); box-shadow: var(--shadow-sm, 0 1px 3px rgba(15,23,42,.08));
+  }
+  #appShell #page-forms table.m-frm.frm-grid tbody > tr:hover td { background: none; }
+  #appShell #page-forms table.m-frm.frm-grid tbody > tr > td {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; padding: 0 !important; border: 0 !important; background: none;
+    text-align: left !important; overflow-wrap: anywhere; font-size: 14px; font-weight: 600; color: var(--ink, #14203a);
+  }
+  #appShell #page-forms table.m-frm.frm-grid tbody > tr > td[data-label]::before {
+    content: attr(data-label); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; line-height: 1.25; color: var(--soft, #64748B);
+  }
+  #appShell #page-forms table.m-frm td.frm-grid__rail { position: absolute; left: 0; top: 0; bottom: 0; width: 4px !important; padding: 0 !important; }
+  #appShell #page-forms table.m-frm td.frm-grid__rail::before { display: none !important; }
+  #appShell #page-forms table.m-frm td.frm-grid__rail { background: var(--rule, #dfe5ee) !important; }
+  #appShell #page-forms table.m-frm td.frm-grid__rail[data-state="published"] { background: var(--go, #16A34A) !important; }
+  #appShell #page-forms table.m-frm td.frm-grid__rail[data-state="draft"] { background: var(--wait, #D97706) !important; }
+  #appShell #page-forms table.m-frm td.frm-grid__rail[data-state="closed"] { background: #9aa7bd !important; }
+  #appShell #page-forms table.m-frm td.frm-grid__rail[data-state="archived"] { background: var(--stop, #DC2626) !important; }
+  #appShell #page-forms table.m-frm td.frm-grid__name { grid-column: 1 / -1; padding-right: 92px !important; font-size: 15.5px; font-weight: 800; line-height: 1.35; min-height: 28px; }
+  #appShell #page-forms table.m-frm td.frm-grid__name::before { display: none !important; }
+  #appShell #page-forms table.m-frm td[data-label="Status"] { position: absolute; right: 12px; top: 14px; align-items: flex-end; }
+  #appShell #page-forms table.m-frm td[data-label="Status"]::before { display: none !important; }
+  #appShell #page-forms table.m-frm td[data-label="Action"] { grid-column: 1 / -1; }
+  #appShell #page-forms table.m-frm td[data-label="Action"]::before { display: none !important; }
+  #appShell #page-forms table.m-frm td[data-label="Action"] .frm-rowacts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; width: 100%; }
+  #appShell #page-forms table.m-frm td[data-label="Action"] .frm-rowacts .frm-btn { width: 100%; justify-content: center; }
+  #appShell #page-forms table.m-frm td[data-label="Action"] > .frm-btn { width: 100%; justify-content: center; }
+  #appShell #page-forms table.m-frm .frm-ref { display: block; font-size: 12.5px; font-weight: 500; color: var(--soft, #64748B); margin-top: 2px; }
+
+  /* the list of who responded: each person's answers open beneath their card */
+  #appShell #page-forms table.m-frm tr.frm-dsub { display: block; padding: 0 !important; margin: -4px 0 10px; background: none !important; border: 0 !important; box-shadow: none !important; }
+  #appShell #page-forms table.m-frm tr.frm-dsub > td { display: block; padding: 0 !important; }
+  #appShell #page-forms table.m-frm.frm-subgrid tbody > tr {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; padding: 10px 12px; margin: 0 0 6px; border-radius: 12px;
+    background: var(--wash, #f5f8fc); border: 1px solid var(--hairline, rgba(15,23,42,.08));
+  }
+  #appShell #page-forms table.m-frm.frm-subgrid tbody > tr > td { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 0 !important; border: 0 !important; font-size: 13.5px; font-weight: 600; text-align: left !important; }
+  #appShell #page-forms table.m-frm.frm-subgrid tbody > tr > td[data-label]::before { content: attr(data-label); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--soft, #64748B); }
+  #appShell #page-forms table.m-frm.frm-subgrid tbody > tr > td:first-child { grid-column: 1 / -1; }
+}
