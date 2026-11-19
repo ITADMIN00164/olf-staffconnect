@@ -881,7 +881,13 @@
 
       if (activeTab) {
 
-        activeTab.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
+        const targetLeft = activeTab.offsetLeft - newScroll.offsetLeft;
+
+        if (activeTab.offsetLeft < newScroll.scrollLeft || (activeTab.offsetLeft + activeTab.offsetWidth) > (newScroll.scrollLeft + newScroll.clientWidth)) {
+
+          newScroll.scrollLeft = Math.max(0, targetLeft - 20);
+
+        }
 
       }
 
@@ -1311,7 +1317,7 @@
 
                   <th style="text-align:center; font-weight:700;">Total Cycles</th>
 
-                  <th style="text-align:center; min-width: 140px;">Actions</th>
+                  ${isAdmin ? '<th style="text-align:center; width: 70px;">Edit</th>' : ''}
 
                 </tr>
 
@@ -1354,15 +1360,15 @@
                         <td style="text-align:center; font-weight:800; color:#DC2626;">${uk}</td>
                         <td style="text-align:center; font-weight:800; color:#4F46E5;">${jee}</td>
                         <td style="text-align:center; font-weight:900; color:#0F172A; background:#E2E8F0; font-size:14px;">${rowCycles}</td>
-                        <td style="text-align:center; white-space:nowrap;">
-                          <span style="background:#E2E8F0; color:#475569; font-size:11px; font-weight:700; padding:4px 10px; border-radius:12px;">Summary Total</span>
-                        </td>
+                        ${isAdmin ? `
+                          <td style="text-align:center; white-space:nowrap; background:#E2E8F0;">—</td>
+                        ` : ''}
                       </tr>
                     `;
                   }
 
                   return `
-                    <tr class="tp-hist-row">
+                    <tr class="tp-hist-row" onclick="window.HistoricalModule.openDistrictDrawer('${escapeHtml(distName)}')" title="Click to view ${escapeHtml(distName)} 360° Profile">
 
                       <td style="text-align:center; color:#94A3B8; font-weight:600;">${sr}</td>
 
@@ -1370,11 +1376,7 @@
 
                       <td class="tp-hist-cell-dist">
 
-                        <a href="javascript:void(0)" onclick="window.HistoricalModule.openDistrictDrawer('${escapeHtml(distName)}')" style="color:#0284C7; text-decoration:none; font-weight:700;">
-
-                          ${escapeHtml(distName)}
-
-                        </a>
+                        <strong style="color:#0284C7;">${escapeHtml(distName)}</strong>
 
                       </td>
 
@@ -1398,25 +1400,13 @@
 
                       <td style="text-align:center; font-weight:800; color:#0F172A; background:#F8FAFC;">${rowCycles}</td>
 
-                      <td style="text-align:center; white-space:nowrap;">
-
-                        <button type="button" class="tp-hist-btn-profile" onclick="window.HistoricalModule.openDistrictDrawer('${escapeHtml(distName)}')">
-
-                          <span>🔍 View</span>
-
-                        </button>
-
-                        ${isAdmin ? `
-
-                          <button type="button" class="tp-hist-btn-edit" onclick="window.HistoricalModule.openAdminEditor('${sheet.id}', '${escapeHtml(distName)}')">
-
+                      ${isAdmin ? `
+                        <td style="text-align:center; white-space:nowrap;" onclick="event.stopPropagation()">
+                          <button type="button" class="tp-hist-btn-edit" onclick="event.stopPropagation();window.HistoricalModule.openAdminEditor('${sheet.id}', '${escapeHtml(distName)}')">
                             <span>✏️ Edit</span>
-
                           </button>
-
-                        ` : ''}
-
-                      </td>
+                        </td>
+                      ` : ''}
 
                     </tr>
 
@@ -1592,8 +1582,6 @@
 
                   <th style="text-align:right; font-weight:700;">Lifeskill Posts</th>
 
-                  <th style="text-align:center;">Actions</th>
-
                 </tr>
 
               </thead>
@@ -1602,7 +1590,7 @@
 
                 ${filteredRows.map(r => `
 
-                  <tr class="tp-hist-row">
+                  <tr class="tp-hist-row" onclick="window.HistoricalModule.openDistrictDrawer('${escapeHtml(r[2])}')" title="Click to view ${escapeHtml(r[2])} 360° Profile">
 
                     <td style="text-align:center; color:#94A3B8; font-weight:600;">${r[0] || '—'}</td>
 
@@ -1610,11 +1598,7 @@
 
                     <td class="tp-hist-cell-dist">
 
-                      <a href="javascript:void(0)" onclick="window.HistoricalModule.openDistrictDrawer('${escapeHtml(r[2])}')" style="color:#0284C7; text-decoration:none; font-weight:700;">
-
-                        ${escapeHtml(r[2] || '—')}
-
-                      </a>
+                      <strong style="color:#0284C7;">${escapeHtml(r[2] || '—')}</strong>
 
                     </td>
 
@@ -1629,16 +1613,6 @@
                     <td style="text-align:right; font-family:monospace; color:#0284C7;">${r[7] || '—'}</td>
 
                     <td style="text-align:right; font-family:monospace; font-weight:800; color:#059669;">${r[8] || '—'}</td>
-
-                    <td style="text-align:center; white-space:nowrap;">
-
-                      <button type="button" class="tp-hist-btn-profile" onclick="window.HistoricalModule.openDistrictDrawer('${escapeHtml(r[2])}')">
-
-                        <span>🔍 View</span>
-
-                      </button>
-
-                    </td>
 
                   </tr>
 
@@ -1734,7 +1708,7 @@
 
                 }).join('')}
 
-                <th style="text-align:center; min-width: 140px;">Actions</th>
+                ${isAdmin ? '<th style="text-align:center; width: 70px;">Edit</th>' : ''}
 
               </tr>
 
@@ -1774,15 +1748,15 @@
                           </td>
                         `;
                       }).join('')}
-                      <td style="text-align:center; white-space:nowrap; background:#F1F5F9;">
-                        <span style="background:#E2E8F0; color:#475569; font-size:11px; font-weight:700; padding:4px 10px; border-radius:12px;">Summary Total</span>
-                      </td>
+                      ${isAdmin ? `
+                        <td style="text-align:center; white-space:nowrap; background:#F1F5F9;">—</td>
+                      ` : ''}
                     </tr>
                   `;
                 }
 
                 return `
-                  <tr class="tp-hist-row">
+                  <tr class="tp-hist-row" onclick="window.HistoricalModule.openDistrictDrawer('${escapeHtml(distName)}')" title="Click to view ${escapeHtml(distName)} 360° Profile">
 
                     ${headers.map((h, colIdx) => {
 
@@ -1810,11 +1784,7 @@
 
                           <td class="tp-hist-cell-dist ${isSticky ? 'tp-hist-col-sticky sticky-col-' + colIdx : ''}">
 
-                            <a href="javascript:void(0)" onclick="window.HistoricalModule.openDistrictDrawer('${escapeHtml(val)}')" style="color:#0284C7; text-decoration:none; font-weight:700;">
-
-                              ${escapeHtml(val || '—')}
-
-                            </a>
+                            <strong style="color:#0284C7;">${escapeHtml(val || '—')}</strong>
 
                           </td>
 
@@ -1834,25 +1804,13 @@
 
                     }).join('')}
 
-                    <td style="text-align:center; white-space:nowrap;">
-
-                      <button type="button" class="tp-hist-btn-profile" onclick="window.HistoricalModule.openDistrictDrawer('${escapeHtml(distName)}')">
-
-                        <span>🔍 View</span>
-
-                      </button>
-
-                      ${isAdmin ? `
-
-                        <button type="button" class="tp-hist-btn-edit" onclick="window.HistoricalModule.openAdminEditor('${sheet.id}', '${escapeHtml(distName)}')">
-
+                    ${isAdmin ? `
+                      <td style="text-align:center; white-space:nowrap;" onclick="event.stopPropagation()">
+                        <button type="button" class="tp-hist-btn-edit" onclick="event.stopPropagation();window.HistoricalModule.openAdminEditor('${sheet.id}', '${escapeHtml(distName)}')">
                           <span>✏️ Edit</span>
-
                         </button>
-
-                      ` : ''}
-
-                    </td>
+                      </td>
+                    ` : ''}
 
                   </tr>
 
@@ -2164,7 +2122,7 @@
 
                 ${yearCols.length >= 2 ? '<th style="text-align:center;">Momentum</th>' : ''}
 
-                <th style="text-align:center; min-width: 140px;">Actions</th>
+                ${isAdmin ? '<th style="text-align:center; width: 70px;">Edit</th>' : ''}
 
               </tr>
 
@@ -2228,7 +2186,7 @@
 
                 return `
 
-                  <tr class="tp-hist-row">
+                  <tr class="tp-hist-row" onclick="window.HistoricalModule.openDistrictDrawer('${escapeHtml(districtName)}')" title="Click to view ${escapeHtml(districtName)} 360° Profile">
 
                     <td style="text-align:center; color:#94A3B8; font-weight:600;">${r[1] || (idx + 1)}</td>
 
@@ -2236,7 +2194,7 @@
 
                     <td class="tp-hist-cell-dist">
 
-                      <strong>${escapeHtml(districtName)}</strong>
+                      <strong style="color:#0284C7;">${escapeHtml(districtName)}</strong>
 
                     </td>
 
@@ -2264,25 +2222,13 @@
 
                     ${yearCols.length >= 2 ? `<td style="text-align:center;">${deltaHtml}</td>` : ''}
 
-                    <td style="text-align:center; white-space:nowrap;">
-
-                      <button type="button" class="tp-hist-btn-profile" onclick="window.HistoricalModule.openDistrictDrawer('${escapeHtml(districtName)}')">
-
-                        <span>🔍 View</span>
-
-                      </button>
-
-                      ${isAdmin ? `
-
-                        <button type="button" class="tp-hist-btn-edit" onclick="window.HistoricalModule.openAdminEditor('${targetSheet.id}', '${escapeHtml(districtName)}')">
-
+                    ${isAdmin ? `
+                      <td style="text-align:center; white-space:nowrap;" onclick="event.stopPropagation()">
+                        <button type="button" class="tp-hist-btn-edit" onclick="event.stopPropagation();window.HistoricalModule.openAdminEditor('${targetSheet.id}', '${escapeHtml(districtName)}')">
                           <span>✏️ Edit</span>
-
                         </button>
-
-                      ` : ''}
-
-                    </td>
+                      </td>
+                    ` : ''}
 
                   </tr>
 
@@ -2450,7 +2396,7 @@
 
                 return `
 
-                  <tr class="tp-hist-row">
+                  <tr class="tp-hist-row" ${distName ? `onclick="window.HistoricalModule.openDistrictDrawer('${escapeHtml(distName)}')" title="Click to view ${escapeHtml(distName)} 360° Profile"` : ''}>
 
                     ${r.map((c, colIdx) => {
 
@@ -2470,7 +2416,7 @@
 
                         <td class="${isSticky ? 'tp-hist-col-sticky sticky-col-' + colIdx : ''}" style="${isNum ? 'text-align:right; font-family:monospace; font-weight:600;' : ''}">
 
-                          ${isDistCell && val ? `<a href="javascript:void(0)" onclick="window.HistoricalModule.openDistrictDrawer('${escapeHtml(val)}')" style="color:#0284C7; text-decoration:none; font-weight:700;">${escapeHtml(val)}</a>` : escapeHtml(val || '—')}
+                          ${isDistCell && val ? `<strong style="color:#0284C7;">${escapeHtml(val)}</strong>` : escapeHtml(val || '—')}
 
                         </td>
 
@@ -2480,9 +2426,9 @@
 
                     ${isAdmin ? `
 
-                      <td style="text-align:center;">
+                      <td style="text-align:center;" onclick="event.stopPropagation()">
 
-                        <button type="button" class="tp-hist-btn-edit" onclick="window.HistoricalModule.openAdminEditor('${sheet.id}', '${escapeHtml(distName)}')">
+                        <button type="button" class="tp-hist-btn-edit" onclick="event.stopPropagation();window.HistoricalModule.openAdminEditor('${sheet.id}', '${escapeHtml(distName)}')">
 
                           <span>✏️ Edit</span>
 
@@ -4667,7 +4613,21 @@
 
             tab.classList.add('active');
 
-            tab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+            const targetLeft = tab.offsetLeft - scrollEl.offsetLeft;
+
+            if (tab.offsetLeft < scrollEl.scrollLeft || (tab.offsetLeft + tab.offsetWidth) > (scrollEl.scrollLeft + scrollEl.clientWidth)) {
+
+              if (typeof scrollEl.scrollTo === 'function') {
+
+                scrollEl.scrollTo({ left: Math.max(0, targetLeft - 20), behavior: 'smooth' });
+
+              } else {
+
+                scrollEl.scrollLeft = Math.max(0, targetLeft - 20);
+
+              }
+
+            }
 
             matched = true;
 
