@@ -209,7 +209,7 @@
      refresh button, so the right tab's data is what reloads. */
   var ptr = null, ptrY = 0, ptrDy = 0, ptrOn = false;
   function refreshButton() {
-    var a = document.getElementById("aw-refresh-all"), b = document.getElementById("refresh-btn"), c = document.getElementById("sg-refresh-btn");
+    var a = document.getElementById("aw-refresh-all"), b = document.getElementById("refresh-btn"), c = document.getElementById("sg-refresh-btn") || document.getElementById("grRefreshAll");
     if (a && a.offsetParent !== null) return a;
     if (b && b.offsetParent !== null) return b;
     if (c && c.offsetParent !== null) return c;
@@ -228,7 +228,7 @@
     if (!area || area.__mPull) return;
     area.__mPull = true;
     area.addEventListener("touchstart", function (e) {
-      ptrOn = !!(MQ && MQ.matches && area.scrollTop <= 0 && area.querySelector(".award-page, #sg-app") && e.touches.length === 1 && refreshButton());
+      ptrOn = !!(MQ && MQ.matches && area.scrollTop <= 0 && area.querySelector(".award-page, #sg-app, #grPage") && e.touches.length === 1 && refreshButton());
       ptrY = e.touches[0].clientY; ptrDy = 0;
     }, { passive: true });
     area.addEventListener("touchmove", function (e) {
