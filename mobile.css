@@ -608,3 +608,90 @@
   .m-fab svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; }
   html.m-typing .m-fab { display: none !important; }
 }
+
+/* ==========================================================================
+   Awards & Gifts, fourth pass: a clear hierarchy. This month stands out, months with
+   nothing yet fold down to one slim line, award cards carry a bar, the dashboard
+   opens with one big summary, loading shows soft placeholders, and pulling down
+   reloads the page.
+   ========================================================================== */
+@media (max-width: 640px) {
+  /* months with nothing in them yet: one slim line */
+  .award-page table.m-matrix tr.m-empty { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; box-shadow: none; background: transparent; border-style: dashed; }
+  .award-page table.m-matrix tr.m-empty > td:not(:first-child) { display: none !important; }
+  .award-page table.m-matrix tr.m-empty > td:first-child { padding: 0 !important; border: 0 !important; font-size: 14.5px; font-weight: 700; color: var(--text-soft, #64748B); }
+  .award-page table.m-matrix tr.m-empty::after { content: "No data yet"; font-size: 11.5px; font-weight: 700; color: var(--text-muted, #94A3B8); padding: 3px 10px; border-radius: 99px; background: rgba(100,116,139,.12); }
+
+  /* the month we are in */
+  .award-page table.m-matrix tr.m-now { border-color: var(--accent, #2F6FE4); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #2F6FE4) 14%, transparent), var(--shadow-sm, 0 1px 3px rgba(15,23,42,.08)); }
+  .award-page table.m-matrix tr.m-now > td:first-child { flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .award-page table.m-matrix tr.m-now > td:first-child::after {
+    content: "This month"; font-size: 10.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 99px; color: #fff; background: linear-gradient(135deg, #2F6FE4, #0B8F7A);
+  }
+
+  /* the on time / late / still to do bar */
+  .m-abar { display: flex; flex: none; gap: 3px; width: 100%; height: 8px; margin-top: 10px; border-radius: 6px; overflow: hidden; background: #E6EBF2; }
+  .m-abar i { display: block; height: 100%; transition: width .5s cubic-bezier(.22,1,.36,1); }
+  .m-abar i.g { background: linear-gradient(90deg, #1DBA85, #16A34A); }
+  .m-abar i.r { background: #EF4444; }
+  .m-abar i.a { background: #F5B544; }
+
+  /* the dashboard's summary card */
+  .award-page .m-sum {
+    margin: 0 0 12px; padding: 18px 18px 16px; border-radius: 20px; color: #fff;
+    background: linear-gradient(135deg, #2457C5, #2F6FE4 55%, #0B8F7A); box-shadow: 0 16px 30px -16px rgba(47,111,228,.6);
+  }
+  .m-sum-main { display: flex; align-items: baseline; gap: 10px; }
+  .m-sum-main b { font-size: 38px; font-weight: 800; letter-spacing: -1.4px; line-height: 1; }
+  .m-sum-main span { font-size: 13px; font-weight: 600; opacity: .9; }
+  .m-sum .m-abar { margin-top: 14px; background: rgba(255,255,255,.25); }
+  .m-sum .m-abar i.g { background: #5EEAD4; }
+  .m-sum .m-abar i.r { background: #FCA5A5; }
+  .m-sum .m-abar i.a { background: #FDE68A; }
+  .m-sum-key { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 12px; font-size: 12.5px; }
+  .m-sum-key span { display: inline-flex; align-items: center; gap: 6px; }
+  .m-sum-key i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .m-sum-key i.g { background: #5EEAD4; } .m-sum-key i.r { background: #FCA5A5; } .m-sum-key i.a { background: #FDE68A; }
+  .m-sum-key b { font-weight: 800; }
+  .m-sum-key em { font-style: normal; opacity: .8; }
+
+  /* loading: soft placeholders, not a line of text */
+  .award-page table.m-matrix td.m-loading {
+    min-height: 190px; border-radius: 16px; color: transparent !important; font-size: 0 !important; padding: 0 !important;
+    background: linear-gradient(100deg, #EEF2F8 30%, #F8FAFD 50%, #EEF2F8 70%) 0 0 / 200% 100% !important;
+  }
+  .award-page table.m-matrix td.m-loading::before { display: none !important; }
+
+  /* pull down to reload */
+  .m-ptr { display: none; }
+}
+@media (max-width: 640px) and (prefers-reduced-motion: no-preference) {
+  .award-page table.m-matrix td.m-loading { animation: m-shimmer 1.3s linear infinite; }
+  @keyframes m-shimmer { to { background-position: -200% 0; } }
+}
+@media (max-width: 640px) {
+  #appShell .m-ptr {
+    position: fixed; left: 50%; top: calc(64px + env(safe-area-inset-top, 0px)); z-index: 600; display: grid; place-items: center; width: 40px; height: 40px;
+    margin-left: -20px; border-radius: 50%; background: var(--glass-strong, #fff); color: #2F6FE4; opacity: 0; pointer-events: none;
+    box-shadow: 0 8px 20px rgba(15,23,42,.2); transform: translateY(calc(var(--d, 0px) - 40px)) scale(.7); transition: opacity .15s ease, transform .2s ease;
+  }
+  #appShell .m-ptr.is-pulling { opacity: 1; transition: none; transform: translateY(var(--d, 0px)) scale(1); }
+  #appShell .m-ptr.is-ready { color: #fff; background: #2F6FE4; }
+  #appShell .m-ptr.is-busy { opacity: 1; transform: translateY(40px) scale(1); }
+  .m-ptr svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  .m-ptr.is-busy svg { animation: m-ptr-spin .8s linear infinite; }
+  @keyframes m-ptr-spin { to { transform: rotate(360deg); } }
+}
+
+@media (max-width: 640px) {
+  .award-page table.m-matrix td.m-merged { display: none !important; }
+  .award-page table.m-matrix tr.m-covered { display: none !important; }
+  /* a percentage sits beside its figure */
+  .award-page table.m-matrix td[data-pct] { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 8px; }
+  .award-page table.m-matrix td[data-pct]::before { flex: 0 0 100%; }
+  .award-page table.m-matrix td[data-pct]::after { content: attr(data-pct); font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 99px; color: var(--text-soft, #64748B); background: rgba(100,116,139,.12); }
+  /* this month: the name and its tag on one line, the bar beneath */
+  .award-page table.m-matrix tr.m-now > td:first-child::after { order: 2; }
+  .award-page table.m-matrix tr.m-now > td:first-child .m-abar { order: 3; }
+}
