@@ -575,9 +575,10 @@ function groupByGoal(items) {
 }
 
 function refreshDataLists() {
-  document.getElementById('members-list').innerHTML = memberNames().map(m=>`<option value="${esc(m)}">`).join('');
-  document.getElementById('goalnames-list').innerHTML = DB.settings.goalNames.map(g=>`<option value="${esc(g)}">`).join('');
-  document.getElementById('cats-list').innerHTML = DB.settings.categories.map(c=>`<option value="${esc(c)}">`).join('');
+  var fill = function (id, html) { var el = document.getElementById(id); if (el) el.innerHTML = html; };   // the page may not be on screen
+  fill('members-list', memberNames().map(m=>`<option value="${esc(m)}">`).join(''));
+  fill('goalnames-list', DB.settings.goalNames.map(g=>`<option value="${esc(g)}">`).join(''));
+  fill('cats-list', DB.settings.categories.map(c=>`<option value="${esc(c)}">`).join(''));
 }
 
 function populateSelect(id, items, emptyLabel='Select…') {

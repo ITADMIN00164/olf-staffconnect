@@ -12,7 +12,7 @@
 (function () {
   "use strict";
   var MQ = window.matchMedia ? window.matchMedia("(max-width: 640px)") : null;
-  var TABLES = "#aw-view-event table, #aw-view-evdash table, #aw-view-award table, #aw-view-dash table";
+  var TABLES = "#aw-view-event table, #aw-view-evdash table, #aw-view-award table, #aw-view-dash table, #sg-app table";
   var pending = false;
 
   function clean(th) {
@@ -86,6 +86,21 @@
     }
   }
 
+  // a completion bar for a "% completed" column
+  function pbar(host, pct) {
+    var el = host.querySelector(".m-pbar");
+    if (pct == null || isNaN(pct)) { if (el) el.remove(); return; }
+    if (!el) {
+      el = document.createElement("span");
+      el.className = "m-pbar";
+      el.setAttribute("aria-hidden", "true");
+      el.appendChild(document.createElement("i"));
+      host.appendChild(el);
+    }
+    var w = Math.max(0, Math.min(100, pct)) + "%";
+    if (el.firstChild.style.width !== w) el.firstChild.style.width = w;
+  }
+
   function decorate(tr, inFoot) {
     var cells = tr.children, first = cells[0];
     if (!first || !first.getAttribute("data-label")) return;
@@ -95,6 +110,8 @@
     for (var i = 1; i < cells.length; i++) if (!NOTHING.test(cells[i].textContent)) { quiet = false; break; }
     tr.classList.toggle("m-empty", !inFoot && quiet && !controls && cells.length > 2);
     tr.classList.toggle("m-now", !inFoot && isThisMonth(first.textContent));
+    var done = cellBy(tr, /^% *complet/i);
+    if (done && !inFoot && !tr.classList.contains("m-empty")) pbar(first, numOf(done.textContent));
     // award bars (Awards list and Awards dashboard)
     var inTime = cellBy(tr, /awarded in time$/i), late = cellBy(tr, /^awarded late$/i), total = cellBy(tr, /^total( awards)?$/i);
     if (inTime && late && total && !tr.classList.contains("m-empty")) {
@@ -192,9 +209,10 @@
      refresh button, so the right tab's data is what reloads. */
   var ptr = null, ptrY = 0, ptrDy = 0, ptrOn = false;
   function refreshButton() {
-    var a = document.getElementById("aw-refresh-all"), b = document.getElementById("refresh-btn");
+    var a = document.getElementById("aw-refresh-all"), b = document.getElementById("refresh-btn"), c = document.getElementById("sg-refresh-btn");
     if (a && a.offsetParent !== null) return a;
     if (b && b.offsetParent !== null) return b;
+    if (c && c.offsetParent !== null) return c;
     return null;
   }
   function ptrBadge() {
@@ -210,7 +228,7 @@
     if (!area || area.__mPull) return;
     area.__mPull = true;
     area.addEventListener("touchstart", function (e) {
-      ptrOn = !!(MQ && MQ.matches && area.scrollTop <= 0 && area.querySelector(".award-page") && e.touches.length === 1 && refreshButton());
+      ptrOn = !!(MQ && MQ.matches && area.scrollTop <= 0 && area.querySelector(".award-page, #sg-app") && e.touches.length === 1 && refreshButton());
       ptrY = e.touches[0].clientY; ptrDy = 0;
     }, { passive: true });
     area.addEventListener("touchmove", function (e) {

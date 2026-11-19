@@ -703,3 +703,82 @@
   .award-page #requisitions-table tbody tr:nth-child(even) td,
   .award-page #delivery-table tbody tr:nth-child(even) td { background: none !important; box-shadow: none !important; }
 }
+
+/* ==========================================================================
+   HO Plan & Review on a phone: a description-and-refresh row, five evenly shared
+   tabs, filters in pairs, figures two across, and every table as cards.
+   ========================================================================== */
+@media (max-width: 640px) {
+  /* banner */
+  #sg-app #sgHero.app-nav { position: relative; padding: 12px !important; gap: 10px !important; }
+  #sg-app #sgHero .sg-hero-ico, #sg-app #sgHero .sg-hero-title { display: none !important; }
+  #sg-app #sgHero .sg-hero-lead { flex: 1 1 100%; display: flex; align-items: center; min-height: 40px; padding-right: 50px; }
+  #sg-app #sgHero .sg-hero-sub { margin: 0; font-size: 12px; line-height: 1.35; opacity: .92; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  #sg-app #sgHero .nav-right { position: absolute; top: 10px; right: 10px; flex: none !important; width: auto; }
+  #sg-app #sgHero #sg-refresh-btn { width: 40px; height: 40px; min-height: 0; padding: 0; font-size: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; }
+  #sg-app #sgHero #sg-refresh-btn .sg-i { width: 18px; height: 18px; }
+  #sg-app #sgHero #nav-dept-label, #sg-app #sgHero #user-badge { display: none !important; }
+  #sg-app #sgHero .sg-hero-nav { flex: 1 1 100%; display: grid; gap: 8px; width: 100%; }
+  #sg-app #sgHero .nav-tabs { display: flex; flex-wrap: nowrap; gap: 3px; width: 100%; overflow: visible; }
+  #sg-app #sgHero .nav-tab { flex: 1 1 0 !important; min-width: 0; padding: 9px 2px !important; font-size: 11.5px !important; line-height: 1.15; text-align: center; white-space: normal !important; justify-content: center; }
+  #sg-app #sgHero .dash-subtabs { display: flex; gap: 4px; width: 100%; overflow: visible; padding: 0 !important; border: 0 !important; }
+  #sg-app #sgHero .dash-subtab-btn { flex: 1 1 0; min-width: 0; padding: 8px 4px !important; font-size: 12px !important; line-height: 1.2; text-align: center; white-space: normal; justify-content: center; }
+
+  /* filters: pairs of pickers, full-width search and buttons */
+  #sg-app .filter-bar { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px !important; padding: 12px !important; }
+  #sg-app .filter-bar select, #sg-app .filter-bar input { width: 100% !important; min-width: 0; height: 46px; font-size: 16px !important; border-radius: 12px; }
+  #sg-app .filter-bar > select:last-of-type:nth-child(odd), #sg-app .filter-bar > input { grid-column: 1 / -1; }
+  #sg-app .filter-bar .sg-fb-actions { grid-column: 1 / -1; margin: 0 !important; display: flex; gap: 8px; }
+  #sg-app .filter-bar .sg-fb-actions .btn { flex: 1 1 0; min-height: 46px; justify-content: center; }
+
+  /* figures */
+  #sg-app .metrics-row { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
+  #sg-app .metrics-row .metric-card { padding: 12px !important; min-width: 0; }
+  #sg-app .metrics-row .metric-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  #sg-app .card-header { padding: 12px 14px !important; }
+  #sg-app .card-body { padding: 14px !important; }
+  #sg-app #page-settings > div[style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+
+  /* tables as cards (aw-mobile.js gives each cell its column's name) */
+  #sg-app .tbl-wrap, #sg-app .plan-tbl-wrap, #sg-app .m-scroll:has(table.m-matrix) {
+    overflow: visible !important; max-height: none !important; min-height: 0 !important; resize: none !important; background: none !important; border: 0 !important; box-shadow: none !important; border-radius: 0;
+  }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl), #sg-app table:is(.m-matrix, .tbl, .plan-tbl) tbody, #sg-app table:is(.m-matrix, .tbl, .plan-tbl) tfoot { display: block; width: 100% !important; min-width: 0 !important; }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) thead, #sg-app table:is(.m-matrix, .tbl, .plan-tbl) colgroup { display: none !important; }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) tr {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; align-items: start;
+    margin: 0 0 10px; padding: 14px 16px 16px; border-radius: 16px; background: var(--surface, #fff);
+    border: 1px solid var(--sg-edge, rgba(15,23,42,.1)); box-shadow: 0 2px 8px rgba(15,23,42,.05);
+  }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) td {
+    display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 0 !important; border: 0 !important; background: none !important;
+    position: static !important; box-shadow: none !important; text-align: left !important; white-space: normal !important; overflow-wrap: anywhere;
+    font-size: 14.5px; font-weight: 600; color: var(--text, #0F172A); filter: none !important;
+  }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) td[data-label]::before {
+    content: attr(data-label); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; line-height: 1.25; color: var(--text-soft, var(--text3, #64748B));
+  }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) td:first-child[data-label] {
+    grid-column: 1 / -1; padding-bottom: 8px !important; font-size: 16px; font-weight: 800; letter-spacing: -.2px;
+    border-bottom: 1px solid var(--sg-hair, rgba(15,23,42,.1)) !important;
+  }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) td:first-child[data-label]::before { display: none; }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) td:empty, #sg-app table:is(.m-matrix, .tbl, .plan-tbl) td.m-merged { display: none !important; }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) td[data-pct] { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 8px; }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) td[data-pct]::before { flex: 0 0 100%; }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) td[data-pct]::after { content: attr(data-pct); font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 99px; color: var(--text-soft, #64748B); background: rgba(100,116,139,.12); }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) input, #sg-app table:is(.m-matrix, .tbl, .plan-tbl) select, #sg-app table:is(.m-matrix, .tbl, .plan-tbl) textarea { width: 100%; min-width: 0; min-height: 44px; font-size: 16px; border-radius: 10px; }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) tr:has(td[colspan]) { display: block; padding: 0; background: none; border: 0; box-shadow: none; }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) td[colspan] { display: block; text-align: center !important; padding: 26px 14px !important; color: var(--text3, #94A3B8); }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) tr.m-empty { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: transparent; box-shadow: none; border-style: dashed; }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) tr.m-empty > td:not(:first-child) { display: none !important; }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) tr.m-empty > td:first-child { padding: 0 !important; border: 0 !important; font-size: 14px; color: var(--text-soft, #64748B); }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) tr.m-empty::after { content: "No data yet"; font-size: 11.5px; font-weight: 700; color: #94A3B8; padding: 3px 10px; border-radius: 99px; background: rgba(100,116,139,.12); }
+  #sg-app table:is(.m-matrix, .tbl, .plan-tbl) tr.plan-total-row { background: color-mix(in srgb, var(--accent, #2F6FE4) 8%, var(--surface, #fff)); }
+}
+
+/* a completion bar under the title of a card */
+@media (max-width: 640px) {
+  .m-pbar { display: block; flex: none; width: 100%; height: 8px; margin-top: 10px; border-radius: 6px; overflow: hidden; background: #E6EBF2; }
+  .m-pbar i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, #1DBA85, #16A34A); transition: width .5s cubic-bezier(.22,1,.36,1); }
+}
