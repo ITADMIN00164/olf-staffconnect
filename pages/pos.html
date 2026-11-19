@@ -1526,8 +1526,8 @@
           .pr-sum-tbl th{display:table-cell;position:static;}
 
           /* writing a note or reading an action: a sheet from the bottom */
-          .pr-modal{align-items:flex-end !important;padding:0 !important;}
-          .pr-modal-box{width:100% !important;max-width:none !important;border-radius:24px 24px 0 0 !important;
+          .pr-modal{align-items:flex-end !important;padding:0 !important;z-index:2100 !important;}
+          .pr-modal-box{width:100% !important;max-width:none !important;max-height:92dvh;overflow-y:auto;border-radius:24px 24px 0 0 !important;
                         padding:10px 18px calc(18px + env(safe-area-inset-bottom,0px)) !important;animation:pr-sheet-up .3s cubic-bezier(.22,1,.36,1);}
           .pr-modal-box::before{content:"";display:block;width:40px;height:4px;border-radius:4px;background:rgba(100,116,139,.4);margin:2px auto 14px;}
           .pr-modal-ta{min-height:34dvh;font-size:16px;}

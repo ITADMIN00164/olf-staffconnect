@@ -510,3 +510,9 @@
   .m-nav-item.is-active .m-nav-ico svg { width: 24px; height: 24px; }
   .m-nav-item.is-active .m-nav-label { color: #fff !important; font-size: 14px; letter-spacing: -.2px; text-shadow: 0 1px 2px rgba(15,23,42,.18); margin-left: 9px; }
 }
+
+/* The bottom bar steps aside while you type (see mobile.js) */
+@media (max-width: 768px) {
+  html.m-typing #appShell.visible .m-nav { display: none !important; }
+  html.m-typing .content-area { padding-bottom: 28px !important; }
+}
