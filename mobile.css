@@ -930,3 +930,88 @@
   #appShell #grPage .gr-sx-panel { padding: 16px 14px; }
   #appShell #grPage .gr-sx-tablewrap { margin: 0; }
 }
+
+/* ==========================================================================
+   OLF Forms on a phone: a slim banner, tabs sharing the width, forms as cards,
+   a one-row save bar, and pop-ups above the bottom bar (forms-mobile.js names
+   each cell).
+   ========================================================================== */
+@media (max-width: 640px) {
+  #appShell #page-forms .frm-head { position: relative; padding: 12px 64px 12px 14px !important; min-height: 0; margin-bottom: 12px; }
+  #appShell #page-forms .frm-head .pg-hero-ico, #appShell #page-forms .frm-head .pg-hero-title, #appShell #page-forms #frmStatus { display: none !important; }
+  #appShell #page-forms .frm-head .pg-hero-lead { min-height: 40px; display: flex; align-items: center; }
+  #appShell #page-forms .frm-head .pg-hero-sub { margin: 0; font-size: 12.5px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  #appShell #page-forms .frm-head__side { position: absolute; top: 12px; right: 12px; margin: 0; width: auto; }
+  #appShell #page-forms .frm-head__side .pg-btn { width: 40px; height: 40px; min-height: 0; padding: 0; font-size: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; }
+  #appShell #page-forms .frm-head__side .pg-btn .frm-i { width: 18px; height: 18px; }
+
+  #appShell #page-forms .frm-tabs { display: flex; width: 100%; box-sizing: border-box; gap: 4px; padding: 6px; }
+  #appShell #page-forms .frm-tab { flex: 1 1 0; min-width: 0; padding: 11px 6px; text-align: center; }
+
+  #appShell #page-forms .frm-input, #appShell #page-forms .frm-field select, #appShell #page-forms .frm-field input:not([type=checkbox]):not([type=radio]), #appShell #page-forms .frm-field textarea { font-size: 16px; min-height: 46px; border-radius: 12px; }
+  #appShell #page-forms .frm-field textarea { min-height: 84px; }
+  #appShell #page-forms .frm-btn { min-height: 44px; border-radius: 12px; font-size: 14.5px; }
+  #appShell #page-forms .frm-btn--tiny { min-height: 40px; padding: 8px 12px; font-size: 13.5px; border-radius: 10px; }
+  #appShell #page-forms .frm-opt { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+  #appShell #page-forms .frm-opt input[type=checkbox], #appShell #page-forms .frm-opt input[type=radio] { width: 20px; height: 20px; margin: 0; flex: none; }
+  #appShell #page-forms .frm-field--mid { padding-bottom: 0; align-items: center; }
+  #appShell #page-forms .frm-qcard__head .frm-rowacts { padding: 0 10px 10px; }
+
+  /* the save bar: one row, pinned just above the bottom bar */
+  #appShell #page-forms .frm-acts--sticky { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 8px; padding: 10px !important; border-radius: 16px; margin-top: 8px; }
+  #appShell #page-forms .frm-acts--sticky .frm-btn { width: 100%; padding-left: 6px; padding-right: 6px; justify-content: center; min-height: 46px; }
+  #appShell #page-forms .frm-acts--sticky .frm-hint { grid-column: 1 / -1; order: -1; margin: 0; width: auto; }
+  #appShell #page-forms .frm-acts--sticky .frm-hint:empty { display: none; }
+
+  /* pop-ups above the bottom bar, from the bottom edge */
+  #appShell #page-forms .frm-modal { z-index: 2100; align-items: flex-end; padding: 0; }
+  #appShell #page-forms .frm-modal__sheet { width: 100%; max-width: none; max-height: 88dvh; overflow-y: auto; border-radius: 22px 22px 0 0; padding: 20px 18px calc(20px + env(safe-area-inset-bottom, 0px)); }
+  #appShell #page-forms .frm-veil { z-index: 2100; }
+  #appShell #page-forms .frm-toasts { bottom: calc(104px + env(safe-area-inset-bottom, 0px)); }
+
+  /* ---- tables as cards ---- */
+  #appShell #page-forms .frm-scroll:has(table.m-frm) { overflow: visible !important; border: 0 !important; background: none !important; box-shadow: none !important; border-radius: 0 !important; }
+  #appShell #page-forms table.m-frm, #appShell #page-forms table.m-frm tbody { display: block; width: 100% !important; min-width: 0 !important; }
+  #appShell #page-forms table.m-frm thead { display: none; }
+  #appShell #page-forms table.m-frm.frm-grid tbody > tr {
+    position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; align-items: start;
+    margin: 0 0 10px; padding: 14px 14px 14px 18px; border-radius: 16px; overflow: hidden;
+    background: var(--glass-strong, #fff); border: 1px solid var(--hairline, rgba(15,23,42,.1)); box-shadow: var(--shadow-sm, 0 1px 3px rgba(15,23,42,.08));
+  }
+  #appShell #page-forms table.m-frm.frm-grid tbody > tr:hover td { background: none; }
+  #appShell #page-forms table.m-frm.frm-grid tbody > tr > td {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; padding: 0 !important; border: 0 !important; background: none;
+    text-align: left !important; overflow-wrap: anywhere; font-size: 14px; font-weight: 600; color: var(--ink, #14203a);
+  }
+  #appShell #page-forms table.m-frm.frm-grid tbody > tr > td[data-label]::before {
+    content: attr(data-label); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; line-height: 1.25; color: var(--soft, #64748B);
+  }
+  #appShell #page-forms table.m-frm td.frm-grid__rail { position: absolute; left: 0; top: 0; bottom: 0; width: 4px !important; padding: 0 !important; }
+  #appShell #page-forms table.m-frm td.frm-grid__rail::before { display: none !important; }
+  #appShell #page-forms table.m-frm td.frm-grid__rail { background: var(--rule, #dfe5ee) !important; }
+  #appShell #page-forms table.m-frm td.frm-grid__rail[data-state="published"] { background: var(--go, #16A34A) !important; }
+  #appShell #page-forms table.m-frm td.frm-grid__rail[data-state="draft"] { background: var(--wait, #D97706) !important; }
+  #appShell #page-forms table.m-frm td.frm-grid__rail[data-state="closed"] { background: #9aa7bd !important; }
+  #appShell #page-forms table.m-frm td.frm-grid__rail[data-state="archived"] { background: var(--stop, #DC2626) !important; }
+  #appShell #page-forms table.m-frm td.frm-grid__name { grid-column: 1 / -1; padding-right: 92px !important; font-size: 15.5px; font-weight: 800; line-height: 1.35; min-height: 28px; }
+  #appShell #page-forms table.m-frm td.frm-grid__name::before { display: none !important; }
+  #appShell #page-forms table.m-frm td[data-label="Status"] { position: absolute; right: 12px; top: 14px; align-items: flex-end; }
+  #appShell #page-forms table.m-frm td[data-label="Status"]::before { display: none !important; }
+  #appShell #page-forms table.m-frm td[data-label="Action"] { grid-column: 1 / -1; }
+  #appShell #page-forms table.m-frm td[data-label="Action"]::before { display: none !important; }
+  #appShell #page-forms table.m-frm td[data-label="Action"] .frm-rowacts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; width: 100%; }
+  #appShell #page-forms table.m-frm td[data-label="Action"] .frm-rowacts .frm-btn { width: 100%; justify-content: center; }
+  #appShell #page-forms table.m-frm td[data-label="Action"] > .frm-btn { width: 100%; justify-content: center; }
+  #appShell #page-forms table.m-frm .frm-ref { display: block; font-size: 12.5px; font-weight: 500; color: var(--soft, #64748B); margin-top: 2px; }
+
+  /* the list of who responded: each person's answers open beneath their card */
+  #appShell #page-forms table.m-frm tr.frm-dsub { display: block; padding: 0 !important; margin: -4px 0 10px; background: none !important; border: 0 !important; box-shadow: none !important; }
+  #appShell #page-forms table.m-frm tr.frm-dsub > td { display: block; padding: 0 !important; }
+  #appShell #page-forms table.m-frm.frm-subgrid tbody > tr {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; padding: 10px 12px; margin: 0 0 6px; border-radius: 12px;
+    background: var(--wash, #f5f8fc); border: 1px solid var(--hairline, rgba(15,23,42,.08));
+  }
+  #appShell #page-forms table.m-frm.frm-subgrid tbody > tr > td { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 0 !important; border: 0 !important; font-size: 13.5px; font-weight: 600; text-align: left !important; }
+  #appShell #page-forms table.m-frm.frm-subgrid tbody > tr > td[data-label]::before { content: attr(data-label); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--soft, #64748B); }
+  #appShell #page-forms table.m-frm.frm-subgrid tbody > tr > td:first-child { grid-column: 1 / -1; }
+}

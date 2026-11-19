@@ -1379,9 +1379,10 @@ function renderDashboard() {
 // ── SMART GOALS ──
 // Member dropdown depends on the chosen department (empty until one is picked).
 function setSgMemberOptions() {
-  const dept = document.getElementById('sg-dept-filter').value;
+  const deptEl = document.getElementById('sg-dept-filter');
   const el = document.getElementById('sg-member-filter');
-  if (!el) return;
+  if (!deptEl || !el) return;                        // the page is not on screen
+  const dept = deptEl.value;
   if (!dept) {
     el.innerHTML = '<option value="">Select Department first…</option>';
   } else {
