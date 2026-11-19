@@ -10,11 +10,12 @@
 
   // State
   let state = {
-    activeState: 'MH',     // Default: Maharashtra
+    activeState: 'ALL',    // Default: All States (MH, CH, MP, BR)
     activeMonth: '202610', // Default: October 2026
     searchQuery: '',
     statusFilter: null,    // null (All) or 'done', 'partial', 'pending', 'unassigned'
-    viewMode: 'flowchart', // 'flowchart' or 'table' (task-271)
+    viewMode: 'table',     // 'table' (default) or 'flowchart'
+    subTab: 'review',      // 'review' (Review Progress) or 'program' (Program Progress)
     sortColumn: 'name',    // 'name', 'role', 'division', 'district', 'manager', 'status', 'score', 'managerStatus'
     sortDirection: 'asc',  // 'asc' or 'desc'
     filterRole: '',
@@ -214,7 +215,22 @@
   }
 
   function getStateData(tree, stateCode) {
-    if (!tree) return { sl: null, divisions: [], label: 'Maharashtra', tag: 'Maharashtra', code: 'MH' };
+    if (!tree) return { sl: null, divisions: [], label: 'All States', tag: 'All States', code: 'ALL' };
+
+    if (stateCode === 'ALL') {
+      return {
+        sl: null,
+        divisions: [
+          ...(tree.mhDivisions || []),
+          ...(tree.chDivisions || []),
+          ...(tree.mpDivisions || []),
+          ...(tree.brDivisions || [])
+        ],
+        label: "All States",
+        tag: "All States",
+        code: "ALL"
+      };
+    }
 
     if (stateCode === 'CH') {
       return {
@@ -611,11 +627,28 @@
   function init() {
     buildAssignmentMaps();
     bindControls();
-    setViewMode(state.viewMode);
+    updateDistrictSelectOptions();
+    setSubTab(state.subTab || 'review');
+    setViewMode(state.viewMode || 'table');
     render();
   }
 
   function bindControls() {
+    const stateSelect = document.getElementById('tpProgStateSelect');
+    if (stateSelect) {
+      stateSelect.value = state.activeState;
+      stateSelect.onchange = function () {
+        setState(this.value);
+      };
+    }
+
+    const distSelect = document.getElementById('tpProgDistrictSelect');
+    if (distSelect) {
+      distSelect.onchange = function () {
+        setDistrict(this.value);
+      };
+    }
+
     const monthSelect = document.getElementById('tpProgMonthSelect');
     if (monthSelect) {
       monthSelect.value = state.activeMonth;
@@ -652,19 +685,77 @@
     }
   }
 
-  // --- Switch Active State (MH, CH, MP, BR) ---
+  // --- Switch Active State (ALL, MH, CH, MP, BR) ---
   function setState(st) {
-    state.activeState = st;
-    ['MH', 'CH', 'MP', 'BR'].forEach(code => {
-      const btn = document.getElementById('tpProgSeg' + code);
-      if (btn) btn.classList.toggle('active', code === st);
-    });
+    state.activeState = st || 'ALL';
+    const stateSel = document.getElementById('tpProgStateSelect');
+    if (stateSel && stateSel.value !== state.activeState) {
+      stateSel.value = state.activeState;
+    }
 
     expandedDivisions.clear();
     state.filterDivision = '';
-    state.filterDistrict = '';
     state.filterManager = '';
+
+    updateDistrictSelectOptions();
     render();
+  }
+
+  // --- Filter by District ---
+  function setDistrict(dist) {
+    state.filterDistrict = dist || '';
+    const topDist = document.getElementById('tpProgDistrictSelect');
+    if (topDist && topDist.value !== state.filterDistrict) {
+      topDist.value = state.filterDistrict;
+    }
+    const colDist = document.getElementById('tpColFilterDistrict');
+    if (colDist && colDist.value !== state.filterDistrict) {
+      colDist.value = state.filterDistrict;
+      colDist.classList.toggle('active', !!state.filterDistrict);
+    }
+    if (state.viewMode === 'table') {
+      updateTableRowsOnly();
+      renderFilterBanner();
+    } else {
+      renderTreeOnly();
+    }
+  }
+
+  function updateDistrictSelectOptions() {
+    const fullRoster = getRosterForState();
+    const rawDistricts = [];
+    fullRoster.forEach(r => {
+      const d = r.district;
+      if (!d || d === '—' || d === '-' || d === 'Division HQ' || d === 'Statewide' || d === 'Assigned Districts') return;
+      if (d.includes(',')) {
+        d.split(',').forEach(sub => {
+          const s = sub.trim();
+          if (s) rawDistricts.push(s);
+        });
+      } else {
+        rawDistricts.push(d.trim());
+      }
+    });
+    const uniqueDistricts = [...new Set(rawDistricts)].sort();
+
+    // Validate current filterDistrict against available districts
+    if (state.filterDistrict && !uniqueDistricts.includes(state.filterDistrict)) {
+      state.filterDistrict = '';
+    }
+
+    const distSelect = document.getElementById('tpProgDistrictSelect');
+    if (distSelect) {
+      distSelect.innerHTML = `<option value="">All Districts (${uniqueDistricts.length})</option>` +
+        uniqueDistricts.map(d => `<option value="${esc(d)}" ${state.filterDistrict === d ? 'selected' : ''}>${esc(d)}</option>`).join('');
+    }
+
+    const colFilter = document.getElementById('tpColFilterDistrict');
+    if (colFilter) {
+      colFilter.innerHTML = `<option value="">District (All)</option>` +
+        uniqueDistricts.map(d => `<option value="${esc(d)}" ${state.filterDistrict === d ? 'selected' : ''}>${esc(d)}</option>`).join('');
+      colFilter.value = state.filterDistrict || '';
+      colFilter.classList.toggle('active', !!state.filterDistrict);
+    }
   }
 
   function clearSearch() {
@@ -930,7 +1021,8 @@
   // Expand all divisions
   function expandAll() {
     const tree = getTreeData();
-    const stateData = getStateData(tree, state.activeState);
+    const activeTreeCode = (state.activeState === 'ALL') ? 'MH' : state.activeState;
+    const stateData = getStateData(tree, activeTreeCode);
     stateData.divisions.forEach(d => {
       expandedDivisions.add(normalizeDivId(d.divisionId));
       expandedDivisions.add(d.divisionId);
@@ -943,15 +1035,15 @@
   function collapseAll() {
     expandedDivisions.clear();
     const tree = getTreeData();
-    const stateData = getStateData(tree, state.activeState);
+    const activeTreeCode = (state.activeState === 'ALL') ? 'MH' : state.activeState;
+    const stateData = getStateData(tree, activeTreeCode);
     renderDivisionPills(stateData.divisions);
     renderTreeOnly();
   }
 
-  // Collect full roster with state/division/district metadata
-  function getRosterForState() {
-    const tree = getTreeData();
-    const stateData = getStateData(tree, state.activeState);
+  // Collect roster for a single state
+  function getRosterForSingleState(tree, stateCode) {
+    const stateData = getStateData(tree, stateCode);
     const roster = [];
     const seenIds = new Set();
 
@@ -969,7 +1061,9 @@
         division: divTitle || staffObj.Location || stateData.label,
         divisionId: divId || '',
         district: distName || staffObj.District || '—',
-        manager: mgrName || staffObj.ReportingManager || 'Leadership'
+        manager: mgrName || staffObj.ReportingManager || 'Leadership',
+        stateCode: stateData.code,
+        stateLabel: stateData.label
       });
     }
 
@@ -1023,6 +1117,28 @@
     return roster;
   }
 
+  // Collect full roster (all states or active state)
+  function getRosterForState() {
+    const tree = getTreeData();
+    if (!tree) return [];
+    if (state.activeState === 'ALL') {
+      const allRoster = [];
+      const seenIds = new Set();
+      ['MH', 'CH', 'MP', 'BR'].forEach(code => {
+        const sub = getRosterForSingleState(tree, code);
+        sub.forEach(item => {
+          const sId = item.staff.id || (item.staff.Name || '');
+          if (!seenIds.has(sId)) {
+            seenIds.add(sId);
+            allRoster.push(item);
+          }
+        });
+      });
+      return allRoster;
+    }
+    return getRosterForSingleState(tree, state.activeState);
+  }
+
   function calculateStats(roster) {
     const stats = { total: roster.length, done: 0, partial: 0, pending: 0, unassigned: 0 };
     roster.forEach(r => {
@@ -1067,7 +1183,9 @@
     const stats = calculateStats(roster);
 
     renderKPIRow(stats, stateData);
-    renderDivisionPills(stateData.divisions);
+    const activeTreeCode = (state.activeState === 'ALL') ? 'MH' : state.activeState;
+    const treeStateData = getStateData(tree, activeTreeCode);
+    renderDivisionPills(treeStateData.divisions);
     if (state.viewMode === 'table') {
       renderTableOnly();
     } else {
@@ -1081,7 +1199,8 @@
     if (!container || !tree) return;
 
     const q = state.searchQuery;
-    const stateData = getStateData(tree, state.activeState);
+    const activeTreeCode = (state.activeState === 'ALL') ? 'MH' : state.activeState;
+    const stateData = getStateData(tree, activeTreeCode);
     const divisions = stateData.divisions;
     const sl = stateData.sl || {
       roleId: "statelead",
@@ -2179,6 +2298,36 @@
     return evalRes.managerStatus || 'Awaiting Review';
   }
 
+  function setSubTab(tab) {
+    state.subTab = tab === 'program' ? 'program' : 'review';
+
+    const btnReview = document.getElementById('tpProgSourceBtnReview');
+    const btnProgram = document.getElementById('tpProgSourceBtnProgram');
+    if (btnReview) btnReview.classList.toggle('active', state.subTab === 'review');
+    if (btnProgram) btnProgram.classList.toggle('active', state.subTab === 'program');
+
+    const reviewContent = document.getElementById('tpProgReviewContent');
+    const programContent = document.getElementById('tpProgProgramContent');
+    const titleEl = document.getElementById('tpProgTitle');
+    const subtitleEl = document.getElementById('tpProgSubtitle');
+    const badgeEl = document.getElementById('tpProgTotalCountBadge');
+
+    if (state.subTab === 'review') {
+      if (reviewContent) reviewContent.style.display = 'block';
+      if (programContent) programContent.style.display = 'none';
+      if (titleEl) titleEl.textContent = 'Review Progress';
+      if (subtitleEl) subtitleEl.textContent = 'Monthly field review performance, submission status, and manager scorecards';
+      if (badgeEl) badgeEl.style.display = 'inline-block';
+      setViewMode(state.viewMode);
+    } else {
+      if (reviewContent) reviewContent.style.display = 'none';
+      if (programContent) programContent.style.display = 'block';
+      if (titleEl) titleEl.textContent = 'Program Progress';
+      if (subtitleEl) subtitleEl.textContent = 'Program progress tracking, operational milestones, and field delivery';
+      if (badgeEl) badgeEl.style.display = 'none';
+    }
+  }
+
   function setViewMode(mode) {
     state.viewMode = mode === 'table' ? 'table' : 'flowchart';
 
@@ -2234,6 +2383,10 @@
       state.filterDivision = val || '';
     } else if (key === 'district') {
       state.filterDistrict = val || '';
+      const topDist = document.getElementById('tpProgDistrictSelect');
+      if (topDist && topDist.value !== state.filterDistrict) {
+        topDist.value = state.filterDistrict;
+      }
     } else if (key === 'manager') {
       state.filterManager = val || '';
     } else if (key === 'score') {
@@ -2253,6 +2406,8 @@
     state.filterScore = '';
     state.filterManagerStatus = '';
     state.searchQuery = '';
+    const topDist = document.getElementById('tpProgDistrictSelect');
+    if (topDist) topDist.value = '';
     const topSearch = document.getElementById('tpProgSearchInput');
     const topClear = document.getElementById('tpProgSearchClear');
     if (topSearch) topSearch.value = '';
@@ -2295,7 +2450,11 @@
       list = list.filter(r => (r.division || '').toLowerCase() === fDiv.toLowerCase());
     }
     if (fDist) {
-      list = list.filter(r => (r.district || '').toLowerCase() === fDist.toLowerCase());
+      const fd = fDist.toLowerCase();
+      list = list.filter(r => {
+        const d = (r.district || '').toLowerCase();
+        return d === fd || d.split(',').map(s => s.trim()).includes(fd);
+      });
     }
     if (fMgr) {
       list = list.filter(r => (r.manager || '').toLowerCase() === fMgr.toLowerCase());
@@ -2631,7 +2790,20 @@
 
     const uniqueRoles = [...new Set(fullRoster.map(r => r.role).filter(Boolean))].sort();
     const uniqueDivisions = [...new Set(fullRoster.map(r => r.division).filter(Boolean))].sort();
-    const uniqueDistricts = [...new Set(fullRoster.map(r => r.district).filter(d => d && d !== '—' && d !== '-'))].sort();
+    const rawDistricts = [];
+    fullRoster.forEach(r => {
+      const d = r.district;
+      if (!d || d === '—' || d === '-' || d === 'Division HQ' || d === 'Statewide' || d === 'Assigned Districts') return;
+      if (d.includes(',')) {
+        d.split(',').forEach(sub => {
+          const s = sub.trim();
+          if (s) rawDistricts.push(s);
+        });
+      } else {
+        rawDistricts.push(d.trim());
+      }
+    });
+    const uniqueDistricts = [...new Set(rawDistricts)].sort();
     const uniqueManagers = [...new Set(fullRoster.map(r => r.manager).filter(m => m && m !== 'Leadership'))].sort();
     const uniqueMgrRatings = [...new Set(fullRoster.map(r => r.evalRes.managerStatus).filter(Boolean))].sort();
 
@@ -2752,6 +2924,11 @@
     init,
     render,
     setState,
+    setDistrict,
+    getState: () => state.activeState,
+    getDistrict: () => state.filterDistrict,
+    setSubTab,
+    getSubTab: () => state.subTab,
     setViewMode,
     setSort,
     setTableFilter,

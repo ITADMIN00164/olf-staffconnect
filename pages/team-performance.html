@@ -1088,13 +1088,17 @@
       overscroll-behavior: contain !important;
       touch-action: pan-y;
     }
+    .tp-modal-overlay.maximized {
+      padding: 0 !important;
     }
     .tp-modal-dialog.maximized {
-      width: 96vw !important;
-      max-width: 96vw !important;
-      height: 94vh !important;
-      max-height: 94vh !important;
-      border-radius: 12px;
+      width: 100vw !important;
+      max-width: 100vw !important;
+      height: 100vh !important;
+      max-height: 100vh !important;
+      border-radius: 0 !important;
+      border: none !important;
+      transform: none !important;
     }
     .tp-modal-overlay.open .tp-modal-dialog {
       transform: translateY(0) scale(1);
@@ -1993,11 +1997,24 @@
       white-space: nowrap;
       color: #334155;
     }
+    .tp-hist-row {
+      cursor: pointer;
+      transition: background-color 0.12s ease;
+    }
     .tp-hist-row:nth-child(even) td {
       background: #FAFAFA;
     }
     .tp-hist-row:hover td {
-      background: #F0FDF4 !important;
+      background: #E0F2FE !important;
+    }
+    .tp-hist-row:hover td.tp-hist-col-sticky {
+      background: #E0F2FE !important;
+    }
+    .tp-hist-row-total {
+      cursor: default !important;
+    }
+    .tp-hist-row-total:hover td {
+      background: #F1F5F9 !important;
     }
     .tp-hist-tr-super th {
       background: #E2E8F0 !important;
@@ -3772,6 +3789,34 @@
       color: #FFFFFF !important;
     }
 
+    /* Program Progress Placeholder — Dark Mode */
+    html[data-theme="dark"] .tp-prog-placeholder-card {
+      background: #0F172A !important;
+      border-color: #334155 !important;
+    }
+    html[data-theme="dark"] .tp-prog-placeholder-card h3 {
+      color: #F8FAFC !important;
+    }
+    html[data-theme="dark"] .tp-prog-placeholder-card p {
+      color: #94A3B8 !important;
+    }
+    html[data-theme="dark"] .tp-prog-placeholder-card span {
+      background: #1E293B !important;
+      color: #CBD5E1 !important;
+      border-color: #334155 !important;
+    }
+
+    /* Historical Row Dark Mode Hover */
+    html[data-theme="dark"] .tp-hist-row:hover td {
+      background: #1E293B !important;
+    }
+    html[data-theme="dark"] .tp-hist-row:hover td.tp-hist-col-sticky {
+      background: #1E293B !important;
+    }
+    html[data-theme="dark"] .tp-hist-row-total:hover td {
+      background: #0F172A !important;
+    }
+
     /* Mode Switcher (Executive Analytics vs Raw Sheet Grid) — Dark Mode */
     html[data-theme="dark"] .tp-hist-mode-switcher {
       background: #0B1120 !important;
@@ -5022,7 +5067,339 @@
       box-shadow: 0 4px 12px rgba(56, 189, 248, 0.35) !important;
     }
 
-  </style>
+  
+      /* ══════════════════════════════════════════════════════════════════════════════
+         WHOLE ORGANIZATION EXECUTIVE TREE & 5 PILLARS ARCHITECTURE
+         ══════════════════════════════════════════════════════════════════════════════ */
+      .tp-org-root-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        min-width: 1100px;
+        padding: 24px 16px 60px;
+        position: relative;
+      }
+      .tp-org-l0-row {
+        display: flex;
+        justify-content: center;
+        align-items: stretch;
+        gap: 28px;
+        margin-bottom: 50px;
+        position: relative;
+        z-index: 2;
+      }
+      .tp-org-l1-row {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(210px, 1fr));
+        gap: 16px;
+        width: 100%;
+        max-width: 1440px;
+        align-items: start;
+        position: relative;
+        z-index: 2;
+      }
+      .tp-org-col {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+        background: rgba(248, 250, 252, 0.65);
+        border: 1px solid #E2E8F0;
+        border-radius: 16px;
+        padding: 14px;
+        box-shadow: 0 2px 10px rgba(15, 23, 42, 0.03);
+      }
+      .tp-org-col-title {
+        font-size: 11.5px;
+        font-weight: 700;
+        color: #475569;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        text-align: center;
+        margin-bottom: 2px;
+      }
+      .tp-card-org {
+        background: #FFFFFF;
+        border-radius: 14px;
+        border: 1px solid #E2E8F0;
+        padding: 14px 16px;
+        box-shadow: 0 4px 14px -2px rgba(15, 23, 42, 0.05);
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        text-align: left;
+      }
+      .tp-card-org:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 24px -4px rgba(15, 23, 42, 0.10);
+        border-color: #93C5FD;
+      }
+      .tp-card-org.tp-card-ceo {
+        border-color: #FCD34D;
+        background: linear-gradient(180deg, #FFFDF5 0%, #FFFFFF 100%);
+        min-width: 250px;
+      }
+      .tp-card-org.tp-card-strategy {
+        border-color: #99F6E4;
+        background: linear-gradient(180deg, #F0FDFA 0%, #FFFFFF 100%);
+        min-width: 240px;
+      }
+      .tp-card-org.tp-card-head {
+        border-color: #BFDBFE;
+      }
+      .tp-org-pill-tag {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: #F1F5F9;
+        color: #475569;
+      }
+      .tp-org-pillar-badge {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: #EFF6FF;
+        color: #1D4ED8;
+        border: 1px solid #BFDBFE;
+      }
+      .tp-badge-interim {
+        display: inline-flex;
+        align-items: center;
+        background: #FEF3C7;
+        color: #B45309;
+        border: 1px solid #FCD34D;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 1.5px 6px;
+        border-radius: 999px;
+        margin-left: 6px;
+        vertical-align: middle;
+      }
+      .tp-badge-vacant {
+        display: inline-flex;
+        align-items: center;
+        background: #F1F5F9;
+        color: #64748B;
+        border: 1px dashed #CBD5E1;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 1.5px 6px;
+        border-radius: 999px;
+        margin-left: 6px;
+        vertical-align: middle;
+      }
+      .tp-org-subnodes-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .tp-btn-drilldown {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        width: 100%;
+        background: #EFF6FF;
+        border: 1px solid #BFDBFE;
+        color: #1D4ED8;
+        font-size: 11.5px;
+        font-weight: 700;
+        padding: 6px 10px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .tp-btn-drilldown:hover {
+        background: #1D4ED8;
+        color: #FFFFFF;
+        border-color: #1D4ED8;
+      }
+      .tp-card-prog-impl {
+        border-left: 3px solid #2563EB !important;
+      }
+      .tp-org-breadcrumb-bar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 18px;
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 12px;
+        margin-bottom: 24px;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+        width: 100%;
+        max-width: 1400px;
+      }
+      .tp-btn-back-org {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #EFF6FF;
+        border: 1px solid #BFDBFE;
+        color: #1D4ED8;
+        font-size: 12px;
+        font-weight: 700;
+        padding: 6px 14px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+      .tp-btn-back-org:hover {
+        background: #2563EB;
+        color: #FFFFFF;
+        border-color: #2563EB;
+      }
+      .tp-org-breadcrumb-sep {
+        color: #94A3B8;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .tp-org-breadcrumb-current {
+        font-size: 13.5px;
+        font-weight: 700;
+        color: #0F172A;
+      }
+      .tp-subdept-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        max-width: 1400px;
+        padding: 10px 0 40px;
+      }
+      .tp-subdept-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 16px;
+        width: 100%;
+      }
+      .tp-curations-subdept-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        width: 100%;
+        max-width: 1360px;
+        box-sizing: border-box;
+      }
+      @media (max-width: 900px) {
+        .tp-curations-subdept-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .tp-curations-associates-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 14px;
+        width: 100%;
+      }
+      @media (max-width: 580px) {
+        .tp-curations-associates-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      .tp-subdept-group {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 14px;
+        padding: 16px;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
+      }
+      .tp-subdept-group-title {
+        font-size: 13px;
+        font-weight: 800;
+        color: #1E293B;
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border-bottom: 1px solid #F1F5F9;
+        padding-bottom: 8px;
+      }
+
+      /* Dark Mode Overrides */
+      html[data-theme="dark"] .tp-org-col {
+        background: rgba(30, 41, 59, 0.6) !important;
+        border-color: #334155 !important;
+      }
+      html[data-theme="dark"] .tp-org-col-title {
+        color: #94A3B8 !important;
+      }
+      html[data-theme="dark"] .tp-card-org {
+        background: #0F172A !important;
+        border-color: #334155 !important;
+      }
+      html[data-theme="dark"] .tp-card-org:hover {
+        border-color: #38BDF8 !important;
+        box-shadow: 0 12px 24px -4px rgba(0, 0, 0, 0.4) !important;
+      }
+      html[data-theme="dark"] .tp-card-org.tp-card-ceo {
+        border-color: #F59E0B !important;
+        background: linear-gradient(180deg, #1C1917 0%, #0F172A 100%) !important;
+      }
+      html[data-theme="dark"] .tp-card-org.tp-card-strategy {
+        border-color: #14B8A6 !important;
+        background: linear-gradient(180deg, #042F2E 0%, #0F172A 100%) !important;
+      }
+      html[data-theme="dark"] .tp-org-pill-tag {
+        background: #1E293B !important;
+        color: #94A3B8 !important;
+      }
+      html[data-theme="dark"] .tp-org-pillar-badge {
+        background: #131E33 !important;
+        color: #38BDF8 !important;
+        border-color: #38BDF8 !important;
+      }
+      html[data-theme="dark"] .tp-badge-interim {
+        background: rgba(245, 158, 11, 0.2) !important;
+        color: #FBBF24 !important;
+        border-color: #F59E0B !important;
+      }
+      html[data-theme="dark"] .tp-badge-vacant {
+        background: #1E293B !important;
+        color: #64748B !important;
+        border-color: #475569 !important;
+      }
+      html[data-theme="dark"] .tp-btn-drilldown {
+        background: #131E33 !important;
+        border-color: #38BDF8 !important;
+        color: #38BDF8 !important;
+      }
+      html[data-theme="dark"] .tp-btn-drilldown:hover {
+        background: #38BDF8 !important;
+        color: #0F172A !important;
+        border-color: #38BDF8 !important;
+      }
+      html[data-theme="dark"] .tp-org-breadcrumb-bar {
+        background: #1E293B !important;
+        border-color: #334155 !important;
+      }
+      html[data-theme="dark"] .tp-btn-back-org {
+        background: #131E33 !important;
+        border-color: #38BDF8 !important;
+        color: #38BDF8 !important;
+      }
+      html[data-theme="dark"] .tp-btn-back-org:hover {
+        background: #38BDF8 !important;
+        color: #0F172A !important;
+      }
+      html[data-theme="dark"] .tp-org-breadcrumb-current {
+        color: #F8FAFC !important;
+      }
+      html[data-theme="dark"] .tp-subdept-group {
+        background: #1E293B !important;
+        border-color: #334155 !important;
+      }
+      html[data-theme="dark"] .tp-subdept-group-title {
+        color: #F8FAFC !important;
+        border-color: #334155 !important;
+      }
+</style>
   <!-- The shared banner, as on the other tabs: the name on the left, the two views on the banner itself. -->
   <section class="pg-hero tp-hero" id="tpHero" aria-label="OLF Insight">
     <span class="pg-blob pg-blob--a" aria-hidden="true"></span>
@@ -5035,13 +5412,13 @@
       </div>
     </div>
     <div class="tp-view-tabs" role="tablist" aria-label="OLF Insight views">
-      <button type="button" role="tab" class="tp-view-tab active" id="tpViewTabSmartGoals" onclick="window.TeamPerformance.switchView('smart-goals')">
-        <svg class="tp-vt-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.500" fill="#FECACA" stroke="#EF4444" stroke-width="1.800"/><circle cx="12" cy="12" r="5.500" fill="#fff" stroke="#EF4444" stroke-width="1.800"/><circle cx="12" cy="12" r="2" fill="#EF4444"/></svg>
-        <span class="tp-view-tab-text">Smart Goals</span>
-      </button>
-      <button type="button" role="tab" class="tp-view-tab" id="tpViewTabProgress" onclick="window.TeamPerformance.switchView('progress')">
+      <button type="button" role="tab" class="tp-view-tab active" id="tpViewTabProgress" onclick="window.TeamPerformance.switchView('progress')">
         <svg class="tp-vt-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.500" fill="#D1FAE5" stroke="#10B981" stroke-width="1.800"/><path d="M7.5 12.5l3 3 6-6" fill="none" stroke="#059669" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span class="tp-view-tab-text">Progress</span>
+      </button>
+      <button type="button" role="tab" class="tp-view-tab" id="tpViewTabSmartGoals" onclick="window.TeamPerformance.switchView('smart-goals')">
+        <svg class="tp-vt-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.500" fill="#FECACA" stroke="#EF4444" stroke-width="1.800"/><circle cx="12" cy="12" r="5.500" fill="#fff" stroke="#EF4444" stroke-width="1.800"/><circle cx="12" cy="12" r="2" fill="#EF4444"/></svg>
+        <span class="tp-view-tab-text">Smart Goals</span>
       </button>
       <button type="button" role="tab" class="tp-view-tab" id="tpViewTabWeeklyOps" onclick="window.TeamPerformance.switchView('weekly-ops')" style="display:none;">
         <svg class="tp-vt-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" fill="#E0E7FF" stroke="#4F46E5" stroke-width="1.800"/><path d="M16 2v4M8 2v4M3 10h18" stroke="#4F46E5" stroke-width="1.800" stroke-linecap="round"/><path d="M8 14h3M8 17h6" stroke="#4F46E5" stroke-width="1.800" stroke-linecap="round"/></svg>
@@ -5054,7 +5431,7 @@
     </div>
   </section>
   <!-- 1. SMART GOALS View Container -->
-  <div id="tpSmartGoalsView" class="tp-view-section">
+  <div id="tpSmartGoalsView" class="tp-view-section" style="display:none;">
     <!-- Top Navigation & Toolbar -->
     <div class="tp-header">
       <div class="tp-header-top-row">
@@ -5139,42 +5516,63 @@
   </div>
   </div> <!-- End #tpSmartGoalsView -->
 
-  <!-- 2. PROGRESS View Container (Replica of Smart Goals with Monthly Field Review data) -->
-  <div id="tpProgressView" class="tp-view-section" style="display:none;">
+  <!-- 2. PROGRESS View Container (Review Progress & Program Progress) -->
+  <div id="tpProgressView" class="tp-view-section">
     <!-- Top Navigation & Toolbar -->
-    <div class="tp-header">
+    <div class="tp-header" style="margin-bottom:16px;">
       <div class="tp-header-left">
-        <div class="tp-title-row">
-          <h2 class="tp-title">Progress</h2>
+        <div class="tp-title-row" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <h2 class="tp-title" id="tpProgTitle">Review Progress</h2>
           <span class="tp-badge" id="tpProgTotalCountBadge">Loading...</span>
         </div>
-        <p class="tp-subtitle">Monthly field review performance, submission status, and manager scorecards</p>
+        <p class="tp-subtitle" id="tpProgSubtitle">Monthly field review performance, submission status, and manager scorecards</p>
       </div>
-      <div class="tp-header-controls">
-        <!-- View Mode Segmented Switcher (Flowchart vs Table View - task-271) -->
+
+      <!-- Source Switcher: Review Progress vs Program Progress (Modeled on Historical Data External/Internal Switcher) -->
+      <div class="tp-hist-source-switcher" id="tpProgSourceSwitcher">
+        <button type="button" class="tp-hist-source-btn active" id="tpProgSourceBtnReview" onclick="window.ProgressModule.setSubTab('review')" title="Review Progress (Field Reviews & Scorecards)">
+          <span>📋 Review Progress</span>
+        </button>
+        <button type="button" class="tp-hist-source-btn" id="tpProgSourceBtnProgram" onclick="window.ProgressModule.setSubTab('program')" title="Program Progress">
+          <span>📈 Program Progress</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 1. Review Progress Sub-View Content -->
+    <div id="tpProgReviewContent">
+      <div class="tp-header-controls" style="margin-bottom:16px;">
+        <!-- View Mode Segmented Switcher (Table View first and default) -->
         <div class="tp-segmented-control" id="tpProgViewModeControl" role="tablist" aria-label="Progress View Mode">
-          <button type="button" class="tp-seg-btn active" id="tpProgViewBtnFlow" onclick="window.ProgressModule.setViewMode('flowchart')" title="Flowchart Hierarchy View">
-            <span class="tp-seg-icon">🌳</span> Flowchart
-          </button>
-          <button type="button" class="tp-seg-btn" id="tpProgViewBtnTable" onclick="window.ProgressModule.setViewMode('table')" title="Tabular Roster View">
+          <button type="button" class="tp-seg-btn active" id="tpProgViewBtnTable" onclick="window.ProgressModule.setViewMode('table')" title="Tabular Roster View">
             <span class="tp-seg-icon">📋</span> Table View
+          </button>
+          <button type="button" class="tp-seg-btn" id="tpProgViewBtnFlow" onclick="window.ProgressModule.setViewMode('flowchart')" title="Flowchart Hierarchy View">
+            <span class="tp-seg-icon">🌳</span> Flowchart
           </button>
         </div>
 
-        <!-- Segmented State Switcher -->
-        <div class="tp-segmented-control" role="tablist">
-          <button type="button" class="tp-seg-btn active" id="tpProgSegMH" onclick="window.ProgressModule.setState('MH')">
-            <span class="tp-seg-icon">🚩</span> Maharashtra
-          </button>
-          <button type="button" class="tp-seg-btn" id="tpProgSegCH" onclick="window.ProgressModule.setState('CH')">
-            <span class="tp-seg-icon">🏛️</span> Chhattisgarh
-          </button>
-          <button type="button" class="tp-seg-btn" id="tpProgSegMP" onclick="window.ProgressModule.setState('MP')">
-            <span class="tp-seg-icon">🌳</span> Madhya Pradesh
-          </button>
-          <button type="button" class="tp-seg-btn" id="tpProgSegBR" onclick="window.ProgressModule.setState('BR')">
-            <span class="tp-seg-icon">🌾</span> Bihar
-          </button>
+        <!-- State & District Dropdown Filters -->
+        <div style="display:inline-flex; align-items:center; gap:8px;">
+          <!-- State Filter -->
+          <div class="tp-hist-select-wrap" id="tpProgStateWrap" title="Filter by State">
+            <span class="tp-hist-select-icon">🚩</span>
+            <select id="tpProgStateSelect" class="tp-hist-select-input" onchange="window.ProgressModule.setState(this.value)">
+              <option value="ALL">All States (4)</option>
+              <option value="MH">Maharashtra</option>
+              <option value="CH">Chhattisgarh</option>
+              <option value="MP">Madhya Pradesh</option>
+              <option value="BR">Bihar</option>
+            </select>
+          </div>
+
+          <!-- District Filter -->
+          <div class="tp-hist-select-wrap" id="tpProgDistrictWrap" title="Filter by District">
+            <span class="tp-hist-select-icon">📍</span>
+            <select id="tpProgDistrictSelect" class="tp-hist-select-input" onchange="window.ProgressModule.setDistrict(this.value)" style="max-width:180px;">
+              <option value="">All Districts</option>
+            </select>
+          </div>
         </div>
         <div style="display:flex; align-items:center; gap:8px;">
           <label for="tpProgMonthSelect" style="font-size:12px; font-weight:700; color:var(--text, #0F172A);">Month:</label>
@@ -5198,7 +5596,7 @@
           <button type="button" id="tpProgSearchClear" class="tp-search-clear" onclick="window.ProgressModule.clearSearch()" style="display:none;">&times;</button>
         </div>
         <!-- Action Buttons -->
-        <div class="tp-btn-group" id="tpProgTreeActions">
+        <div class="tp-btn-group" id="tpProgTreeActions" style="display:none;">
           <button type="button" class="tp-btn tp-btn-secondary" onclick="window.ProgressModule.expandAll()" title="Expand all divisions">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="7 13 12 18 17 13"></polyline><polyline points="7 6 12 11 17 6"></polyline></svg> Expand All
           </button>
@@ -5207,47 +5605,63 @@
           </button>
         </div>
       </div>
-    </div>
 
-    <!-- KPI Summary Row -->
-    <div class="tp-prog-kpi-row" id="tpProgKpiRow">
-      <!-- Dynamically injected -->
-    </div>
-
-    <!-- Active KPI Status Filter Banner -->
-    <div class="tp-prog-filter-banner" id="tpProgFilterBanner" style="display:none;"></div>
-
-    <!-- Division Toggle Pills Bar -->
-    <div class="tp-division-pills-bar" id="tpProgDivisionBar">
-      <span class="tp-filter-label">Quick Toggle:</span>
-      <div class="tp-pills-wrapper" id="tpProgDivisionPills">
-        <!-- Injected dynamically -->
+      <!-- KPI Summary Row -->
+      <div class="tp-prog-kpi-row" id="tpProgKpiRow">
+        <!-- Dynamically injected -->
       </div>
-    </div>
 
-    <!-- How to read the chart -->
-    <div class="tp-legend" aria-label="How to read the chart">
-      <span class="tp-lg" style="--c:#F59E0B"><i></i>State lead</span>
-      <span class="tp-lg" style="--c:#0D9488"><i></i>Division</span>
-      <span class="tp-lg" style="--c:#8B5CF6"><i></i>Division manager</span>
-      <span class="tp-lg" style="--c:#4F8EF7"><i></i>Programme manager</span>
-      <span class="tp-lg" style="--c:#64748B"><i></i>Project officer</span>
-      <span class="tp-lg-hint">Open a division with View Team. Details opens monthly field review data.</span>
-    </div>
+      <!-- Active KPI Status Filter Banner -->
+      <div class="tp-prog-filter-banner" id="tpProgFilterBanner" style="display:none;"></div>
 
-    <!-- Tree Viewport & Canvas -->
-    <div class="tp-viewport" id="tpProgViewport">
-      <div class="tp-canvas" id="tpProgTreeCanvas">
-        <svg class="tp-connectors-svg" id="tpProgConnectorSvg"></svg>
-        <div id="tpProgTreeContainer" class="tp-tree-container">
-          <!-- Rendered dynamically -->
+      <!-- Division Toggle Pills Bar -->
+      <div class="tp-division-pills-bar" id="tpProgDivisionBar" style="display:none;">
+        <span class="tp-filter-label">Quick Toggle:</span>
+        <div class="tp-pills-wrapper" id="tpProgDivisionPills">
+          <!-- Injected dynamically -->
         </div>
       </div>
-    </div>
 
-    <!-- Tabular View Container (task-271) -->
-    <div class="tp-prog-table-view" id="tpProgTableView" style="display:none;">
-      <!-- Rendered dynamically by ProgressModule.renderTableOnly() -->
+      <!-- How to read the chart -->
+      <div class="tp-legend" aria-label="How to read the chart" style="display:none;">
+        <span class="tp-lg" style="--c:#F59E0B"><i></i>State lead</span>
+        <span class="tp-lg" style="--c:#0D9488"><i></i>Division</span>
+        <span class="tp-lg" style="--c:#8B5CF6"><i></i>Division manager</span>
+        <span class="tp-lg" style="--c:#4F8EF7"><i></i>Programme manager</span>
+        <span class="tp-lg" style="--c:#64748B"><i></i>Project officer</span>
+        <span class="tp-lg-hint">Open a division with View Team. Details opens monthly field review data.</span>
+      </div>
+
+      <!-- Tree Viewport & Canvas -->
+      <div class="tp-viewport" id="tpProgViewport" style="display:none;">
+        <div class="tp-canvas" id="tpProgTreeCanvas">
+          <svg class="tp-connectors-svg" id="tpProgConnectorSvg"></svg>
+          <div id="tpProgTreeContainer" class="tp-tree-container">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabular View Container (Default View) -->
+      <div class="tp-prog-table-view" id="tpProgTableView" style="display:block;">
+        <!-- Rendered dynamically by ProgressModule.renderTableOnly() -->
+      </div>
+    </div> <!-- End #tpProgReviewContent -->
+
+    <!-- 2. Program Progress Sub-View Container -->
+    <div id="tpProgProgramContent" style="display:none; padding: 24px 0;">
+      <div class="tp-prog-placeholder-card" style="max-width: 720px; margin: 40px auto; background: var(--surface, #FFFFFF); border: 2px dashed #CBD5E1; border-radius: 16px; padding: 48px 32px; text-align: center; box-shadow: 0 4px 20px rgba(15,23,42,0.04);">
+        <div style="width: 56px; height: 56px; margin: 0 auto 16px auto; border-radius: 50%; background: #EFF6FF; display: flex; align-items: center; justify-content: center; font-size: 26px;">
+          📈
+        </div>
+        <h3 style="font-size: 20px; font-weight: 800; color: var(--text, #0F172A); margin: 0 0 8px 0;">Program Progress</h3>
+        <p style="font-size: 14px; color: var(--text-muted, #64748B); line-height: 1.6; max-width: 520px; margin: 0 auto 20px auto;">
+          This view is ready for program progress metrics, milestones, and deliverables.
+        </p>
+        <span style="display: inline-block; padding: 6px 14px; background: #F1F5F9; color: #475569; font-size: 12px; font-weight: 700; border-radius: 20px; border: 1px solid #E2E8F0;">
+          Awaiting configuration
+        </span>
+      </div>
     </div>
   </div> <!-- End #tpProgressView -->
 
@@ -5281,9 +5695,6 @@
           </div>
         </div>
         <div class="tp-modal-header-actions">
-          <button type="button" class="tp-btn tp-btn-sm tp-btn-subtle" id="tpResetDefaultBtn" onclick="window.TeamPerformance.resetDefaultAll()" title="Reset all data back to original organization template" style="display:none;">
-            ↺ Reset to Default
-          </button>
           <button type="button" class="tp-modal-btn-icon" id="tpModalMaxBtn" onclick="window.TeamPerformance.toggleModalMaximize()" title="Maximize / Fullscreen" aria-label="Maximize / Fullscreen">
             ⛶
           </button>

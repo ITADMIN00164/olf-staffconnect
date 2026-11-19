@@ -138,7 +138,8 @@ const STATUS_VALUES = ["Active", "Inactive"];
 /* A record with no Status is Active - the field arrived after the directory
    did, so absence means "nobody has said otherwise". */
 function isActiveEmployee(emp) {
-    return String((emp || {})["Status"] || "").trim().toLowerCase() !== "inactive";
+    const s = String((emp || {})["Status"] || (emp || {})["Employee status"] || (emp || {}).status || (emp || {})["Employee Status"] || "").trim().toLowerCase();
+    return s !== "inactive" && s !== "disabled" && s !== "resigned" && s !== "left" && s !== "terminated";
 }
 
 /* A blank cell never erases anything, which is what keeps an upload from
@@ -1636,9 +1637,8 @@ async function getPageHtml(page) {
     // which looks like a broken page rather than a cached one. Hosting already
     // sends no-cache for HTML, so in production this costs a 304 and nothing
     // more; locally it is the difference between seeing an edit and not.
-    const res  = await fetch(`pages/${page}.html?v=20261119s`, { cache: "no-cache" });
+    const res  = await fetch(`pages/${page}.html?v=20261119T`, { cache: "no-cache" });
     const html = await res.text();
-    pageFragments.set(page, html);
     return html;
 }
 
@@ -2295,6 +2295,9 @@ window.navigate = async function (page) {
     else if (page === "team-performance") {
         if (window.TeamPerformance && typeof window.TeamPerformance.mount === "function") {
             window.TeamPerformance.mount();
+        }
+        if (window.ProgressModule && typeof window.ProgressModule.init === "function") {
+            window.ProgressModule.init();
         }
     }
 
@@ -4047,6 +4050,9 @@ async function deleteEmployeeRecord(empId) {
         });
 
         await loadEmployees();
+        if (window.TeamPerformance && typeof window.TeamPerformance.setStaffList === "function") {
+            window.TeamPerformance.setStaffList(employees);
+        }
         notify(`Employee ${empId} deleted.`, "success");
     } catch (err) {
         console.error(err);
@@ -4475,6 +4481,9 @@ async function handleExcelUpload(e) {
         }
 
         await loadEmployees();
+        if (window.TeamPerformance && typeof window.TeamPerformance.setStaffList === "function") {
+            window.TeamPerformance.setStaffList(employees);
+        }
 
     } catch (err) {
         console.error("Excel upload failed:", err);
@@ -4544,6 +4553,9 @@ async function saveEmployee() {
 
         closeModal();
         await loadEmployees();
+        if (window.TeamPerformance && typeof window.TeamPerformance.setStaffList === "function") {
+            window.TeamPerformance.setStaffList(employees);
+        }
         notify(currentMode === "edit" ? "Employee updated successfully." : "Employee added successfully.", "success");
     } catch (err) {
         console.error(err);

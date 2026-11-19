@@ -1587,7 +1587,8 @@
 ];
 
   // State
-  let activeView = "smart-goals"; // 'smart-goals' | 'historical'
+  let activeView = "progress"; // 'progress' | 'smart-goals' | 'historical'
+  let activeOrgView = "org"; // 'org' | 'program-impl' | 'itops' | 'prog-insights' | 'prod-enable' 
   let activeState = "MH"; // 'MH' | 'CH' | 'MP' | 'BR'
   let expandedDivisions = new Set(); // Set of division/track IDs that are expanded
   let searchQuery = "";
@@ -1702,9 +1703,6 @@
   function updateModalEditControlsVisibility() {
     const canEdit = canEditUser;
 
-    const resetBtn = document.getElementById("tpResetDefaultBtn");
-    if (resetBtn) resetBtn.style.display = canEdit ? "inline-flex" : "none";
-
     const editGoalsBtn = document.getElementById("tpEditGoalsBtn");
     if (editGoalsBtn) editGoalsBtn.style.display = canEdit ? "inline-flex" : "none";
 
@@ -1718,10 +1716,13 @@
     if (editAnnexuresBtn) editAnnexuresBtn.style.display = canEdit ? "inline-flex" : "none";
 
     if (!canEdit) {
-      toggleEditGoals(false);
-      toggleEditRole(false);
-      toggleEditPriority(false);
-      toggleEditAnnexures(false);
+      const modal = document.getElementById("tpModal");
+      if (modal) {
+        toggleEditGoals(false);
+        toggleEditRole(false);
+        toggleEditPriority(false);
+        toggleEditAnnexures(false);
+      }
     }
   }
 
@@ -1871,6 +1872,9 @@
   // Keep an immutable snapshot of original template data for instant clean reset
   let originalTemplateSnapshot = {};
   try {
+    if (window.OLF_ORGCHART_DATA && window.OLF_ORGCHART_DATA.roles) {
+      window.TEAM_PERFORMANCE_ROLES = Object.assign({}, window.TEAM_PERFORMANCE_ROLES || {}, window.OLF_ORGCHART_DATA.roles);
+    }
     if (window.TEAM_PERFORMANCE_ROLES) {
       originalTemplateSnapshot = JSON.parse(JSON.stringify(window.TEAM_PERFORMANCE_ROLES));
     }
@@ -1934,7 +1938,11 @@
   }
 
   function isActiveEmployee(emp) {
-    return String((emp || {})["Status"] || "").trim().toLowerCase() !== "inactive";
+    if (!emp) return false;
+    const s = String(
+      emp.Status ?? emp["Employee status"] ?? emp.status ?? emp["Employee Status"] ?? emp.employeeStatus ?? ""
+    ).trim().toLowerCase();
+    return s !== "inactive" && s !== "disabled" && s !== "resigned" && s !== "left" && s !== "terminated";
   }
 
   function isActualDivisionManager(emp) {
@@ -1966,6 +1974,11 @@
     if (found && found.Name) return found.Name.trim();
 
     if (normEmail.includes("prashant")) return "Prashant Patil";
+    if (normEmail.includes("priyanshi")) return "Priyanshi Arora";
+    if (normEmail.includes("vaidehi")) return "Vaidehi M Shhalu";
+    if (normEmail.includes("sowmya")) return "Sowmya Srinivasan";
+    if (normEmail.includes("craig")) return "Craig H Dsouza";
+    if (normEmail.includes("bharat")) return "Bharat Sinha";
     if (normEmail.includes("vishvajit")) return "Vishvajit G Pawar";
     if (normEmail.includes("manoj")) return "Manoj C Girase";
     if (normEmail.includes("vishal")) return "Vishal J Dahat";
@@ -2611,6 +2624,26 @@
     if (!roleId) return null;
 
     const cleanRoleId = String(roleId).trim().toLowerCase();
+    const stripped = roleId.replace(/-(?:ch|mh|mp|br)-[a-z0-9_-]+$/i, "");
+    const cleanStripped = stripped.toLowerCase();
+
+    const orgRoles = (window.OLF_ORGCHART_DATA && window.OLF_ORGCHART_DATA.roles) || {};
+    if (orgRoles[roleId]) return orgRoles[roleId];
+    if (orgRoles[stripped]) return orgRoles[stripped];
+
+    if (cleanRoleId.includes("analyst") || cleanRoleId.includes("shrisai") || cleanRoleId.includes("bhandwalkar") || cleanRoleId.includes("padhen") || cleanRoleId.includes("sinare") || cleanRoleId.includes("ghule")) {
+      if (orgRoles["prog-insights-analyst"]) return orgRoles["prog-insights-analyst"];
+    }
+    if (cleanRoleId.includes("aryan") || cleanRoleId.includes("alisha") || cleanRoleId.includes("it-ops-associate") || cleanRoleId.includes("vaishnavi") || cleanRoleId.includes("tupkar") || cleanRoleId.includes("sapkal")) {
+      if (orgRoles["it-ops-associate"]) return orgRoles["it-ops-associate"];
+    }
+    if (cleanRoleId.includes("curation") || cleanRoleId.includes("gitanjali") || cleanRoleId.includes("sagar") || cleanRoleId.includes("shivprasad") || cleanRoleId.includes("sadhna") || cleanRoleId.includes("yuvraj")) {
+      if (orgRoles["curation-associate"]) return orgRoles["curation-associate"];
+    }
+    if (cleanRoleId.includes("content") || cleanRoleId.includes("chandana") || cleanRoleId.includes("nikita") || cleanRoleId.includes("bhimrao") || cleanRoleId.includes("sakshi") || cleanRoleId.includes("bhushan")) {
+      if (orgRoles["content-associate"]) return orgRoles["content-associate"];
+    }
+
     if (cleanRoleId.includes("jeetendra") || cleanRoleId.includes("olf-24-046") || cleanRoleId === "dm-cg") {
       const dmCg = (window.TEAM_PERFORMANCE_ROLES || {})["dm-cg"] || originalTemplateSnapshot["dm-cg"];
       if (dmCg) return dmCg;
@@ -2620,8 +2653,6 @@
       if (dmAmr && dmAmr.hasData) return dmAmr;
     }
 
-    const stripped = roleId.replace(/-(?:ch|mh|mp|br)-[a-z0-9_-]+$/i, "");
-    const cleanStripped = stripped.toLowerCase();
     if (cleanStripped.includes("jeetendra") || cleanStripped.includes("olf-24-046") || cleanStripped === "dm-cg") {
       const dmCg = (window.TEAM_PERFORMANCE_ROLES || {})["dm-cg"] || originalTemplateSnapshot["dm-cg"];
       if (dmCg) return dmCg;
@@ -2783,7 +2814,7 @@
       }
     }
 
-    let original = (window.TEAM_PERFORMANCE_ROLES || {})[lookupId] || originalTemplateSnapshot[lookupId];
+    let original = (window.TEAM_PERFORMANCE_ROLES || {})[lookupId] || (window.OLF_ORGCHART_DATA && window.OLF_ORGCHART_DATA.roles && window.OLF_ORGCHART_DATA.roles[lookupId]) || originalTemplateSnapshot[lookupId];
     if (!original) {
       original = resolveRoleFromStaff(lookupId) || {};
     }
@@ -2905,6 +2936,950 @@
     container.innerHTML = html;
   }
 
+
+  function getLiveRoleHolder(roleId) {
+    if (!liveEmployees || !liveEmployees.length) return null;
+    const cleanRole = String(roleId || "").toLowerCase();
+
+    return liveEmployees.find(e => {
+      if (!isActiveEmployee(e)) return false;
+      const eName = String(e.Name || e.name || "").toLowerCase();
+      const eDesig = String(e.Designation || e.designation || "").toLowerCase();
+      const eEmail = String(e.Email || e.email || "").toLowerCase();
+
+      if (cleanRole === "ceo" && (eDesig === "ceo" || eEmail.startsWith("sanjay") || (eName.startsWith("sanjay") && eName.includes("dalmia")))) return true;
+      if (cleanRole === "cos" && (eEmail.startsWith("reena") || (eName.startsWith("reena") && eName.includes("dalmia")))) return true;
+      if (cleanRole === "coo" && (eDesig === "coo" || eEmail.startsWith("vishvajit") || (eName.startsWith("vishvajit") && eName.includes("pawar")))) return true;
+      if (cleanRole === "strategy" && (eEmail.startsWith("rajeev") || eName.includes("rajeev"))) return true;
+      if (cleanRole === "platform" && (eEmail.startsWith("craig") || eName.includes("craig") || (eDesig.includes("head") && eDesig.includes("platform")))) return true;
+      if (cleanRole === "head-partnership" && (eEmail.startsWith("sanjay") || (eName.startsWith("sanjay") && eName.includes("dalmia")))) return true;
+      if (cleanRole === "lead-partnership" && (eEmail.startsWith("sheeba") || eName.includes("sheeba"))) return true;
+      if (cleanRole === "partnership-mgr" && (eEmail.startsWith("sowmya") || eName.includes("sowmya"))) return true;
+      if (cleanRole === "finance" && (eEmail.startsWith("accounts") || eEmail.startsWith("anjali.dandile") || (eName.includes("anjali") && eName.includes("dandile")))) return true;
+      if (cleanRole === "office-admin" && (eEmail.startsWith("vishal.nagawade") || (eName.includes("vishal") && eName.includes("nagawade")) || (eDesig.includes("admin") && eDesig.includes("officer")))) return true;
+      if (cleanRole === "talent-acquisition" && (eEmail.startsWith("talent") || eName.includes("raghav"))) return true;
+      if (cleanRole === "prog-gov" && (eEmail.startsWith("hemant") || (eName.includes("hemant") && eName.includes("sahu")))) return true;
+      if (cleanRole === "itops" && (eEmail.startsWith("omkar") || eEmail.startsWith("itadmin") || (eName.startsWith("omkar") && eName.includes("yelgandalkar")))) return true;
+      if (cleanRole === "prog-insights" && (eEmail.startsWith("prashant@") || (eName.startsWith("prashant") && (eName.includes("bhondve") || eName.includes("bondve"))) || (eDesig.includes("lead") && eDesig.includes("insight")))) return true;
+      if (cleanRole === "prod-enable" && (eEmail.startsWith("bharat") || eName.includes("bharat"))) return true;
+      if (cleanRole === "community" && (eEmail.startsWith("tejal@") || (eName.includes("tejal") && eName.includes("hande")))) return true;
+      if (cleanRole === "marketing-mgr" && (eEmail.startsWith("vaibhavi") || eName.includes("vaibhavi"))) return true;
+      if (cleanRole === "events-mgr" && (eEmail.startsWith("anjali@") || eEmail.includes("anjalibisht") || (eName.includes("anjali") && eName.includes("bisht")))) return true;
+      if (cleanRole === "team-dev" && (eEmail.startsWith("aditee") || eName.includes("aditee"))) return true;
+      if (cleanRole === "curation-lead" && (eEmail.startsWith("vaidehi") || eName.includes("vaidehi"))) return true;
+      if (cleanRole === "advisory-george" && (eEmail.startsWith("george") || eName.includes("george"))) return true;
+      if (cleanRole === "advisory-shalini" && (eEmail.startsWith("shalini") || eName.includes("shalini"))) return true;
+
+      return false;
+    }) || null;
+  }
+
+  function resolveLiveEmployeeName(roleId, fallbackName) {
+    if (!liveEmployees || !liveEmployees.length) return fallbackName;
+    const match = getLiveRoleHolder(roleId);
+    return match ? (match.Name || match.name || fallbackName) : fallbackName;
+  }
+
+  function resolveLiveMember(email, fallbackName, fallbackTitle, returnFallback = false) {
+    if (!liveEmployees || !liveEmployees.length) {
+      return { name: fallbackName, title: fallbackTitle, email: email || "", active: true };
+    }
+    const cleanEmail = String(email || "").trim().toLowerCase();
+    const cleanFallback = String(fallbackName || "").trim().toLowerCase();
+    const match = liveEmployees.find(e => {
+      if (!isActiveEmployee(e)) return false;
+      const eEmail = String(e.Email || e.email || "").trim().toLowerCase();
+      const eName = String(e.Name || e.name || "").trim().toLowerCase();
+      if (cleanEmail && eEmail === cleanEmail) return true;
+      if (cleanFallback && (eName === cleanFallback || (cleanFallback.length > 5 && eName.includes(cleanFallback)))) return true;
+      return false;
+    });
+    if (match) {
+      return {
+        name: match.Name || match.name || fallbackName,
+        title: match.Designation || match.designation || fallbackTitle,
+        email: match.Email || match.email || email || "",
+        id: match.id || "",
+        active: true,
+        reportingManager: resolveManagerName(match, ""),
+        dept: match.Dept || ""
+      };
+    }
+    if (returnFallback) {
+      return { name: fallbackName, title: fallbackTitle, email: email || "", active: false };
+    }
+    return null;
+  }
+
+  function getLiveReportees(managerEmail, fallbackMembers) {
+    const cleanMgr = String(managerEmail || "").trim().toLowerCase();
+    if (liveEmployees && liveEmployees.length) {
+      const matches = liveEmployees.filter(e => {
+        if (!isActiveEmployee(e)) return false;
+        const mgr = String(e["Reporting manager"] || e.reportingManager || e.ReportingManager || "").trim().toLowerCase();
+        return mgr === cleanMgr;
+      });
+
+      if (matches.length > 0) {
+        return matches.map(e => ({
+          id: e.id || e.idDocument || (e.Email ? e.Email.split("@")[0] : ""),
+          name: e.Name || e.name || "Team Member",
+          email: e.Email || e.email || "",
+          title: e.Designation || e.designation || "Associate",
+          dept: e.Dept || e.Department || e.department || "",
+          reportingManager: resolveManagerName(e, ""),
+          tag: e.Designation && /lead|sr|senior/i.test(e.Designation) ? "Senior" : "Associate"
+        }));
+      }
+
+      if (fallbackMembers && fallbackMembers.length) {
+        return fallbackMembers
+          .map(m => {
+            const live = resolveLiveMember(m.email, m.name, m.title);
+            return live ? { ...m, name: live.name, title: live.title } : null;
+          })
+          .filter(Boolean);
+      }
+      return [];
+    }
+    return fallbackMembers || [];
+  }
+
+  function switchOrgView(view) {
+    activeOrgView = view || "org";
+    renderTree();
+    updateHeaderForOrgView();
+    scheduleConnectorUpdate();
+    if (searchQuery) {
+      const allMatched = Array.from(document.querySelectorAll(".tp-matched, .tp-matched-row")).filter(el => {
+        if (el.classList.contains("tp-district-card") && el.querySelector(".tp-matched-row")) return false;
+        return true;
+      });
+      const summaryEl = document.getElementById("tpSearchSummary");
+      const summaryText = document.getElementById("tpSearchSummaryText");
+      if (summaryEl && summaryText) {
+        summaryEl.style.display = "flex";
+        summaryText.textContent = `Found ${allMatched.length} match(es) for "${searchQuery}"`;
+      }
+    }
+  }
+
+  function updateHeaderForOrgView() {
+    const isRootOrg = activeOrgView === "org";
+    const segControl = document.querySelector(".tp-segmented-control");
+    const divBar = document.getElementById("tpDivisionBar");
+    const totalBadge = document.getElementById("tpTotalCountBadge");
+    const subtitle = document.querySelector("#tpSmartGoalsView .tp-subtitle");
+    const btnGroup = document.querySelector("#tpSmartGoalsView .tp-btn-group");
+
+    if (segControl) segControl.style.display = activeOrgView === "program-impl" ? "inline-flex" : "none";
+    if (divBar) divBar.style.display = activeOrgView === "program-impl" ? "flex" : "none";
+    if (btnGroup) btnGroup.style.display = activeOrgView === "program-impl" ? "flex" : "none";
+
+    if (isRootOrg) {
+      if (totalBadge) {
+        const renderedCards = document.querySelectorAll("#tpOrgRootWrap .tp-card-org");
+        const count = renderedCards.length || 22;
+        totalBadge.textContent = `Whole Organization · ${count} Key Roles`;
+      }
+      if (subtitle) subtitle.textContent = "Executive leadership, 5 organization pillars, and department scorecards";
+    } else if (activeOrgView === "itops") {
+      if (totalBadge) totalBadge.textContent = "IT Operations · 11 Staff";
+      if (subtitle) subtitle.textContent = "IT Operations hierarchy, technical leads, associates, and interns";
+    } else if (activeOrgView === "prog-insights") {
+      if (totalBadge) totalBadge.textContent = "Program Insights · 6 Staff";
+      if (subtitle) subtitle.textContent = "Program Insights leadership, data analysts, and scorecards";
+    } else if (activeOrgView === "curations") {
+      if (totalBadge) totalBadge.textContent = "Content & Curations · 10 Staff";
+      if (subtitle) subtitle.textContent = "Content production, educational taxonomy, and pedagogical curation";
+    } else if (activeOrgView === "partnerships") {
+      if (totalBadge) totalBadge.textContent = "Partnerships & Founder's Office · 5 Staff";
+      if (subtitle) subtitle.textContent = "Donor engagement, grant servicing, proposal development, and executive initiatives";
+    } else if (activeOrgView === "community-marketing") {
+      if (totalBadge) totalBadge.textContent = "Community Marketing & Communications · 3 Staff";
+      if (subtitle) subtitle.textContent = "Field impact storytelling, digital communications, research briefs, and campaigns";
+    } else if (activeOrgView === "program-impl") {
+      updateCounts();
+      if (subtitle) subtitle.textContent = "State-to-district operational hierarchy, commitments, and editable scorecards";
+    }
+  }
+
+
+
+  function renderOrgRootView() {
+    const data = window.OLF_ORGCHART_DATA || {};
+    const tree = data.tree || {};
+    const ceo = tree.ceo || { name: "Sanjay Dalmia", title: "CEO", roleId: "ceo" };
+    const strategy = tree.strategy || { name: "Rajeev Kumar", title: "Strategy & Network", roleId: "strategy" };
+    const pillars = tree.pillars || [];
+
+    const ceoName = resolveLiveEmployeeName("ceo", ceo.name);
+    const strategyName = resolveLiveEmployeeName("strategy", strategy.name);
+
+    let html = `
+      <div class="tp-org-root-wrap" id="tpOrgRootWrap">
+        <!-- L0: Strategy & Network + CEO -->
+        <div class="tp-org-l0-row">
+          <div class="tp-card tp-card-org tp-card-strategy" id="n-strategy" onclick="window.TeamPerformance.openModal('strategy')">
+            <div class="tp-card-header">
+              <span class="tp-org-pill-tag" style="background:rgba(26,133,119,0.12);color:#0D6B5E;">Strategic Partner</span>
+              <button type="button" class="tp-card-details-btn" onclick="event.stopPropagation();window.TeamPerformance.openModal('strategy')">Details →</button>
+            </div>
+            <div class="tp-card-name">${esc(strategyName)}</div>
+            <div class="tp-card-role-label">${esc(strategy.title)}</div>
+            <div class="tp-card-sub">Adviser &amp; Network Development</div>
+          </div>
+
+          <div class="tp-card tp-card-org tp-card-ceo" id="n-ceo" onclick="window.TeamPerformance.openModal('ceo')">
+            <div class="tp-card-header">
+              <span class="tp-org-pill-tag" style="background:rgba(217,119,6,0.14);color:#B45309;">Executive Lead</span>
+              <button type="button" class="tp-card-details-btn" onclick="event.stopPropagation();window.TeamPerformance.openModal('ceo')">Details →</button>
+            </div>
+            <div class="tp-card-name">${esc(ceoName)}</div>
+            <div class="tp-card-role-label">${esc(ceo.title)}</div>
+            <div class="tp-card-sub">Open Links Foundation</div>
+          </div>
+        </div>
+
+        <!-- L1: 5 Pillars Row -->
+        <div class="tp-org-l1-row" id="tpOrgL1Row">
+    `;
+
+    for (const p of pillars) {
+      const head = p.head || {};
+      const headEmp = getLiveRoleHolder(head.roleId);
+      const headName = headEmp ? (headEmp.Name || headEmp.name) : resolveLiveEmployeeName(head.roleId, head.name);
+      const interimTag = head.interim ? `<span class="tp-badge-interim">Interim</span>` : "";
+      const headMgr = headEmp ? resolveManagerName(headEmp, "") : (head.reportingManager || "");
+      const headMgrHtml = headMgr ? `<div class="tp-card-sub" style="font-size:11px;color:#64748B;margin-top:2px;">Reports to: ${esc(headMgr)}</div>` : "";
+
+      html += `
+        <div class="tp-org-col" id="${esc(p.id)}">
+          <div class="tp-org-col-title">${esc(p.title)}</div>
+
+          <!-- Pillar Head Card -->
+          <div class="tp-card tp-card-org tp-card-head" id="${esc(head.id)}" onclick="window.TeamPerformance.openModal('${esc(head.roleId)}', '${esc(head.title)}', '${esc(headName)}', '${esc(headMgr)}')">
+            <div class="tp-card-header">
+              <span class="tp-org-pillar-badge">Pillar Lead</span>
+              <button type="button" class="tp-card-details-btn" onclick="event.stopPropagation();window.TeamPerformance.openModal('${esc(head.roleId)}', '${esc(head.title)}', '${esc(headName)}', '${esc(headMgr)}')">Details →</button>
+            </div>
+            <div class="tp-card-name">${esc(headName)} ${interimTag}</div>
+            <div class="tp-card-role-label">${esc(head.title)}</div>
+            ${headMgrHtml}
+          </div>
+
+          <!-- Subordinate Nodes -->
+          <div class="tp-org-subnodes-wrap">
+      `;
+
+      for (const node of (p.nodes || [])) {
+        if (node.isProgramTree) {
+          html += `
+            <div class="tp-card tp-card-org tp-card-drilldown tp-card-prog-impl" id="${esc(node.id)}" onclick="window.TeamPerformance.switchOrgView('program-impl')">
+              <div class="tp-card-header">
+                <span class="tp-org-pill-tag" style="background:#EFF6FF;color:#1D4ED8;">Field Network</span>
+                <span style="font-size:11px;font-weight:700;color:#2563EB;">Hierarchy ➔</span>
+              </div>
+              <div class="tp-card-name">${esc(node.title)}</div>
+              <div class="tp-card-role-label">4 States · 16 PMs · 57 POs</div>
+              <div class="tp-card-sub" style="margin-bottom:8px;">Maharashtra, Chhattisgarh, MP, Bihar</div>
+              <button type="button" class="tp-btn-drilldown" onclick="event.stopPropagation();window.TeamPerformance.switchOrgView('program-impl')">
+                🌳 View Field Hierarchy →
+              </button>
+            </div>
+          `;
+        } else if (node.isSubDept) {
+          const liveEmp = getLiveRoleHolder(node.roleId);
+          if (liveEmployees && liveEmployees.length > 0 && !liveEmp) {
+            continue;
+          }
+          const nodeName = liveEmp ? (liveEmp.Name || liveEmp.name) : resolveLiveEmployeeName(node.roleId, node.name);
+          const nodeInterim = node.interim ? `<span class="tp-badge-interim">Interim</span>` : "";
+          const nodeVacant = node.vacant ? `<span class="tp-badge-vacant">Vacant</span>` : "";
+
+          html += `
+            <div class="tp-card tp-card-org tp-card-drilldown" id="${esc(node.id)}" onclick="window.TeamPerformance.switchOrgView('${esc(node.subDeptId)}')">
+              <div class="tp-card-header">
+                <span class="tp-org-pill-tag" style="background:#F0FDF4;color:#15803D;">Department</span>
+                <button type="button" class="tp-card-details-btn" onclick="event.stopPropagation();window.TeamPerformance.openModal('${esc(node.roleId)}')">Details →</button>
+              </div>
+              <div class="tp-card-name">${esc(nodeName)} ${nodeInterim} ${nodeVacant}</div>
+              <div class="tp-card-role-label">${esc(node.title)}</div>
+              <div style="margin-top:8px;">
+                <button type="button" class="tp-btn-drilldown" onclick="event.stopPropagation();window.TeamPerformance.switchOrgView('${esc(node.subDeptId)}')">
+                  👥 View Team →
+                </button>
+              </div>
+            </div>
+          `;
+        } else {
+          const liveEmp = getLiveRoleHolder(node.roleId);
+          if (liveEmployees && liveEmployees.length > 0 && !liveEmp) {
+            continue;
+          }
+          const nodeName = liveEmp ? (liveEmp.Name || liveEmp.name) : resolveLiveEmployeeName(node.roleId, node.name);
+          const nodeInterim = node.interim ? `<span class="tp-badge-interim">Interim</span>` : "";
+          const nodeVacant = node.vacant ? `<span class="tp-badge-vacant">Vacant</span>` : "";
+          const liveMgr = liveEmp ? resolveManagerName(liveEmp, "") : (node.reportingManager || "");
+          const mgrHtml = liveMgr ? `<div class="tp-card-sub" style="font-size:11px;color:#64748B;margin-top:2px;">Reports to: ${esc(liveMgr)}</div>` : "";
+
+          html += `
+            <div class="tp-card tp-card-org tp-card-subnode" id="${esc(node.id)}" onclick="window.TeamPerformance.openModal('${esc(node.roleId)}', '${esc(node.title)}', '${esc(nodeName)}', '${esc(liveMgr)}')">
+              <div class="tp-card-header">
+                <span class="tp-org-pill-tag">Role</span>
+                <button type="button" class="tp-card-details-btn" onclick="event.stopPropagation();window.TeamPerformance.openModal('${esc(node.roleId)}', '${esc(node.title)}', '${esc(nodeName)}', '${esc(liveMgr)}')">Details →</button>
+              </div>
+              <div class="tp-card-name">${esc(nodeName)} ${nodeInterim} ${nodeVacant}</div>
+              <div class="tp-card-role-label">${esc(node.title)}</div>
+              ${mgrHtml}
+            </div>
+          `;
+        }
+      }
+
+      html += `
+          </div>
+        </div>
+      `;
+    }
+
+    html += `
+        </div>
+      </div>
+    `;
+
+    return html;
+  }
+
+  function renderItOpsTree() {
+    const omkar = resolveLiveMember("omkar@openlinksfoundation.org", "Omkar Yelgandalkar", "IT Operations Manager", true);
+    const hritik = resolveLiveMember("hritik@openlinksfoundation.org", "Hritik Takawale", "Technical Lead", true);
+    const ishwari = resolveLiveMember("ishwari@openlinksfoundation.org", "Ishwari Potekar", "Technical Lead", true);
+
+    const rawHritik = [
+      { id: "vaishnavi", email: "vaishnavi@openlinksfoundation.org", name: "Vaishnavi Patil", title: "IT Ops Associate", tag: "Associate" },
+      { id: "vishal", email: "vishal.tupkar@openlinksfoundation.org", name: "Vishal Tupkar", title: "IT Ops Associate", tag: "Associate" },
+      { id: "sanket", email: "sanket@openlinksfoundation.org", name: "Sanket Sapkal", title: "IT Ops Associate", tag: "Associate" },
+      { id: "aryan", email: "aryan@openlinksfoundation.org", name: "Aryan J Kadhikhaye", title: "IT Operations Associate", tag: "Associate" }
+    ];
+    function resolveItTrack(fallbackList, leadMgrName) {
+      if (!liveEmployees || !liveEmployees.length) return fallbackList;
+      return fallbackList.map(item => {
+        const cleanEmail = String(item.email || "").trim().toLowerCase();
+        const cleanName = String(item.name || "").trim().toLowerCase();
+        const emp = liveEmployees.find(e => {
+          if (!isActiveEmployee(e)) return false;
+          const eEmail = String(e.Email || e.email || "").trim().toLowerCase();
+          const eName = String(e.Name || e.name || "").trim().toLowerCase();
+          if (cleanEmail && eEmail === cleanEmail) return true;
+          if (cleanName && (eName === cleanName || (cleanName.length > 5 && eName.includes(cleanName)))) return true;
+          return false;
+        });
+        if (!emp) return null;
+        const liveMgr = resolveManagerName(emp, leadMgrName);
+        return {
+          id: item.id || emp.id || cleanEmail.split("@")[0],
+          name: emp.Name || emp.name || item.name,
+          title: emp.Designation || emp.designation || item.title,
+          email: emp.Email || emp.email || item.email,
+          tag: item.tag || (emp.Designation && /senior|sr|lead/i.test(emp.Designation) ? "Senior" : "Associate"),
+          reportingManager: liveMgr
+        };
+      }).filter(Boolean);
+    }
+
+    const hritikTeam = resolveItTrack(rawHritik, hritik.name);
+
+    const rawIshwari = [
+      { id: "riya", email: "riya@openlinksfoundation.org", name: "Riya Demapure", title: "IT Ops Associate", tag: "Associate" },
+      { id: "prajakta", email: "prajakta@openlinksfoundation.org", name: "Prajakta Nakade", title: "IT Ops Associate", tag: "Associate" },
+      { id: "alisha", email: "alisha@openlinksfoundation.org", name: "Alisha R Khandare", title: "Associate - IT Ops", tag: "Associate" },
+      { id: "ishwari-g", email: "ishwari.g@openlinksfoundation.org", name: "Ishwari Gaikwad", title: "IT Ops Intern", tag: "Intern" },
+      { id: "trupti", email: "trupti@openlinksfoundation.org", name: "Trupti Salve", title: "IT Ops Intern", tag: "Intern" }
+    ];
+    const ishwariTeam = resolveItTrack(rawIshwari, ishwari.name);
+
+    return `
+      <div class="tp-subdept-container">
+        <div class="tp-org-breadcrumb-bar">
+          <button type="button" class="tp-btn-back-org" onclick="window.TeamPerformance.switchOrgView('org')">
+            ← Entire Organization
+          </button>
+          <span class="tp-org-breadcrumb-sep">/</span>
+          <span class="tp-org-breadcrumb-current">IT Operations — ${esc(omkar.name)}</span>
+        </div>
+
+        <!-- Manager Card -->
+        <div style="display:flex;justify-content:center;margin-bottom:32px;width:100%;">
+          <div class="tp-card tp-card-org" style="width:300px;border-color:#38BDF8;box-shadow:0 6px 20px -2px rgba(56,189,248,0.15);" onclick="window.TeamPerformance.openModal('itops', 'IT Operations Manager', '${esc(omkar.name)}', 'Craig H Dsouza')">
+            <div class="tp-card-header">
+              <span class="tp-org-pillar-badge">IT Ops Head</span>
+              <button type="button" class="tp-card-details-btn" onclick="event.stopPropagation();window.TeamPerformance.openModal('itops', 'IT Operations Manager', '${esc(omkar.name)}', 'Craig H Dsouza')">Details →</button>
+            </div>
+            <div class="tp-card-name">${esc(omkar.name)}</div>
+            <div class="tp-card-role-label">${esc(omkar.title)}</div>
+            <div class="tp-card-sub" style="font-size:11.5px;color:#0D9488;margin-top:6px;font-weight:600;">Reports to: ${esc(omkar.reportingManager || "Craig H Dsouza")}</div>
+          </div>
+        </div>
+
+        <!-- Technical Lead Tracks -->
+        <div class="tp-subdept-grid">
+          <!-- Track 1: Hritik -->
+          <div class="tp-subdept-group">
+            <div class="tp-subdept-group-title">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#2563EB;"></span>
+              Technical Lead: ${esc(hritik.name)}
+            </div>
+            <div class="tp-org-subnodes-wrap">
+              <div class="tp-card tp-card-org" onclick="window.TeamPerformance.openModal('itops', 'Technical Lead', '${esc(hritik.name)}', '${esc(omkar.name)}')">
+                <div class="tp-card-header"><span class="tp-org-pill-tag">Lead</span><button type="button" class="tp-card-details-btn" onclick="event.stopPropagation();window.TeamPerformance.openModal('itops', 'Technical Lead', '${esc(hritik.name)}', '${esc(omkar.name)}')">Details →</button></div>
+                <div class="tp-card-name">${esc(hritik.name)}</div>
+                <div class="tp-card-role-label">${esc(hritik.title)}</div>
+              </div>
+              ${hritikTeam.map(m => {
+                const mMgr = m.reportingManager || hritik.name;
+                return `
+                <div class="tp-card tp-card-org" onclick="window.TeamPerformance.openModal('${m.id}', '${esc(m.title)}', '${esc(m.name)}', '${esc(mMgr)}')">
+                  <div class="tp-card-header">
+                    <span class="tp-org-pill-tag">${esc(m.tag)}</span>
+                    <button type="button" class="tp-card-details-btn" onclick="event.stopPropagation();window.TeamPerformance.openModal('${m.id}', '${esc(m.title)}', '${esc(m.name)}', '${esc(mMgr)}')">Details →</button>
+                  </div>
+                  <div class="tp-card-name">${esc(m.name)}</div>
+                  <div class="tp-card-role-label">${esc(m.title)}</div>
+                  <div class="tp-card-sub" style="font-size:11px;color:#64748B;margin-top:2px;">Reports to: ${esc(mMgr)}</div>
+                </div>
+              `;
+              }).join("")}
+            </div>
+          </div>
+
+          <!-- Track 2: Ishwari -->
+          <div class="tp-subdept-group">
+            <div class="tp-subdept-group-title">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#8B5CF6;"></span>
+              Technical Lead: ${esc(ishwari.name)}
+            </div>
+            <div class="tp-org-subnodes-wrap">
+              <div class="tp-card tp-card-org" onclick="window.TeamPerformance.openModal('itops', 'Technical Lead', '${esc(ishwari.name)}', '${esc(omkar.name)}')">
+                <div class="tp-card-header"><span class="tp-org-pill-tag">Lead</span><button type="button" class="tp-card-details-btn" onclick="event.stopPropagation();window.TeamPerformance.openModal('itops', 'Technical Lead', '${esc(ishwari.name)}', '${esc(omkar.name)}')">Details →</button></div>
+                <div class="tp-card-name">${esc(ishwari.name)}</div>
+                <div class="tp-card-role-label">${esc(ishwari.title)}</div>
+                <div class="tp-card-sub" style="font-size:11px;color:#64748B;margin-top:2px;">Reports to: ${esc(omkar.name)}</div>
+              </div>
+              ${ishwariTeam.map(m => {
+                const mMgr = m.reportingManager || ishwari.name;
+                return `
+                <div class="tp-card tp-card-org" onclick="window.TeamPerformance.openModal('${m.id}', '${esc(m.title)}', '${esc(m.name)}', '${esc(mMgr)}')">
+                  <div class="tp-card-header">
+                    <span class="tp-org-pill-tag">${esc(m.tag)}</span>
+                    <button type="button" class="tp-card-details-btn" onclick="event.stopPropagation();window.TeamPerformance.openModal('${m.id}', '${esc(m.title)}', '${esc(m.name)}', '${esc(mMgr)}')">Details →</button>
+                  </div>
+                  <div class="tp-card-name">${esc(m.name)}</div>
+                  <div class="tp-card-role-label">${esc(m.title)}</div>
+                  <div class="tp-card-sub" style="font-size:11px;color:#64748B;margin-top:2px;">Reports to: ${esc(mMgr)}</div>
+                </div>
+              `;
+              }).join("")}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderProgInsightsTree() {
+    const data = (window.OLF_ORGCHART_DATA && window.OLF_ORGCHART_DATA.subDepts && window.OLF_ORGCHART_DATA.subDepts["prog-insights"]) || {};
+    const prashantLead = resolveLiveMember("prashant@openlinksfoundation.org", "Prashant Bhondve", "Manager — Program Insights", true);
+
+    const rawAnalysts = data.analysts || [
+      { id: "omkar-sinare", email: "omkarsinare@openlinksfoundation.org", name: "Omkar Sinare", title: "Analyst — Program Insights" },
+      { id: "akash-ghule", email: "akash.g@openlinksfoundation.org", name: "Akash Ghule", title: "Analyst — Program Insights" },
+      { id: "shrisai-bandal", email: "shrisai.olf@gmail.com", name: "Shrisai Vijaykant Bandal", title: "Analyst — Program Insights" },
+      { id: "om-bhandwalkar", email: "ombhandwalkar.olf@gmail.com", name: "Om S Bhandwalkar", title: "Analyst — Program Insights" },
+      { id: "amit-padhen", email: "amit@openlinksfoundation.org", name: "Amit D Padhen", title: "Analyst — Program Insights" }
+    ];
+
+    const analysts = getLiveReportees("prashant@openlinksfoundation.org", rawAnalysts);
+
+    return `
+      <div class="tp-subdept-container">
+        <div class="tp-org-breadcrumb-bar">
+          <button type="button" class="tp-btn-back-org" onclick="window.TeamPerformance.switchOrgView('org')">
+            ← Entire Organization
+          </button>
+          <span class="tp-org-breadcrumb-sep">/</span>
+          <span class="tp-org-breadcrumb-current">Program Insights — ${esc(prashantLead.name)}</span>
+        </div>
+
+        <!-- Manager Card -->
+        <div style="display:flex;justify-content:center;margin-bottom:32px;width:100%;">
+          <div class="tp-card tp-card-org" style="width:320px;border-color:#10B981;box-shadow:0 6px 20px -2px rgba(16,185,129,0.15);" onclick="window.TeamPerformance.openModal('prog-insights', 'Manager — Program Insights', '${esc(prashantLead.name)}', 'Vishvajit G Pawar')">
+            <div class="tp-card-header">
+              <span class="tp-org-pillar-badge" style="background:#ECFDF5;color:#047857;border-color:#A7F3D0;">Insights Lead</span>
+              <button type="button" class="tp-card-details-btn" onclick="event.stopPropagation();window.TeamPerformance.openModal('prog-insights', 'Manager — Program Insights', '${esc(prashantLead.name)}', 'Vishvajit G Pawar')">Details →</button>
+            </div>
+            <div class="tp-card-name">${esc(prashantLead.name)}</div>
+            <div class="tp-card-role-label">${esc(prashantLead.title)}</div>
+            <div class="tp-card-sub" style="font-size:11.5px;color:#0D9488;margin-top:6px;font-weight:600;">Reports to: ${esc(prashantLead.reportingManager || "Vishvajit G Pawar")}</div>
+          </div>
+        </div>
+
+        <div class="tp-subdept-group" style="width:100%;max-width:960px;">
+          <div class="tp-subdept-group-title">Data Analysts &amp; Research Associates (${analysts.length})</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:14px;">
+            ${analysts.map(an => `
+              <div class="tp-card tp-card-org" style="cursor:pointer;" onclick="window.TeamPerformance.openModal('${an.id}', '${esc(an.title)}', '${esc(an.name)}', '${esc(prashantLead.name)}')">
+                <div class="tp-card-header">
+                  <span class="tp-org-pill-tag">Analyst</span>
+                  <button type="button" class="tp-card-details-btn" onclick="event.stopPropagation();window.TeamPerformance.openModal('${an.id}', '${esc(an.title)}', '${esc(an.name)}', '${esc(prashantLead.name)}')">Details →</button>
+                </div>
+                <div class="tp-card-name">${esc(an.name)}</div>
+                <div class="tp-card-role-label">${esc(an.title)}</div>
+                <div class="tp-card-sub" style="font-size:11px;color:#64748B;margin-top:4px;">Reporting to ${esc(prashantLead.name)}</div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderProdEnableTree() {
+    const bharat = resolveLiveMember("bharat@openlinksfoundation.org", "Bharat Sinha", "Department Head — Product Enablement", true);
+    const rameshwar = resolveLiveMember("rameshwar@openlinksfoundation.org", "Rameshwar Walkikar", "Content Lead", true);
+
+    const rawContentFallback = [
+      { id: "bhimrao", email: "bhimrao@openlinksfoundation.org", name: "Bhimrao Dhondu Suralkar", title: "Senior Content Associate", tag: "Senior" },
+      { id: "nikita", email: "nikita@openlinksfoundation.org", name: "Nikita Mahadev Patre", title: "Pune HO - Content", tag: "Associate" }
+    ];
+    const contentTeam = rawContentFallback.map(m => {
+      const live = resolveLiveMember(m.email, m.name, m.title);
+      return live ? { ...m, name: live.name, title: live.title } : null;
+    }).filter(Boolean);
+
+    const isRameshwarInactive = liveEmployees && liveEmployees.some(e => 
+      (e.Email && e.Email.toLowerCase().startsWith("rameshwar")) && !isActiveEmployee(e)
+    );
+    const rameshwarName = isRameshwarInactive ? "Vacant · Interim" : rameshwar.name;
+
+    return `
+      <div class="tp-subdept-container">
+        <div class="tp-org-breadcrumb-bar">
+          <button type="button" class="tp-btn-back-org" onclick="window.TeamPerformance.switchOrgView('org')">
+            ← Entire Organization
+          </button>
+          <span class="tp-org-breadcrumb-sep">/</span>
+          <span class="tp-org-breadcrumb-current">Product Enablement — ${esc(bharat.name)}</span>
+        </div>
+
+        <!-- Head Card -->
+        <div style="display:flex;justify-content:center;margin-bottom:32px;width:100%;">
+          <div class="tp-card tp-card-org" style="width:320px;border-color:#F59E0B;box-shadow:0 6px 20px -2px rgba(245,158,11,0.15);" onclick="window.TeamPerformance.openModal('prod-enable', 'Department Head — Product Enablement', '${esc(bharat.name)}', 'Vishvajit G Pawar')">
+            <div class="tp-card-header">
+              <span class="tp-org-pillar-badge" style="background:#FFFBEB;color:#B45309;border-color:#FDE68A;">Department Lead</span>
+              <button type="button" class="tp-card-details-btn" onclick="event.stopPropagation();window.TeamPerformance.openModal('prod-enable', 'Department Head — Product Enablement', '${esc(bharat.name)}', 'Vishvajit G Pawar')">Details →</button>
+            </div>
+            <div class="tp-card-name">${esc(bharat.name)}</div>
+            <div class="tp-card-role-label">${esc(bharat.title)}</div>
+            <div class="tp-card-sub" style="font-size:11.5px;color:#0D9488;margin-top:6px;font-weight:600;">Reports to: ${esc(bharat.reportingManager || "Vishvajit G Pawar")}</div>
+          </div>
+        </div>
+
+        <div class="tp-subdept-grid" style="justify-content:center;">
+          <!-- Content Team -->
+          <div class="tp-subdept-group" style="max-width:480px;width:100%;">
+            <div class="tp-subdept-group-title">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#F59E0B;"></span>
+              Content Team (Lead: ${esc(rameshwarName)})
+            </div>
+            <div class="tp-org-subnodes-wrap">
+              <div class="tp-card tp-card-org" onclick="window.TeamPerformance.openModal('prod-enable', 'Content Lead', '${esc(rameshwarName)}', '${esc(bharat.name)}')">
+                <div class="tp-card-header"><span class="tp-org-pill-tag">Lead</span><button type="button" class="tp-card-details-btn" onclick="event.stopPropagation();window.TeamPerformance.openModal('prod-enable', 'Content Lead', '${esc(rameshwarName)}', '${esc(bharat.name)}')">Details →</button></div>
+                <div class="tp-card-name">${esc(rameshwarName)}</div>
+                <div class="tp-card-role-label">${esc(rameshwar.title)}</div>
+              </div>
+              ${contentTeam.map(m => `
+                <div class="tp-card tp-card-org" onclick="window.TeamPerformance.openModal('${m.id}', '${esc(m.title)}', '${esc(m.name)}', '${esc(rameshwar.name)}')">
+                  <div class="tp-card-header">
+                    <span class="tp-org-pill-tag">${esc(m.tag)}</span>
+                    <button type="button" class="tp-card-details-btn" onclick="event.stopPropagation();window.TeamPerformance.openModal('${m.id}', '${esc(m.title)}', '${esc(m.name)}', '${esc(rameshwar.name)}')">Details →</button>
+                  </div>
+                  <div class="tp-card-name">${esc(m.name)}</div>
+                  <div class="tp-card-role-label">${esc(m.title)}</div>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderCurationsTree() {
+    const pool = (liveEmployees && liveEmployees.length) ? liveEmployees : CACHED_PROGRAM_STAFF;
+    const activeStaff = pool.filter(isActiveEmployee);
+
+    // 1. Department Lead (Vaidehi M Shhalu)
+    const vaidehiEmp = activeStaff.find(e => {
+      const email = String(e.Email || "").toLowerCase();
+      const name = String(e.Name || "").toLowerCase();
+      return email.startsWith("vaidehi") || name.includes("vaidehi");
+    });
+    const vaidehiName = vaidehiEmp ? (vaidehiEmp.Name || "Vaidehi M Shhalu") : "Vaidehi M Shhalu";
+    const vaidehiTitle = vaidehiEmp ? (vaidehiEmp.Designation || "Curations Manager") : "Curations Manager";
+    const vaidehiMgr = vaidehiEmp ? resolveManagerName(vaidehiEmp, "Vishvajit G Pawar") : "Vishvajit G Pawar";
+
+    // 2. Discover all active staff belonging to Content & Curations
+    const relevantStaff = activeStaff.filter(e => {
+      const email = String(e.Email || "").toLowerCase();
+      const name = String(e.Name || "").toLowerCase();
+      if (email.startsWith("vaidehi") || name.includes("vaidehi")) return false; // Exclude lead
+
+      const dept = String(e.Dept || e.Department || "").toLowerCase();
+      const desig = String(e.Designation || "").toLowerCase();
+      const mgr = String(e["Reporting manager"] || e["Reporting Manager"] || e.reportingManager || "").toLowerCase();
+
+      return dept.includes("content") || dept.includes("curation") ||
+             desig.includes("content") || desig.includes("curation") ||
+             mgr.includes("vaidehi");
+    });
+
+    // 3. Fallback datasets in case liveEmployees is still loading offline
+    const rawContentFallback = [
+      { id: "bhimrao", Email: "bhimrao@openlinksfoundation.org", Name: "Bhimrao Dhondu Suralkar", Designation: "Senior Associate - Content", Dept: "Back Office - Content", "Reporting manager": "priyanshi@openlinksfoundation.org", defaultMgr: "Priyanshi Arora" },
+      { id: "nikita", Email: "nikita@openlinksfoundation.org", Name: "Nikita Mahadev Patre", Designation: "Pune HO - Content", Dept: "Back Office - Content", "Reporting manager": "priyanshi@openlinksfoundation.org", defaultMgr: "Priyanshi Arora" },
+      { id: "sakshi", Email: "sakshi@openlinksfoundation.org", Name: "Sakshi V Latale", Designation: "Program Associate - Content & Curations", Dept: "Back Office - Content", "Reporting manager": "vaidehi@openlinksfoundation.org", defaultMgr: "Vaidehi M Shhalu" }
+    ];
+
+    const rawCurationFallback = [
+      { id: "bhushan", Email: "bhushan@openlinksfoundation.org", Name: "Bhushan G Rathod", Designation: "Program Associate - Content & Curations", Dept: "Back Office - Curation", "Reporting manager": "vaidehi@openlinksfoundation.org", defaultMgr: "Vaidehi M Shhalu" },
+      { id: "sadhna", Email: "sadhna@openlinksfoundation.org", Name: "Sadhna Ladiya", Designation: "Program Associate - Content & Curations", Dept: "Back Office - Curation", "Reporting manager": "vaidehi@openlinksfoundation.org", defaultMgr: "Vaidehi M Shhalu" },
+      { id: "rushikesh", Email: "rushikesh.s@openlinksfoundation.org", Name: "Rushikesh Kailas Shelar", Designation: "Program Associate - Curation", Dept: "Back Office - Curation", "Reporting manager": "vaidehi@openlinksfoundation.org", defaultMgr: "Vaidehi M Shhalu" },
+      { id: "yuvraj", Email: "yuvraj@openlinksfoundation.org", Name: "Yuvraj Mane", Designation: "Program Associate - Curation", Dept: "Back Office - Curation", "Reporting manager": "vaidehi@openlinksfoundation.org", defaultMgr: "Vaidehi M Shhalu" },
+      { id: "sagar", Email: "sagar.d@openlinksfoundation.org", Name: "Sagar S Dayma", Designation: "Program Associate Curation", Dept: "Back Office - Curation", "Reporting manager": "vaidehi@openlinksfoundation.org", defaultMgr: "Vaidehi M Shhalu" },
+      { id: "mahadevi", Email: "mahadevirathod.olf@gmail.com", Name: "Mahadevi Rathod", Designation: "Program Associate - Curation", Dept: "Back Office - Curation", "Reporting manager": "vaidehi@openlinksfoundation.org", defaultMgr: "Vaidehi M Shhalu" }
+    ];
+
+    let contentList = [];
+    let curationList = [];
+
+    if (relevantStaff.length > 0) {
+      // PREFERENCE 1: DEPARTMENT (100% data-driven from Employees tab)
+      relevantStaff.forEach(e => {
+        const dept = String(e.Dept || e.Department || "").toLowerCase();
+        if (dept.includes("content")) {
+          contentList.push(e);
+        } else if (dept.includes("curation")) {
+          curationList.push(e);
+        } else {
+          const desig = String(e.Designation || "").toLowerCase();
+          if (desig.includes("content") && !desig.includes("curation")) {
+            contentList.push(e);
+          } else {
+            curationList.push(e);
+          }
+        }
+      });
+    } else {
+      contentList = rawContentFallback;
+      curationList = rawCurationFallback;
+    }
+
+    // Helper: format member and resolve reporting manager exactly as recorded in Employee tab
+    function transformStaffMember(emp) {
+      const name = String(emp.Name || emp.name || "Associate").trim();
+      const title = String(emp.Designation || emp.designation || "Associate").trim();
+      const dept = String(emp.Dept || emp.Department || "").trim();
+      const mgrName = resolveManagerName(emp, emp.defaultMgr || "Vaidehi M Shhalu");
+      const tag = /senior|sr|lead|manager/i.test(title) ? "Senior" : "Associate";
+      const id = emp.id || (emp.Email ? emp.Email.split("@")[0] : "emp");
+
+      return {
+        id,
+        name,
+        title,
+        dept,
+        reportingManager: mgrName,
+        tag
+      };
+    }
+
+    const contentTeam = contentList.map(transformStaffMember);
+    const curationTeam = curationList.map(transformStaffMember);
+
+    // PREFERENCE 2: SORT BY REPORTING MANAGER, THEN NAME
+    contentTeam.sort((a, b) => {
+      const mgrCmp = a.reportingManager.localeCompare(b.reportingManager);
+      return mgrCmp !== 0 ? mgrCmp : a.name.localeCompare(b.name);
+    });
+
+    curationTeam.sort((a, b) => {
+      const mgrCmp = a.reportingManager.localeCompare(b.reportingManager);
+      return mgrCmp !== 0 ? mgrCmp : a.name.localeCompare(b.name);
+    });
+
+    return `
+      <div class="tp-subdept-container" style="display:flex;flex-direction:column;align-items:center;width:100%;">
+        <div class="tp-org-breadcrumb-bar" style="width:100%;max-width:1100px;">
+          <button type="button" class="tp-btn-back-org" onclick="window.TeamPerformance.switchOrgView('org')">
+            ← Entire Organization
+          </button>
+          <span class="tp-org-breadcrumb-sep">/</span>
+          <span class="tp-org-breadcrumb-current">Content &amp; Curations — ${esc(vaidehiName)}</span>
+        </div>
+
+        <!-- Head Card: Curations Manager -->
+        <div style="display:flex;justify-content:center;margin-bottom:32px;width:100%;">
+          <div class="tp-card tp-card-org" style="width:340px;border-color:#EC4899;box-shadow:0 6px 20px -2px rgba(236,72,153,0.15);" onclick="window.TeamPerformance.openModal('curation-lead', 'Curations Manager', '${esc(vaidehiName)}', '${esc(vaidehiMgr)}')">
+            <div class="tp-card-header">
+              <span class="tp-org-pillar-badge" style="background:#FDF2F8;color:#BE185D;border-color:#FBCFE8;">Department Lead</span>
+              <button type="button" class="tp-card-details-btn" onclick="event.stopPropagation();window.TeamPerformance.openModal('curation-lead', 'Curations Manager', '${esc(vaidehiName)}', '${esc(vaidehiMgr)}')">Details →</button>
+            </div>
+            <div class="tp-card-name">${esc(vaidehiName)}</div>
+            <div class="tp-card-role-label">${esc(vaidehiTitle)}</div>
+            <div class="tp-card-sub" style="font-size:11.5px;color:#0D9488;margin-top:6px;font-weight:600;">Reports to: ${esc(vaidehiMgr)}</div>
+          </div>
+        </div>
+
+        <!-- Sub-Teams Container (Equal 50/50 Distribution of Space) -->
+        <div class="tp-curations-subdept-grid">
+          <!-- 1. Content Team (Preference 1: Department = Back Office - Content) -->
+          <div class="tp-subdept-group" style="width:100%;box-sizing:border-box;">
+            <div class="tp-subdept-group-title" style="justify-content:flex-start;">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#F59E0B;"></span>
+              Content Team &middot; ${contentTeam.length} Members
+            </div>
+            <div class="tp-curations-associates-grid">
+              ${contentTeam.map(m => `
+                <div class="tp-card tp-card-org" style="width:100%;box-sizing:border-box;" onclick="window.TeamPerformance.openModal('${m.id}', '${esc(m.title)}', '${esc(m.name)}', '${esc(m.reportingManager)}')">
+                  <div class="tp-card-header">
+                    <span class="tp-org-pill-tag">${esc(m.tag)}</span>
+                    <button type="button" class="tp-card-details-btn" onclick="event.stopPropagation();window.TeamPerformance.openModal('${m.id}', '${esc(m.title)}', '${esc(m.name)}', '${esc(m.reportingManager)}')">Details →</button>
+                  </div>
+                  <div class="tp-card-name">${esc(m.name)}</div>
+                  <div class="tp-card-role-label">${esc(m.title)}</div>
+                  <div class="tp-card-sub" style="font-size:11.5px;color:#0D9488;margin-top:6px;font-weight:600;">Reports to: ${esc(m.reportingManager)}</div>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+
+          <!-- 2. Curation Team (Preference 1: Department = Back Office - Curation) -->
+          <div class="tp-subdept-group" style="width:100%;box-sizing:border-box;">
+            <div class="tp-subdept-group-title" style="justify-content:flex-start;">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#EC4899;"></span>
+              Curation Team &middot; ${curationTeam.length} Associates
+            </div>
+            <div class="tp-curations-associates-grid">
+              ${curationTeam.map(m => `
+                <div class="tp-card tp-card-org" style="width:100%;box-sizing:border-box;" onclick="window.TeamPerformance.openModal('${m.id}', '${esc(m.title)}', '${esc(m.name)}', '${esc(m.reportingManager)}')">
+                  <div class="tp-card-header">
+                    <span class="tp-org-pill-tag">${esc(m.tag)}</span>
+                    <button type="button" class="tp-card-details-btn" onclick="event.stopPropagation();window.TeamPerformance.openModal('${m.id}', '${esc(m.title)}', '${esc(m.name)}', '${esc(m.reportingManager)}')">Details →</button>
+                  </div>
+                  <div class="tp-card-name">${esc(m.name)}</div>
+                  <div class="tp-card-role-label">${esc(m.title)}</div>
+                  <div class="tp-card-sub" style="font-size:11.5px;color:#0D9488;margin-top:6px;font-weight:600;">Reports to: ${esc(m.reportingManager)}</div>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderPartnershipsTree() {
+    const data = (window.OLF_ORGCHART_DATA && window.OLF_ORGCHART_DATA.subDepts && window.OLF_ORGCHART_DATA.subDepts["partnerships"]) || {};
+    const sowmya = resolveLiveMember("sowmya@openlinksfoundation.org", "Sowmya Srinivasan", "Partnerships Manager", true);
+
+    const rawMembers = data.members || [
+      { id: "prashant-g", roleId: "partnerships-team", title: "Partnerships Associate", name: "Prashant S Gajbhiye", email: "prashant.g@openlinksfoundation.org", tag: "Associate" },
+      { id: "naveed", roleId: "partnerships-team", title: "Partnerships Associate", name: "Naveed M T", email: "naveed@openlinksfoundation.org", tag: "Associate" },
+      { id: "neetika", roleId: "partnerships-team", title: "Associate Founder's Office", name: "Neetika S Verma", email: "neetika@openlinksfoundation.org", tag: "Associate" },
+      { id: "priyanshi", roleId: "partnerships-team", title: "Associate Founder's Office", name: "Priyanshi Arora", email: "priyanshi@openlinksfoundation.org", tag: "Associate" }
+    ];
+
+    const members = getLiveReportees("sowmya@openlinksfoundation.org", rawMembers);
+
+    return `
+      <div class="tp-subdept-container">
+        <div class="tp-org-breadcrumb-bar">
+          <button type="button" class="tp-btn-back-org" onclick="window.TeamPerformance.switchOrgView('org')">
+            ← Entire Organization
+          </button>
+          <span class="tp-org-breadcrumb-sep">/</span>
+          <span class="tp-org-breadcrumb-current">Partnerships &amp; Founder's Office — ${esc(sowmya.name)}</span>
+        </div>
+
+        <!-- Manager Card -->
+        <div style="display:flex;justify-content:center;margin-bottom:32px;width:100%;">
+          <div class="tp-card tp-card-org" style="width:320px;border-color:#3B82F6;box-shadow:0 6px 20px -2px rgba(59,130,246,0.15);" onclick="window.TeamPerformance.openModal('partnership-mgr', 'Manager — Partnership Enablement', '${esc(sowmya.name)}', 'Sanjay Dalmia')">
+            <div class="tp-card-header">
+              <span class="tp-org-pillar-badge" style="background:#EFF6FF;color:#1D4ED8;border-color:#BFDBFE;">Partnerships Lead</span>
+              <button type="button" class="tp-card-details-btn" onclick="event.stopPropagation();window.TeamPerformance.openModal('partnership-mgr', 'Manager — Partnership Enablement', '${esc(sowmya.name)}', 'Sanjay Dalmia')">Details →</button>
+            </div>
+            <div class="tp-card-name">${esc(sowmya.name)}</div>
+            <div class="tp-card-role-label">${esc(sowmya.title)}</div>
+            <div class="tp-card-sub" style="font-size:11.5px;color:#0D9488;margin-top:6px;font-weight:600;">Reports to: ${esc(sowmya.reportingManager || "Sanjay Dalmia")}</div>
+          </div>
+        </div>
+
+        <div class="tp-subdept-group" style="width:100%;max-width:960px;">
+          <div class="tp-subdept-group-title">Team Members &amp; Founder's Office Associates (${members.length})</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:14px;">
+            ${members.map(m => `
+              <div class="tp-card tp-card-org" style="cursor:pointer;" onclick="window.TeamPerformance.openModal('${esc(m.roleId || "partnerships-team")}', '${esc(m.title)}', '${esc(m.name)}', '${esc(sowmya.name)}')">
+                <div class="tp-card-header">
+                  <span class="tp-org-pill-tag">${esc(m.tag || "Associate")}</span>
+                  <button type="button" class="tp-card-details-btn" onclick="event.stopPropagation();window.TeamPerformance.openModal('${esc(m.roleId || "partnerships-team")}', '${esc(m.title)}', '${esc(m.name)}', '${esc(sowmya.name)}')">Details →</button>
+                </div>
+                <div class="tp-card-name">${esc(m.name)}</div>
+                <div class="tp-card-role-label">${esc(m.title)}</div>
+                <div class="tp-card-sub" style="font-size:11px;color:#64748B;margin-top:4px;">Reporting to ${esc(sowmya.name)}</div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderCommunityMarketingTree() {
+    const data = (window.OLF_ORGCHART_DATA && window.OLF_ORGCHART_DATA.subDepts && window.OLF_ORGCHART_DATA.subDepts["community-marketing"]) || {};
+    const vaibhavi = resolveLiveMember("vaibhavi@openlinksfoundation.org", "Vaibhavi Ratish Kumar", "Manager — Community Marketing", true);
+
+    const rawMembers = data.members || [
+      { id: "anushka", roleId: "marketing-team", title: "Program Associate — Communications", name: "Anushka Banerjee", email: "anushka@openlinksfoundation.org", tag: "Associate" },
+      { id: "ashutosh", roleId: "marketing-team", title: "Research Associate", name: "Ashutosh Ghag", email: "ashutosh@openlinksfoundation.org", tag: "Associate" }
+    ];
+
+    const members = getLiveReportees("vaibhavi@openlinksfoundation.org", rawMembers);
+
+    return `
+      <div class="tp-subdept-container">
+        <div class="tp-org-breadcrumb-bar">
+          <button type="button" class="tp-btn-back-org" onclick="window.TeamPerformance.switchOrgView('org')">
+            ← Entire Organization
+          </button>
+          <span class="tp-org-breadcrumb-sep">/</span>
+          <span class="tp-org-breadcrumb-current">Community Marketing &amp; Communications — ${esc(vaibhavi.name)}</span>
+        </div>
+
+        <!-- Manager Card -->
+        <div style="display:flex;justify-content:center;margin-bottom:32px;width:100%;">
+          <div class="tp-card tp-card-org" style="width:320px;border-color:#EC4899;box-shadow:0 6px 20px -2px rgba(236,72,153,0.15);" onclick="window.TeamPerformance.openModal('marketing-mgr', 'Manager — Community Marketing', '${esc(vaibhavi.name)}', '${esc(vaibhavi.reportingManager || 'Reena Dalmia')}')">
+            <div class="tp-card-header">
+              <span class="tp-org-pillar-badge" style="background:#FDF2F8;color:#BE185D;border-color:#FBCFE8;">Marketing Lead</span>
+              <button type="button" class="tp-card-details-btn" onclick="event.stopPropagation();window.TeamPerformance.openModal('marketing-mgr', 'Manager — Community Marketing', '${esc(vaibhavi.name)}', '${esc(vaibhavi.reportingManager || 'Reena Dalmia')}')">Details →</button>
+            </div>
+            <div class="tp-card-name">${esc(vaibhavi.name)}</div>
+            <div class="tp-card-role-label">${esc(vaibhavi.title)}</div>
+            <div class="tp-card-sub" style="font-size:11.5px;color:#0D9488;margin-top:6px;font-weight:600;">Reports to: ${esc(vaibhavi.reportingManager || 'Reena Dalmia')}</div>
+          </div>
+        </div>
+
+        <div class="tp-subdept-group" style="width:100%;max-width:960px;">
+          <div class="tp-subdept-group-title">Communications &amp; Research Associates (${members.length})</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:14px;">
+            ${members.map(m => `
+              <div class="tp-card tp-card-org" style="cursor:pointer;" onclick="window.TeamPerformance.openModal('${esc(m.roleId || "marketing-team")}', '${esc(m.title)}', '${esc(m.name)}', '${esc(m.reportingManager || vaibhavi.name)}')">
+                <div class="tp-card-header">
+                  <span class="tp-org-pill-tag">${esc(m.tag || "Associate")}</span>
+                  <button type="button" class="tp-card-details-btn" onclick="event.stopPropagation();window.TeamPerformance.openModal('${esc(m.roleId || "marketing-team")}', '${esc(m.title)}', '${esc(m.name)}', '${esc(m.reportingManager || vaibhavi.name)}')">Details →</button>
+                </div>
+                <div class="tp-card-name">${esc(m.name)}</div>
+                <div class="tp-card-role-label">${esc(m.title)}</div>
+                <div class="tp-card-sub" style="font-size:11px;color:#64748B;margin-top:4px;">Reporting to ${esc(m.reportingManager || vaibhavi.name)}</div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function drawOrgConnectors() {
+    const svg = document.getElementById("tpSvg");
+    const container = document.getElementById("tpCanvas");
+    const treeContainer = document.getElementById("tpTreeContainer");
+    if (!svg || !container || !treeContainer) return;
+
+    const width = Math.max(container.scrollWidth, treeContainer.scrollWidth);
+    const height = Math.max(container.scrollHeight, treeContainer.scrollHeight);
+    svg.setAttribute("width", width);
+    svg.setAttribute("height", height);
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    svg.style.width = width + "px";
+    svg.style.height = height + "px";
+
+    const ceoCard = document.getElementById("n-ceo");
+    const stratCard = document.getElementById("n-strategy");
+    const pillarHeadIds = ["n-fundraising", "n-cos", "n-coo", "n-platform", "n-community"];
+    const headCards = pillarHeadIds.map(id => document.getElementById(id)).filter(Boolean);
+
+    if (!ceoCard || !headCards.length) {
+      svg.innerHTML = "";
+      return;
+    }
+
+    let toSvg;
+    const ctm = typeof svg.getScreenCTM === "function" ? svg.getScreenCTM() : null;
+    if (ctm && typeof svg.createSVGPoint === "function") {
+      const invCtm = ctm.inverse();
+      const pt = svg.createSVGPoint();
+      toSvg = (sx, sy) => {
+        pt.x = sx;
+        pt.y = sy;
+        const res = pt.matrixTransform(invCtm);
+        return { x: Math.round(res.x), y: Math.round(res.y) };
+      };
+    } else {
+      const cRect = container.getBoundingClientRect();
+      toSvg = (sx, sy) => ({
+        x: Math.round(sx - cRect.left),
+        y: Math.round(sy - cRect.top)
+      });
+    }
+
+    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+    const lineColor = isDark ? "#334155" : "#CBD5E1";
+    let svgHtml = "";
+
+    // 1. Line Strategy to CEO
+    if (stratCard) {
+      const sBox = stratCard.getBoundingClientRect();
+      const cBox = ceoCard.getBoundingClientRect();
+      const sPt = toSvg(sBox.right, sBox.top + sBox.height / 2);
+      const cPt = toSvg(cBox.left, cBox.top + cBox.height / 2);
+      svgHtml += `<line x1="${sPt.x}" y1="${sPt.y}" x2="${cPt.x}" y2="${cPt.y}" stroke="${lineColor}" stroke-width="2" stroke-dasharray="4 4" />`;
+    }
+
+    // 2. Vertical line from CEO bottom to rail
+    const ceoBox = ceoCard.getBoundingClientRect();
+    const ceoPt = toSvg(ceoBox.left + ceoBox.width / 2, ceoBox.bottom);
+    const busY = ceoPt.y + 24;
+    svgHtml += `<line x1="${ceoPt.x}" y1="${ceoPt.y}" x2="${ceoPt.x}" y2="${busY}" stroke="${lineColor}" stroke-width="2" />`;
+
+    // 3. Horizontal rail across pillar heads
+    const headPts = headCards.map(h => {
+      const hBox = h.getBoundingClientRect();
+      return toSvg(hBox.left + hBox.width / 2, hBox.top);
+    });
+
+    const minX = Math.min(...headPts.map(p => p.x));
+    const maxX = Math.max(...headPts.map(p => p.x));
+
+    svgHtml += `<line x1="${minX}" y1="${busY}" x2="${maxX}" y2="${busY}" stroke="${lineColor}" stroke-width="2" />`;
+
+    // 4. Vertical drops down to each pillar head
+    for (const hp of headPts) {
+      svgHtml += `<line x1="${hp.x}" y1="${busY}" x2="${hp.x}" y2="${hp.y}" stroke="${lineColor}" stroke-width="2" />`;
+    }
+
+    svg.innerHTML = svgHtml;
+  }
+
   function renderTree() {
     const container = document.getElementById("tpTreeContainer");
     if (!container) return;
@@ -2916,17 +3891,47 @@
     }
 
     let html = "";
-    if (activeState === "MH") {
-      html = renderMaharashtraTree(tree);
-    } else if (activeState === "CH") {
-      html = renderChhattisgarhTree(tree);
-    } else if (activeState === "MP") {
-      html = renderMadhyaPradeshTree(tree);
-    } else if (activeState === "BR") {
-      html = renderBiharTree(tree);
+    if (activeOrgView === "org") {
+      html = renderOrgRootView();
+    } else if (activeOrgView === "itops") {
+      html = renderItOpsTree();
+    } else if (activeOrgView === "prog-insights") {
+      html = renderProgInsightsTree();
+    } else if (activeOrgView === "prod-enable") {
+      html = renderProdEnableTree();
+    } else if (activeOrgView === "curations") {
+      html = renderCurationsTree();
+    } else if (activeOrgView === "partnerships") {
+      html = renderPartnershipsTree();
+    } else if (activeOrgView === "community-marketing") {
+      html = renderCommunityMarketingTree();
+    } else {
+      // Program Implementation Field Hierarchy with Breadcrumb
+      const stateLabels = { MH: "Maharashtra", CH: "Chhattisgarh", MP: "Madhya Pradesh", BR: "Bihar" };
+      const currentLabel = stateLabels[activeState] || activeState;
+      const breadcrumb = `
+        <div class="tp-org-breadcrumb-bar">
+          <button type="button" class="tp-btn-back-org" onclick="window.TeamPerformance.switchOrgView('org')">
+            ← Entire Organization
+          </button>
+          <span class="tp-org-breadcrumb-sep">/</span>
+          <span class="tp-org-breadcrumb-current">Program Implementation (${esc(currentLabel)})</span>
+        </div>
+      `;
+
+      if (activeState === "MH") {
+        html = breadcrumb + renderMaharashtraTree(tree);
+      } else if (activeState === "CH") {
+        html = breadcrumb + renderChhattisgarhTree(tree);
+      } else if (activeState === "MP") {
+        html = breadcrumb + renderMadhyaPradeshTree(tree);
+      } else if (activeState === "BR") {
+        html = breadcrumb + renderBiharTree(tree);
+      }
     }
 
     container.innerHTML = html;
+    applySearchHighlights();
     updateCounts();
     const newRootCard = document.querySelector(".tp-card-root");
     if (newRootCard && window.__tpResizeObserver) {
@@ -3181,6 +4186,11 @@
     const badge = document.getElementById("tpTotalCountBadge");
     if (!badge) return;
 
+    if (activeOrgView !== "program-impl") {
+      updateHeaderForOrgView();
+      return;
+    }
+
     const tree = window.TEAM_PERFORMANCE_TREE || dynamicTree;
     if (!tree) return;
 
@@ -3275,6 +4285,14 @@
     svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
     svg.style.width = width + "px";
     svg.style.height = height + "px";
+
+    if (activeOrgView === "org") {
+      drawOrgConnectors();
+      return;
+    } else if (activeOrgView !== "program-impl") {
+      svg.innerHTML = "";
+      return;
+    }
 
     const rootCard = document.querySelector(".tp-card-root");
     const divCards = document.querySelectorAll(".tp-divisions-row .tp-card-div");
@@ -3432,14 +4450,31 @@
     // Look up in liveEmployees
     const stripped = String(roleId || "").replace(/-(?:ch|mh|mp|br)-[a-z0-9_-]+$/i, "");
     const cleanStripped = stripped.toLowerCase();
-    const emp = (liveEmployees || []).find(e => 
+    let emp = (liveEmployees || []).find(e => 
       e.id === roleId || 
       e.id === stripped || 
       (e.Email && (e.Email.trim().toLowerCase() === cleanId || e.Email.trim().toLowerCase() === cleanStripped)) ||
       (fallbackPerson && e.Name && e.Name.trim().toLowerCase() === String(fallbackPerson).trim().toLowerCase())
     );
+    if (!emp) {
+      emp = getLiveRoleHolder(resolvedId) || getLiveRoleHolder(roleId);
+    }
 
-    // 1. Resolve Name
+    // 1. Resolve Role
+    let roleName = (fallbackLevel || roleData.title || roleData.level || (emp ? emp.Designation : null) || roleData.designation || "Role").replace(/\s+Track$/i, "").trim();
+    if (cleanId === "statelead") {
+      roleName = "State Lead";
+    } else if (cleanId === "dm-pune") {
+      roleName = "Associate Division Manager";
+    } else if (cleanId.startsWith("dm-")) {
+      roleName = roleName || "Division Manager";
+    } else if (cleanId.startsWith("pm-") || cleanId.includes("pm")) {
+      roleName = roleName || "Program Manager";
+    } else if (cleanId.startsWith("d-")) {
+      roleName = "District Operations";
+    }
+
+    // 2. Resolve Name
     let personName = "";
     if (fallbackPerson && !/^(role|designation|staff member|district|division operations)$/i.test(fallbackPerson.trim())) {
       personName = fallbackPerson;
@@ -3455,6 +4490,9 @@
       personName = "Vishal J Dahat";
     } else if (cleanId === "dm-nashik") {
       personName = "Shrikant S Sawant";
+    } else if (cleanId === "curation-lead" || (fallbackPerson && /vaidehi/i.test(fallbackPerson))) {
+      personName = "Vaidehi M Shhalu";
+      roleName = "Curations Manager";
     } else if (emp && emp.Name) {
       personName = emp.Name;
     } else if (roleData.name && !/^(role|designation|staff member|district|division operations)$/i.test(roleData.name.trim())) {
@@ -3473,22 +4511,30 @@
     personName = personName.replace(/^(?:program manager|division manager|project officer|state lead|coo)\s*:\s*/i, "");
     personName = personName.replace(/\s*·\s*\d+\s*(?:districts?|zones?|staff|pos?).*$/i, "").trim();
 
-    // 2. Resolve Role
-    let roleName = (fallbackLevel || roleData.level || (emp ? emp.Designation : null) || roleData.designation || "Role").replace(/\s+Track$/i, "").trim();
-    if (cleanId === "statelead") {
-      roleName = "State Lead";
-    } else if (cleanId === "dm-pune") {
-      roleName = "Associate Division Manager";
-    } else if (cleanId.startsWith("dm-")) {
-      roleName = roleName || "Division Manager";
-    } else if (cleanId.startsWith("pm-") || cleanId.includes("pm")) {
-      roleName = roleName || "Program Manager";
-    } else if (cleanId.startsWith("d-")) {
-      roleName = "District Operations";
+    // 3. Resolve Reporting Manager: Prioritize live database reporting manager
+    const liveMgr = emp ? resolveManagerName(emp, "") : "";
+    let reportingMgr = (liveMgr && liveMgr !== "Leadership" && liveMgr !== "None")
+      ? liveMgr
+      : (fallbackReportingMgr || (roleData.reportingManager || null));
+
+    if (cleanId === "curation-lead" || (fallbackPerson && /vaidehi/i.test(fallbackPerson))) {
+      reportingMgr = "Vishvajit G Pawar";
+    } else if (cleanId === "prod-enable") {
+      reportingMgr = "Vishvajit G Pawar";
+    } else if (cleanId === "talent-acquisition" || (fallbackPerson && /raghav/i.test(fallbackPerson))) {
+      reportingMgr = "Vishvajit G Pawar";
+    } else if (cleanId === "dm-nashik" || (fallbackPerson && /shrikant/i.test(fallbackPerson))) {
+      reportingMgr = "Vishvajit G Pawar";
+    } else if (cleanId === "community" || (fallbackPerson && /tejal/i.test(fallbackPerson))) {
+      reportingMgr = liveMgr || "Vishvajit G Pawar";
+    } else if (cleanId === "marketing-mgr" || (fallbackPerson && /vaibhavi/i.test(fallbackPerson))) {
+      reportingMgr = liveMgr || "Reena Dalmia";
+    } else if (cleanId === "finance" || (fallbackPerson && /anjali/i.test(fallbackPerson) && /dandile/i.test(fallbackPerson))) {
+      reportingMgr = liveMgr || "Prashant B Bhondve";
+    } else if (cleanId === "office-admin" || (fallbackPerson && /vishal/i.test(fallbackPerson) && /nagawade/i.test(fallbackPerson))) {
+      reportingMgr = liveMgr || "Prashant B Bhondve";
     }
 
-    // 3. Resolve Reporting Manager
-    let reportingMgr = fallbackReportingMgr || (emp ? resolveManagerName(emp, "") : null);
     if (!reportingMgr || reportingMgr === "Leadership" || reportingMgr === "None") {
       if (cleanId === "statelead") {
         reportingMgr = "Prashant Patil";
@@ -3582,12 +4628,16 @@
   function toggleModalMaximize() {
     isModalMaximized = !isModalMaximized;
     const dialog = document.querySelector("#tpModal .tp-modal-dialog");
+    const modal = document.getElementById("tpModal");
     const btn = document.getElementById("tpModalMaxBtn");
     if (dialog) {
       dialog.classList.toggle("maximized", isModalMaximized);
     }
+    if (modal) {
+      modal.classList.toggle("maximized", isModalMaximized);
+    }
     if (btn) {
-      btn.innerHTML = isModalMaximized ? "◗" : "⛶";
+      btn.innerHTML = isModalMaximized ? "🗗" : "⛶";
       btn.title = isModalMaximized ? "Restore default size" : "Maximize / Fullscreen";
       btn.setAttribute("aria-label", isModalMaximized ? "Restore default size" : "Maximize / Fullscreen");
     }
@@ -3595,7 +4645,10 @@
 
   function closeModal() {
     const modal = document.getElementById("tpModal");
-    if (modal) modal.classList.remove("open");
+    if (modal) {
+      modal.classList.remove("open");
+      modal.classList.remove("maximized");
+    }
     const dialog = document.querySelector("#tpModal .tp-modal-dialog");
     if (dialog) dialog.classList.remove("maximized");
     isModalMaximized = false;
@@ -3603,6 +4656,7 @@
     if (btn) {
       btn.innerHTML = "⛶";
       btn.title = "Maximize / Fullscreen";
+      btn.setAttribute("aria-label", "Maximize / Fullscreen");
     }
     currentModalRoleId = null;
     tabEditStates = { goals: false, role: false, priority: false, annexures: false };
@@ -3665,10 +4719,15 @@
       return;
     }
     tabEditStates.goals = isEdit;
-    document.getElementById("tpGoalsViewContainer").style.display = isEdit ? "none" : "block";
-    document.getElementById("tpGoalsEditContainer").style.display = isEdit ? "block" : "none";
-    document.getElementById("tpEditGoalsBtn").style.display = isEdit ? "none" : (canEditUser ? "inline-flex" : "none");
-    document.getElementById("tpEditGoalsControls").style.display = isEdit ? "flex" : "none";
+    const gView = document.getElementById("tpGoalsViewContainer");
+    const gEdit = document.getElementById("tpGoalsEditContainer");
+    const gBtn = document.getElementById("tpEditGoalsBtn");
+    const gCtrl = document.getElementById("tpEditGoalsControls");
+    if (!gView || !gEdit || !gBtn || !gCtrl) return;
+    gView.style.display = isEdit ? "none" : "block";
+    gEdit.style.display = isEdit ? "block" : "none";
+    gBtn.style.display = isEdit ? "none" : (canEditUser ? "inline-flex" : "none");
+    gCtrl.style.display = isEdit ? "flex" : "none";
 
     if (isEdit) {
       const goals = getRoleData(currentModalRoleId).goals || [];
@@ -3831,10 +4890,15 @@
       return;
     }
     tabEditStates.role = isEdit;
-    document.getElementById("tpRoleViewContainer").style.display = isEdit ? "none" : "block";
-    document.getElementById("tpRoleEditContainer").style.display = isEdit ? "block" : "none";
-    document.getElementById("tpEditRoleBtn").style.display = isEdit ? "none" : (canEditUser ? "inline-flex" : "none");
-    document.getElementById("tpEditRoleControls").style.display = isEdit ? "flex" : "none";
+    const rView = document.getElementById("tpRoleViewContainer");
+    const rEdit = document.getElementById("tpRoleEditContainer");
+    const rBtn = document.getElementById("tpEditRoleBtn");
+    const rCtrl = document.getElementById("tpEditRoleControls");
+    if (!rView || !rEdit || !rBtn || !rCtrl) return;
+    rView.style.display = isEdit ? "none" : "block";
+    rEdit.style.display = isEdit ? "block" : "none";
+    rBtn.style.display = isEdit ? "none" : (canEditUser ? "inline-flex" : "none");
+    rCtrl.style.display = isEdit ? "flex" : "none";
 
     if (isEdit) {
       const roleData = getRoleData(currentModalRoleId);
@@ -3930,10 +4994,15 @@
       return;
     }
     tabEditStates.priority = isEdit;
-    document.getElementById("tpPriorityViewContainer").style.display = isEdit ? "none" : "block";
-    document.getElementById("tpPriorityEditContainer").style.display = isEdit ? "block" : "none";
-    document.getElementById("tpEditPriorityBtn").style.display = isEdit ? "none" : (canEditUser ? "inline-flex" : "none");
-    document.getElementById("tpEditPriorityControls").style.display = isEdit ? "flex" : "none";
+    const pView = document.getElementById("tpPriorityViewContainer");
+    const pEdit = document.getElementById("tpPriorityEditContainer");
+    const pBtn = document.getElementById("tpEditPriorityBtn");
+    const pCtrl = document.getElementById("tpEditPriorityControls");
+    if (!pView || !pEdit || !pBtn || !pCtrl) return;
+    pView.style.display = isEdit ? "none" : "block";
+    pEdit.style.display = isEdit ? "block" : "none";
+    pBtn.style.display = isEdit ? "none" : (canEditUser ? "inline-flex" : "none");
+    pCtrl.style.display = isEdit ? "flex" : "none";
 
     if (isEdit) {
       const priorities = getRoleData(currentModalRoleId).priority || [];
@@ -4233,10 +5302,15 @@
       return;
     }
     tabEditStates.annexures = isEdit;
-    document.getElementById("tpAnnexuresViewContainer").style.display = isEdit ? "none" : "block";
-    document.getElementById("tpAnnexuresEditContainer").style.display = isEdit ? "block" : "none";
-    document.getElementById("tpEditAnnexuresBtn").style.display = isEdit ? "none" : (canEditUser ? "inline-flex" : "none");
-    document.getElementById("tpEditAnnexuresControls").style.display = isEdit ? "flex" : "none";
+    const aView = document.getElementById("tpAnnexuresViewContainer");
+    const aEdit = document.getElementById("tpAnnexuresEditContainer");
+    const aBtn = document.getElementById("tpEditAnnexuresBtn");
+    const aCtrl = document.getElementById("tpEditAnnexuresControls");
+    if (!aView || !aEdit || !aBtn || !aCtrl) return;
+    aView.style.display = isEdit ? "none" : "block";
+    aEdit.style.display = isEdit ? "block" : "none";
+    aBtn.style.display = isEdit ? "none" : (canEditUser ? "inline-flex" : "none");
+    aCtrl.style.display = isEdit ? "flex" : "none";
 
     if (isEdit) {
       const annexures = getRoleData(currentModalRoleId).annexures || [];
@@ -4348,6 +5422,81 @@
 
   // --- Search & Filters ---
 
+  function applySearchHighlights() {
+    if (!searchQuery) return;
+    const q = searchQuery.toLowerCase();
+    const container = document.getElementById("tpTreeContainer");
+    if (!container) return;
+
+    // 1. Highlight matching PO rows in field hierarchy
+    const poRows = container.querySelectorAll(".tp-po-row");
+    poRows.forEach(row => {
+      const txt = (row.textContent || "").toLowerCase();
+      if (txt.includes(q)) {
+        row.classList.add("tp-matched-row");
+        const parentDst = row.closest(".tp-district-card");
+        if (parentDst) parentDst.classList.add("tp-matched");
+      }
+    });
+
+    // 2. Highlight matching cards across all views (Org root, Subdepartments, Field divisions, PMs, State Lead)
+    const cards = container.querySelectorAll(".tp-card, .tp-district-card");
+    cards.forEach(card => {
+      const txt = (card.textContent || "").toLowerCase();
+      const click = (card.getAttribute("onclick") || "").toLowerCase();
+      if (txt.includes(q) || click.includes(q)) {
+        card.classList.add("tp-matched");
+      }
+    });
+
+    // 3. Drilldown cards in Org root view that have matching employees inside
+    if (activeOrgView === "org") {
+      const staff = (liveEmployees && liveEmployees.length) ? liveEmployees : CACHED_PROGRAM_STAFF;
+      const matchingStaff = (staff || []).filter(e => {
+        if (!isActiveEmployee(e)) return false;
+        const n = (e.Name || "").toLowerCase();
+        const d = (e.Designation || "").toLowerCase();
+        const dept = (e.Dept || "").toLowerCase();
+        const m = (e["Reporting manager"] || e.reportingManager || "").toLowerCase();
+        return n.includes(q) || d.includes(q) || dept.includes(q) || m.includes(q);
+      });
+
+      if (matchingStaff.length > 0) {
+        cards.forEach(card => {
+          const click = card.getAttribute("onclick") || "";
+          if (card.classList.contains("tp-card-prog-impl") || click.includes("'program-impl'")) {
+            const hasField = matchingStaff.some(e => {
+              const dept = (e.Dept || "").toLowerCase();
+              const des = (e.Designation || "").toLowerCase();
+              return dept.includes("program implementation") || /project officer|program manager|division manager|state lead/i.test(des);
+            });
+            if (hasField) card.classList.add("tp-matched");
+          }
+          if (click.includes("'curations'")) {
+            const hasCur = matchingStaff.some(e => /content|curation/i.test(e.Dept || "") || /content|curation/i.test(e.Designation || ""));
+            if (hasCur) card.classList.add("tp-matched");
+          }
+          if (click.includes("'itops'")) {
+            const hasIt = matchingStaff.some(e => /it ops|information technology|technical lead/i.test(e.Dept || "") || /it ops|technical lead/i.test(e.Designation || ""));
+            if (hasIt) card.classList.add("tp-matched");
+          }
+          if (click.includes("'prog-insights'")) {
+            const hasIns = matchingStaff.some(e => /insights/i.test(e.Dept || "") || /insights/i.test(e.Designation || ""));
+            if (hasIns) card.classList.add("tp-matched");
+          }
+          if (click.includes("'prod-enable'")) {
+            const hasProd = matchingStaff.some(e => /product|enablement/i.test(e.Dept || "") || /product|enablement/i.test(e.Designation || ""));
+            if (hasProd) card.classList.add("tp-matched");
+          }
+          if (click.includes("'community-marketing'")) {
+            const hasMkt = matchingStaff.some(e => /marketing|community/i.test(e.Dept || "") || /marketing|community/i.test(e.Designation || ""));
+            if (hasMkt) card.classList.add("tp-matched");
+          }
+        });
+      }
+    }
+  }
+
   function onSearch(query) {
     searchQuery = (query || "").trim();
     const clearBtn = document.getElementById("tpSearchClear");
@@ -4363,13 +5512,19 @@
     renderTree();
 
     if (searchQuery) {
-      const matched = document.querySelectorAll(".tp-matched, .tp-matched-row");
+      const allMatched = Array.from(document.querySelectorAll(".tp-matched, .tp-matched-row")).filter(el => {
+        if (el.classList.contains("tp-district-card") && el.querySelector(".tp-matched-row")) {
+          return false;
+        }
+        return true;
+      });
+
       if (summaryEl && summaryText) {
         summaryEl.style.display = "flex";
-        summaryText.textContent = `Found ${matched.length} match(es) for "${searchQuery}"`;
+        summaryText.textContent = `Found ${allMatched.length} match(es) for "${searchQuery}"`;
       }
-      if (matched.length > 0) {
-        matched[0].scrollIntoView({ behavior: "smooth", block: "center" });
+      if (allMatched.length > 0) {
+        allMatched[0].scrollIntoView({ behavior: "smooth", block: "center" });
       }
     } else {
       if (summaryEl) summaryEl.style.display = "none";
@@ -4398,6 +5553,9 @@
 
   // --- Mount ---
   async function mount() {
+    const qView = (typeof window !== "undefined" && window.location) ? new URLSearchParams(window.location.search).get("view") : null;
+    switchView(qView || activeView || "progress");
+
     loadLocalEditors();
     await checkPermissions();
     await initLiveData();
@@ -4405,6 +5563,7 @@
     await checkPermissions();
     renderDivisionPills();
     renderTree();
+    updateHeaderForOrgView();
     updateToolbarAdminUI();
 
     const viewport = document.getElementById("tpViewport");
@@ -4462,10 +5621,18 @@
     if (viewName === "weekly-ops") {
       viewName = "progress"; // Operation Tracker is temporarily on hold / disabled
     }
-    unlockBackgroundScroll();
+    document.body.classList.remove('tp-modal-open');
+    savedContentScrollTop = 0;
+    const contentArea = document.querySelector('.content-area') || document.getElementById('pageContent');
+    if (contentArea && contentArea.scrollTop) {
+      contentArea.scrollTop = 0;
+    }
+    if (typeof window.scrollTo === 'function') {
+      window.scrollTo(0, 0);
+    }
     activeView = viewName;
     const isSmart = viewName === "smart-goals";
-    const isProgress = viewName === "progress";
+    const isProgress = viewName === "progress" || viewName === "review-progress" || viewName === "program-progress";
     const isHist = viewName === "historical" || viewName === "internal" || viewName === "external";
     const isWeeklyOps = viewName === "weekly-ops";
 
@@ -4494,6 +5661,11 @@
     } else if (isProgress) {
       if (window.ProgressModule && typeof window.ProgressModule.init === 'function') {
         window.ProgressModule.init();
+      }
+      if (viewName === "program-progress" && window.ProgressModule && typeof window.ProgressModule.setSubTab === 'function') {
+        window.ProgressModule.setSubTab('program');
+      } else if (viewName === "review-progress" && window.ProgressModule && typeof window.ProgressModule.setSubTab === 'function') {
+        window.ProgressModule.setSubTab('review');
       }
     } else if (isHist) {
       const ds = (viewName === 'internal') ? 'internal' : 'external';
@@ -4553,6 +5725,7 @@
     canCurrentUserEdit: () => canEditUser,
     isCurrentUserAdmin: () => isAdminUser,
     switchView,
+    switchOrgView,
     setState,
     toggleDivision,
     expandAll,
@@ -4592,6 +5765,13 @@
     addNoteToAnnexure,
     // Progress Module helpers
     getStaffList: () => liveEmployees,
+    setStaffList: (newList) => {
+      if (Array.isArray(newList) && newList.length) {
+        liveEmployees = newList;
+        dynamicTree = buildOperationalTree(liveEmployees);
+        window.TEAM_PERFORMANCE_TREE = dynamicTree;
+      }
+    },
     getTree: () => dynamicTree || window.TEAM_PERFORMANCE_TREE,
     // Reset
     resetDefaultAll
