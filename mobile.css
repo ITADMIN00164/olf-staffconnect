@@ -516,3 +516,95 @@
   html.m-typing #appShell.visible .m-nav { display: none !important; }
   html.m-typing .content-area { padding-bottom: 28px !important; }
 }
+
+/* ==========================================================================
+   Awards & Gifts, third pass: a navigation-only banner, a floating New
+   requisition button, compact figures, and every month-by-column table laid out
+   as one card per row (aw-mobile.js gives each cell its column's name).
+   ========================================================================== */
+@media (max-width: 640px) {
+  /* The header already names the page, so the banner is just the navigation. */
+  .award-page #awHero .pg-hero-lead { display: none !important; }
+  .award-page #awHero { padding: 12px !important; gap: 8px !important; }
+  .award-page #awHero .aw-toptabs { margin-right: 52px; }
+  .award-page #awHero #refresh-btn {
+    position: absolute; top: 12px; right: 12px; width: 40px; height: 40px; min-height: 0; padding: 0; font-size: 0;
+    display: inline-flex; align-items: center; justify-content: center; border-radius: 12px;
+  }
+  .award-page #awHero #refresh-btn .aw-icon { font-size: 18px; }
+  .award-page #awHero .aw-top-actions { display: block; width: 0; height: 0; padding: 0; margin: 0; overflow: visible; }
+  /* the views inside a section share the row evenly, so nothing slides sideways */
+  .award-page #awHero .aw-subtabs { overflow: visible !important; flex-wrap: nowrap !important; gap: 4px !important; width: 100%; }
+  .award-page #awHero .aw-subtabs > * {
+    flex: 1 1 0 !important; min-width: 0; justify-content: center; text-align: center; white-space: normal !important;
+    padding: 7px 4px !important; font-size: 12px !important; line-height: 1.2;
+  }
+  .award-page #awHero .aw-subtabs > * .aw-icon { display: none; }
+  /* New requisition lives in a floating button instead (made by aw-mobile.js) */
+  .award-page #awHero #new-req-btn { display: none !important; }
+
+  /* Figures above the requisition list: two across, the delivery ring full width, no decoration */
+  .award-page .kpis { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
+  .award-page .kpis .kpi { min-width: 0; padding: 12px !important; }
+  .award-page .kpis .kpi::after, .award-page .kpis .kpi::before { display: none !important; }
+  .award-page .kpis .kpi.kpi-ring { grid-column: 1 / -1; }
+
+  /* ---- grids of numbers as cards ---- */
+  .award-page .pom-card:has(table.m-matrix), .award-page .pom-card.scroll:has(table.m-matrix),
+  .award-page .awm-view .pom-card:has(table.m-matrix), .award-page .awm-view .pom-card.scroll:has(table.m-matrix) {
+    overflow: visible !important; max-height: none !important; background: none !important; border: 0 !important; box-shadow: none !important; padding: 0 !important;
+  }
+  .award-page .m-scroll:has(table.m-matrix) { overflow: visible !important; border-radius: 0; }
+  .award-page table.m-matrix, .award-page table.m-matrix tbody, .award-page table.m-matrix tfoot { display: block; width: 100% !important; min-width: 0 !important; }
+  .award-page table.m-matrix thead, .award-page table.m-matrix colgroup { display: none !important; }
+  .award-page table.m-matrix tr {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; align-items: start;
+    margin: 0 0 10px; padding: 14px 16px 16px; border-radius: 16px; background: var(--glass-strong, #fff);
+    border: 1px solid var(--hairline, rgba(15,23,42,.1)); box-shadow: var(--shadow-sm, 0 1px 3px rgba(15,23,42,.08));
+  }
+  .award-page table.m-matrix tfoot tr { background: color-mix(in srgb, var(--accent, #2F6FE4) 8%, var(--glass-strong, #fff)); }
+  .award-page table.m-matrix td {
+    display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 0 !important; border: 0 !important; background: none !important;
+    position: static !important; box-shadow: none !important; text-align: left !important; white-space: normal !important;
+    font-size: 15px; font-weight: 700; color: var(--text, #0F172A);
+  }
+  .award-page table.m-matrix td[data-label]::before {
+    content: attr(data-label); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    line-height: 1.25; color: var(--text-soft, #64748B);
+  }
+  /* the month (or the first column) is the card's title */
+  .award-page table.m-matrix td:first-child[data-label] {
+    grid-column: 1 / -1; padding-bottom: 8px !important; font-size: 17px; font-weight: 800; letter-spacing: -.2px;
+    border-bottom: 1px solid var(--hairline, rgba(15,23,42,.1)) !important;
+  }
+  .award-page table.m-matrix td:first-child[data-label]::before { display: none; }
+  /* Save sits under the figures, full width; "last updated" is a quiet line */
+  .award-page table.m-matrix td[data-label="Save"] { grid-column: 1 / -1; }
+  .award-page table.m-matrix td[data-label="Save"]::before { display: none; }
+  .award-page table.m-matrix td[data-label="Save"] .rowsave-btn { width: 100%; min-height: 44px; justify-content: center; border-radius: 12px; font-size: 14.5px; }
+  .award-page table.m-matrix td[data-label="Last Updated"] { grid-column: 1 / -1; font-size: 12.5px; font-weight: 500; color: var(--text-soft, #64748B); }
+  .award-page table.m-matrix td:empty { display: none; }
+  .award-page table.m-matrix input[type="number"], .award-page table.m-matrix input[type="text"] {
+    width: 100%; min-width: 0; height: 46px; font-size: 16px; border-radius: 12px;
+  }
+  /* "choose a district to begin" and other messages: a quiet, centred card */
+  .award-page table.m-matrix tr:has(td[colspan]) { display: block; padding: 0; background: none; border: 0; box-shadow: none; }
+  .award-page table.m-matrix td[colspan] { display: block; text-align: center !important; padding: 30px 16px !important; }
+  .award-page table.m-matrix td.pom-msg { text-align: center !important; padding: 30px 16px !important; }
+}
+
+/* the floating New requisition button */
+.m-fab { display: none; }
+@media (max-width: 640px) {
+  #appShell .m-fab:not([hidden]) {
+    position: fixed; right: 16px; bottom: calc(106px + env(safe-area-inset-bottom, 0px)); z-index: 700;
+    display: inline-flex; align-items: center; gap: 8px; height: 54px; padding: 0 20px 0 16px; border: 0; border-radius: 18px; cursor: pointer;
+    font: inherit; font-size: 15px; font-weight: 800; letter-spacing: -.1px; color: #fff; -webkit-tap-highlight-color: transparent;
+    background: linear-gradient(135deg, #2F6FE4, #0B8F7A);
+    box-shadow: 0 16px 30px -10px rgba(47,111,228,.6), 0 4px 10px rgba(15,23,42,.2);
+    transition: transform .15s ease, box-shadow .2s ease;
+  }
+  #appShell .m-fab:active { transform: scale(.95); }
+  .m-fab svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; }
+  html.m-typing .m-fab { display: none !important; }
+}
