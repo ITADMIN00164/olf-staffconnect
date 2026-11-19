@@ -695,3 +695,11 @@
   .award-page table.m-matrix tr.m-now > td:first-child::after { order: 2; }
   .award-page table.m-matrix tr.m-now > td:first-child .m-abar { order: 3; }
 }
+
+/* Requisition and delivery cards: no table striping behind the lines of a card */
+@media (max-width: 640px) {
+  .award-page #requisitions-table tbody tr.req-row > td,
+  .award-page #delivery-table tbody tr.req-row > td,
+  .award-page #requisitions-table tbody tr:nth-child(even) td,
+  .award-page #delivery-table tbody tr:nth-child(even) td { background: none !important; box-shadow: none !important; }
+}
