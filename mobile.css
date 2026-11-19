@@ -1015,3 +1015,144 @@
   #appShell #page-forms table.m-frm.frm-subgrid tbody > tr > td[data-label]::before { content: attr(data-label); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--soft, #64748B); }
   #appShell #page-forms table.m-frm.frm-subgrid tbody > tr > td:first-child { grid-column: 1 / -1; }
 }
+
+/* ==========================================================================
+   OLF Insight on a phone: a slim banner, full-width switchers and pickers, the
+   staff directory as cards, two-up figures, and charts that open at their first
+   card (insight-mobile.js names each cell).
+   ========================================================================== */
+@media (max-width: 640px) {
+  #appShell #tpRoot .tp-hero { position: relative; padding: 12px !important; gap: 10px; min-height: 0; margin-bottom: 12px; }
+  #appShell #tpRoot .tp-hero .pg-hero-ico, #appShell #tpRoot .tp-hero .pg-hero-title { display: none !important; }
+  #appShell #tpRoot .tp-hero .pg-hero-lead { min-height: 0; }
+  #appShell #tpRoot .tp-hero .pg-hero-sub { margin: 0; font-size: 12.5px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  #appShell #tpRoot .tp-hero .tp-view-tabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; width: 100%; overflow: visible; padding: 4px; }
+  #appShell #tpRoot .tp-hero .tp-view-tab { min-width: 0; height: auto; min-height: 44px; padding: 6px 4px !important; flex-direction: column; gap: 2px; font-size: 11.5px; line-height: 1.15; white-space: normal; text-align: center; justify-content: center; }
+  #appShell #tpRoot .tp-hero .tp-view-tab .tp-vt-ico { width: 17px; height: 17px; }
+
+  /* cards under the banner */
+  #appShell #tpRoot .tp-header { padding: 14px !important; margin-bottom: 12px !important; }
+  #appShell #tpRoot .tp-header-top-row { flex-direction: column; align-items: stretch; gap: 10px; }
+  #appShell #tpRoot .tp-header-right .tp-btn { width: 100%; justify-content: center; min-height: 44px; }
+  #appShell #tpRoot .tp-title { font-size: 17px; }
+  #appShell #tpRoot .tp-subtitle { font-size: 12.5px; line-height: 1.4; }
+
+  /* switchers share the width */
+  #appShell #tpRoot .tp-segmented-control, #appShell #tpRoot .tp-hist-source-switcher { display: flex; width: 100%; box-sizing: border-box; gap: 4px; }
+  #appShell #tpRoot .tp-segmented-control .tp-seg-btn, #appShell #tpRoot .tp-hist-source-btn { flex: 1 1 0; min-width: 0; min-height: 42px; justify-content: center; text-align: center; padding: 8px 6px; white-space: normal; line-height: 1.2; }
+  #appShell #tpRoot #tpSegMH, #appShell #tpRoot #tpSegCH, #appShell #tpRoot #tpSegMP, #appShell #tpRoot #tpSegBR { font-size: 11.5px; }
+  #appShell #tpRoot .tp-header-controls { display: grid !important; grid-template-columns: 1fr; gap: 10px !important; width: 100%; }
+  #appShell #tpRoot .tp-header-controls > * { min-width: 0; max-width: 100%; }
+  #appShell #tpRoot .tp-header-controls > div[style*="inline-flex"] { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px !important; width: 100%; }
+  #appShell #tpRoot .tp-header-controls .tp-hist-select-wrap { width: 100%; min-width: 0; min-height: 46px; box-sizing: border-box; }
+  #appShell #tpRoot .tp-header-controls select { width: 100% !important; max-width: none !important; min-width: 0; font-size: 16px !important; min-height: 44px; }
+  #appShell #tpRoot .tp-header-controls > div[style*="display:flex"] { display: grid !important; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px !important; width: 100%; align-items: center; }
+  #appShell #tpRoot .tp-header-controls .tp-btn { min-height: 44px; }
+  #appShell #tpRoot .tp-search-box { width: 100% !important; max-width: none !important; }
+  #appShell #tpRoot .tp-search-box { display: flex; }
+  #appShell #tpRoot .tp-search-box input { width: 100% !important; max-width: none !important; font-size: 16px; height: 46px; }
+  #appShell #tpRoot .tp-btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+  #appShell #tpRoot .tp-btn-group .tp-btn { min-height: 44px; justify-content: center; }
+  #appShell #tpRoot .tp-division-pills-bar { flex-wrap: wrap; gap: 8px; }
+  #appShell #tpRoot .tp-pills-wrapper { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+  #appShell #tpRoot .tp-pills-wrapper::-webkit-scrollbar { display: none; }
+
+  /* figures: two across, the odd one out full width */
+  #appShell #tpRoot .tp-prog-kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; margin-bottom: 12px !important; }
+  #appShell #tpRoot .tp-prog-kpi-row .tp-prog-kpi-card { margin-bottom: 0 !important; min-width: 0; padding: 12px 10px !important; }
+  #appShell #tpRoot .tp-prog-kpi-row .tp-prog-kpi-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  #appShell #tpRoot .tp-hist-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
+  #appShell #tpRoot .tp-hist-kpi-card { min-width: 0; padding: 14px 12px !important; }
+  #appShell #tpRoot .tp-hist-kpi-card::after { display: none; }
+  #appShell #tpRoot .tp-hist-kpi-val { font-size: 24px !important; }
+
+  /* charts: a bounded panning box, no empty stretch */
+  #appShell #tpRoot .tp-viewport { min-height: 0 !important; max-height: 72dvh; padding: 16px 12px 28px !important; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; scroll-behavior: auto; }
+  #appShell #tpRoot .tp-legend { gap: 6px 12px; }
+
+  /* historical: pickers full width, buttons in pairs */
+  #appShell #tpRoot .tp-hist-toolbar-box { padding: 12px !important; }
+  #appShell #tpRoot .tp-hist-toolbar-box .tp-hist-select-wrap { width: 100%; box-sizing: border-box; }
+  #appShell #tpRoot .tp-hist-toolbar-box select { width: 100% !important; max-width: none !important; font-size: 16px !important; min-height: 44px; }
+  #appShell #tpRoot .tp-hist-toolbar-box input[type=text], #appShell #tpRoot .tp-hist-toolbar-box input[type=search] { width: 100% !important; max-width: none !important; font-size: 16px !important; min-height: 44px; }
+
+  /* ---- the staff directory ---- */
+  #appShell #tpRoot .tp-prog-tbl-card { border-radius: 18px; }
+  #appShell #tpRoot .tp-prog-tbl-toolbar { flex-direction: column; align-items: stretch; gap: 10px; padding: 14px !important; }
+  #appShell #tpRoot .tp-prog-tbl-toolbar > div { width: 100%; }
+  #appShell #tpRoot .tp-prog-tbl-export-btn { width: 100%; min-height: 44px; justify-content: center; }
+  #appShell #tpRoot .m-filter-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: calc(100% - 28px); min-height: 46px; margin: 0 14px 12px; border: 1px solid var(--hairline, rgba(15,23,42,.12)); border-radius: 14px; background: var(--glass-strong, #fff); color: var(--text, #0F172A); font: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  #appShell #tpRoot .m-filter-btn b[hidden] { display: none; }
+  #appShell #tpRoot .m-filter-btn b { min-width: 22px; height: 22px; padding: 0 6px; display: inline-grid; place-items: center; border-radius: 99px; background: #2F6FE4; color: #fff; font-size: 12px; }
+  #appShell #tpRoot .m-filter-btn::after { content: ""; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg) translateY(-2px); transition: transform .2s; }
+  #appShell #tpRoot .m-filter-btn.is-open::after { transform: rotate(-135deg) translateY(-2px); }
+  #appShell #tpRoot .tp-prog-tbl-wrap { overflow: visible !important; max-height: none !important; padding: 0 14px 14px; }
+  #appShell #tpRoot table.m-dir, #appShell #tpRoot table.m-dir tbody, #appShell #tpRoot table.m-dir thead { display: block; width: 100% !important; min-width: 0 !important; }
+  #appShell #tpRoot table.m-dir colgroup { display: none !important; }
+  #appShell #tpRoot table.m-dir tr.tp-table-filter-row { display: none; }
+  #appShell #tpRoot .tp-prog-tbl-wrap.m-open table.m-dir tr.tp-table-filter-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 8px; margin: 0 0 12px; padding: 12px; border-radius: 14px; background: var(--wash, rgba(100,116,139,.08)); }
+  #appShell #tpRoot table.m-dir tr.tp-table-filter-row th { display: block; position: static; padding: 0 !important; border: 0 !important; background: none !important; min-width: 0; }
+  #appShell #tpRoot table.m-dir tr.tp-table-filter-row th:first-child { grid-column: 1 / -1; }
+  #appShell #tpRoot table.m-dir tr.tp-table-filter-row th[data-label]::before { content: attr(data-label); display: block; margin-bottom: 4px; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-soft, #64748B); }
+  #appShell #tpRoot table.m-dir tr.tp-table-filter-row select, #appShell #tpRoot table.m-dir tr.tp-table-filter-row input { width: 100% !important; min-width: 0; min-height: 44px; font-size: 16px !important; border-radius: 12px; }
+
+  #appShell #tpRoot table.m-dir tbody tr {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; align-items: start;
+    margin: 0 0 10px; padding: 14px 16px; border-radius: 16px; background: var(--glass-strong, #fff);
+    border: 1px solid var(--hairline, rgba(15,23,42,.1)); box-shadow: var(--shadow-sm, 0 1px 3px rgba(15,23,42,.08));
+  }
+  #appShell #tpRoot table.m-dir tbody tr:active { transform: scale(.99); }
+  #appShell #tpRoot table.m-dir tbody td { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; padding: 0 !important; border: 0 !important; background: none !important; text-align: left !important; }
+  #appShell #tpRoot table.m-dir tbody td * { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; max-width: 100% !important; }
+  #appShell #tpRoot table.m-dir tbody td[data-label]::before { content: attr(data-label); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-soft, #64748B); }
+  #appShell #tpRoot table.m-dir tbody td[data-label="Name"] { grid-column: 1 / -1; order: 0; padding-bottom: 10px !important; border-bottom: 1px solid var(--hairline, rgba(15,23,42,.1)) !important; }
+  #appShell #tpRoot table.m-dir tbody td[data-label="Name"]::before { display: none; }
+  #appShell #tpRoot table.m-dir tbody td[data-label="Name"] > div { width: 100%; }
+  #appShell #tpRoot table.m-dir tbody td[data-label="Name"] div[style*="font-weight:700"] { font-size: 15px !important; }
+  #appShell #tpRoot table.m-dir tbody td[data-label="Review"] { order: 1; }
+  #appShell #tpRoot table.m-dir tbody td[data-label="Role"] { order: 2; }
+  #appShell #tpRoot table.m-dir tbody td[data-label="Division"] { order: 3; }
+  #appShell #tpRoot table.m-dir tbody td[data-label="District"] { order: 4; }
+  #appShell #tpRoot table.m-dir tbody td[data-label="Manager"] { order: 5; }
+  #appShell #tpRoot table.m-dir tbody td[data-label="Rating"] { order: 6; }
+  #appShell #tpRoot table.m-dir tbody td[data-label="Score"] { order: 7; grid-column: 1 / -1; }
+  #appShell #tpRoot table.m-dir tbody td[colspan] { display: block; grid-column: 1 / -1; text-align: center !important; }
+  #appShell #tpRoot table.m-dir tbody td[colspan]::before { display: none; }
+  #appShell #tpRoot table.m-dir tbody tr:has(> td[colspan]) { display: block; padding: 0; background: none; border: 0; box-shadow: none; }
+
+  /* ---- simple tables in Historical Data as cards ---- */
+  #appShell #tpRoot table.m-hist, #appShell #tpRoot table.m-hist tbody { display: block; width: 100% !important; min-width: 0 !important; }
+  #appShell #tpRoot table.m-hist thead { display: none; }
+  #appShell #tpRoot table.m-hist tbody tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; margin: 0 0 10px; padding: 14px 16px; border-radius: 16px; background: var(--glass-strong, #fff); border: 1px solid var(--hairline, rgba(15,23,42,.1)); }
+  #appShell #tpRoot table.m-hist tbody td { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 0 !important; border: 0 !important; background: none !important; text-align: left !important; white-space: normal !important; overflow-wrap: anywhere; }
+  #appShell #tpRoot table.m-hist tbody td[data-label]::before { content: attr(data-label); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-soft, #64748B); }
+  #appShell #tpRoot table.m-hist tbody td:first-child, #appShell #tpRoot table.m-hist tbody td:nth-child(2) { font-weight: 800; }
+  #appShell #tpRoot table.m-hist tbody td:nth-child(3) { grid-column: 1 / -1; }
+}
+
+/* Insight: the district trajectory list as rich cards, and pop-ups as bottom sheets */
+@media (max-width: 640px) {
+  #appShell #tpRoot table.m-hist-wide tbody tr { position: relative; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 8px; padding: 14px 14px 14px; -webkit-tap-highlight-color: transparent; }
+  #appShell #tpRoot table.m-hist-wide tbody tr:active { transform: scale(.99); }
+  #appShell #tpRoot table.m-hist-wide tbody tr > td { font-size: 14px; font-weight: 600; }
+  #appShell #tpRoot table.m-hist-wide tbody tr > td[data-label="#"] { display: none; }
+  #appShell #tpRoot table.m-hist-wide tbody tr > td[data-label="State"] { order: 1; grid-column: 1; align-items: flex-start; justify-content: center; }
+  #appShell #tpRoot table.m-hist-wide tbody tr > td[data-label="State"]::before, #appShell #tpRoot table.m-hist-wide tbody tr > td[data-label="District"]::before { display: none; }
+  #appShell #tpRoot table.m-hist-wide tbody tr > td[data-label="District"] { order: 2; grid-column: 2 / 4; font-size: 16px; font-weight: 800; justify-content: center; }
+  #appShell #tpRoot table.m-hist-wide tbody tr > td[data-label="Momentum"] { order: 3; grid-column: 4; align-items: flex-end; justify-content: center; }
+  #appShell #tpRoot table.m-hist-wide tbody tr > td[data-label="Momentum"]::before { display: none; }
+  #appShell #tpRoot table.m-hist-wide tbody tr > td[data-label^="Division"] { order: 4; grid-column: 1 / 3; padding-top: 10px !important; border-top: 1px solid var(--hairline, rgba(15,23,42,.1)) !important; }
+  #appShell #tpRoot table.m-hist-wide tbody tr > td[data-label^="Program"] { order: 5; grid-column: 3 / 5; padding-top: 10px !important; border-top: 1px solid var(--hairline, rgba(15,23,42,.1)) !important; }
+  #appShell #tpRoot table.m-hist-wide tbody tr > td[data-label^="Cohort"] { order: 6; }
+  #appShell #tpRoot table.m-hist-wide tbody tr > td[data-label^="Age"] { order: 7; }
+  #appShell #tpRoot table.m-hist-wide tbody tr > td[data-label^="Grade"] { order: 8; }
+  #appShell #tpRoot table.m-hist-wide tbody tr > td[data-label^="Target"] { order: 9; }
+  #appShell #tpRoot table.m-hist-wide tbody tr > td[data-label^="Pass"] { order: 10; font-size: 13px; }
+  #appShell #tpRoot table.m-hist-wide tbody tr > td:nth-child(3) { grid-column: 2 / 4; }
+  #appShell #tpRoot table.m-hist-wide tbody tr > td:first-child, #appShell #tpRoot table.m-hist-wide tbody tr > td:nth-child(2) { font-weight: 600; }
+
+  #appShell #tpRoot .tp-modal-overlay { padding: 0; align-items: flex-end; }
+  #appShell #tpRoot .tp-modal-dialog { width: 100% !important; max-width: none !important; max-height: 92dvh !important; border-radius: 22px 22px 0 0 !important; }
+  #appShell #tpRoot .tp-modal-body { padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+  #appShell #tpRoot .tp-modal-dialog input, #appShell #tpRoot .tp-modal-dialog select, #appShell #tpRoot .tp-modal-dialog textarea { font-size: 16px; }
+}
