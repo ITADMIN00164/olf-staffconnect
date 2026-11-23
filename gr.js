@@ -106,15 +106,22 @@
     };
 
     /* ====================================================
-       RETIRED DISTRICT NAMES
-       Records already in the sheet may carry a name the upload form no
-       longer offers — either an older spelling or a district that has
-       since been renamed. Those uploads are real, so they are MERGED into
-       the correct district rather than shown as a separate row: the table
-       stays at exactly the master 50 and the counts stay complete.
+       DISTRICT NAMES - ONE NAME PER PLACE
+       The same district can reach this page under more than one name:
+       an older spelling ("Beed"), a renamed district ("Ahmednagar"), or
+       the name the Employees tab uses ("Thane-ZP" for "Thane"). Every
+       record is shown, filtered and counted under ONE name, so a place
+       never splits into two rows or two dropdown entries.
+
+       The Employees tab decides that name (see EMPLOYEE DISTRICTS below).
+       Whenever it names a district differently from this page, the page
+       switches to the Employees name and every older upload saved under
+       the old name is shown and counted under the new one - in the
+       Dashboard, My uploads, Summary, Analytics and the Excel download.
+       The Google Sheet rows themselves are not rewritten.
 
        Keyed by community, because the same word can mean different
-       districts in different states — Chhattisgarh has "Raigarh" while
+       districts in different states - Chhattisgarh has "Raigarh" while
        Maharashtra has "Raigarh MH", and those must never be conflated.
     ==================================================== */
     const RETIRED_DISTRICT_NAMES = {
@@ -135,38 +142,103 @@
         "Mumbai Suburban": { from: "MH", to: "MH_MC" }
     };
 
+    // Comparison key: case, spaces, hyphens and other punctuation ignored.
+    function districtKey(s) {
+        return String(s == null ? "" : s).toLowerCase().replace(/[^a-z0-9]/g, "");
+    }
+    // The key without a Zilla Parishad tag, so "Thane-ZP" and "Thane" meet.
+    // Only ZP is dropped: MC and ATC are different bodies, never merged.
+    function coreKey(s) {
+        return districtKey(s)
+            .replace(/^(zillaparishad|zp)(?=.)/, "")
+            .replace(/(?<=.)(zillaparishad|zp)$/, "");
+    }
+
+    // community -> Map(key of the old name -> the name it is shown under)
+    const DISTRICT_ALIASES = Object.create(null);
+    Object.keys(RETIRED_DISTRICT_NAMES).forEach(c => {
+        const m = DISTRICT_ALIASES[c] = new Map();
+        Object.keys(RETIRED_DISTRICT_NAMES[c]).forEach(o => m.set(districtKey(o), RETIRED_DISTRICT_NAMES[c][o]));
+    });
+    const MOVED_BY_KEY = new Map(Object.keys(MOVED_DISTRICTS).map(n => [districtKey(n), MOVED_DISTRICTS[n]]));
+
+    /** Records `from` as another name of `to` in a community. True if that is new. */
+    function setDistrictAlias(c, from, to) {
+        const k = districtKey(from);
+        if (!k || k === districtKey(to)) return false;
+        const m = DISTRICT_ALIASES[c] || (DISTRICT_ALIASES[c] = new Map());
+        if (m.get(k) === to) return false;
+        m.set(k, to);
+        return true;
+    }
+
+    /** Shows district `from` as `to` from now on, old records included. */
+    function renameDistrict(c, from, to) {
+        const list = STATE_DISTRICTS[c] || [];
+        const i = list.indexOf(from);
+        if (i >= 0) list[i] = to;
+        const m = DISTRICT_ALIASES[c] || (DISTRICT_ALIASES[c] = new Map());
+        m.forEach((v, k) => { if (v === from) m.set(k, to); });   // older names follow along
+        m.delete(districtKey(to));                                  // the new name is not an alias of anything
+        m.set(districtKey(from), to);
+    }
+
     /**
-     * Maps whatever is stored on a record to the master (state, district)
-     * it belongs to. Returns the input unchanged when no rule applies.
+     * Maps whatever is stored on a record to the (community, district) it
+     * is shown under. Returns the input unchanged when no rule applies.
      */
     function canonicalDistrict(state, district) {
         let st = state || "";
-        let d = String(district == null ? "" : district).trim();
+        let d = String(district == null ? "" : district).replace(/\s+/g, " ").trim();
+        if (!d) return { state: st, district: d };
 
-        const byState = RETIRED_DISTRICT_NAMES[st];
-        if (byState && byState[d]) d = byState[d];
-
-        const moved = MOVED_DISTRICTS[d];
+        const moved = MOVED_BY_KEY.get(districtKey(d));
         if (moved && st === moved.from) st = moved.to;
 
-        return { state: st, district: d };
+        const m = DISTRICT_ALIASES[st];
+        const aliased = m && m.get(districtKey(d));
+        if (aliased) d = aliased;
+
+        // Same place, different typing ("thane-zp ") -> the list's spelling.
+        const k = districtKey(d);
+        const listed = (STATE_DISTRICTS[st] || []).find(x => districtKey(x) === k);
+        return { state: st, district: listed || d };
+    }
+
+    /**
+     * Brings every record in memory onto the one-name-per-place rule.
+     * Cheap and idempotent, so each render calls it first; only the
+     * on-screen copy changes, never what is sent to the server.
+     */
+    function normalizeRecords() {
+        for (const r of allRecords) {
+            if (!r || !r.district) continue;
+            const c = canonicalDistrict(r.state, r.district);
+            if (c.district !== r.district) r.district = c.district;
+            if (c.state !== r.state) r.state = c.state;
+        }
     }
 
     /* ====================================================
        EMPLOYEE DISTRICTS
-       Adds to STATE_DISTRICTS every district the Employees tab records
-       for active staff, read through window.olfGeography() in app.js -
-       the same directory reader the Awards page uses.
+       Reads every district the Employees tab records for active staff
+       (State, Division and District all filled in), through
+       window.olfGeography() in app.js - the reader the Awards page uses.
 
-       Additive only: the base list above stays, so a district never
-       drops out of the dropdowns or Analytics just because nobody is
-       currently posted there.
+       For each one:
+         - already on this page under the same name (case, spaces and
+           hyphens aside): nothing changes;
+         - on this page under another name - an older spelling, or the
+           same place with a ZP tag ("Thane" / "Thane-ZP"): the page
+           switches to the Employees name, and old uploads follow it;
+         - not on this page at all: added.
+       If the Employees tab spells one place two ways, the first spelling
+       (A-Z) is used and the other is folded into it.
 
-       Matching ignores case, spaces and hyphens, and runs through the
-       retired-name map first, so "Beed", "beed" or "Janjgir-Champa" in
-       the directory do not add a second copy of a district already here.
+       Nothing is ever removed: a district stays in the dropdowns and in
+       Analytics even when nobody is currently posted there.
 
-       The directory records only "Maharashtra", so a new Maharashtra
+       The directory records only "Maharashtra", so a NEW Maharashtra
        district is put in a community by its name: "ATC" -> MH-ATC;
        "MC", Municipal, Corporation, KDMC, PCMC, BMC -> MH-MC; else MH.
        A state the page does not know yet gets its own community.
@@ -179,18 +251,35 @@
     };
     const MH_FAMILY = ["MH", "MH_ATC", "MH_MC"];
 
-    function districtKey(s) {
-        return String(s == null ? "" : s).toLowerCase().replace(/[^a-z0-9]/g, "");
-    }
     function mhCommunityFor(name) {
         if (/\batc\b/i.test(name)) return "MH_ATC";
         if (/(\bmc\b|municipal|corporation|\bkdmc\b|\bpcmc\b|\bbmc\b)/i.test(name)) return "MH_MC";
         return "MH";
     }
 
-    /** Merges the directory's districts in. Returns true if anything was added. */
+    // The district already on the page that `name` refers to, if any.
+    // Exact and known-alias matches are tried before ZP-tag matches.
+    function findListedDistrict(communities, name) {
+        const k = districtKey(name), ck = coreKey(name);
+        for (const pass of [1, 2]) {
+            for (const c of communities) {
+                const aliasTo = DISTRICT_ALIASES[c] && DISTRICT_ALIASES[c].get(k);
+                for (const e of (STATE_DISTRICTS[c] || [])) {
+                    const hit = pass === 1
+                        ? (districtKey(e) === k || e === aliasTo)
+                        : (ck && coreKey(e) === ck);
+                    if (hit) return { c, e };
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Applies the directory's districts. Returns true if anything changed. */
     function mergeEmployeeDistricts(tree) {
-        let added = false;
+        let changed = false;
+        const owned = new Set();   // "community::key" of entries an Employees name already decided
+
         (tree || []).forEach(stateNode => {
             const stateName = String((stateNode && stateNode.name) || "").replace(/\s+/g, " ").trim();
             if (!stateName) return;
@@ -198,44 +287,55 @@
             if (!code) {
                 // A state not configured here yet: its own community, keyed by its name.
                 code = stateName;
-                if (!STATE_LABELS[code]) { STATE_LABELS[code] = stateName; added = true; }
+                if (!STATE_LABELS[code]) { STATE_LABELS[code] = stateName; changed = true; }
             }
+            const family = code === "MH" ? MH_FAMILY : [code];
 
             (stateNode.divisions || []).forEach(div => {
                 (div.districts || []).forEach(raw => {
                     const name = String(raw || "").replace(/\s+/g, " ").trim();
                     if (!name) return;
-                    const target = code === "MH" ? mhCommunityFor(name) : code;
-                    // Retired-name lookup that ignores case and spacing ("beed", "Raigad ").
-                    const retired = RETIRED_DISTRICT_NAMES[target] || {};
-                    const oldName = Object.keys(retired).find(o => districtKey(o) === districtKey(name));
-                    const canon = canonicalDistrict(target, oldName || name);
-                    const family = code === "MH" ? MH_FAMILY : [canon.state];
-                    const k = districtKey(canon.district);
-                    const known = family.some(c =>
-                        (STATE_DISTRICTS[c] || []).some(d => districtKey(d) === k));
-                    if (known) return;
 
-                    (STATE_DISTRICTS[canon.state] = STATE_DISTRICTS[canon.state] || []).push(canon.district);
-                    if (!STATE_LABELS[canon.state]) STATE_LABELS[canon.state] = canon.state;
-                    added = true;
+                    const hit = findListedDistrict(family, name);
+                    if (hit) {
+                        if (owned.has(hit.c + "::" + districtKey(hit.e))) {
+                            // A second spelling of a place already decided: fold it in.
+                            if (setDistrictAlias(hit.c, name, hit.e)) changed = true;
+                            return;
+                        }
+                        if (districtKey(hit.e) !== districtKey(name)) {
+                            renameDistrict(hit.c, hit.e, name);
+                            changed = true;
+                            owned.add(hit.c + "::" + districtKey(name));
+                        } else {
+                            owned.add(hit.c + "::" + districtKey(hit.e));
+                        }
+                        return;
+                    }
+
+                    const target = code === "MH" ? mhCommunityFor(name) : code;
+                    (STATE_DISTRICTS[target] = STATE_DISTRICTS[target] || []).push(name);
+                    if (!STATE_LABELS[target]) STATE_LABELS[target] = target;
+                    owned.add(target + "::" + districtKey(name));
+                    changed = true;
                 });
             });
         });
-        if (added) Object.keys(STATE_DISTRICTS).forEach(c => STATE_DISTRICTS[c].sort(cmpStr));
-        return added;
+        if (changed) Object.keys(STATE_DISTRICTS).forEach(c => STATE_DISTRICTS[c].sort(cmpStr));
+        return changed;
     }
 
     /**
-     * Reads the directory (cached for a minute by app.js) and, if it adds
-     * anything, refreshes the dropdowns in place - keeping whatever the
-     * member has already picked - and redraws the tab on screen.
+     * Reads the directory (cached for a minute by app.js) and, if it
+     * changes anything, refreshes the dropdowns in place - keeping what
+     * the member has already picked - and redraws the tab on screen.
      */
     function loadEmployeeDistricts() {
         if (typeof window.olfGeography !== "function") return;
         window.olfGeography()
             .then(tree => {
                 if (!mergeEmployeeDistricts(tree)) return;
+                normalizeRecords();
                 refreshLocationSelects();
                 rerenderAll();
             })
@@ -252,8 +352,21 @@
                 fillStateSelect(s, { includeAll });
                 if (keepState) s.value = keepState;
                 fillDistrictSelect(d, s.value, { includeAll });
-                if (keepDist) d.value = keepDist;
+                if (keepDist) d.value = canonicalDistrict(s.value, keepDist).district;
             });
+
+        // Filters already chosen keep working under a renamed district.
+        const renameAll = (list, states) => [...new Set(list.map(n => {
+            for (const c of (states.length ? states : Object.keys(STATE_DISTRICTS))) {
+                const out = canonicalDistrict(c, n).district;
+                if (out !== n) return out;
+            }
+            return n;
+        }))];
+        sumDistricts = renameAll(sumDistricts, sumStates);
+        anDistricts = renameAll(anDistricts, anStates);
+        if (myColFilters.district) myColFilters.district = renameAll([myColFilters.district], [])[0];
+
         ["grSumStateMS", "grSumDistrictMS", "grAnDistrictMS"].forEach(id => {
             const w = document.getElementById(id);
             if (w) renderMultiSelect(w);
@@ -1752,6 +1865,7 @@
     }
 
     function renderMyUploads() {
+        normalizeRecords();
         const body = document.getElementById("grMyBody");
         if (!body) return;
 
@@ -1974,6 +2088,7 @@
     }
 
     function renderDetailed() {
+        normalizeRecords();
         const body = document.getElementById("grDetailedBody");
         if (!body) return;
 
@@ -2673,6 +2788,7 @@
     }
 
     function renderSummary() {
+        normalizeRecords();
         const wrap = document.getElementById("grSummaryWrap");
         if (!wrap) return;
 
@@ -3408,6 +3524,7 @@
     }
 
     function renderAnalytics() {
+        normalizeRecords();
         renderAnalyticsTabs();   // counts move as records arrive
         const body = document.getElementById("grAnBody");
         const foot = document.getElementById("grAnFoot");
