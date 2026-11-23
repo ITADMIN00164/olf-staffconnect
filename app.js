@@ -2288,6 +2288,20 @@ window.navigate = async function (page) {
         }
     }
 
+    else if (page === "ho-plan-new") {
+        // The copy runs in its own frame: hand it the same plan-admin answer the live tab gets.
+        const user = window.__olfUser;
+        if (user) {
+            const isPlanAdmin = await isSmartGoalsAdmin(user.email.toLowerCase());
+            window.SMART_GOALS_USER = { email: user.email, isAdmin: isPlanAdmin };
+            const fw = document.getElementById("hpNewFrame")?.contentWindow;
+            if (fw && fw.SmartGoals && typeof fw.SmartGoals.setUser === "function") {
+                fw.SMART_GOALS_USER = window.SMART_GOALS_USER;
+                fw.SmartGoals.setUser(window.SMART_GOALS_USER);
+            }
+        }
+    }
+
     else if (page === "award-management") {
         // award.js reads window.__olfUser / window.__olfEmployee itself for the
         // requester, so there is nothing to inject here.

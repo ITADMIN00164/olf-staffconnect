@@ -224,7 +224,7 @@
   var NAV_LABEL = {
     "home": "Home", "employees": "Employees", "er-dashboards": "Dashboards", "award-management": "Awards & Gifts",
     "calendar": "Calendar", "smart-goals": "HO Plan", "pos": "Field Review", "gr": "GRs", "forms": "Forms",
-    "pom": "Old POM", "team-performance": "Insight"
+    "pom": "Old POM", "team-performance": "Insight", "ho-plan-new": "In development"
   };
   var navBar = null, navScroll = null, navSig = "", navLearned = false, navNudged = false;
 
