@@ -341,16 +341,22 @@ async function deleteBatch(i) {
   }
 }
 
-// ── Verify the Shikshan Utsav (SU) awards of the open month ──
-// IT admin only. For the district and month that are open, fills in every pending SU record the
-// same way - Awarded Yes, Awarded By District Education Officer, the date, one picture, Description
-// NA - and verifies it. Records already verified or rejected, and every other category, are left alone.
-const SU_CATEGORY = "Shikshan Utsav (SU)";
-const SU_AWARDED_BY = "District Education Officer";
+// ── Verify the Shikshan Utsav (SU) / Nanhe Sitare (NS) awards of the open month ──
+// IT admin only. For the district and month that are open, fills in every pending record of the
+// chosen category the same way - Awarded Yes, Awarded By District Education Officer, the date, one
+// picture, Description NA - and verifies it. Records already verified or rejected, and every other
+// category, are left alone. Each category has its own button.
+const BULK_CATS = {
+  SU: { key: "SU", category: "Shikshan Utsav (SU)", name: "Shikshan Utsav", btn: "awmAdmBulk" },
+  NS: { key: "NS", category: "Nanhe Sitare (NS)",   name: "Nanhe Sitare",   btn: "awmAdmBulkNS" }
+};
+const BULK_AWARDED_BY = "District Education Officer";
 const MONTH_NO = { Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6, Jul: 7, Aug: 8, Sep: 9, Oct: 10, Nov: 11, Dec: 12 };
 
-function isPendingSU(r) {
-  return String(r.awardCategory || "").trim() === SU_CATEGORY && r.verified !== "Yes" && r.verified !== "Rejected";
+function isPendingOf(cat) {
+  return function (r) {
+    return String(r.awardCategory || "").trim() === cat.category && r.verified !== "Yes" && r.verified !== "Rejected";
+  };
 }
 
 // "Aug-2026" -> { y: 2026, m: 8 }; a label that is not a month ("Pending 2025-26") -> null.
@@ -364,27 +370,32 @@ function driveFileId(url) { return (String(url || "").match(/[-\w]{25,}/) || [])
 
 // The button shows only where there is something for it to do.
 window.awmBulkRefresh = function () {
-  const b = el("awmAdmBulk");
   const a = api();
-  if (!b || !a) return;
-  const n = (a.records() || []).filter(isPendingSU).length;
-  b.hidden = !(isAdmin() && n);
-  if (n) {
-    // an icon, the words, and how many are waiting - so it catches the eye and says what it will do
-    b.innerHTML = '<svg class="awm-bulk-ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.500l2.800 2.800L16.500 9.500"/></svg>' +
-      '<span>Verify SU awards</span><span class="awm-bulk-n">' + n + '</span>';
-    b.title = n + " Shikshan Utsav award" + (n === 1 ? "" : "s") + " waiting to be verified in this month";
-  }
+  if (!a) return;
+  const recs = a.records() || [];
+  Object.keys(BULK_CATS).forEach(function (k) {
+    const cat = BULK_CATS[k];
+    const b = el(cat.btn);
+    if (!b) return;
+    const n = recs.filter(isPendingOf(cat)).length;
+    b.hidden = !(isAdmin() && n);
+    if (n) {
+      // an icon, the words, and how many are waiting - so it catches the eye and says what it will do
+      b.innerHTML = '<svg class="awm-bulk-ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.500l2.800 2.800L16.500 9.500"/></svg>' +
+        '<span>Verify ' + cat.key + ' awards</span><span class="awm-bulk-n">' + n + '</span>';
+      b.title = n + " " + cat.name + " award" + (n === 1 ? "" : "s") + " waiting to be verified in this month";
+    }
+  });
 };
 
-// The pending SU records of this month in this district, straight from the database.
-async function pendingSU(month, district) {
+// The pending records of one category, this month, this district, straight from the database.
+async function pendingOf(cat, month, district) {
   const a = api();
   const out = [];
   let from = 0;
   const base = "award_records?select=id&month_label=eq." + encodeURIComponent(month) +
     "&district_name=eq." + encodeURIComponent(district) +
-    "&award_category=eq." + encodeURIComponent(SU_CATEGORY) + "&verified=eq.false" +
+    "&award_category=eq." + encodeURIComponent(cat.category) + "&verified=eq.false" +
     (a.hasRejected() ? "&or=(rejected.eq.false,rejected.is.null)" : "") +
     "&order=id.asc&limit=1000";
   for (;;) {
@@ -403,14 +414,14 @@ function ensureBulkModal() {
   m.className = "pom-modal-overlay";
   m.innerHTML =
     '<div class="pom-modal-box awm-edit-box awm-bulk-box">' +
-      '<div class="awm-bulk-head"><span class="awm-bulk-badge">SU</span>' +
-        '<div><div class="pom-modal-title">Verify Shikshan Utsav awards</div>' +
+      '<div class="awm-bulk-head"><span class="awm-bulk-badge" id="awmBulkBadge">SU</span>' +
+        '<div><div class="pom-modal-title" id="awmBulkTitle">Verify Shikshan Utsav awards</div>' +
         '<div class="awm-bulk-where" id="awmBulkWhere"></div></div></div>' +
       '<div class="awm-bulk-count"><b id="awmBulkN">…</b><span id="awmBulkNLab">awards to verify</span></div>' +
       '<div class="awm-bulk-lab">Each award will be set to</div>' +
       '<div class="awm-bulk-set">' +
         '<div><span>Awarded</span><b>Yes</b></div>' +
-        '<div><span>Awarded by</span><b>' + esc(SU_AWARDED_BY) + '</b></div>' +
+        '<div><span>Awarded by</span><b>' + esc(BULK_AWARDED_BY) + '</b></div>' +
         '<div><span>Description</span><b>NA</b></div>' +
         '<div><span>Status</span><b>Verified</b></div>' +
       '</div>' +
@@ -420,7 +431,7 @@ function ensureBulkModal() {
       '</div>' +
       '<img id="awmBulkPreview" class="awm-bulk-preview" alt="" hidden>' +
       '<p class="awm-bulk-note" id="awmBulkMsg"></p>' +
-      '<p class="awm-bulk-fine">Only pending Shikshan Utsav awards of this month are changed. Awards already verified or rejected, and other categories, are left alone.</p>' +
+      '<p class="awm-bulk-fine" id="awmBulkFine">Only pending Shikshan Utsav awards of this month are changed. Awards already verified or rejected, and other categories, are left alone.</p>' +
       '<div class="pom-modal-actions"><button type="button" id="awmBulkCancel" class="pmbtn cancel">Cancel</button>' +
       '<button type="button" id="awmBulkGo" class="pmbtn primary" disabled>Verify</button></div>' +
     '</div>';
@@ -432,7 +443,7 @@ function ensureBulkModal() {
   el("awmBulkGo").addEventListener("click", runBulk);
 }
 
-let bulk = null;          // { month, district, list: [{id}], label, span: {min,max}|null }
+let bulk = null;          // { cat, month, district, list: [{id}], label, span: {min,max}|null }
 let bulkBusy = false;
 
 function closeBulk() {
@@ -461,7 +472,7 @@ function syncBulk() {
   const date = el("awmBulkDate").value;
   const file = el("awmBulkFile").files && el("awmBulkFile").files[0];
   let why = "", bad = false;
-  if (!n) { why = "There are no pending Shikshan Utsav awards here."; bad = true; }
+  if (!n) { why = "There are no pending " + bulk.cat.name + " awards here."; bad = true; }
   else if (bulk.span && date && (date < bulk.span.min || date > bulk.span.max)) { why = "The date must be in " + bulk.label + "."; bad = true; }
   else if (!date) why = "Choose the date.";
   else if (!file) why = "Upload the image to continue.";
@@ -471,9 +482,9 @@ function syncBulk() {
   go.textContent = n ? ("Verify " + n + " award" + (n === 1 ? "" : "s")) : "Verify";
 }
 
-async function openBulk() {
+async function openBulk(cat) {
   const a = api();
-  if (!isAdmin() || !a) return;
+  if (!isAdmin() || !a || !cat) return;
   const month = a.month(), district = a.district();
   if (!month || !district) return;
   if (a.isDirty()) {
@@ -482,7 +493,10 @@ async function openBulk() {
   }
   ensureBulkModal();
   const pm = parseMonth(month);
-  bulk = { month: month, district: district, list: [], label: month, span: null };
+  bulk = { cat: cat, month: month, district: district, list: [], label: month, span: null };
+  el("awmBulkBadge").textContent = cat.key;
+  el("awmBulkTitle").textContent = "Verify " + cat.name + " awards";
+  el("awmBulkFine").textContent = "Only pending " + cat.name + " awards of this month are changed. Awards already verified or rejected, and other categories, are left alone.";
   if (pm) {
     const last = new Date(pm.y, pm.m, 0).getDate();
     bulk.span = { min: pm.y + "-" + two(pm.m) + "-01", max: pm.y + "-" + two(pm.m) + "-" + two(last) };
@@ -501,12 +515,12 @@ async function openBulk() {
   el("awmBulkGo").textContent = "Verify";
   el("awmBulkModal").classList.add("open");
   try {
-    bulk.list = await pendingSU(month, district);
+    bulk.list = await pendingOf(cat, month, district);
     el("awmBulkN").textContent = String(bulk.list.length);
     el("awmBulkNLab").textContent = bulk.list.length === 1 ? "award to verify" : "awards to verify";
     syncBulk();
   } catch (e) {
-    console.error("Could not count the pending SU awards:", e);
+    console.error("Could not count the pending " + cat.key + " awards:", e);
     setBulkNote("Could not load the awards. Close this and try again.", true);
   }
 }
@@ -528,7 +542,7 @@ async function runBulk() {
 
     const now = new Date().toISOString();
     const body = {
-      awarded: true, awarded_by: SU_AWARDED_BY, awarded_date: date,
+      awarded: true, awarded_by: BULK_AWARDED_BY, awarded_date: date,
       image_url: url, drive_file_id: driveFileId(url) || null, uploaded_by: who() || null,
       description: "NA", verified: true, verified_by: who() || null, updated_at: now
     };
@@ -547,7 +561,8 @@ async function runBulk() {
     }
 
     // Every change is written down, as for a single record.
-    const note = "Bulk verify of Shikshan Utsav awards, " + bulk.district + ", " + bulk.month + ", dated " + date;
+    const catName = bulk.cat.name;
+    const note = "Bulk verify of " + catName + " awards, " + bulk.district + ", " + bulk.month + ", dated " + date;
     for (const part of chunks(doneIds, 200)) {
       await call("POST", "award_record_events", part.map(id => ({
         record_id: id, action: "verified (bulk)", by_email: who() || null,
@@ -558,7 +573,7 @@ async function runBulk() {
     bulkBusy = false;
     closeBulk();
     await a.refresh();
-    a.showToast(done + " Shikshan Utsav award" + (done === 1 ? "" : "s") + " verified" + (skipped ? " (" + skipped + " skipped: already verified)" : "") + ".");
+    a.showToast(done + " " + catName + " award" + (done === 1 ? "" : "s") + " verified" + (skipped ? " (" + skipped + " skipped: already verified)" : "") + ".");
   } catch (e) {
     console.error("Bulk verify failed:", e);
     bulkBusy = false;
@@ -580,6 +595,7 @@ window.awmAdminInit = function () {
     bar.className = "awm-adminbar";
     bar.innerHTML = '<span class="awm-adm-tag">IT admin</span>' +
       '<button type="button" id="awmAdmBulk" class="awm-adm-btn go" hidden>Verify SU awards…</button>' +
+      '<button type="button" id="awmAdmBulkNS" class="awm-adm-btn go" hidden>Verify NS awards…</button>' +
       '<span class="awm-adminbar-gap"></span>' +
       '<button type="button" id="awmAdmUploads" class="awm-adm-btn">All uploads</button>' +
       '<button type="button" id="awmAdmTrash" class="awm-adm-btn">Deleted records</button>';
@@ -587,7 +603,8 @@ window.awmAdminInit = function () {
     wrap.insertBefore(bar, card);
     el("awmAdmTrash").addEventListener("click", openTrash);
     el("awmAdmUploads").addEventListener("click", openUploads);
-    el("awmAdmBulk").addEventListener("click", openBulk);
+    el("awmAdmBulk").addEventListener("click", function () { openBulk(BULK_CATS.SU); });
+    el("awmAdmBulkNS").addEventListener("click", function () { openBulk(BULK_CATS.NS); });
   }
   if (typeof window.awmBulkRefresh === "function") window.awmBulkRefresh();
 };
