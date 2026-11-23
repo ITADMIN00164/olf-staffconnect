@@ -32,12 +32,14 @@
 
     /* ====================================================
        STATE → DISTRICTS  (OLF's operational districts)
-       MH 27 · MH-ATC 1 · MH-MC 8 · CG 11 · BR 1 · MP 2  =  50
+       Base list: MH 27 · MH-ATC 1 · MH-MC 8 · CG 11 · BR 1 · MP 2  =  50
+       PLUS every district recorded on the Employees tab (active staff) -
+       see EMPLOYEE DISTRICTS below. A district added to an employee there
+       shows up here on the next visit, with no code change.
 
-       These are the districts OLF actually works in, not every district
-       in each state. ONE list drives both the upload dropdowns and the
-       Analytics table, so a district can never be uploadable but missing
-       from analytics, or listed in analytics but not uploadable.
+       ONE list drives both the upload dropdowns and the Analytics table,
+       so a district can never be uploadable but missing from analytics,
+       or listed in analytics but not uploadable.
     ==================================================== */
     const STATE_LABELS = {
         MH: "Maharashtra",
@@ -119,6 +121,7 @@
         MH: {
             "Beed": "Bid",                 // earlier spelling
             "Raigad": "Raigarh MH",        // earlier spelling
+            "Raigarh": "Raigarh MH",       // as the Employees tab may type it
             "Ahmednagar": "Ahilyanagar",   // renamed district
             "Osmanabad": "Dharashiv"       // renamed district
         },
@@ -147,6 +150,114 @@
         if (moved && st === moved.from) st = moved.to;
 
         return { state: st, district: d };
+    }
+
+    /* ====================================================
+       EMPLOYEE DISTRICTS
+       Adds to STATE_DISTRICTS every district the Employees tab records
+       for active staff, read through window.olfGeography() in app.js -
+       the same directory reader the Awards page uses.
+
+       Additive only: the base list above stays, so a district never
+       drops out of the dropdowns or Analytics just because nobody is
+       currently posted there.
+
+       Matching ignores case, spaces and hyphens, and runs through the
+       retired-name map first, so "Beed", "beed" or "Janjgir-Champa" in
+       the directory do not add a second copy of a district already here.
+
+       The directory records only "Maharashtra", so a new Maharashtra
+       district is put in a community by its name: "ATC" -> MH-ATC;
+       "MC", Municipal, Corporation, KDMC, PCMC, BMC -> MH-MC; else MH.
+       A state the page does not know yet gets its own community.
+    ==================================================== */
+    const STATE_NAME_TO_CODE = {
+        "maharashtra": "MH", "mh": "MH",
+        "chhattisgarh": "CG", "chattisgarh": "CG", "cg": "CG",
+        "bihar": "BR", "br": "BR",
+        "madhya pradesh": "MP", "mp": "MP"
+    };
+    const MH_FAMILY = ["MH", "MH_ATC", "MH_MC"];
+
+    function districtKey(s) {
+        return String(s == null ? "" : s).toLowerCase().replace(/[^a-z0-9]/g, "");
+    }
+    function mhCommunityFor(name) {
+        if (/\batc\b/i.test(name)) return "MH_ATC";
+        if (/(\bmc\b|municipal|corporation|\bkdmc\b|\bpcmc\b|\bbmc\b)/i.test(name)) return "MH_MC";
+        return "MH";
+    }
+
+    /** Merges the directory's districts in. Returns true if anything was added. */
+    function mergeEmployeeDistricts(tree) {
+        let added = false;
+        (tree || []).forEach(stateNode => {
+            const stateName = String((stateNode && stateNode.name) || "").replace(/\s+/g, " ").trim();
+            if (!stateName) return;
+            let code = STATE_NAME_TO_CODE[stateName.toLowerCase()];
+            if (!code) {
+                // A state not configured here yet: its own community, keyed by its name.
+                code = stateName;
+                if (!STATE_LABELS[code]) { STATE_LABELS[code] = stateName; added = true; }
+            }
+
+            (stateNode.divisions || []).forEach(div => {
+                (div.districts || []).forEach(raw => {
+                    const name = String(raw || "").replace(/\s+/g, " ").trim();
+                    if (!name) return;
+                    const target = code === "MH" ? mhCommunityFor(name) : code;
+                    // Retired-name lookup that ignores case and spacing ("beed", "Raigad ").
+                    const retired = RETIRED_DISTRICT_NAMES[target] || {};
+                    const oldName = Object.keys(retired).find(o => districtKey(o) === districtKey(name));
+                    const canon = canonicalDistrict(target, oldName || name);
+                    const family = code === "MH" ? MH_FAMILY : [canon.state];
+                    const k = districtKey(canon.district);
+                    const known = family.some(c =>
+                        (STATE_DISTRICTS[c] || []).some(d => districtKey(d) === k));
+                    if (known) return;
+
+                    (STATE_DISTRICTS[canon.state] = STATE_DISTRICTS[canon.state] || []).push(canon.district);
+                    if (!STATE_LABELS[canon.state]) STATE_LABELS[canon.state] = canon.state;
+                    added = true;
+                });
+            });
+        });
+        if (added) Object.keys(STATE_DISTRICTS).forEach(c => STATE_DISTRICTS[c].sort(cmpStr));
+        return added;
+    }
+
+    /**
+     * Reads the directory (cached for a minute by app.js) and, if it adds
+     * anything, refreshes the dropdowns in place - keeping whatever the
+     * member has already picked - and redraws the tab on screen.
+     */
+    function loadEmployeeDistricts() {
+        if (typeof window.olfGeography !== "function") return;
+        window.olfGeography()
+            .then(tree => {
+                if (!mergeEmployeeDistricts(tree)) return;
+                refreshLocationSelects();
+                rerenderAll();
+            })
+            .catch(err => console.warn("[GR] could not read districts from Employees", err));
+    }
+
+    function refreshLocationSelects() {
+        [["grUpState", "grUpDistrict", false], ["grDashState", "grDashDistrict", true]]
+            .forEach(([sId, dId, includeAll]) => {
+                const s = document.getElementById(sId);
+                const d = document.getElementById(dId);
+                if (!s || !d) return;
+                const keepState = s.value, keepDist = d.value;
+                fillStateSelect(s, { includeAll });
+                if (keepState) s.value = keepState;
+                fillDistrictSelect(d, s.value, { includeAll });
+                if (keepDist) d.value = keepDist;
+            });
+        ["grSumStateMS", "grSumDistrictMS", "grAnDistrictMS"].forEach(id => {
+            const w = document.getElementById(id);
+            if (w) renderMultiSelect(w);
+        });
     }
 
     /* ====================================================
@@ -765,6 +876,7 @@
             wireSummaryFilters();
             wireAnalyticsFilters();
             wireBusyOverlay();
+            loadEmployeeDistricts();
 
             const who = document.getElementById("grWhoAmI");
             if (who) {
