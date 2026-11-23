@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>In development</title>
+<!-- A separate copy of HO Plan & Review. It runs in its own frame, so its
+     scripts, element ids and saved data cannot clash with the live tab.
+     It reads and writes the hp_ tables only, never the live ones. -->
+<style>html,body,#hpNewRoot{margin:0;height:100%;background:transparent;}</style>
+<script>
+(function () {
+  // Borrow the app's styles and theme from the page that holds this frame.
+  try {
+    var P = window.parent, pd = P.document;
+    document.documentElement.className = pd.documentElement.className;
+    Array.prototype.forEach.call(pd.documentElement.attributes, function (a) {
+      if (a.name !== 'class' && a.name !== 'style') document.documentElement.setAttribute(a.name, a.value);
+    });
+    var st = pd.documentElement.getAttribute('style');
+    if (st) document.documentElement.setAttribute('style', st);
+    Array.prototype.forEach.call(pd.head.querySelectorAll('style, link[rel="stylesheet"]'), function (n) {
+      document.head.appendChild(n.cloneNode(true));
+    });
+    window.SMART_GOALS_USER = P.SMART_GOALS_USER || null;
+  } catch (e) { console.warn('[HO new] could not read the app shell', e); }
+})();
+</script>
+</head>
+<body>
+<div id="hpNewRoot"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="sg-supabase-new.js?v=2"></script>
+<script src="smartgoal-new.js?v=11"></script>
+<script>
+(function () {
+  fetch('pages/ho-plan-new-app.html?v=hp10', { cache: 'no-cache' })
+    .then(function (r) { return r.text(); })
+    .then(function (html) {
+      document.getElementById('hpNewRoot').innerHTML = html;
+      // innerHTML does not run <script> tags; the fragment's styles are already applied.
+      if (window.SmartGoals && window.SmartGoals.mount) window.SmartGoals.mount();
+    });
+})();
+</script>
+</body>
+</html>
