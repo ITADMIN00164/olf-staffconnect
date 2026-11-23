@@ -155,7 +155,8 @@
 
     // Comparison key: case, spaces, hyphens and other punctuation ignored.
     function districtKey(s) {
-        return String(s == null ? "" : s).toLowerCase().replace(/[^a-z0-9]/g, "");
+        return String(s == null ? "" : s).toLowerCase().replace(/[^a-z0-9]/g, "")
+            .replace(/municipalcorporation/g, "mc");   // "Nagpur Municipal Corporation" = "Nagpur - MC"
     }
     // The key without a Zilla Parishad tag, so "Thane-ZP" and "Thane" meet.
     // Only ZP is dropped: MC and ATC are different bodies, never merged.
@@ -192,6 +193,9 @@
         m.forEach((v, k) => { if (v === from) m.set(k, to); });   // older names follow along
         m.delete(districtKey(to));                                  // the new name is not an alias of anything
         m.set(districtKey(from), to);
+        const sf = SHORT_FORMS[c] || (SHORT_FORMS[c] = new Map());
+        sf.forEach((v, k) => { if (v === from) sf.set(k, to); });
+        if (isShortForm(from)) sf.set(districtKey(from), to);
     }
 
     /**
@@ -262,6 +266,15 @@
     };
     const MH_FAMILY = ["MH", "MH_ATC", "MH_MC"];
 
+    // "Maharashtra", "MH", or a label this page itself uses ("Maharashtra - MC").
+    function stateCodeFor(stateName) {
+        const n = String(stateName || "").toLowerCase().replace(/\s+/g, " ").trim();
+        if (STATE_NAME_TO_CODE[n]) return STATE_NAME_TO_CODE[n];
+        const k = districtKey(n);
+        return Object.keys(STATE_LABELS).find(c =>
+            districtKey(STATE_LABELS[c]) === k || districtKey(c) === k) || "";
+    }
+
     function mhCommunityFor(name) {
         if (/\batc\b/i.test(name)) return "MH_ATC";
         if (/(\bmc\b|municipal|corporation|\bkdmc\b|\bpcmc\b|\bbmc\b)/i.test(name)) return "MH_MC";
@@ -272,18 +285,43 @@
     // Exact and known-alias matches are tried before ZP-tag matches.
     function findListedDistrict(communities, name) {
         const k = districtKey(name), ck = coreKey(name);
-        for (const pass of [1, 2]) {
+        const ini = initialsKey(name), tokens = wordKeys(name);
+        for (const pass of [1, 2, 3]) {
             for (const c of communities) {
                 const aliasTo = DISTRICT_ALIASES[c] && DISTRICT_ALIASES[c].get(k);
                 for (const e of (STATE_DISTRICTS[c] || [])) {
-                    const hit = pass === 1
-                        ? (districtKey(e) === k || e === aliasTo)
-                        : (ck && coreKey(e) === ck);
+                    const hit = pass === 1 ? (districtKey(e) === k || e === aliasTo)
+                        : pass === 2 ? (ck && coreKey(e) === ck)
+                        : shortFormsOf(c, e).some(sk => ini === sk || tokens.indexOf(sk) >= 0);
                     if (hit) return { c, e };
                 }
             }
         }
         return null;
+    }
+
+    /* Short forms. A listed name in capitals ("KDMC", "PCMC") is the same
+       place as a name that either spells it out - the initials of
+       "Pimpri Chinchwad - MC" or "Kalyan Dombivli Municipal Corporation"
+       are PCMC and KDMC - or carries it as a word ("Thane - KDMC"). */
+    function isShortForm(e) { return /^[A-Z]{3,6}$/.test(String(e || "").trim()); }
+    // community -> Map(short-form key -> the name it is now shown under), kept
+    // when a short form is renamed, so "Kalyan Dombivli - MC" still finds
+    // "Thane - KDMC" after KDMC took that name.
+    const SHORT_FORMS = Object.create(null);
+    function shortFormsOf(c, e) {
+        const out = isShortForm(e) ? [districtKey(e)] : [];
+        const m = SHORT_FORMS[c];
+        if (m) m.forEach((v, k) => { if (v === e) out.push(k); });
+        return out;
+    }
+    function wordKeys(name) {
+        return String(name || "").split(/[^A-Za-z0-9]+/).filter(Boolean).map(w => w.toLowerCase());
+    }
+    function initialsKey(name) {
+        // A word already in capitals ("MC") counts whole; any other word gives its first letter.
+        return String(name || "").split(/[^A-Za-z0-9]+/).filter(Boolean)
+            .map(w => /^[A-Z]{2,}$/.test(w) ? w.toLowerCase() : w[0].toLowerCase()).join("");
     }
 
     /** Applies the directory's districts. Returns true if anything changed. */
@@ -294,13 +332,13 @@
         (tree || []).forEach(stateNode => {
             const stateName = String((stateNode && stateNode.name) || "").replace(/\s+/g, " ").trim();
             if (!stateName) return;
-            let code = STATE_NAME_TO_CODE[stateName.toLowerCase()];
+            let code = stateCodeFor(stateName);
             if (!code) {
                 // A state not configured here yet: its own community, keyed by its name.
                 code = stateName;
                 if (!STATE_LABELS[code]) { STATE_LABELS[code] = stateName; changed = true; }
             }
-            const family = code === "MH" ? MH_FAMILY : [code];
+            const family = MH_FAMILY.indexOf(code) >= 0 ? MH_FAMILY : [code];
 
             (stateNode.divisions || []).forEach(div => {
                 (div.districts || []).forEach(raw => {
