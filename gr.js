@@ -132,6 +132,17 @@
             "Ahmednagar": "Ahilyanagar",   // renamed district
             "Osmanabad": "Dharashiv"       // renamed district
         },
+        MH_MC: {
+            // Short forms vs full names of the same corporation. Hyphens,
+            // spaces and capitals are ignored, so "Pimpri-Chinchwad MC" matches too.
+            "Pimpri Chinchwad - MC": "PCMC",
+            "Pimpri Chinchwad": "PCMC",
+            "Pimpri Chinchwad Municipal Corporation": "PCMC",
+            "Kalyan Dombivli - MC": "KDMC",
+            "Kalyan Dombivali - MC": "KDMC",
+            "Kalyan Dombivli": "KDMC",
+            "Kalyan Dombivli Municipal Corporation": "KDMC"
+        },
         CG: {
             "Janjgir-Champa": "Janjgir - Champa"   // spacing differs
         }
