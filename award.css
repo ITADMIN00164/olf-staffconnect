@@ -2667,6 +2667,15 @@
 }
 @keyframes aw-img-spin { to { transform: rotate(360deg); } }
 
+/* Award toasts live on <body> (award-manage.js creates #awmToastsBody there) so the top bar can't cover them. */
+#awmToastsBody { position: fixed; top: 84px; right: 18px; z-index: 10000; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+#awmToastsBody .pom-toast { min-width: 220px; max-width: 380px; padding: 12px 16px; border-radius: 10px; font-size: 13.5px; font-weight: 600; line-height: 1.4;
+  color: #fff; box-shadow: 0 10px 28px rgba(0,0,0,.22); opacity: 1; transform: none; transition: opacity .3s, transform .3s; pointer-events: auto; }
+#awmToastsBody .pom-toast.hide { opacity: 0; transform: translateY(-8px); }
+#awmToastsBody .pom-toast.success { background: #16a34a; }
+#awmToastsBody .pom-toast.error   { background: #ef4444; }
+#awmToastsBody .pom-toast.info    { background: #4f8ef7; }
+
 
 /* ======================================================================
    The shared banner, as on the other pages. The page name sits on the

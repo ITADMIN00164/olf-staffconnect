@@ -234,13 +234,21 @@ function showLoader() { document.getElementById("awmLoader").classList.add("open
 function hideLoader() { document.getElementById("awmLoader").classList.remove("open"); }
 
 function showToast(message, type = "success") {
-  const wrap = document.getElementById("awmToasts");
-  if (!wrap) return;
+  // Inside the page the toast box (#awmToasts) sat under the app's top bar (only a thin red
+  // edge showed), so error messages were never readable. Toasts now go in one box on
+  // <body>; award.css places it just below the top bar, above everything.
+  let wrap = document.getElementById("awmToastsBody");
+  if (!wrap) {
+    wrap = document.createElement("div");
+    wrap.id = "awmToastsBody";
+    document.body.appendChild(wrap);
+  }
   const t = document.createElement("div");
   t.className = "pom-toast " + type;
   t.textContent = message;
   wrap.appendChild(t);
-  setTimeout(() => { t.classList.add("hide"); setTimeout(() => t.remove(), 300); }, 3000);
+  const ms = type === "error" ? 7000 : 3000;   // errors stay long enough to read
+  setTimeout(() => { t.classList.add("hide"); setTimeout(() => t.remove(), 300); }, ms);
 }
 
 function showModal({ title, message, buttons }) {
@@ -1337,10 +1345,133 @@ async function compressImage(file) {
 }
 
 // Compress + base64 in one go. Returns { data (base64, no prefix), mimeType, ext }.
+// If shrinking ever stalls (an odd file, a busy phone), give up after 15 s and send the original.
 async function prepareImage(file) {
-  const c = await compressImage(file);
+  const fallback = { blob: file, mimeType: file.type || "image/jpeg",
+                     ext: (file.name.match(/\.[a-z0-9]+$/i) || [".jpg"])[0] };
+  const c = await Promise.race([
+    compressImage(file),
+    new Promise(r => setTimeout(() => r(fallback), 15000))
+  ]);
   const dataUrl = await fileToBase64(c.blob);
   return { data: dataUrl.split(",")[1], mimeType: c.mimeType, ext: c.ext };
+}
+
+// ---------------------------------------------------------------------------
+// Sending an image to the Apps Script service (stores it in Google Drive).
+//
+// The script stores a photo in a few seconds, but on some browsers / networks
+// its reply never reaches the page (seen Nov 2026: the file was in Drive in
+// ~1.5 s and the script's run "Completed" in ~4 s, yet the row hung on
+// "Uploading…" for minutes). So the page does not depend on that reply alone:
+//
+//   1. send the upload and wait for the reply as usual;
+//   2. no reply after FIND_AFTER_MS → ask the script every FIND_EVERY_MS whether a
+//      file with this upload's unique name has arrived (action=findUpload); if it
+//      has, the upload is done — exactly as if the reply had come;
+//   3. still not there after RESEND_AT_MS → send the same upload once more. The
+//      script returns the existing file for a name it already has, so a re-send
+//      can never make a second copy;
+//   4. nothing after UPLOAD_LIMIT_MS → report a failure the user can retry.
+//
+// Steps 2-3 need the updated script (tools/pom-api/Upload.gs). Until it is
+// deployed, findUpload gets the old "POM API Running" answer: no "found" field,
+// so the page just waits for the normal reply and never re-sends.
+// ---------------------------------------------------------------------------
+const FIND_AFTER_MS   = 15000;
+const FIND_EVERY_MS   = 4000;
+const RESEND_AT_MS    = 40000;
+const UPLOAD_LIMIT_MS = 90000;
+
+// fetch → JSON, giving up after `ms`. A reply that isn't JSON (Google's HTML error
+// page) is an error, not a hang.
+async function fetchJsonWithin(url, opts, ms) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), ms);
+  try {
+    const res = await fetch(url, Object.assign({}, opts, { signal: ctl.signal }));
+    const text = await res.text();
+    try { return JSON.parse(text); }
+    catch (e) { throw new Error("The image server sent an unexpected reply (HTTP " + res.status + ")"); }
+  } catch (e) {
+    if (e.name === "AbortError") throw new Error("no answer in " + Math.round(ms / 1000) + " s");
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function postImage(payload) {
+  const t0 = Date.now();
+  const kb = Math.round(payload.data.length * 0.75 / 1024);
+  const findUrl = API_URL + "?action=findUpload" +
+    "&month="    + encodeURIComponent(payload.month || "") +
+    "&district=" + encodeURIComponent(payload.district || "") +
+    "&name="     + encodeURIComponent(payload.fileName || "");
+
+  return new Promise((resolve, reject) => {
+    let settled = false, canFind = false, resent = false, checking = false, lastError = null;
+    let findTimer = null, limitTimer = null;
+
+    const stop = () => { settled = true; clearTimeout(findTimer); clearTimeout(limitTimer); };
+    const ok = (out, how) => {
+      if (settled) return;
+      stop();
+      console.info(`[award] image upload done in ${Date.now() - t0} ms via ${how} (${kb} KB)`);
+      resolve(out);
+    };
+    const fail = (err) => {
+      if (settled) return;
+      stop();
+      console.warn("[award] image upload failed after " + (Date.now() - t0) + " ms:", err);
+      reject(err);
+    };
+
+    const send = (label) => {
+      fetchJsonWithin(API_URL, { method: "POST", body: JSON.stringify(payload) }, UPLOAD_LIMIT_MS)
+        .then(out => {
+          if (out && out.success) ok(out, label);
+          else fail(new Error((out && out.error) || "Upload failed"));     // a real "no" from the script
+        })
+        .catch(err => {
+          // Lost or broken reply: don't give up here - the "did it arrive?" checks
+          // below decide. Remember why, for the message if everything fails.
+          lastError = err;
+          console.warn("[award] no usable reply to the " + label + ":", err.message || err);
+        });
+    };
+
+    const check = async () => {
+      if (settled) return;
+      if (!checking) {
+        checking = true;
+        try {
+          const out = await fetchJsonWithin(findUrl, {}, 10000);
+          if (out && Object.prototype.hasOwnProperty.call(out, "found")) canFind = true;
+          if (out && out.found === true) { ok({ success: true, id: out.id, url: out.url, recovered: true }, "arrival check"); return; }
+        } catch (e) {
+          console.warn("[award] arrival check failed:", e.message || e);   // try again next round
+        } finally {
+          checking = false;
+        }
+      }
+      if (settled) return;
+      if (canFind && !resent && Date.now() - t0 >= RESEND_AT_MS) {
+        resent = true;
+        console.warn("[award] image not in Drive yet - sending it once more");
+        send("re-send");
+      }
+      findTimer = setTimeout(check, FIND_EVERY_MS);
+    };
+
+    send("upload");
+    findTimer  = setTimeout(check, FIND_AFTER_MS);
+    limitTimer = setTimeout(() => {
+      const msg = lastError ? String(lastError.message || lastError) : "";
+      const why = msg && !/^no answer/.test(msg) ? " (" + msg + ")" : "";
+      fail(new Error("The image server didn't answer in " + UPLOAD_LIMIT_MS / 1000 + " s" + why));
+    }, UPLOAD_LIMIT_MS + 2000);
+  });
 }
 
 function driveId(url) {
@@ -1404,6 +1535,12 @@ window.awmUploadImage = async function (index, file) {
   }
 
   cell.innerHTML = '<span class="img-status">Uploading…</span>';
+  // Show the seconds ticking, so a slow upload is visibly alive (and a stuck one is obvious).
+  const upStart = Date.now();
+  const tick = setInterval(() => {
+    const s = cell.querySelector(".img-status");
+    if (s) s.textContent = `Uploading… ${Math.round((Date.now() - upStart) / 1000)}s`;
+  }, 1000);
   try {
     const img = await prepared;
     const safeName = (currentRecords[index].fullName || "image").replace(/[^\w]+/g, "_");
@@ -1418,8 +1555,8 @@ window.awmUploadImage = async function (index, file) {
       replaceId: (deleteOld && driveId(existingUrl)) || null   // the Apps Script deletes this file once the new one is stored
     };
 
-    const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
-    const out = await res.json();
+    const out = await postImage(payload);
+    clearInterval(tick);
     if (!out.success) throw new Error(out.error || "Upload failed");
 
     const wasDirty = !!currentRecords[index]._dirty;
@@ -1467,9 +1604,10 @@ window.awmUploadImage = async function (index, file) {
       showToast("Image uploaded.");
     }
   } catch (e) {
+    clearInterval(tick);
     console.error(e);
     cell.innerHTML = renderImageCell(index) + '<span class="img-status error">Failed — retry</span>';
-    showToast("Image upload failed.", "error");
+    showToast("Image upload failed: " + String((e && e.message) || e).slice(0, 140) + ". Please try again.", "error");
   }
 };
 
@@ -2025,8 +2163,7 @@ window.awmApi = {
       data: img.data,
       replaceId: null
     };
-    const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
-    const out = await res.json();
+    const out = await postImage(payload);
     if (!out.success) throw new Error(out.error || "Upload failed");
     return out.url;
   },
