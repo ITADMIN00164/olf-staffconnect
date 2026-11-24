@@ -20,7 +20,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <!-- Light / Dark / System theme. Loaded first so the right theme is
          applied before anything paints (no white flash in dark mode). -->
-    <script src="theme.js?v=2026-10-28b"></script>
+    <script src="theme.js?v=2026-11-25a"></script>
     <!-- Themed dropdown lists for every <select> (UI only; phones keep the native picker) -->
     <script src="olf-select.js?v=20261106s"></script>
 
@@ -3259,6 +3259,17 @@
         background: linear-gradient(135deg, #F04438, #E04F6B); box-shadow: 0 0 0 2px var(--chrome-bg, #fff), 0 3px 8px rgba(240,68,56,.4);
     }
     .tb-bell-n[hidden] { display: none; }
+
+    /* ── Spaces button in the top bar ── */
+    .tb-rooms svg { width: 25px; height: 25px; overflow: visible; }
+    .tb-rooms .tbr-leaf { transform-box: fill-box; transform-origin: 0 50%; transition: transform .35s cubic-bezier(.34,1.3,.64,1); }
+    .tb-rooms:hover .tbr-leaf, .tb-rooms:focus-visible .tbr-leaf { transform: scaleX(.4); }
+    .tb-rooms:hover { color: inherit; border-color: rgba(124,58,237,.45); box-shadow: 0 6px 14px -6px rgba(124,58,237,.55); }
+    .tb-rooms-dot { position: absolute; top: -3px; right: -3px; width: 11px; height: 11px; border-radius: 50%; background: #10B981; box-shadow: 0 0 0 2px var(--chrome-bg, #fff); }
+    .tb-rooms-dot[hidden] { display: none; }
+    .tb-rooms-dot.busy { background: #EF4444; }
+    .tb-rooms-dot.shut { background: #94A3B8; }
+    @media (max-width: 480px) { .tb-rooms svg { width: 23px; height: 23px; } }
     @media (max-width: 480px) {
         .topbar-logo .logo-sc { display: none; }        /* just "OLF" on a phone, so the buttons fit */
         .tp-group { gap: 8px; }
@@ -3546,6 +3557,22 @@
     html[data-theme] #appShell .theme-switch button:hover { color: var(--tb-ink); }
     html[data-theme] #appShell .theme-switch button[aria-checked="true"] { color: #2F6FE4; }
     html[data-theme] #appShell .theme-switch button svg { width: 16px; height: 16px; }
+
+    /* one button for the colour theme: it shows the current choice (light, dark or device) and a click moves to the next */
+    @media (min-width: 769px) {
+        html[data-theme] #appShell .theme-switch { padding: 0; height: auto; gap: 0; background: none; border: 0; box-shadow: none; }
+        html[data-theme] #appShell .theme-switch::before { display: none; }
+        #appShell .theme-switch button:not([aria-checked="true"]) { display: none; }
+        html[data-theme] #appShell .theme-switch button[aria-checked="true"] {
+            width: 38px; height: 38px; border-radius: 12px; color: #2F6FE4; background: var(--glass-strong, #fff);
+            border: 1px solid var(--hairline, rgba(15,23,42,.08)); box-shadow: var(--shadow-sm);
+            transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+        }
+        html[data-theme="dark"] #appShell .theme-switch button[aria-checked="true"] { color: #8DB4FF; }
+        html[data-theme] #appShell .theme-switch button[aria-checked="true"]:hover { transform: translateY(-1px); border-color: rgba(47,111,228,.4); box-shadow: 0 6px 14px -6px rgba(36,87,197,.4); }
+        html[data-theme] #appShell .theme-switch button[aria-checked="true"] svg { width: 19px; height: 19px; transform: none; }
+        html[data-theme] #appShell .theme-switch button[aria-checked="true"]:hover svg { transform: rotate(25deg) scale(1.1); }
+    }
 
     html[data-theme] #appShell .tb-bell {
         width: var(--tb-ctl); height: var(--tb-ctl); border-radius: 12px; color: var(--tb-soft);
@@ -4118,6 +4145,10 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12.5" rx="2"/><path d="M8.5 20.5h7M12 16.5v4"/></svg>
                 </button>
             </div>
+            <button class="tb-bell tb-rooms" id="tbRoomsBtn" type="button" data-open-rooms aria-label="Spaces" title="Spaces">
+                <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M18 6.500l6 2.500v17.500l-6 2.500z" fill="#C4B5FD"/><rect x="2.500" y="2.500" width="21" height="27.500" rx="4" fill="#7C3AED"/><path d="M6.500 6h13.500a1 1 0 0 1 1 1v21H6.500z" fill="#EDE9FE"/><g class="tbr-leaf"><path d="M6.500 6l8.500-2.600v26L6.500 28z" fill="#A78BFA"/><circle cx="12.200" cy="17.500" r="1.200" fill="#F5F3FF"/></g><circle cx="23" cy="23" r="8.300" fill="#fff"/><circle cx="23" cy="23" r="7" fill="#F59E0B"/><circle cx="23" cy="23" r="5.300" fill="#FFFBEB"/><path d="M23 19.600V23l2.500 1.600" stroke="#B45309" stroke-width="1.700" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="tb-rooms-dot" id="tbRoomsDot" hidden></span>
+            </button>
             <button class="tb-bell" id="tbBellBtn" type="button" aria-label="Announcements" title="Announcements">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9.5a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15.5 6 9.5z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg>
                 <span class="tb-bell-n" hidden>0</span>
@@ -4379,6 +4410,8 @@
 <script src="profile.js"></script>
 <script src="pom.js"></script>
 <script src="calendar.js?v=2026-11-19a"></script>
+<script src="rooms-ui.js?v=2026-11-26c"></script>
+<script src="rooms.js?v=2026-11-26c"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="sg-supabase.js"></script>
 <script src="smartgoal.js?v=2026-11-19a"></script>

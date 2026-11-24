@@ -1,0 +1,58 @@
+// ROOM BOOKING - FIRESTORE SECURITY RULES (add these blocks to your existing rules)
+//
+// How to use:
+//   1. Open Firebase console > Firestore Database > Rules.
+//   2. Paste the three "match" blocks below INSIDE your existing
+//      "match /databases/{database}/documents { ... }" block, and add the two
+//      helper functions next to your other functions (skip any you already have
+//      with the same name).
+//   3. Publish.
+//
+// What they do:
+//   - Anyone signed in can read rooms, bookings and slots (needed for the day view).
+//   - You can create a booking only as yourself, only in 9:00 am - 7:00 pm, in 15-minute steps.
+//   - You can change or delete only your own bookings. The IT admin can delete anyone's.
+//   - Each 15-minute slot is its own document with a fixed id (roomId_date_HHMM).
+//     A slot can only be created if it does not exist yet, which is what stops two
+//     people booking the same time.
+//   - Only the IT admin can rename or switch off rooms.
+
+    function rbSignedIn() { return request.auth != null && request.auth.token.email != null; }
+    function rbMe() { return request.auth.token.email.lower(); }
+    function rbAdmin() { return rbSignedIn() && rbMe() == 'itadmin@openlinksfoundation.org'; }
+
+    match /roomConfig/{roomId} {
+      allow read: if rbSignedIn();
+      allow write: if rbAdmin();
+    }
+
+    match /roomBookings/{bookingId} {
+      allow read: if rbSignedIn();
+      allow create: if rbSignedIn()
+        && request.resource.data.bookedBy == rbMe()
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120
+        && request.resource.data.startMin is int && request.resource.data.endMin is int
+        && request.resource.data.startMin % 15 == 0 && request.resource.data.endMin % 15 == 0
+        && request.resource.data.startMin >= 540 && request.resource.data.endMin <= 1140
+        && request.resource.data.endMin > request.resource.data.startMin;
+      allow update: if rbSignedIn()
+        && resource.data.bookedBy == rbMe()
+        && request.resource.data.bookedBy == resource.data.bookedBy
+        && request.resource.data.roomId == resource.data.roomId
+        && request.resource.data.date == resource.data.date
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120
+        && request.resource.data.startMin is int && request.resource.data.endMin is int
+        && request.resource.data.startMin % 15 == 0 && request.resource.data.endMin % 15 == 0
+        && request.resource.data.startMin >= 540 && request.resource.data.endMin <= 1140
+        && request.resource.data.endMin > request.resource.data.startMin;
+      allow delete: if rbSignedIn() && (resource.data.bookedBy == rbMe() || rbAdmin());
+    }
+
+    match /roomSlots/{slotId} {
+      allow read: if rbSignedIn();
+      allow create: if rbSignedIn() && request.resource.data.by == rbMe();
+      allow update: if false;
+      allow delete: if rbSignedIn() && (resource.data.by == rbMe() || rbAdmin());
+    }

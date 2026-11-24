@@ -22,7 +22,8 @@ import {
     query,
     where,
     serverTimestamp,
-    onSnapshot
+    onSnapshot,
+    runTransaction
 } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 
 /* ====================================
@@ -1450,6 +1451,171 @@ window.olfGetEmployees = async function () {
 };
 
 /* ====================================
+   ROOM BOOKING (Firestore)
+
+   Collections
+     roomConfig/{roomId}           optional per-room overrides: name, label, active, order
+     roomBookings/{bookingId}      one document per booking
+     roomSlots/{roomId_date_HHMM}  one document per 15 minutes of a booking
+
+   The slot documents are what make double-booking impossible: a booking
+   claims every 15-minute slot it covers inside ONE transaction, and a slot
+   that already exists makes the whole booking fail. rooms.js talks to this
+   through window.olfRooms only, so the page itself never imports Firebase.
+==================================== */
+
+const RB_OPEN = 9 * 60, RB_CLOSE = 19 * 60, RB_STEP = 15, RB_HORIZON_DAYS = 30;
+
+function rbPad(n) { return n < 10 ? "0" + n : String(n); }
+function rbIst() {
+    const d = new Date(Date.now() + 5.5 * 3600000);
+    return {
+        date: d.getUTCFullYear() + "-" + rbPad(d.getUTCMonth() + 1) + "-" + rbPad(d.getUTCDate()),
+        min: d.getUTCHours() * 60 + d.getUTCMinutes()
+    };
+}
+function rbDay(dateStr) {
+    const p = String(dateStr).split("-");
+    return new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+}
+function rbSlotIds(roomId, date, startMin, endMin) {
+    const ids = [];
+    for (let m = startMin; m < endMin; m += RB_STEP) ids.push(roomId + "_" + date + "_" + rbPad(Math.floor(m / 60)) + rbPad(m % 60));
+    return ids;
+}
+// Checks the rules of the booking itself. The Firestore rules repeat the important ones.
+function rbValidate(b) {
+    if (!b || !b.roomId) throw new Error("Choose a room.");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(b.date || ""))) throw new Error("Choose a date.");
+    if (!Number.isInteger(b.startMin) || !Number.isInteger(b.endMin)) throw new Error("Choose a start and end time.");
+    if (b.startMin % RB_STEP || b.endMin % RB_STEP) throw new Error("Times move in 15-minute steps.");
+    if (b.startMin < RB_OPEN || b.endMin > RB_CLOSE || b.endMin <= b.startMin) throw new Error("Choose a time between 9:00 am and 7:00 pm.");
+    if (rbDay(b.date).getUTCDay() === 0) throw new Error("Rooms are closed on Sundays.");
+    const now = rbIst();
+    if (b.date < now.date || (b.date === now.date && b.endMin <= now.min)) throw new Error("That time has already passed.");
+    const last = new Date(rbDay(now.date).getTime() + RB_HORIZON_DAYS * 86400000);
+    if (rbDay(b.date) > last) throw new Error("You can book up to " + RB_HORIZON_DAYS + " days ahead.");
+    const title = String(b.title || "").trim();
+    if (!title) throw new Error("Enter a title.");
+    if (title.length > 120) throw new Error("Keep the title under 120 characters.");
+}
+function rbCleanAttendees(list) {
+    return (Array.isArray(list) ? list : []).slice(0, 30).map(a => ({
+        name: String((a && a.name) || "").slice(0, 80),
+        email: String((a && a.email) || "").toLowerCase().slice(0, 120)
+    })).filter(a => a.name || a.email);
+}
+
+window.olfRooms = {
+    user() {
+        const u = window.__olfUser || {};
+        const email = String(u.email || auth.currentUser?.email || "").toLowerCase();
+        return { email, name: u.displayName || auth.currentUser?.displayName || email, isAdmin: email === ORG_ADMIN_EMAIL };
+    },
+
+    async loadConfig() {
+        const snap = await getDocs(collection(db, "roomConfig"));
+        const out = {};
+        snap.forEach(d => { out[d.id] = d.data(); });
+        return out;
+    },
+
+    async saveConfig(roomId, cfg) {
+        if (!this.user().isAdmin) throw new Error("Only an admin can change the spaces.");
+        await setDoc(doc(db, "roomConfig", roomId), {
+            name: String(cfg.name || "").trim().slice(0, 40),
+            label: String(cfg.label || "").trim().slice(0, 40),
+            active: cfg.active !== false,
+            order: Number.isFinite(cfg.order) ? cfg.order : 0,
+            updatedAt: serverTimestamp()
+        }, { merge: true });
+    },
+
+    // Live list of the bookings of one day. Returns the function that stops listening.
+    watchDay(date, onData, onError) {
+        const q = query(collection(db, "roomBookings"), where("date", "==", date));
+        return onSnapshot(q, snap => onData(snap.docs.map(d => ({ id: d.id, ...d.data() }))), err => { if (onError) onError(err); });
+    },
+
+    async myBookings() {
+        const me = this.user();
+        const snap = await getDocs(query(collection(db, "roomBookings"), where("bookedBy", "==", me.email)));
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    },
+
+    async createBooking(b) {
+        const me = this.user();
+        if (!me.email) throw new Error("Sign in again to book a room.");
+        rbValidate(b);
+        const ref = doc(collection(db, "roomBookings"));
+        const slots = rbSlotIds(b.roomId, b.date, b.startMin, b.endMin);
+        await runTransaction(db, async (tx) => {
+            const snaps = await Promise.all(slots.map(id => tx.get(doc(db, "roomSlots", id))));
+            if (snaps.some(sn => sn.exists())) throw new Error("SLOT_TAKEN");
+            tx.set(ref, {
+                roomId: b.roomId, date: b.date, startMin: b.startMin, endMin: b.endMin,
+                title: String(b.title).trim(), notes: String(b.notes || "").slice(0, 500),
+                attendees: rbCleanAttendees(b.attendees),
+                bookedBy: me.email, bookedByName: me.name,
+                createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+            });
+            slots.forEach(id => tx.set(doc(db, "roomSlots", id), { bookingId: ref.id, roomId: b.roomId, date: b.date, by: me.email }));
+        });
+        return ref.id;
+    },
+
+    // Change the time, title, notes or attendees of your own booking.
+    async updateBooking(id, b) {
+        const me = this.user();
+        const ref = doc(db, "roomBookings", id);
+        await runTransaction(db, async (tx) => {
+            const cur = await tx.get(ref);
+            if (!cur.exists()) throw new Error("That booking no longer exists.");
+            const old = cur.data();
+            if (old.bookedBy !== me.email) throw new Error("You can only change your own bookings.");
+            const next = Object.assign({}, old, b, { roomId: old.roomId, date: old.date });
+            rbValidate(next);
+            const oldIds = rbSlotIds(old.roomId, old.date, old.startMin, old.endMin);
+            const newIds = rbSlotIds(old.roomId, old.date, next.startMin, next.endMin);
+            const added = newIds.filter(x => oldIds.indexOf(x) < 0);
+            const snaps = await Promise.all(added.map(sid => tx.get(doc(db, "roomSlots", sid))));
+            if (snaps.some(sn => sn.exists())) throw new Error("SLOT_TAKEN");
+            oldIds.filter(x => newIds.indexOf(x) < 0).forEach(sid => tx.delete(doc(db, "roomSlots", sid)));
+            added.forEach(sid => tx.set(doc(db, "roomSlots", sid), { bookingId: id, roomId: old.roomId, date: old.date, by: old.bookedBy }));
+            tx.update(ref, {
+                startMin: next.startMin, endMin: next.endMin,
+                title: String(next.title).trim(), notes: String(next.notes || "").slice(0, 500),
+                attendees: rbCleanAttendees(next.attendees), updatedAt: serverTimestamp()
+            });
+        });
+    },
+
+    // The person who booked it, or an admin, can cancel.
+    async cancelBooking(id) {
+        const me = this.user();
+        const ref = doc(db, "roomBookings", id);
+        await runTransaction(db, async (tx) => {
+            const cur = await tx.get(ref);
+            if (!cur.exists()) return;
+            const old = cur.data();
+            if (old.bookedBy !== me.email && !me.isAdmin) throw new Error("You can only cancel your own bookings.");
+            rbSlotIds(old.roomId, old.date, old.startMin, old.endMin).forEach(sid => tx.delete(doc(db, "roomSlots", sid)));
+            tx.delete(ref);
+        });
+    },
+
+    // Active staff, for the attendees list.
+    async staff() {
+        const rows = await window.olfGetEmployees();
+        return rows.filter(r => {
+            const st = String(r["Status"] || r["Employee status"] || r["Employee Status"] || r.status || "").trim().toLowerCase();
+            return st !== "inactive" && String(r.Name || "").trim();
+        }).map(r => ({ name: String(r.Name).trim(), email: String(r.Email || "").trim().toLowerCase(), dept: String(r.Dept || "").trim() }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+    }
+};
+
+/* ====================================
    WHERE THE ORGANISATION WORKS
 
    State -> Division -> District, built from the Employees records rather
@@ -2242,6 +2408,7 @@ window.navigate = async function (page) {
 
     if (page === "home") {
         initHomePage();
+        if (window.RoomBooking && typeof window.RoomBooking.homeTile === "function") window.RoomBooking.homeTile();
     }
     else if (page === "employees") {
         initEmployeesPage();
@@ -2301,6 +2468,7 @@ window.navigate = async function (page) {
             }
         }
     }
+
 
     else if (page === "award-management") {
         // award.js reads window.__olfUser / window.__olfEmployee itself for the

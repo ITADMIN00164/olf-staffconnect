@@ -544,6 +544,8 @@
             var on = btns[i].getAttribute("data-theme-choice") === pref;
             btns[i].setAttribute("aria-checked", on ? "true" : "false");
             btns[i].tabIndex = on ? 0 : -1;
+            var NAMES = { light: "Light", dark: "Dark", system: "Device setting" }, ORDER = ["light", "dark", "system"];
+            btns[i].title = on ? "Theme: " + NAMES[pref] + ". Click to switch to " + NAMES[ORDER[(ORDER.indexOf(pref) + 1) % 3]] : NAMES[btns[i].getAttribute("data-theme-choice")];
         }
     }
 
@@ -563,7 +565,10 @@
         group.dataset.wired = "1";
         group.addEventListener("click", function (e) {
             var b = e.target.closest("[data-theme-choice]");
-            if (b) setPref(b.getAttribute("data-theme-choice"));
+            if (!b) return;
+            // only the current choice is visible: a click on it moves on to the next one (light, dark, device)
+            if (b.getAttribute("aria-checked") === "true") { var order = ["light", "dark", "system"]; setPref(order[(order.indexOf(pref) + 1) % 3]); }
+            else setPref(b.getAttribute("data-theme-choice"));
         });
         // Radio-group keyboard pattern: arrows move and select.
         group.addEventListener("keydown", function (e) {
