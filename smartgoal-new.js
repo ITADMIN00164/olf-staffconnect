@@ -204,77 +204,15 @@ let editingReviewId = null;
 const ROLES = { ADMIN:'admin', DEPT_HEAD:'dept_head', MEMBER:'member' };
 let currentUser = { name:'Admin', dept:'', role: ROLES.ADMIN };
 
-function applyRoleFilter(items, type) {
-  if (currentUser.role === ROLES.ADMIN) return items;
-  if (currentUser.role === ROLES.DEPT_HEAD) return items.filter(i => i.dept === currentUser.dept);
-  if (currentUser.role === ROLES.MEMBER) return items.filter(i => i.member === currentUser.name);
-  return [];
-}
-
-function canAccessSettings() { return currentUser.role === ROLES.ADMIN; }
-function canAccessReviews()  { return true; }
-// SMART Goal add/edit/delete: the goal's owner, that dept's head, or an admin.
-function canEditGoal(g) {
-  if (currentUser.role === ROLES.ADMIN) return true;
-  if (currentUser.role === ROLES.DEPT_HEAD && g && g.dept === currentUser.dept) return true;
-  if (g && g.member === currentUser.name && currentUser.name) return true; // owner
-  return false;
-}
-// Success Measures of a SMART Goal: editable by the member, their reporting
-// manager and anyone above that manager in the reporting chain, plus the
-// member's Dept Head and Admins. Everyone who can see the goal can view them.
-function canEditSuccessMeasures(g) {
-  if (!g) return false;
-  if (currentUser.role === ROLES.ADMIN) return true;
-  if (currentUser.role === ROLES.DEPT_HEAD && g.dept === currentUser.dept) return true;
-  if (g.member && currentUser.name && g.member === currentUser.name) return true;
-  return isAboveInChain(g.member, g.dept);
-}
-// True when the logged-in user is the member's reporting manager, or that
-// manager's manager, and so on up the chain (followed by manager email).
-function isAboveInChain(memberName, dept) {
-  var me = _myEmail(); if (!me || !memberName) return false;
-  var ms = (DB.settings && DB.settings.members) || [];
-  var m = memberRecordByName(memberName, dept), seen = {};
-  for (var hop = 0; m && hop < 12; hop++) {
-    var mgr = _lc(m.managerEmail);
-    if (!mgr || seen[mgr]) return false;
-    if (mgr === me) return true;
-    seen[mgr] = 1;
-    m = ms.find(function (x) { return _lc(x.email) === mgr; }) || null;
-  }
-  return false;
-}
-function canEditTask(task) {
-  if (currentUser.role === ROLES.ADMIN) return true;
-  if (currentUser.role === ROLES.DEPT_HEAD && task.dept === currentUser.dept) return true;
-  if (currentUser.role === ROLES.MEMBER && task.member === currentUser.name) return true;
-  return false;
-}
-function canEditMemberScore(r) {
-  // The MEMBER column is the person's own self-assessment. Admin can edit any;
-  // otherwise only the member themselves, on their OWN review, regardless of
-  // role -- so a Dept Head fills in their own member score too. It is never
-  // editable by that person's dept head or reporting manager.
-  if (currentUser.role === ROLES.ADMIN) return true;
-  return !!(r && currentUser.name && r.member === currentUser.name);
-}
-function canEditMgrScore(r) {
-  if (!r) return false;
-  if (currentUser.role === ROLES.ADMIN) return true;
-  // A Dept Head scores the Manager column for the OTHER members of their dept,
-  // but NOT their own review: a Dept Head's own manager score belongs to that
-  // Dept Head's reporting manager, never to themselves.
-  if (currentUser.role === ROLES.DEPT_HEAD && r.dept === currentUser.dept && r.member !== currentUser.name) return true;
-  if (isManagerOf(r.member, r.dept)) return true; // assigned reporting manager
-  return false;
-}
-
-// ── Manager relationship (assigned per-member, not a role) ──────────
-// The logged-in user's email lives in the module var currentEmail (set by
-// resolveUser at login). A person is the 'manager' of a member iff that
-// member's managerEmail matches currentEmail. This is a RELATIONSHIP layered
-// on top of whatever Role the person holds; it never replaces Role.
+// ── WHO MAY DO WHAT ─────────────────────────────────────────────────────
+// One rule for goals, monthly plans and reviews, all inside ONE department:
+//   · a person controls their own work (and gives their own member score);
+//   · a manager controls everyone BELOW them in the reporting chain: their direct
+//     reports, those people's reports, and so on down;
+//   · nobody controls someone above or beside them;
+//   · an admin controls everyone.
+// The chain is followed only through people of the same department, so a manager
+// from another department has no say here.
 function _lc(x) { return String(x == null ? '' : x).trim().toLowerCase(); }
 function _myEmail() { return _lc(currentEmail); }
 function memberRecordByName(name, dept) {
@@ -284,25 +222,66 @@ function memberRecordByName(name, dept) {
   for (i = 0; i < ms.length; i++) { if (ms[i].name === name) return ms[i]; }
   return null;
 }
-function isManagerOf(memberName, dept) {
-  var me = _myEmail(); if (!me || !memberName) return false;
-  var m = memberRecordByName(memberName, dept);
-  return !!(m && _lc(m.managerEmail) === me);
+// True when the signed-in person is above this member in the reporting chain, inside the department.
+function isBelowMe(memberName, dept) {
+  var me = _myEmail();
+  if (!me || !memberName || !dept || currentUser.dept !== dept) return false;
+  var ms = (DB.settings && DB.settings.members) || [];
+  var m = null, i;
+  for (i = 0; i < ms.length; i++) { if (ms[i].name === memberName && ms[i].dept === dept) { m = ms[i]; break; } }
+  var seen = {};
+  for (var hop = 0; m && hop < 20; hop++) {
+    var mgr = _lc(m.managerEmail);
+    if (!mgr || seen[mgr]) return false;
+    if (mgr === me) return true;
+    seen[mgr] = 1;
+    var next = null;
+    for (i = 0; i < ms.length; i++) { if (_lc(ms[i].email) === mgr && ms[i].dept === dept) { next = ms[i]; break; } }
+    m = next;
+  }
+  return false;
 }
+function isManagerOf(memberName, dept) { return isBelowMe(memberName, dept); }
+function isAboveInChain(memberName, dept) { return isBelowMe(memberName, dept); }
+// the people below the signed-in person (same department)
 function myReportees() {
-  var me = _myEmail(); if (!me) return [];
-  return ((DB.settings && DB.settings.members) || []).filter(function (m) { return _lc(m.managerEmail) === me; });
+  return ((DB.settings && DB.settings.members) || []).filter(function (m) { return isBelowMe(m.name, m.dept); });
 }
-function amIManager() { return myReportees().length > 0; }
-// A review is visible if: admin (all) · dept head (own dept) · it's your own ·
-// or you are the member's assigned reporting manager (works across departments).
-function canViewReview(r) {
+function amIManager() { return currentUser.role !== ROLES.ADMIN && myReportees().length > 0; }
+// own work, or work of someone below me
+function canControl(memberName, dept) {
+  if (currentUser.role === ROLES.ADMIN) return true;
+  if (memberName && currentUser.name && memberName === currentUser.name && (!dept || !currentUser.dept || dept === currentUser.dept)) return true;
+  return isBelowMe(memberName, dept);
+}
+
+// What shows on the Dashboard: everything for an admin, otherwise your own work and the work of people below you.
+function applyRoleFilter(items, type) {
+  if (currentUser.role === ROLES.ADMIN) return items;
+  return items.filter(function (i) { return canControl(i.member, i.dept); });
+}
+
+function canAccessSettings() { return currentUser.role === ROLES.ADMIN; }
+function canAccessReviews()  { return true; }
+// SMART Goals (add / edit / delete) and their Success Measures: own goals, or goals of people below me.
+function canEditGoal(g) { return !!g && canControl(g.member, g.dept); }
+function canEditSuccessMeasures(g) { return !!g && canControl(g.member, g.dept); }
+// Monthly plan tasks: own tasks, or tasks of people below me.
+function canEditTask(task) { return !!task && canControl(task.member, task.dept); }
+// Review: the member score is the person's own; the manager score is for people above them.
+function canEditMemberScore(r) {
+  if (currentUser.role === ROLES.ADMIN) return true;
+  return !!(r && currentUser.name && r.member === currentUser.name);
+}
+function canEditMgrScore(r) {
   if (!r) return false;
   if (currentUser.role === ROLES.ADMIN) return true;
-  if (currentUser.role === ROLES.DEPT_HEAD && r.dept === currentUser.dept) return true;
-  if (r.member === currentUser.name && currentUser.name) return true;
-  if (isManagerOf(r.member, r.dept)) return true;
-  return false;
+  return isBelowMe(r.member, r.dept);
+}
+// A review is visible to: an admin, the person it is about, and people above them in the chain.
+function canViewReview(r) {
+  if (!r) return false;
+  return canControl(r.member, r.dept);
 }
 
 function renderUserBadge() {
@@ -315,8 +294,7 @@ function renderUserBadge() {
   `;
   document.getElementById('nav-tab-settings').style.display = canAccessSettings() ? '' : 'none';
   document.getElementById('nav-tab-reviews').style.display = '';
-  if (currentUser.role === ROLES.MEMBER) currentDept = '';
-  else if (currentUser.role === ROLES.DEPT_HEAD && !currentDept) currentDept = currentUser.dept;
+  if (currentUser.role !== ROLES.ADMIN) currentDept = currentUser.dept || '';
 }
 
 function openRoleSwitcher() { openModal('role-switcher-modal'); renderRoleSwitcher(); }
@@ -583,19 +561,17 @@ function populateAllSelects() {
   const {depts} = DB.settings, members = memberNames(), years = academicYearOptions();
   populateSelect('global-dept', depts, 'All Departments');
 
-  populateYearSelect('sg-year-filter', {emptyLabel:'All Academic Years', selectCurrent:true});
+  sgFillYearSelect();
   populateSelect('sg-dept-filter', depts, 'Select Department…');
   setSgMemberOptions();
 
-  populateYearSelect('mp-year', {emptyLabel:'Academic Year…', selectCurrent:true});
-  populateSelect('mp-month', MONTHS, 'Month…');
+  mpFillYearMonth();
   populateSelect('mp-week', WEEKS, 'All Weeks');
   populateSelect('mp-dept', depts, 'Department…');
   // mp-goal & mp-member are scoped to the selected department + role
   refreshMpDeptScopedDropdowns();
 
-  populateYearSelect('rv-year', {emptyLabel:'All Academic Years', selectCurrent:true});
-  populateSelect('rv-month', MONTHS, 'All Months');
+  rvFillYearMonth();
   populateSelect('rv-dept', depts, 'All Depts');
   populateSelect('rv-member', members, 'Select Member…');
 
@@ -617,26 +593,21 @@ function populateAllSelects() {
   populateSelect('dash-dept-filter', depts, 'All Departments');
 }
 
-// Role-scoped member names for dept-scoped dropdowns:
-//   admin -> members in the given dept; dept_head -> own dept; member -> self only.
+// People the signed-in person may work on in a department: an admin, everyone;
+// anyone else, themselves and the people below them in the chain (only in their own department).
 function scopedMemberNames(dept) {
-  if (currentUser.role === ROLES.MEMBER) return currentUser.name ? [currentUser.name] : [];
-  if (currentUser.role === ROLES.DEPT_HEAD) return membersInDept(currentUser.dept).map(function(m){return m.name;});
-  return membersInDept(dept).map(function(m){return m.name;});
-}
-
-// Reviews-only member scope: like scopedMemberNames, but ALSO includes the
-// user themselves and everyone who reports to them (their reportees), even
-// across departments. Used only by the Reviews tab so a Manager can pick a
-// reportee to view/score. Does NOT widen Monthly Plan / SMART Goals scope.
-function reviewScopedMemberNames(dept) {
   if (currentUser.role === ROLES.ADMIN) return membersInDept(dept).map(function(m){return m.name;});
-  var set = {}, order = [];
-  function add(n){ if (n && !set[n]) { set[n] = 1; order.push(n); } }
-  if (currentUser.role === ROLES.DEPT_HEAD) membersInDept(currentUser.dept).forEach(function(m){ add(m.name); });
-  add(currentUser.name);
-  myReportees().forEach(function(m){ add(m.name); });
-  return order;
+  if (!currentUser.dept || (dept && dept !== currentUser.dept)) return [];
+  var out = [];
+  membersInDept(currentUser.dept).forEach(function (m) { if (canControl(m.name, m.dept)) out.push(m.name); });
+  return out;
+}
+// Same people for the Reviews tab.
+function reviewScopedMemberNames(dept) { return scopedMemberNames(dept); }
+// member records of those people (for the Dashboard tables)
+function scopedMembers(dept) {
+  var names = scopedMemberNames(dept);
+  return ((DB.settings && DB.settings.members) || []).filter(function (m) { return m.dept === dept && names.indexOf(m.name) > -1; });
 }
 
 // Monthly Plan: SMART Goal + Member dropdowns follow the selected department.
@@ -651,7 +622,7 @@ function refreshMpDeptScopedDropdowns() {
   populateSelect('mp-goal', [...new Set(goalPool.map(function(g){return g.goal;}))], 'All SMART Goals');
   populateSelect('mp-member', membersInDept(dept).map(function(m){return m.name;}), 'All Members');
 }
-function onMpDeptChange() { refreshMpDeptScopedDropdowns(); renderPlan(); }
+function onMpDeptChange() { mpPerson = ''; var w = document.getElementById('mp-week'); if (w) w.value = ''; refreshMpDeptScopedDropdowns(); renderPlan(); }
 
 // Auto-populate the landing state of filters: current AY, current month, and
 // (for non-admins) the user's own department. Only fills EMPTY fields, so it
@@ -690,14 +661,7 @@ function applyFilterDefaults() {
     mpMem.value = currentUser.name;
     mpMem.dataset.selfDefault = '1';
   }
-  // ...and on the current week of the month (Week 1 = days 1-7, ... Week 5 = 29-31),
-  // once per visit like the member above, so "All Weeks" stays picked after a Refresh.
-  const mpWeek = document.getElementById('mp-week');
-  if (mpWeek && !mpWeek.dataset.weekDefault && !mpWeek.value &&
-      (document.getElementById('mp-month') || {}).value === nowMonth) {
-    mpWeek.value = 'Week ' + Math.min(5, Math.ceil(new Date().getDate() / 7));
-    mpWeek.dataset.weekDefault = '1';
-  }
+  // The Monthly Plan opens on All weeks; the week chips narrow it down.
 }
 
 function populateTaskMemberDropdown() {
@@ -786,6 +750,64 @@ function getCurrentPageId() {
 }
 
 // ── PAGE NAV ──
+// ── Motion helpers ──
+function hpReducedMotion() { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
+// the highlight that glides under the page tabs
+function hpGlide() {
+  var box = document.querySelector('#sgHero .nav-tabs'); if (!box) return;
+  var act = box.querySelector('.nav-tab.active'); if (!act || !act.offsetWidth) return;
+  var g = box.querySelector('.hp-glider');
+  if (!g) { g = document.createElement('span'); g.className = 'hp-glider'; g.setAttribute('aria-hidden', 'true'); box.insertBefore(g, box.firstChild); g.style.transition = 'none'; }
+  g.style.width = act.offsetWidth + 'px'; g.style.height = act.offsetHeight + 'px';
+  g.style.transform = 'translate(' + act.offsetLeft + 'px,' + act.offsetTop + 'px)';
+  if (g.style.transition === 'none') requestAnimationFrame(function () { requestAnimationFrame(function () { g.style.transition = ''; }); });
+}
+// numbers climb to their value
+function hpCountUp(scope) {
+  if (hpReducedMotion() || !scope) return;
+  Array.prototype.forEach.call(scope.querySelectorAll('.db-tile b, .mp-tile b, .rv-big b, .sgp-mt b'), function (el) {
+    var n = el.firstChild; if (!n || n.nodeType !== 3) return;
+    var m = /^(\D*?)(-?\d+(?:\.\d+)?)([\s\S]*)$/.exec(n.nodeValue); if (!m) return;
+    var end = parseFloat(m[2]); if (!isFinite(end) || Math.abs(end) < 2) return;
+    var dec = (m[2].split('.')[1] || '').length, t0 = null, dur = 750;
+    function step(ts) {
+      if (t0 === null) t0 = ts;
+      var p = Math.min((ts - t0) / dur, 1), e = 1 - Math.pow(1 - p, 3);
+      n.nodeValue = m[1] + (end * e).toFixed(dec) + m[3];
+      if (p < 1) requestAnimationFrame(step); else n.nodeValue = m[1] + m[2] + m[3];
+    }
+    n.nodeValue = m[1] + (0).toFixed(dec) + m[3];
+    requestAnimationFrame(step);
+    // if the screen is hidden or busy the animation may not run: always end on the true value
+    setTimeout(function () { n.nodeValue = m[1] + m[2] + m[3]; }, dur + 250);
+  });
+}
+var _hpEnterT = null;
+// called when you arrive on a page: its pieces rise in and its numbers climb
+function hpEnter() {
+  var root = document.getElementById('sg-app'); if (!root) return;
+  hpGlide();
+  if (hpReducedMotion()) return;
+  root.classList.remove('hp-enter'); void root.offsetWidth; root.classList.add('hp-enter');
+  hpCountUp(document.querySelector('#sg-app .page.active'));
+  clearTimeout(_hpEnterT); _hpEnterT = setTimeout(function () { root.classList.remove('hp-enter'); }, 1200);
+}
+// the right-hand side slides in when another person is picked
+function hpSwap() {
+  if (hpReducedMotion()) return;
+  var m = document.querySelector('#sg-app .page.active .sgp-main'); if (!m) return;
+  m.classList.remove('hp-swap'); void m.offsetWidth; m.classList.add('hp-swap');
+  setTimeout(function () { m.classList.remove('hp-swap'); }, 500);
+}
+// a soft green glow on whatever was just saved
+var hpFlashId = null;
+function hpFlashNow(sel) {
+  if (hpReducedMotion()) return;
+  var el = document.querySelector('#sg-app .page.active ' + sel); if (!el) return;
+  el.classList.remove('hp-flash-el'); void el.offsetWidth; el.classList.add('hp-flash-el');
+  setTimeout(function () { el.classList.remove('hp-flash-el'); }, 1300);
+}
+window.addEventListener('resize', function () { try { hpGlide(); } catch (e) {} });
 function showPage(id) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
@@ -793,6 +815,7 @@ function showPage(id) {
   const tabMap={dashboard:0,'smart-goals':1,'monthly-plan':2,reviews:3,settings:4};
   document.querySelectorAll('.nav-tab')[tabMap[id]]?.classList.add('active');
   renderPage(id);
+  hpEnter();
 }
 
 function renderPage(id) {
@@ -808,7 +831,6 @@ function renderPage(id) {
 function deptsInScope(deptFilter) {
   let depts;
   if (currentUser.role === ROLES.ADMIN) depts = DB.settings.depts.slice();
-  else if (currentUser.role === ROLES.DEPT_HEAD) depts = [currentUser.dept];
   else depts = currentUser.dept ? [currentUser.dept] : [];
   if (deptFilter) depts = depts.filter(d => d === deptFilter);
   return depts;
@@ -861,50 +883,7 @@ function _avgScoredPerf(list){ var a=_annReviews(list).filter(function(x){return
 function _perfCell(v){ return v==null?'<span style="color:var(--text3)">—</span>':'<span style="font-weight:700;color:'+pctColor(v)+'">'+v+'%</span>'; }
 function _momCell(cur,prev){ if(cur==null||prev==null) return '—'; var d=cur-prev; return d>=0?'<span style="color:var(--green);font-weight:700">▲ +'+d+'</span>':'<span style="color:var(--red);font-weight:700">▼ '+d+'</span>'; }
 
-function renderReviewOverview(){
-  var el=document.getElementById('dash-review-score'); if(!el) return;
-  var year=(document.getElementById('dash-year-filter')||{}).value||'';
-  var month=(document.getElementById('dash-month-filter')||{}).value||'';
-  var deptFilter=(document.getElementById('dash-dept-filter')||{}).value||currentDept;
-
-  var base=applyRoleFilter(DB.reviews,'review'); if(year) base=base.filter(function(r){return r.year===year;});
-  var scoped=base.slice(); if(deptFilter) scoped=scoped.filter(function(r){return r.dept===deptFilter;}); if(month) scoped=scoped.filter(function(r){return r.month===month;});
-
-  var A=_annReviews(scoped);
-  var filed=A.filter(function(x){return x.status!=='draft';}).length;
-  var pending=A.filter(function(x){return x.status==='awaiting';}).length;
-  var scoredArr=A.filter(function(x){return x.status==='scored';});
-  var avgPerf=scoredArr.length?Math.round(scoredArr.reduce(function(s,x){return s+x.perf;},0)/scoredArr.length):null;
-
-  var momVal='—', momTxt=month?'':'select a single month';
-  if(month){
-    var db=deptFilter?base.filter(function(r){return r.dept===deptFilter;}):base;
-    var cur=_avgScoredPerf(db.filter(function(r){return r.month===month;}));
-    var pm=ayPrevMonth(month);
-    if(!pm){ momTxt='no prior month (June)'; }
-    else { var prev=_avgScoredPerf(db.filter(function(r){return r.month===pm;}));
-      momVal=_momCell(cur,prev);
-      momTxt=(cur==null||prev==null)?('vs '+pm+' — not enough data'):('vs '+pm+' ('+prev+'% → '+cur+'%)'); }
-  }
-
-  var kpi='<div class="metrics-row" style="margin-bottom:14px">'
-    +'<div class="metric-card"><div class="metric-label">Reviews Filed</div><div class="metric-val">'+filed+'</div></div>'
-    +'<div class="metric-card"><div class="metric-label">Pending Mgr Score</div><div class="metric-val" style="color:var(--amber)">'+pending+'</div></div>'
-    +'<div class="metric-card"><div class="metric-label">Mgr Scored</div><div class="metric-val" style="color:var(--green)">'+scoredArr.length+'</div></div>'
-    +'<div class="metric-card"><div class="metric-label">Org Avg Performance</div><div class="metric-val">'+(avgPerf==null?'—':avgPerf+'%')+'</div><div class="metric-sub">'+(scoredArr.length?'n='+scoredArr.length+' scored':'no scored reviews')+'</div></div>'
-    +'<div class="metric-card"><div class="metric-label">MoM Change</div><div class="metric-val">'+momVal+'</div><div class="metric-sub">'+momTxt+'</div></div>'
-    +'</div>';
-
-  el.innerHTML=kpi
-    +'<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:20px;align-items:start">'
-      +'<div><div class="sub-hd">By Department</div>'+_reviewDeptTable(scoped,base,deptFilter,month)+'</div>'
-      +'<div><div class="sub-hd">Performance Distribution</div>'+_reviewDonut(scoped)+'</div>'
-    +'</div>'
-    +'<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:20px;align-items:start;margin-top:16px">'
-      +'<div>'+_reviewMemberTable(base,deptFilter,month)+'</div>'
-      +'<div><div class="sub-hd">Avg Performance % — month-wise trend (org-wide'+(year?', '+esc(year):'')+')</div>'+_reviewTrend(base)+'</div>'
-    +'</div>';
-}
+function renderReviewOverview(){ dbRenderReview(); }
 
 function _reviewTrend(base){
   var rows=AY_MONTHS.map(function(m){
@@ -1004,39 +983,7 @@ function _goalScoreTable(scoped){
 function varColor(v){ if(v==null) return 'var(--text3)'; var a=Math.abs(v); if(a<10) return 'var(--text2)'; if(v>0) return a>=30?'#C0392B':'#C07C0A'; return a>=30?'#2E5FA3':'#4A78C0'; }
 function _varCell(hv){ if(hv.variancePct==null) return '<span style="color:var(--text3)">—</span>'; var t=(hv.variancePct>0?'+':'')+hv.variancePct+'%'; return '<span style="font-weight:700;color:'+varColor(hv.variancePct)+'" title="'+(hv.estTotal||0)+'h est → '+(hv.actualTotal||0)+'h actual">'+t+'</span>'; }
 
-function renderPlanOverview(){
-  var el=document.getElementById('dash-plan-progress'); if(!el) return;
-  var year=(document.getElementById('dash-year-filter')||{}).value||'';
-  var month=(document.getElementById('dash-month-filter')||{}).value||'';
-  var deptFilter=(document.getElementById('dash-dept-filter')||{}).value||currentDept;
-  var base=applyRoleFilter(DB.tasks,'task'); if(year) base=base.filter(function(t){return t.year===year;});
-  var scoped=base.slice(); if(deptFilter) scoped=scoped.filter(function(t){return t.dept===deptFilter;}); if(month) scoped=scoped.filter(function(t){return t.month===month;});
-  var week=(document.getElementById('dash-week-filter')||{}).value||''; if(week) scoped=scoped.filter(function(t){return t.week===week;});
-
-  // Two balanced full-width rows: wide tables on the left, their companion chart on the right.
-  var total=scoped.length, done=scoped.filter(function(t){return t.status==='Completed';}).length, ip=scoped.filter(function(t){return t.status==='In Process';}).length, pend=scoped.filter(function(t){return t.status==='Pending';}).length;
-  var overdue=scoped.filter(isTaskOverdue).length, onhold=scoped.filter(function(t){return t.status==='On Hold';}).length, cancelled=scoped.filter(function(t){return t.status==='Cancelled';}).length;
-  var pct=total>0?Math.round(done/total*100):0, hv=computeHoursVariance(scoped), ic=computeItemsCompletion(scoped);
-  var hvTxt=hv.variancePct==null?'—':(hv.variancePct>0?'+':'')+hv.variancePct+'%';
-  var kpi='<div class="metrics-row" style="margin-bottom:16px">'
-    +'<div class="metric-card"><div class="metric-label">Total Tasks</div><div class="metric-val">'+total+'</div></div>'
-    +'<div class="metric-card"><div class="metric-label">Completed</div><div class="metric-val" style="color:var(--green)">'+done+'</div><div class="bar"><div class="bar-fill" style="width:'+pct+'%;background:var(--green)"></div></div><div class="metric-sub">'+pct+'% completion</div></div>'
-    +'<div class="metric-card"><div class="metric-label">In Process</div><div class="metric-val" style="color:var(--amber)">'+ip+'</div></div>'
-    +'<div class="metric-card"><div class="metric-label">Pending</div><div class="metric-val" style="color:var(--red)">'+pend+'</div></div>'
-    +'<div class="metric-card"><div class="metric-label">On Hold / Cancelled</div><div class="metric-val">'+onhold+'<span style="color:var(--text3)"> / </span>'+cancelled+'</div></div>'
-    +'<div class="metric-card"><div class="metric-label">Overdue</div><div class="metric-val" style="color:var(--red)">'+overdue+'</div><div class="metric-sub">past target, not done</div></div>'
-    +'<div class="metric-card"><div class="metric-label">Est vs Actual Hrs</div><div class="metric-val" style="color:'+varColor(hv.variancePct)+'">'+hvTxt+'</div><div class="metric-sub">'+(hv.estTotal||0)+'h → '+(hv.actualTotal||0)+'h</div></div>'
-    +'<div class="metric-card"><div class="metric-label">Items Delivered</div><div class="metric-val">'+(ic.ratioPct==null?'—':ic.ratioPct+'%')+'</div><div class="metric-sub">'+(ic.actualTotal||0)+' / '+(ic.plannedTotal||0)+' items</div></div>'
-    +'</div>';
-  el.innerHTML=kpi+'<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:20px;align-items:start">'
-      +'<div><div class="sub-hd">By Department</div>'+_planDeptTable(scoped,deptFilter)+'</div>'
-      +'<div><div class="sub-hd">Status Distribution</div>'+_planDonut(scoped)+'</div>'
-    +'</div>'
-    +'<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:20px;align-items:start;margin-top:16px">'
-      +'<div>'+_planMemberTable(scoped,deptFilter)+'</div>'
-      +'<div><div class="sub-hd">Completion % — month-wise trend (org-wide'+(year?', '+esc(year):'')+')</div>'+_planTrend(base)+'</div>'
-    +'</div>';
-}
+function renderPlanOverview(){ dbRenderPlan(); }
 
 function _planTrend(base){
   var rows=AY_MONTHS.map(function(m){
@@ -1183,9 +1130,7 @@ function renderReviewAssist(){
   var dept=(document.getElementById('rf-dept')||{}).value||'';
   var member=(document.getElementById('rf-member')||{}).value||'';
   if(!member||!dept||!month) return;
-  var isReviewer = currentUser.role===ROLES.ADMIN
-    || (currentUser.role===ROLES.DEPT_HEAD && dept===currentUser.dept)
-    || isManagerOf(member,dept);
+  var isReviewer = currentUser.role===ROLES.ADMIN || isBelowMe(member,dept);
   if(!isReviewer || member===currentUser.name) return;   // hidden from the member during self-review
 
   var met=memberMonthMetrics(member,dept,year,month);
@@ -1271,7 +1216,7 @@ function renderWatchlist(){
 // ── #2 Data-Quality (admin only) ──
 function renderDataQuality(){
   var card=document.getElementById('dash-dq-card'); var el=document.getElementById('dash-dataquality'); if(!el) return;
-  if(currentUser.role===ROLES.MEMBER){ if(card) card.style.display='none'; return; }
+  if(currentUser.role!==ROLES.ADMIN && !amIManager()){ if(card) card.style.display='none'; return; }
   if(card) card.style.display='';
   var ts=_dashScope('task'), rv=_dashScope('review'); var deptFilter=ts.deptFilter;
   function pc(n,d){ return d>0?Math.round(n/d*100):null; }
@@ -1323,6 +1268,256 @@ function renderDataQuality(){
     +'<div class="sub-hd" style="margin-top:18px">Quality of Tasks</div>'+table2;
 }
 // ═══════════════════════════════════════════════════════════════════════════════════════
+
+
+// ══════════ DASHBOARD: insights first, then the detail ══════════
+var DB_MON = { June: 'Jun', July: 'Jul', August: 'Aug', September: 'Sep', October: 'Oct', November: 'Nov', December: 'Dec', January: 'Jan', February: 'Feb', March: 'Mar', April: 'Apr', May: 'May' };
+function dbScope() {
+  var g = function (id) { return (document.getElementById(id) || {}).value || ''; };
+  return { year: g('dash-year-filter'), month: g('dash-month-filter'), week: g('dash-week-filter'), dept: g('dash-dept-filter') || currentDept };
+}
+function dbDaysLate(t) {
+  var tg = sgIstYMD(t.tgtDate), td = sgIstTodayYMD(); if (!tg) return 0;
+  return Math.round((Date.UTC(td[0], td[1], td[2]) - Date.UTC(tg[0], tg[1], tg[2])) / 86400000);
+}
+function dbPct(n, d) { return d > 0 ? Math.round(n / d * 100) : null; }
+function dbDelta(cur, prev, unit) {
+  if (cur == null || prev == null) return '';
+  var d = cur - prev; if (d === 0) return '<span class="db-d">no change</span>';
+  return '<span class="db-d ' + (d > 0 ? 'up' : 'down') + '">' + (d > 0 ? '\u25B2 +' : '\u25BC ') + d + (unit || '') + '</span>';
+}
+function dbTile(label, value, sub, color, bar) {
+  return '<div class="db-tile" style="--tc:' + color + '"><span>' + label + '</span><b>' + value + '</b><em>' + sub + '</em>'
+    + (bar == null ? '' : '<div class="db-prog"><i style="width:' + Math.min(bar, 100) + '%;background:' + color + '"></i></div>') + '</div>';
+}
+function dbCard(title, note, body) {
+  return '<div class="db-card"><div class="db-ch"><h3>' + title + '</h3>' + (note ? '<span>' + note + '</span>' : '') + '</div><div class="db-cb">' + body + '</div></div>';
+}
+function dbStack(segs) {
+  var tot = segs.reduce(function (a, x) { return a + x.value; }, 0);
+  if (!tot) return '<div class="db-empty">Nothing to show for this selection yet.</div>';
+  return '<div class="db-stack">' + segs.filter(function (x) { return x.value; }).map(function (x) { return '<i title="' + esc(x.label) + ': ' + x.value + '" style="width:' + (x.value / tot * 100) + '%;background:' + x.color + '"></i>'; }).join('') + '</div>'
+    + '<div class="db-leg">' + segs.map(function (x) { return '<div><i style="background:' + x.color + '"></i>' + esc(x.label) + '<b>' + x.value + '</b></div>'; }).join('') + '</div>';
+}
+function dbCols(rows, selMonth) {
+  if (!rows.some(function (r) { return r.pct != null; })) return '<div class="db-empty">No data for this academic year yet.</div>';
+  return '<div class="db-cols">' + rows.map(function (r) {
+    var h = r.pct == null ? 0 : Math.max(r.pct, 2);
+    return '<div class="db-col' + (r.m === selMonth ? ' is-sel' : '') + '" title="' + esc(r.m) + (r.pct == null ? ': no data' : ': ' + r.pct + '%' + (r.n ? ' (' + r.n + ')' : '')) + '">'
+      + '<em>' + (r.pct == null ? '' : r.pct + '%') + '</em><div class="bar" style="height:' + (r.pct == null ? 0 : h * 1.15) + 'px;background:' + (r.pct == null ? 'transparent' : pctColor(r.pct)) + ';opacity:' + (!selMonth || r.m === selMonth ? 1 : .55) + '"></div><small>' + DB_MON[r.m] + '</small></div>';
+  }).join('') + '</div>';
+}
+function dbMeter(v) {
+  if (v == null) return '<span style="color:var(--text3)">\u2014</span>';
+  return '<div class="db-meter"><span><i style="width:' + Math.min(v, 100) + '%;background:' + pctColor(v) + '"></i></span><b style="color:' + pctColor(v) + '">' + v + '%</b></div>';
+}
+function dbPctText(v) { return v == null ? '<span style="color:var(--text3)">\u2014</span>' : '<b style="color:' + pctColor(v) + '">' + v + '%</b>'; }
+function dbOpenTask(id) {
+  var t = DB.tasks.find(function (x) { return x.id === id; }); if (!t) return;
+  document.getElementById('mp-year').value = t.year; document.getElementById('mp-month').value = t.month;
+  document.getElementById('mp-dept').value = t.dept; document.getElementById('mp-week').value = '';
+  refreshMpDeptScopedDropdowns(); mpPerson = t.member; mpOpen[id] = true;
+  showPage('monthly-plan');
+}
+function dbOpenReview(id) {
+  var r = DB.reviews.find(function (x) { return x.id === id; }); if (!r) return;
+  document.getElementById('rv-year').value = r.year; document.getElementById('rv-month').value = r.month;
+  if (currentUser.role === ROLES.ADMIN) document.getElementById('rv-dept').value = r.dept;
+  rvPerson = r.member; showPage('reviews');
+}
+function dbLink(fn, arg, inner) {
+  var call = fn + "('" + escJs(arg) + "')";
+  return '<div class="db-li is-link" role="button" tabindex="0" onclick="' + call + '" onkeydown="if(event.key===\'Enter\')' + call + '">' + inner + '<span class="mpt-chev" aria-hidden="true">\u203A</span></div>';
+}
+function dbInsight(tone, html) { return '<div class="db-in ' + tone + '"><i></i><div>' + html + '</div></div>'; }
+function dbTableDept(S) {   // which department the people table is about; null = show the departments table
+  if (S.dept) return S.dept;
+  if (currentUser.role !== ROLES.ADMIN && currentUser.dept) return currentUser.dept;
+  return null;
+}
+
+// ── Plan ──
+function dbRenderPlan() {
+  var el = document.getElementById('dash-plan-progress'); if (!el) return;
+  var S = dbScope();
+  var base = applyRoleFilter(DB.tasks, 'task'); if (S.year) base = base.filter(function (t) { return t.year === S.year; });
+  var inDept = S.dept ? base.filter(function (t) { return t.dept === S.dept; }) : base;
+  var tasks = inDept.slice();
+  if (S.month) tasks = tasks.filter(function (t) { return t.month === S.month; });
+  if (S.week) tasks = tasks.filter(function (t) { return t.week === S.week; });
+  var live = tasks.filter(function (t) { return t.status !== 'Cancelled'; });
+  var done = live.filter(function (t) { return t.status === 'Completed'; }).length;
+  var pct = dbPct(done, live.length);
+  var overdue = tasks.filter(isTaskOverdue), stale = tasks.filter(isTaskStale);
+  var hv = computeHoursVariance(tasks), ic = computeItemsCompletion(tasks), ot = computeOnTimeRate(tasks), q = computeMgrQuality(tasks);
+  var pm = S.month ? ayPrevMonth(S.month) : null, prevPct = null;
+  if (pm) { var pt = inDept.filter(function (t) { return t.month === pm && t.status !== 'Cancelled'; }); prevPct = dbPct(pt.filter(function (t) { return t.status === 'Completed'; }).length, pt.length); }
+  var scopeTxt = (S.dept || 'All departments') + (S.month ? ' \u00B7 ' + S.month : ' \u00B7 whole year') + (S.week ? ' \u00B7 ' + S.week : '');
+
+  if (!tasks.length) {
+    el.innerHTML = '<div class="db-card" style="margin-top:0"><div class="db-empty" style="padding:56px 16px"><b style="display:block;font-size:15px;color:var(--text);margin-bottom:4px">No tasks for this selection</b>' + esc(scopeTxt) + '. Pick another month or department, or add tasks in the Monthly Plan tab.</div></div>';
+    return;
+  }
+
+  // insights: the few things worth knowing, in plain words
+  var ins = [];
+  var pc = pct == null ? 0 : pct;
+  ins.push(dbInsight(pc >= 80 ? 'good' : (pc >= 50 ? 'warn' : 'bad'), '<b>' + (pct == null ? 0 : pct) + '% of tasks are complete</b> (' + done + ' of ' + live.length + ')' + (prevPct != null ? ', ' + (pct - prevPct === 0 ? 'the same as ' + pm : (pct > prevPct ? (pct - prevPct) + ' points up from ' : (prevPct - pct) + ' points down from ') + pm) : '') + '.'));
+  ins.push(overdue.length ? dbInsight('bad', '<b>' + overdue.length + ' overdue task' + (overdue.length > 1 ? 's' : '') + '</b>' + (stale.length ? ', ' + stale.length + ' untouched for ' + STALE_DAYS + '+ days' : '') + '.') : dbInsight('good', '<b>No overdue tasks.</b> Everything is on track.'));
+  if (ot.onTimePct != null) ins.push(dbInsight(ot.onTimePct >= 80 ? 'good' : (ot.onTimePct >= 50 ? 'warn' : 'bad'), '<b>' + ot.onTimePct + '% of completed tasks</b> were finished by their target date.'));
+  if (hv.variancePct != null && Math.abs(hv.variancePct) >= 15) ins.push(dbInsight(hv.variancePct > 0 ? 'warn' : 'good', 'Hours are <b>' + Math.abs(hv.variancePct) + '% ' + (hv.variancePct > 0 ? 'over' : 'under') + '</b> the estimate (' + Math.round(hv.actualTotal * 10) / 10 + ' h against ' + Math.round(hv.estTotal * 10) / 10 + ' h).'));
+  var help = tasks.filter(function (t) { return _hasVal(t.helpNeeded); });
+  if (help.length) ins.push(dbInsight('warn', '<b>' + help.length + ' task' + (help.length > 1 ? 's' : '') + '</b> ' + (help.length > 1 ? 'are' : 'is') + ' waiting on help.'));
+  var tDept = dbTableDept(S), noPlan = [];
+  if (tDept && S.month) {
+    noPlan = scopedMembers(tDept).filter(function (m) { return !inDept.some(function (t) { return t.member === m.name && t.month === S.month; }); });
+    if (noPlan.length) ins.push(dbInsight('warn', '<b>' + noPlan.length + ' ' + (noPlan.length > 1 ? 'people have' : 'person has') + ' no plan</b> for ' + S.month + ': ' + esc(noPlan.slice(0, 4).map(function (m) { return m.name; }).join(', ')) + (noPlan.length > 4 ? ' and ' + (noPlan.length - 4) + ' more' : '') + '.'));
+  }
+
+  var tiles = '<div class="db-tiles">'
+    + dbTile('Completion', (pct == null ? '\u2014' : pct + '%') + dbDelta(pct, prevPct, ' pts'), done + ' of ' + live.length + ' tasks', pct == null ? 'var(--text3)' : pctColor(pct), pct)
+    + dbTile('Overdue', overdue.length, overdue.length ? 'past target, not done' : 'all on track', overdue.length ? '#DC2626' : '#16A34A')
+    + dbTile('On time', ot.onTimePct == null ? '\u2014' : ot.onTimePct + '%', ot.completedCount + ' completed', ot.onTimePct == null ? 'var(--text3)' : pctColor(ot.onTimePct), ot.onTimePct)
+    + dbTile('Hours', hv.variancePct == null ? '\u2014' : (hv.variancePct > 0 ? '+' : '') + hv.variancePct + '%', Math.round(hv.estTotal * 10) / 10 + ' h est \u2192 ' + Math.round(hv.actualTotal * 10) / 10 + ' h actual', varColor(hv.variancePct) === 'var(--text3)' ? '#64748B' : varColor(hv.variancePct))
+    + dbTile('Items delivered', ic.ratioPct == null ? '\u2014' : ic.ratioPct + '%', ic.actualTotal + ' of ' + ic.plannedTotal + ' planned', ic.ratioPct == null ? 'var(--text3)' : pctColor(ic.ratioPct), ic.ratioPct)
+    + dbTile('Manager grade', q.qualityPct == null ? '\u2014' : q.qualityPct + '%', q.gradedCount + ' graded of ' + q.completedCount + ' done', q.qualityPct == null ? 'var(--text3)' : pctColor(q.qualityPct), q.qualityPct)
+    + '</div>';
+
+  var st = { Completed: 0, 'In Process': 0, Pending: 0, Planned: 0, 'On Hold': 0, Cancelled: 0 };
+  tasks.forEach(function (t) { if (st[t.status] !== undefined) st[t.status]++; });
+  var stack = dbStack([{ label: 'Completed', value: st.Completed, color: '#16A34A' }, { label: 'In process', value: st['In Process'], color: '#2F6FE4' }, { label: 'Pending', value: st.Pending, color: '#D97706' },
+    { label: 'Planned', value: st.Planned, color: '#94A3B8' }, { label: 'On hold', value: st['On Hold'], color: '#7C3AED' }, { label: 'Cancelled', value: st.Cancelled, color: '#CBD5E1' }]);
+  var unpl = tasks.filter(function (t) { return t.planned === 'No'; }).length;
+  stack += '<p class="sgp-hint" style="margin-top:12px">' + unpl + ' of ' + tasks.length + ' tasks were not in the original plan.</p>';
+
+  var trend = AY_MONTHS.map(function (m) {
+    var mt = inDept.filter(function (t) { return t.month === m && t.status !== 'Cancelled'; });
+    return { m: m, n: mt.length, pct: mt.length ? dbPct(mt.filter(function (t) { return t.status === 'Completed'; }).length, mt.length) : null };
+  });
+
+  // needs attention: the most overdue tasks first, then anything waiting on help
+  var late = overdue.slice().sort(function (a, b) { return dbDaysLate(b) - dbDaysLate(a); }).slice(0, 6);
+  var att = late.map(function (t) {
+    var d = dbDaysLate(t);
+    return dbLink('dbOpenTask', t.id, '<div class="db-lm"><b>' + esc(t.action) + '</b><small>' + esc(t.member) + ' \u00B7 ' + esc(t.goal) + ' \u00B7 ' + esc(t.month) + ' ' + esc(t.week) + '</small></div><span class="db-pill bad">' + d + (d === 1 ? ' day' : ' days') + ' late</span>');
+  }).join('');
+  att += help.slice(0, 4).map(function (t) {
+    return dbLink('dbOpenTask', t.id, '<div class="db-lm"><b>' + esc(t.helpNeeded) + '</b><small>' + esc(t.member) + ' \u00B7 ' + esc(t.action) + '</small></div><span class="db-pill warn">Needs help</span>');
+  }).join('');
+  if (!att) att = '<div class="db-empty" style="color:#166534">All clear. Nothing overdue and nobody is waiting on help.</div>';
+
+  // people (or departments)
+  var rows, headLabel;
+  function rowFor(label, link, ts) {
+    var lv = ts.filter(function (t) { return t.status !== 'Cancelled'; }), dn = lv.filter(function (t) { return t.status === 'Completed'; }).length;
+    var h = computeHoursVariance(ts), o = computeOnTimeRate(ts);
+    return { label: label, link: link, n: ts.length, pct: dbPct(dn, lv.length), od: ts.filter(isTaskOverdue).length, ot: o.onTimePct, hv: h.variancePct };
+  }
+  if (tDept) {
+    headLabel = 'Person';
+    rows = scopedMembers(tDept).map(function (m) {
+      var ts = tasks.filter(function (t) { return t.member === m.name && t.dept === tDept; });
+      return rowFor(m.name, _memberLink(m.name, tDept), ts);
+    });
+  } else {
+    headLabel = 'Department';
+    rows = deptsInScope('').map(function (d) { return rowFor(d, '<b>' + esc(d) + '</b>', tasks.filter(function (t) { return t.dept === d; })); });
+  }
+  rows.sort(function (a, b) { return (b.od - a.od) || ((a.pct == null ? 101 : a.pct) - (b.pct == null ? 101 : b.pct)); });
+  var table = rows.length ? '<div class="db-scroll"><table class="db-tbl"><thead><tr><th>' + headLabel + '</th><th class="c">Tasks</th><th>Completion</th><th class="c">On time</th><th class="c">Overdue</th><th class="c">Hours vs est.</th></tr></thead><tbody>'
+    + rows.map(function (r) {
+      return '<tr><td>' + r.link + '</td><td class="c">' + (r.n || '<span style="color:var(--text3)">0</span>') + '</td><td>' + (r.n ? dbMeter(r.pct) : '<span class="db-pill">No plan</span>') + '</td><td class="c">' + dbPctText(r.ot) + '</td>'
+        + '<td class="c">' + (r.od ? '<span class="db-pill bad">' + r.od + '</span>' : '<span style="color:var(--text3)">0</span>') + '</td><td class="c">' + (r.hv == null ? '<span style="color:var(--text3)">\u2014</span>' : '<b style="color:' + varColor(r.hv) + '">' + (r.hv > 0 ? '+' : '') + r.hv + '%</b>') + '</td></tr>';
+    }).join('') + '</tbody></table></div>' : '<div class="db-empty">No people in this department yet.</div>';
+
+  el.innerHTML = '<div class="db-ins">' + ins.join('') + '</div>' + tiles
+    + '<div class="db-grid">' + dbCard('Task status', esc(scopeTxt), stack) + dbCard('Completion by month', 'academic year, ' + (S.dept ? esc(S.dept) : 'all departments'), dbCols(trend, S.month)) + '</div>'
+    + dbCard('Needs attention', 'most overdue first', att)
+    + dbCard(tDept ? 'People in ' + esc(tDept) : 'Departments', 'those who need attention come first', table);
+}
+
+// ── Reviews ──
+function dbRenderReview() {
+  var el = document.getElementById('dash-review-score'); if (!el) return;
+  var S = dbScope();
+  var base = applyRoleFilter(DB.reviews, 'review'); if (S.year) base = base.filter(function (r) { return r.year === S.year; });
+  var inDept = S.dept ? base.filter(function (r) { return r.dept === S.dept; }) : base;
+  var scoped = S.month ? inDept.filter(function (r) { return r.month === S.month; }) : inDept;
+  var A = _annReviews(scoped);
+  var filed = A.filter(function (x) { return x.status !== 'draft'; }).length;
+  var awaiting = A.filter(function (x) { return x.status === 'awaiting'; });
+  var scored = A.filter(function (x) { return x.status === 'scored'; });
+  var avg = scored.length ? Math.round(scored.reduce(function (s, x) { return s + x.perf; }, 0) / scored.length) : null;
+  var high = scored.filter(function (x) { return x.perf >= 80; }).length, low = scored.filter(function (x) { return x.perf < 50; }).length;
+  var pm = S.month ? ayPrevMonth(S.month) : null, prevAvg = pm ? _avgScoredPerf(inDept.filter(function (r) { return r.month === pm; })) : null;
+  var scopeTxt = (S.dept || 'All departments') + (S.month ? ' \u00B7 ' + S.month : ' \u00B7 whole year');
+
+  if (!A.length) {
+    el.innerHTML = '<div class="db-card" style="margin-top:0"><div class="db-empty" style="padding:56px 16px"><b style="display:block;font-size:15px;color:var(--text);margin-bottom:4px">No reviews for this selection</b>' + esc(scopeTxt) + '. Reviews appear here once they are started in the Reviews tab.</div></div>';
+    return;
+  }
+
+  var ins = [];
+  if (avg != null) ins.push(dbInsight(avg >= 80 ? 'good' : (avg >= 50 ? 'warn' : 'bad'), 'Average performance is <b>' + avg + '%</b> across ' + scored.length + ' scored review' + (scored.length > 1 ? 's' : '') + (prevAvg != null ? ', ' + (avg === prevAvg ? 'the same as ' + pm : (avg > prevAvg ? (avg - prevAvg) + ' points up from ' : (prevAvg - avg) + ' points down from ') + pm) : '') + '.'));
+  else ins.push(dbInsight('warn', '<b>No review has a manager score yet</b> for this selection.'));
+  ins.push(awaiting.length ? dbInsight('warn', '<b>' + awaiting.length + ' review' + (awaiting.length > 1 ? 's are' : ' is') + ' waiting for a manager score:</b> ' + esc(awaiting.slice(0, 4).map(function (x) { return x.r.member; }).join(', ')) + (awaiting.length > 4 ? ' and ' + (awaiting.length - 4) + ' more' : '') + '.') : dbInsight('good', '<b>No review is waiting</b> for a manager score.'));
+  if (low) ins.push(dbInsight('bad', '<b>' + low + ' review' + (low > 1 ? 's are' : ' is') + ' below 50%.</b> These people may need support.'));
+  if (high) ins.push(dbInsight('good', '<b>' + high + ' review' + (high > 1 ? 's are' : ' is') + ' at 80% or more.</b>'));
+
+  var tiles = '<div class="db-tiles">'
+    + dbTile('Average performance', (avg == null ? '\u2014' : avg + '%') + dbDelta(avg, prevAvg, ' pts'), scored.length ? 'across ' + scored.length + ' scored' : 'no scored reviews', avg == null ? 'var(--text3)' : pctColor(avg), avg)
+    + dbTile('Reviews filed', filed, 'with at least one score', '#2F6FE4')
+    + dbTile('Awaiting manager', awaiting.length, 'self-scored, not yet scored', awaiting.length ? '#D97706' : '#16A34A')
+    + dbTile('Manager scored', scored.length, 'complete', '#16A34A')
+    + dbTile('80% or more', high, 'strong performance', '#16A34A')
+    + dbTile('Below 50%', low, 'needs support', low ? '#DC2626' : '#16A34A')
+    + '</div>';
+
+  var mix = dbStack([{ label: '80% or more', value: high, color: '#16A34A' }, { label: '50 to 79%', value: scored.length - high - low, color: '#D97706' }, { label: 'Below 50%', value: low, color: '#DC2626' }, { label: 'Awaiting manager', value: awaiting.length, color: '#93C5FD' }]);
+  var trend = AY_MONTHS.map(function (m) {
+    var sc = _annReviews(inDept.filter(function (r) { return r.month === m; })).filter(function (x) { return x.status === 'scored'; });
+    return { m: m, n: sc.length, pct: sc.length ? Math.round(sc.reduce(function (s, x) { return s + x.perf; }, 0) / sc.length) : null };
+  });
+
+  // goals: where people score best and worst
+  var gmap = {};
+  scored.forEach(function (x) { computeGoalScores(x.r).forEach(function (gs) { if (gs.scorePct == null) return; var o = gmap[gs.goal] || (gmap[gs.goal] = { goal: gs.goal, sum: 0, n: 0 }); o.sum += gs.scorePct; o.n++; }); });
+  var goals = Object.keys(gmap).map(function (k) { var o = gmap[k]; o.avg = Math.round(o.sum / o.n); return o; }).sort(function (a, b) { return a.avg - b.avg; });
+  var gbar = function (o) { return '<div class="db-gbar"><span title="' + esc(o.goal) + '">' + esc(o.goal) + '</span><div class="db-meter" style="min-width:0"><span><i style="width:' + o.avg + '%;background:' + pctColor(o.avg) + '"></i></span></div><b style="color:' + pctColor(o.avg) + '">' + o.avg + '%</b></div>'; };
+  var goalsHtml = goals.length ? '<div class="sgp-hint" style="margin:0 0 4px;font-weight:700;color:var(--text2)">Weakest goals</div>' + goals.slice(0, 5).map(gbar).join('')
+    + (goals.length > 5 ? '<div class="sgp-hint" style="margin:12px 0 4px;font-weight:700;color:var(--text2)">Strongest goals</div>' + goals.slice(-3).reverse().map(gbar).join('') : '')
+    : '<div class="db-empty">No scored goals yet.</div>';
+
+  var aw = awaiting.slice(0, 6).map(function (x) {
+    return dbLink('dbOpenReview', x.r.id, '<div class="db-lm"><b>' + esc(x.r.member) + '</b><small>' + esc(x.r.dept) + ' \u00B7 ' + esc(x.r.month) + (x.r.reviewer ? ' \u00B7 Reviewer ' + esc(x.r.reviewer) : '') + '</small></div><span class="db-pill wait">Awaiting</span>');
+  }).join('') || '<div class="db-empty" style="color:#166534">Nothing is waiting for a manager score.</div>';
+
+  // people / departments
+  var tDept = dbTableDept(S), refMonth = S.month;
+  if (!refMonth) {
+    for (var i = AY_MONTHS.length - 1; i >= 0; i--) { var mm = AY_MONTHS[i]; if (_annReviews(inDept.filter(function (r) { return r.month === mm; })).some(function (x) { return x.status === 'scored'; })) { refMonth = mm; break; } }
+  }
+  var table = '';
+  if (!refMonth) table = '<div class="db-empty">No scored reviews yet.</div>';
+  else {
+    var p1 = ayPrevMonth(refMonth), p2 = p1 ? ayPrevMonth(p1) : null;
+    var perf = function (filterFn, mo) { return mo ? _avgScoredPerf(inDept.filter(function (r) { return r.month === mo && filterFn(r); })) : null; };
+    var list = tDept ? scopedMembers(tDept).map(function (m) { return { label: _memberLink(m.name, tDept), f: function (r) { return r.member === m.name && r.dept === tDept; }, name: m.name }; })
+                     : deptsInScope('').map(function (d) { return { label: '<b>' + esc(d) + '</b>', f: function (r) { return r.dept === d; }, name: d }; });
+    var rowsR = list.map(function (o) { var a = perf(o.f, refMonth), b = perf(o.f, p1), c = perf(o.f, p2); return { o: o, a: a, b: b, c: c, flag: (a != null && b != null && a < 50 && b < 50) }; });
+    rowsR.sort(function (x, y) { return ((y.flag ? 1 : 0) - (x.flag ? 1 : 0)) || ((x.a == null ? 101 : x.a) - (y.a == null ? 101 : y.a)); });
+    table = '<div class="db-scroll"><table class="db-tbl"><thead><tr><th>' + (tDept ? 'Person' : 'Department') + '</th><th class="c">' + refMonth + '</th><th class="c">' + (p1 || '\u2014') + '</th><th class="c">' + (p2 || '\u2014') + '</th><th class="c">Trend</th></tr></thead><tbody>'
+      + rowsR.map(function (r) {
+        var tr = (r.a != null && r.b != null) ? (r.a === r.b ? '<span style="color:var(--text3)">\u2014</span>' : (r.a > r.b ? '<span class="db-d up">\u25B2 +' + (r.a - r.b) + '</span>' : '<span class="db-d down">\u25BC ' + (r.a - r.b) + '</span>')) : '<span style="color:var(--text3)">\u2014</span>';
+        return '<tr><td>' + r.o.label + (r.flag ? ' <span class="db-pill bad" title="Below 50% two months running">Low 2 months</span>' : '') + '</td><td class="c">' + dbPctText(r.a) + '</td><td class="c">' + dbPctText(r.b) + '</td><td class="c">' + dbPctText(r.c) + '</td><td class="c">' + tr + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+
+  el.innerHTML = '<div class="db-ins">' + ins.join('') + '</div>' + tiles
+    + '<div class="db-grid">' + dbCard('Performance mix', esc(scopeTxt), mix) + dbCard('Average performance by month', 'academic year, ' + (S.dept ? esc(S.dept) : 'all departments'), dbCols(trend, S.month)) + '</div>'
+    + '<div class="db-grid">' + dbCard('Goals', 'average score of each SMART Goal', goalsHtml) + dbCard('Waiting for a manager score', 'self-scored reviews', aw) + '</div>'
+    + dbCard(tDept ? 'People in ' + esc(tDept) : 'Departments', refMonth ? 'performance in ' + refMonth + ' and the two months before' : '', table);
+}
 
 function renderDashboard() {
   const year = document.getElementById('dash-year-filter')?.value || '';
@@ -1385,123 +1580,270 @@ function onSgDeptChange() {
   renderSmartGoals();
 }
 
+// ══════════ SMART GOALS: people list on the left, goal cards on the right ══════════
+var SGP_COLORS = ['#2F6FE4', '#0E8C7A', '#D97706', '#7C3AED', '#DB2777', '#0891B2', '#65A30D'];
+var _sgpQ = '';
+
+function sgYearList() {
+  var set = {}; academicYearOptions().forEach(function (y) { set[y] = 1; });
+  (DB.goals || []).forEach(function (g) { if (g.year) set[g.year] = 1; });
+  return Object.keys(set).sort();
+}
+function sgFillYearSelect() {
+  var el = document.getElementById('sg-year-filter'); if (!el) return;
+  var cur = el.value;
+  el.innerHTML = sgYearList().map(function (y) { return '<option value="' + esc(y) + '">' + esc(ayLabel(y)) + '</option>'; }).join('');
+  el.value = cur || currentAcademicYear();
+}
+function sgpGroups(year, dept, member) {
+  return groupByGoal(DB.goals.filter(function (g) { return g.year === year && g.dept === dept && g.member === member; }));
+}
+function sgpTotal(groups) { return groups.reduce(function (t, g) { return t + (parseFloat(g.weightage) || 0); }, 0); }
+function sgpStatus(total, n) {
+  if (!n) return { cls: 'none', txt: 'No goals' };
+  if (Math.abs(total - 100) < 0.001) return { cls: 'ok', txt: '100%' };
+  if (total > 100) return { cls: 'over', txt: total + '%' };
+  return { cls: 'part', txt: total + '%' };
+}
+function sgCenter(list) {
+  if (!list || window.innerWidth > 860) return;
+  var sel = list.querySelector('.is-sel'); if (!sel) return;
+  try { list.scrollLeft = sel.offsetLeft - Math.max(0, (list.clientWidth - sel.offsetWidth) / 2); } catch (e) {}
+}
+function sgpSearch(v) { _sgpQ = String(v || '').trim().toLowerCase(); renderSgPeople(); }
+function sgpPick(name) {
+  var el = document.getElementById('sg-member-filter'); if (!el) return;
+  el.value = name; renderSmartGoals(); hpSwap();
+  if (window.innerWidth <= 860) { var m = document.getElementById('smart-goals-list'); if (m && m.scrollIntoView) m.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+}
+function sgpToggleAll() {
+  var cards = document.querySelectorAll('#smart-goals-list .sgp-card'); if (!cards.length) return;
+  var anyClosed = Array.prototype.some.call(cards, function (c) { return !c.classList.contains('is-open'); });
+  Array.prototype.forEach.call(cards, function (c) { c.classList.toggle('is-open', anyClosed); });
+}
+function sgpToggle(hd) { var c = hd.closest('.sgp-card'); if (c) c.classList.toggle('is-open'); }
+
+function renderSgPeople() {
+  var el = document.getElementById('sgp-people-list'); if (!el) return;
+  var year = document.getElementById('sg-year-filter').value;
+  var dept = document.getElementById('sg-dept-filter').value;
+  var member = document.getElementById('sg-member-filter').value;
+  var cnt = document.getElementById('sgp-count');
+  if (!dept) { el.innerHTML = ''; if (cnt) cnt.textContent = ''; return; }
+  var ppl = scopedMemberNames(dept).map(function (n) { return memberRecordByName(n, dept) || { name: n, dept: dept }; })
+    .sort(function (x, y) { return x.name.localeCompare(y.name); });
+  var done = 0;
+  ppl.forEach(function (m) { var g = sgpGroups(year, dept, m.name); if (g.length && Math.abs(sgpTotal(g) - 100) < 0.001) done++; });
+  if (cnt) cnt.textContent = ppl.length + (ppl.length === 1 ? ' person' : ' people') + ' \u00B7 ' + done + ' with goals complete';
+  var shown = ppl.filter(function (m) { return !_sgpQ || (m.name + ' ' + (m.email || '')).toLowerCase().indexOf(_sgpQ) > -1; });
+  el.innerHTML = shown.map(function (m) {
+    var g = sgpGroups(year, dept, m.name), st = sgpStatus(sgpTotal(g), g.length);
+    return '<button type="button" class="sgp-person' + (m.name === member ? ' is-sel' : '') + '" onclick="sgpPick(\'' + escJs(m.name) + '\')">'
+      + '<span class="hp-av">' + esc(hpInitials(m.name)) + '</span>'
+      + '<span class="sgp-pm"><span class="sgp-pn">' + esc(m.name) + '</span><span class="sgp-ps">' + g.length + (g.length === 1 ? ' goal' : ' goals') + '</span></span>'
+      + '<span class="sgp-chip ' + st.cls + '">' + st.txt + '</span></button>';
+  }).join('') || '<div class="hp-empty"><b>' + (_sgpQ ? 'No match' : 'No people') + '</b>' + (_sgpQ ? 'Try a different name.' : 'No active employees in this department.') + '</div>';
+  sgCenter(el);
+}
+
+function sgpDeptList() {
+  var all = DB.settings.depts || [];
+  if (currentUser.role === ROLES.ADMIN) return all;
+  return all.filter(function (d) { return d === currentUser.dept; });
+}
+function sgpDept(name) {
+  var el = document.getElementById('sg-dept-filter'); if (!el) return;
+  el.value = name; onSgDeptChange();
+}
 function renderSmartGoals() {
-  const year = document.getElementById('sg-year-filter').value;
-  const dept = document.getElementById('sg-dept-filter').value;
-  const member = document.getElementById('sg-member-filter').value;
-  const listEl = document.getElementById('smart-goals-list');
-
-  // Cascading gate: pick a Department, then a Member, before anything shows.
-  if (!dept) {
-    listEl.innerHTML = `<div class="empty"><div class="empty-icon">${sgIc('building')}</div><p>Select a <b>Department</b> above to begin.</p></div>`;
-    return;
+  var deptEl = document.getElementById('sg-dept-filter'), memEl = document.getElementById('sg-member-filter');
+  if (!deptEl || !memEl) return;
+  sgFillYearSelect();
+  var depts = sgpDeptList();
+  // open on a department, and on a person, so the page is never an empty box
+  if (!deptEl.value || depts.indexOf(deptEl.value) < 0) { deptEl.value = depts[0] || ''; setSgMemberOptions(); memEl.value = ''; }
+  var dept = deptEl.value;
+  if (dept && !memEl.value) {
+    var names = scopedMemberNames(dept).slice().sort(function (x, y) { return x.localeCompare(y); });
+    var pick = (currentUser.name && names.indexOf(currentUser.name) > -1) ? currentUser.name : names[0];
+    if (pick) { setSgMemberOptions(); memEl.value = pick; }
   }
-  if (!member) {
-    listEl.innerHTML = `<div class="empty"><div class="empty-icon">${sgIc('user')}</div><p>Now select a <b>Member</b> to view their SMART Goals.</p></div>`;
-    return;
+  var chips = document.getElementById('sgp-depts');
+  if (chips) {
+    chips.innerHTML = depts.map(function (d) {
+      return '<button type="button" class="sgp-chip-d' + (d === dept ? ' is-sel' : '') + '" onclick="sgpDept(\'' + escJs(d) + '\')">' + esc(d) + '</button>';
+    }).join('') || '<span style="font-size:12.5px;color:var(--text3)">No departments yet. An admin adds them in Settings.</span>';
   }
+  renderSgPeople();
+  renderSgDetail();
+}
 
-  let goals = DB.goals.filter(g => g.dept === dept && g.member === member);
-  if (year) goals = goals.filter(g=>g.year===year);
+function renderSgDetail() {
+  var listEl = document.getElementById('smart-goals-list');
+  var year = document.getElementById('sg-year-filter').value;
+  var dept = document.getElementById('sg-dept-filter').value;
+  var member = document.getElementById('sg-member-filter').value;
+  if (!dept || !member) { listEl.innerHTML = '<div class="hp-empty" style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:48px 16px"><b>' + (DB.settings.depts.length ? 'No people to show' : 'No departments yet') + '</b>' + (DB.settings.depts.length ? 'There are no active people in this department.' : 'An admin adds departments in Settings, then their people appear here.') + '</div>'; return; }
 
-  if (!goals.length) {
-    listEl.innerHTML = `<div class="empty"><div class="empty-icon">${sgIc('target')}</div><p>No SMART goals for <b>${esc(member)}</b> yet.<br>Click "+ Add SMART Goal" to start.</p></div>`;
-    return;
-  }
+  var groups = sgpGroups(year, dept, member);
+  var total = sgpTotal(groups), st = sgpStatus(total, groups.length);
+  var rec = memberRecordByName(member, dept) || {};
+  var canEdit = canEditGoal({ dept: dept, member: member });
+  var left = Math.round((100 - total) * 100) / 100;
+  var msg = { none: canEdit ? 'No goals yet. Add the first goal to get started.' : 'No goals have been set yet.',
+              part: left + '% still to allocate. Goals should add up to 100%.',
+              ok: 'All set. The goals add up to 100%.',
+              over: 'Over by ' + (Math.round((total - 100) * 100) / 100) + '%. Reduce a goal\u2019s weightage so the total is 100%.' }[st.cls];
 
-  // group first by member (so each member's goals are visually separated), then by goal name within
-  const byMember = {};
-  const memberOrder = [];
-  goals.forEach(g => {
-    const key = `${g.dept}||${g.member}`;
-    if (!byMember[key]) { byMember[key] = { dept:g.dept, member:g.member, items:[] }; memberOrder.push(key); }
-    byMember[key].items.push(g);
+  var html = '<div class="sgp-head"><div class="hp-av">' + esc(hpInitials(member)) + '</div>'
+    + '<div class="sgp-hn"><h2>' + esc(member) + '</h2><p>' + esc(dept) + ' \u00B7 ' + esc(academicYearShort(year)) + (rec.managerName ? ' \u00B7 Reports to ' + esc(rec.managerName) : '') + '</p></div>'
+    + (canEdit ? '<div class="sgp-ha"><button class="btn btn-secondary" onclick="openCopyGoals()">Copy goals</button><button class="btn btn-primary" onclick="openAddGoalModal()">+ Add SMART Goal</button></div>' : '')
+    + '</div>';
+
+  html += '<div class="sgp-meter"><div class="sgp-mt"><b>Weightage ' + total + '% of 100%</b><span>' + groups.length + (groups.length === 1 ? ' goal' : ' goals') + (groups.length > 1 ? ' \u00B7 <button type="button" class="sgp-link" onclick="sgpToggleAll()">Expand / collapse all</button>' : '') + '</span></div>'
+    + '<div class="sgp-bar-t">' + groups.map(function (g, i) { return '<i title="' + esc(g.goal) + ' ' + g.weightage + '%" style="width:' + Math.min(parseFloat(g.weightage) || 0, 100) + '%;background:' + SGP_COLORS[i % SGP_COLORS.length] + '"></i>'; }).join('') + '</div>'
+    + '<div class="sgp-msg ' + st.cls + '">' + msg + '</div></div>';
+
+  groups.forEach(function (grp, i) {
+    var r0 = grp.rows[0];
+    var maxTotal = grp.rows.reduce(function (t, r) { return t + (parseFloat(r.maxScore) || 0); }, 0);
+    html += '<article class="sgp-card is-open"><div class="sgp-ch" onclick="sgpToggle(this)">'
+      + '<span class="sgp-dot" style="background:' + SGP_COLORS[i % SGP_COLORS.length] + '"></span>'
+      + '<div class="sgp-ct"><h3>' + esc(grp.goal) + '</h3><p>' + esc(r0.description || (grp.rows.length + (grp.rows.length === 1 ? ' activity' : ' activities') + ' \u00B7 max score ' + maxTotal)) + '</p></div>'
+      + '<span class="sgp-w">' + grp.weightage + '%</span>'
+      + '<span class="sgp-actions" onclick="event.stopPropagation()">' + sgSuccessEyeBtn(r0.year, r0.dept, r0.member, grp.goal, r0.id)
+      + (canEdit ? '<button class="btn btn-secondary btn-sm" title="Edit goal" onclick="editGoalGroup(\'' + escJs(r0.year) + '\',\'' + escJs(r0.dept) + '\',\'' + escJs(r0.member) + '\',\'' + escJs(grp.goal) + '\')">' + sgIc('edit') + '</button>'
+        + '<button class="btn btn-danger btn-sm" title="Delete goal" onclick="deleteGoalGroup(\'' + escJs(r0.year) + '\',\'' + escJs(r0.dept) + '\',\'' + escJs(r0.member) + '\',\'' + escJs(grp.goal) + '\')">' + sgIc('trash') + '</button>' : '')
+      + '</span><span class="sgp-chev">\u203A</span></div>'
+      + '<div class="sgp-body"><div class="sgp-act is-h"><span>Activity</span><span>Particulars</span><span style="text-align:center">Max</span><span></span></div>'
+      + grp.rows.map(function (r) {
+          return '<div class="sgp-act"><b>' + esc(r.cat) + '</b><span class="sgp-pt">' + esc(r.particulars || '\u2014') + '</span><span class="sgp-mx">' + r.maxScore + '</span>'
+            + '<span class="sgp-ac">' + (canEdit ? '<button class="btn btn-secondary btn-sm" title="Edit" onclick="openGoalModal(\'' + r.id + '\')">' + sgIc('edit') + '</button><button class="btn btn-danger btn-sm" title="Delete" onclick="deleteGoal(\'' + r.id + '\')">' + sgIc('trash') + '</button>' : '') + '</span></div>';
+        }).join('')
+      + (canEdit ? '<button class="btn btn-secondary btn-sm sgp-add" onclick="openGoalModal(null,{year:\'' + escJs(r0.year) + '\',dept:\'' + escJs(r0.dept) + '\',member:\'' + escJs(r0.member) + '\',goal:\'' + escJs(grp.goal) + '\',weightage:' + grp.weightage + ',description:\'' + escJs(r0.description || '') + '\'})">+ Add activity</button>' : '')
+      + '</div></article>';
   });
+  listEl.innerHTML = html;
+}
 
-  let html = '';
-  memberOrder.forEach(key => {
-    const block = byMember[key];
-    const mInfo = DB.settings.members.find(m=>m.name===block.member && m.dept===block.dept);
-    const groups = groupByGoal(block.items);
-
-    // ── Summary of SMART Goals: # | SMART Goal | Description | Weightage (+ Total row) ──
-    const grpYears = [...new Set(block.items.map(i=>i.year))];
-    const yearSuffix = grpYears.length===1 ? ` — ${academicYearShort(grpYears[0])}` : '';
-    let summaryRows = '';
-    let totalWeightage = 0;
-    groups.forEach((grp,i) => {
-      const weightage = parseFloat(grp.weightage)||0;
-      totalWeightage += weightage;
-      const desc = grp.rows[0].description || '';
-      summaryRows += `<tr>
-        <td style="text-align:center;color:var(--text3)">${i+1}</td>
-        <td style="font-weight:600">${esc(grp.goal)}</td>
-        <td style="font-size:11px;color:var(--text2)">${esc(desc||'—')}</td>
-        <td style="text-align:center;font-weight:600">${weightage}%</td>
-      </tr>`;
-    });
-    const summaryHtml = `<div style="margin-bottom:14px">
-      <div class="review-section-hd">Summary of SMART Goals${yearSuffix}</div>
-      <div class="tbl-wrap"><table class="tbl tbl-fixed">
-        <colgroup>
-          <col style="width:5%"><col style="width:25%"><col style="width:55%"><col style="width:15%">
-        </colgroup>
-        <thead><tr>
-          <th style="text-align:center">#</th><th>SMART Goal</th><th>Description</th>
-          <th style="text-align:center">Weightage</th>
-        </tr></thead>
-        <tbody>
-          ${summaryRows}
-          <tr style="background:var(--surface2);font-weight:700">
-            <td colspan="3" style="text-align:right">Total</td>
-            <td style="text-align:center">${totalWeightage}%</td>
-          </tr>
-        </tbody>
-      </table></div>
-    </div>`;
-
-    html += `<div style="margin-bottom:22px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        <span style="font-size:14px;font-weight:800">${esc(block.member)}</span>
-        <span style="font-size:11px;color:var(--text3)">${esc(block.dept)}</span>
-        ${mInfo?roleBadge(mInfo.role):''}
-      </div>
-      ${summaryHtml}
-      <div class="goal-tree">`;
-    groups.forEach(grp => {
-      const r0 = grp.rows[0];
-      const canEdit = canEditGoal(r0);
-      html += `<div class="goal-group">
-        <div class="goal-group-header sg-goal-hd" onclick="toggleGoalGroup(this)" style="display:grid;grid-template-columns:18px 1.6fr 2fr auto;align-items:center;gap:10px">
-          <span class="sg-goal-chevron">▶</span>
-          <span class="goal-group-title">${esc(grp.goal)} <b>(${grp.weightage}%)</b></span>
-          <span style="font-size:12px;color:var(--text2);font-style:${r0.description?'normal':'italic'}">${esc(r0.description||'—')}</span>
-          <span class="actions-cell" onclick="event.stopPropagation()">
-            ${sgSuccessEyeBtn(r0.year, r0.dept, r0.member, grp.goal, r0.id)}
-            ${canEdit ? `<button class="btn btn-secondary btn-sm" onclick="editGoalGroup('${escJs(r0.year)}','${escJs(r0.dept)}','${escJs(r0.member)}','${escJs(grp.goal)}')" title="Edit SMART Goal">${sgIc('edit')}</button>
-            <button class="btn btn-danger btn-sm" onclick="deleteGoalGroup('${escJs(r0.year)}','${escJs(r0.dept)}','${escJs(r0.member)}','${escJs(grp.goal)}')" title="Delete SMART Goal">${sgIc('trash')}</button>
-            <button class="btn btn-secondary btn-sm" onclick="openGoalModal(null,{year:'${escJs(r0.year)}',dept:'${escJs(r0.dept)}',member:'${escJs(r0.member)}',goal:'${escJs(grp.goal)}',weightage:${grp.weightage},description:'${escJs(r0.description||'')}'})">+ Add Activity</button>` : `<span style="font-size:11px;color:var(--text3)">View only</span>`}
-          </span>
-        </div>
-        <div class="goal-items-list" style="display:none">
-          <div class="goal-item-row goal-col-head" style="grid-template-columns:1.6fr 2fr 90px 70px">
-            <span>Activity</span><span>Particulars</span><span style="text-align:center">Max Score</span><span></span>
-          </div>
-          ${grp.rows.map(r=>`<div class="goal-item-row" style="grid-template-columns:1.6fr 2fr 90px 70px">
-            <span class="gi-name">${esc(r.cat)}</span>
-            <span class="gi-cat">${esc(r.particulars||'—')}</span>
-            <span style="text-align:center;font-weight:700">${r.maxScore}</span>
-            <span class="actions-cell">
-              ${canEdit ? `<button class="btn btn-secondary btn-sm" onclick="openGoalModal('${r.id}')" title="Edit">${sgIc('edit')}</button>
-              <button class="btn btn-danger btn-sm" onclick="deleteGoal('${r.id}')" title="Delete">${sgIc('trash')}</button>` : ''}
-            </span>
-          </div>`).join('')}
-        </div>
-      </div>`;
-    });
-    html += `</div></div>`;
+// ── Add a SMART Goal with all its activities in one go ──
+function sgAgRow(vals) {
+  vals = vals || {};
+  var host = document.getElementById('ag-acts'); if (!host) return;
+  var d = document.createElement('div'); d.className = 'sgp-ag-r';
+  d.innerHTML = '<input class="ag-cat" list="cats-list" placeholder="Activity" value="' + esc(vals.cat || '') + '" autocomplete="off">'
+    + '<input class="ag-max" type="number" min="0" placeholder="Max" value="' + esc(vals.max == null ? '' : vals.max) + '">'
+    + '<textarea class="ag-part sgp-ag-p" placeholder="Particulars (optional)">' + esc(vals.part || '') + '</textarea>'
+    + '<button type="button" class="hp-x" title="Remove" onclick="sgAgRemoveRow(this)">\u2715</button>';
+  host.appendChild(d);
+}
+function sgAgRemoveRow(btn) {
+  var host = document.getElementById('ag-acts');
+  if (host.children.length <= 1) { toast('A goal needs at least one activity'); return; }
+  btn.closest('.sgp-ag-r').remove();
+}
+function sgAgLeft(year, dept, member) {
+  return Math.round((100 - sgpTotal(sgpGroups(year, dept, member))) * 100) / 100;
+}
+function openAddGoalModal() {
+  var year = document.getElementById('sg-year-filter').value, dept = document.getElementById('sg-dept-filter').value, member = document.getElementById('sg-member-filter').value;
+  if (!dept || !member) { toast('Select a person first'); return; }
+  if (!canEditGoal({ dept: dept, member: member })) { toast('You can only add goals for yourself, or for your department if you lead it'); return; }
+  document.getElementById('ag-context').textContent = member + ' \u00B7 ' + dept + ' \u00B7 ' + academicYearShort(year);
+  document.getElementById('ag-goal').value = '';
+  document.getElementById('ag-weightage').value = '';
+  document.getElementById('ag-description').value = '';
+  var left = sgAgLeft(year, dept, member);
+  document.getElementById('ag-remaining').textContent = left > 0 ? left + '% left to allocate' : 'Already at 100%. Reduce another goal first.';
+  document.getElementById('ag-acts').innerHTML = '';
+  sgAgRow();
+  openModal('add-goal-modal');
+  setTimeout(function () { var g = document.getElementById('ag-goal'); if (g) g.focus(); }, 60);
+}
+function saveNewGoal() {
+  var year = document.getElementById('sg-year-filter').value, dept = document.getElementById('sg-dept-filter').value, member = document.getElementById('sg-member-filter').value;
+  var goal = document.getElementById('ag-goal').value.trim();
+  var weightage = parseFloat(document.getElementById('ag-weightage').value);
+  var description = document.getElementById('ag-description').value.trim();
+  if (!canEditGoal({ dept: dept, member: member })) { toast('You can only add goals for yourself, or for your department if you lead it'); return; }
+  if (!goal) { toast('Enter the goal name'); return; }
+  if (isNaN(weightage) || weightage <= 0) { toast('Enter the weightage'); return; }
+  var left = sgAgLeft(year, dept, member);
+  if (weightage > left) { toast('Only ' + left + '% is left. Lower the weightage or reduce another goal.'); return; }
+  if (sgpGroups(year, dept, member).some(function (g) { return g.goal === goal; })) { toast('This person already has "' + goal + '". Use + Add activity on that goal.'); return; }
+  var acts = [], bad = false;
+  Array.prototype.forEach.call(document.querySelectorAll('#ag-acts .sgp-ag-r'), function (r) {
+    var cat = r.querySelector('.ag-cat').value.trim(), mx = parseFloat(r.querySelector('.ag-max').value), part = r.querySelector('.ag-part').value.trim();
+    if (!cat && isNaN(mx) && !part) return;          // empty row: ignore
+    if (!cat || isNaN(mx)) { bad = true; return; }
+    acts.push({ cat: cat, maxScore: mx, particulars: part });
   });
-  document.getElementById('smart-goals-list').innerHTML = html;
+  if (bad) { toast('Each activity needs a name and a max score'); return; }
+  if (!acts.length) { toast('Add at least one activity'); return; }
+  if (!DB.settings.goalNames.includes(goal)) DB.settings.goalNames.push(goal);
+  acts.forEach(function (a) {
+    if (!DB.settings.categories.includes(a.cat)) DB.settings.categories.push(a.cat);
+    DB.goals.push({ id: uid(), year: year, dept: dept, member: member, goal: goal, weightage: weightage, description: description, cat: a.cat, particulars: a.particulars, maxScore: a.maxScore });
+  });
+  save(); populateAllSelects(); closeModal('add-goal-modal'); renderSmartGoals(); renderSidebar(); hpFlashNow('.sgp-meter');
+  toast('SMART Goal added');
+}
+
+// ── Copy goals from another person or an earlier year ──
+function openCopyGoals() {
+  var year = document.getElementById('sg-year-filter').value, dept = document.getElementById('sg-dept-filter').value, member = document.getElementById('sg-member-filter').value;
+  if (!dept || !member) { toast('Select a person first'); return; }
+  if (!canEditGoal({ dept: dept, member: member })) { toast('You do not have access to change this person\u2019s goals'); return; }
+  document.getElementById('cp-context').textContent = 'Into ' + member + ' \u00B7 ' + dept + ' \u00B7 ' + academicYearShort(year) + '. Goals this person already has are skipped.';
+  var names = scopedMemberNames(dept).slice().sort(function (x, y) { return x.localeCompare(y); });
+  document.getElementById('cp-from').innerHTML = names.map(function (n) { return '<option value="' + esc(n) + '"' + (n === member ? ' selected' : '') + '>' + esc(n === member ? n + ' (earlier year)' : n) + '</option>'; }).join('');
+  sgCpFromChange();
+  openModal('copy-goals-modal');
+}
+function sgCpFromChange() {
+  var year = document.getElementById('sg-year-filter').value, dept = document.getElementById('sg-dept-filter').value, member = document.getElementById('sg-member-filter').value;
+  var from = document.getElementById('cp-from').value;
+  var yrs = {}; DB.goals.forEach(function (g) { if (g.dept === dept && g.member === from && !(from === member && g.year === year)) yrs[g.year] = 1; });
+  var list = Object.keys(yrs).sort().reverse();
+  document.getElementById('cp-year').innerHTML = list.length ? list.map(function (y) { return '<option value="' + esc(y) + '">' + esc(ayLabel(y)) + '</option>'; }).join('') : '<option value="">No goals found</option>';
+  sgCpUpdate();
+}
+function sgCpPlan() {
+  var year = document.getElementById('sg-year-filter').value, dept = document.getElementById('sg-dept-filter').value, member = document.getElementById('sg-member-filter').value;
+  var from = document.getElementById('cp-from').value, fy = document.getElementById('cp-year').value;
+  if (!fy) return { items: [], skipped: [], total: 0, after: 0 };
+  var have = {}; sgpGroups(year, dept, member).forEach(function (g) { have[g.goal] = 1; });
+  var src = sgpGroups(fy, dept, from);
+  var items = src.filter(function (g) { return !have[g.goal]; }), skipped = src.filter(function (g) { return have[g.goal]; });
+  var add = sgpTotal(items);
+  return { items: items, skipped: skipped, add: add, after: sgpTotal(sgpGroups(year, dept, member)) + add };
+}
+function sgCpUpdate() {
+  var pl = sgCpPlan(), box = document.getElementById('cp-preview'), go = document.getElementById('cp-go');
+  if (!pl.items.length) {
+    box.innerHTML = '<div class="hp-empty"><b>Nothing to copy</b>' + (pl.skipped.length ? 'This person already has all of these goals.' : 'Pick a person and year that have goals.') + '</div>';
+    go.disabled = true; return;
+  }
+  var over = pl.after > 100.0001;
+  box.innerHTML = '<div class="sgp-prev">' + pl.items.map(function (g) { return '<div><span>' + esc(g.goal) + ' <span style="color:var(--text3)">\u00B7 ' + g.rows.length + (g.rows.length === 1 ? ' activity' : ' activities') + '</span></span><b>' + g.weightage + '%</b></div>'; }).join('') + '</div>'
+    + '<p class="sgp-msg ' + (over ? 'over' : (Math.abs(pl.after - 100) < 0.001 ? 'ok' : 'part')) + '" style="margin-top:10px">Total after copying: ' + pl.after + '%' + (over ? '. This is over 100%, so it can\u2019t be copied.' : '') + '</p>'
+    + (pl.skipped.length ? '<p class="sgp-hint">' + pl.skipped.length + ' already there, skipped.</p>' : '');
+  go.disabled = over;
+}
+function saveCopyGoals() {
+  var year = document.getElementById('sg-year-filter').value, dept = document.getElementById('sg-dept-filter').value, member = document.getElementById('sg-member-filter').value;
+  if (!canEditGoal({ dept: dept, member: member })) { toast('You do not have access to change this person\u2019s goals'); return; }
+  var pl = sgCpPlan();
+  if (!pl.items.length || pl.after > 100.0001) return;
+  pl.items.forEach(function (g) {
+    g.rows.forEach(function (r) {
+      var n = { id: uid(), year: year, dept: dept, member: member, goal: r.goal, weightage: r.weightage, description: r.description || '', cat: r.cat, particulars: r.particulars || '', maxScore: r.maxScore };
+      if (r.successMeasures !== undefined) n.successMeasures = r.successMeasures;
+      DB.goals.push(n);
+    });
+  });
+  save(); populateAllSelects(); closeModal('copy-goals-modal'); renderSmartGoals(); renderSidebar();
+  toast(pl.items.length + (pl.items.length === 1 ? ' goal copied' : ' goals copied'));
 }
 
 function openGoalModal(id, prefill) {
@@ -1513,7 +1855,7 @@ function openGoalModal(id, prefill) {
     toast('You can only add activities to your own SMART Goals'); return;
   }
   editingGoalId = id || null;
-  document.getElementById('goal-modal-title').textContent = id ? 'Edit SMART Goal' : 'Add SMART Goal';
+  document.getElementById('goal-modal-title').textContent = id ? 'Edit activity' : 'Add activity';
   if (id) {
     const g = DB.goals.find(x=>x.id===id);
     if (g) {
@@ -1542,10 +1884,10 @@ function openGoalModal(id, prefill) {
   } else {
     document.getElementById('gf-year').value = currentAcademicYearGuess();
     // A plain member can only create their own goals — prefill (and effectively lock) to self.
-    const selfDept = (currentUser.role === ROLES.MEMBER || currentUser.role === ROLES.DEPT_HEAD) ? (currentUser.dept || currentDept || '') : (currentDept || '');
+    const selfDept = (currentUser.role !== ROLES.ADMIN) ? (currentUser.dept || currentDept || '') : (currentDept || '');
     document.getElementById('gf-dept').value = selfDept;
     populateGoalMemberDropdown();
-    document.getElementById('gf-member').value = (currentUser.role === ROLES.MEMBER) ? currentUser.name : '';
+    document.getElementById('gf-member').value = (currentUser.role !== ROLES.ADMIN) ? currentUser.name : '';
     document.getElementById('gf-goal').value = '';
     document.getElementById('gf-weightage').value = '';
     document.getElementById('gf-description').value = '';
@@ -1553,6 +1895,8 @@ function openGoalModal(id, prefill) {
     document.getElementById('gf-maxscore').value = '';
     document.getElementById('gf-particulars').value = '';
   }
+  var _c = document.getElementById('gf-context');
+  if (_c) _c.textContent = [document.getElementById('gf-member').value, (document.getElementById('gf-goal').value || '') + (document.getElementById('gf-weightage').value ? ' (' + document.getElementById('gf-weightage').value + '%)' : '')].filter(Boolean).join(' \u00B7 ');
   openModal('goal-modal');
 }
 
@@ -1630,6 +1974,8 @@ function editGoalGroup(year, dept, member, goal) {
   const smBtn = document.getElementById('gg-success-btn');
   if (smBtn) smBtn.innerHTML = smRow ? sgIc('eye') + ' View / Edit Success Measures' : '+ Add Success Measures';
   document.getElementById('gg-context').textContent = `${member} · ${dept} · ${academicYearShort(year)}`;
+  var _others = sgpGroups(year, dept, member).filter(function (g) { return g.goal !== goal; }).reduce(function (t, g) { return t + (parseFloat(g.weightage) || 0); }, 0);
+  var _h = document.getElementById('gg-hint'); if (_h) _h.textContent = 'Up to ' + (Math.round((100 - _others) * 100) / 100) + '% available';
   openModal('goalgroup-modal');
 }
 function saveGoalGroup() {
@@ -1639,6 +1985,8 @@ function saveGoalGroup() {
   const weightage = parseFloat(document.getElementById('gg-weightage').value);
   const description = document.getElementById('gg-description').value.trim();
   if (!newGoal || isNaN(weightage)) { toast('SMART Goal name and weightage are required'); return; }
+  var othersTotal = sgpGroups(year, dept, member).filter(function (g) { return g.goal !== oldGoal; }).reduce(function (t, g) { return t + (parseFloat(g.weightage) || 0); }, 0);
+  if (othersTotal + weightage > 100.0001) { toast('The total would be ' + (Math.round((othersTotal + weightage) * 100) / 100) + '%. The most this goal can have is ' + (Math.round((100 - othersTotal) * 100) / 100) + '%.'); return; }
   if (!DB.settings.goalNames.includes(newGoal)) DB.settings.goalNames.push(newGoal);
   DB.goals.forEach(g => {
     if (g.year===year && g.dept===dept && g.member===member && g.goal===oldGoal) {
@@ -1646,7 +1994,7 @@ function saveGoalGroup() {
     }
   });
   editingGoalGroup = null;
-  save(); populateAllSelects(); closeModal('goalgroup-modal'); renderSmartGoals(); renderSidebar();
+  save(); populateAllSelects(); closeModal('goalgroup-modal'); renderSmartGoals(); renderSidebar(); hpFlashNow('.sgp-meter');
   toast('SMART Goal updated');
 }
 function deleteGoalGroup(year, dept, member, goal) {
@@ -1673,9 +2021,7 @@ function gradeTitle(g) { return (g && GRADE_DESC[g]) ? (g + ' — ' + GRADE_DESC
 function canEditMgrTaskFields(t) {
   if (!t) return false;
   if (currentUser.role === ROLES.ADMIN) return true;
-  if (currentUser.role === ROLES.DEPT_HEAD && t.dept === currentUser.dept && t.member !== currentUser.name) return true;
-  if (isManagerOf(t.member, t.dept)) return true;
-  return false;
+  return isBelowMe(t.member, t.dept);
 }
 // Academic-year-aware month position (June=0 … May=11) for sorting reviews latest-first.
 function sgAyMonthPos(month) { var i = MONTHS.indexOf(month); return i < 0 ? -1 : (i - 5 + 12) % 12; }
@@ -1751,7 +2097,7 @@ function renderColsPanel() {
 // Manager Grade/Comment columns are visible ONLY to admins, dept heads, and
 // anyone who is a reporting manager (has reportees). Plain members never see them.
 function canSeeMgrCols() {
-  return currentUser.role === ROLES.ADMIN || currentUser.role === ROLES.DEPT_HEAD || amIManager();
+  return currentUser.role === ROLES.ADMIN || amIManager();
 }
 function visibleCols() {
   return COL_DEFS.filter(c => {
@@ -1850,47 +2196,215 @@ function planCellHtml(t, key) {
   }
 }
 
-function renderPlan() {
-  const year=document.getElementById('mp-year').value;
-  const month=document.getElementById('mp-month').value;
-  const week=document.getElementById('mp-week').value;
-  const dept=document.getElementById('mp-dept').value;
-  const tbody=document.getElementById('plan-tbody');
+// ══════════ MONTHLY PLAN: people list on the left, task cards on the right ══════════
+var mpPerson = '', mpSynced = '', mpOpen = {}, _mpQ = '';
+var MP_STATUS = ['Planned', 'In Process', 'Pending', 'Completed', 'On Hold', 'Cancelled'];
 
-  // Academic Year, Month and Department are mandatory; Week is optional (All Weeks).
-  if (!year || !month || !dept) {
-    document.getElementById('plan-thead').innerHTML='';
-    tbody.innerHTML=`<tr><td colspan="23"><div class="empty"><div class="empty-icon">${sgIc('calendar')}</div><p>Select <b>Academic Year</b>, <b>Month</b> and <b>Department</b> above to view the plan.</p></div></td></tr>`;
+function mpFillYearMonth() {
+  var y = document.getElementById('mp-year'), m = document.getElementById('mp-month'); if (!y || !m) return;
+  var cy = y.value, cm = m.value;
+  y.innerHTML = sgYearList().map(function (v) { return '<option value="' + esc(v) + '">' + esc(ayLabel(v)) + '</option>'; }).join('');
+  y.value = cy || currentAcademicYear();
+  var months = MONTHS.slice(5).concat(MONTHS.slice(0, 5));
+  m.innerHTML = months.map(function (v) { return '<option value="' + v + '">' + v + '</option>'; }).join('');
+  m.value = cm || MONTHS[new Date().getMonth()];
+}
+function mpTodayStr() { var t = sgIstTodayYMD(); return t[0] + '-' + String(t[1] + 1).padStart(2, '0') + '-' + String(t[2]).padStart(2, '0'); }
+function mpTasksOf(year, month, dept, member) {
+  return DB.tasks.filter(function (t) { return t.year === year && t.month === month && t.dept === dept && t.member === member; });
+}
+function mpSearchPeople(v) { _mpQ = String(v || '').trim().toLowerCase(); renderPlan(); }
+function mpPick(name) {
+  mpPerson = name; renderPlan(); hpSwap();
+  if (window.innerWidth <= 860) { var m = document.getElementById('mp-head'); if (m && m.scrollIntoView) m.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+}
+function mpDept(name) {
+  var el = document.getElementById('mp-dept'); if (!el) return;
+  el.value = name; mpPerson = ''; document.getElementById('mp-week').value = '';
+  refreshMpDeptScopedDropdowns(); renderPlan();
+}
+function mpWeek(w) { document.getElementById('mp-week').value = w; renderPlan(); }
+function mpToggle(id) { mpOpen[id] = !mpOpen[id]; var c = document.getElementById('row-' + id); if (c) c.classList.toggle('is-open', !!mpOpen[id]); }
+
+function renderPlan() {
+  var yEl = document.getElementById('mp-year'), mEl = document.getElementById('mp-month'), dEl = document.getElementById('mp-dept');
+  if (!yEl || !mEl || !dEl) return;
+  mpFillYearMonth();
+  var depts = DB.settings.depts || [];
+  if (!dEl.value || depts.indexOf(dEl.value) < 0) {
+    dEl.value = (currentUser.role !== ROLES.ADMIN && depts.indexOf(currentUser.dept) > -1) ? currentUser.dept : (depts[0] || '');
+    refreshMpDeptScopedDropdowns();
+  }
+  var year = yEl.value, month = mEl.value, dept = dEl.value;
+
+  var people = membersInDept(dept).slice().sort(function (x, y) { return x.name.localeCompare(y.name); });
+  // somebody opened a person from elsewhere (it sets the hidden member box): follow it
+  var memEl = document.getElementById('mp-member');
+  if (memEl && memEl.value && memEl.value !== mpSynced) mpPerson = memEl.value;
+  if (!mpPerson || !people.some(function (p) { return p.name === mpPerson; })) {
+    mpPerson = people.some(function (p) { return p.name === currentUser.name; }) ? currentUser.name : (people[0] ? people[0].name : '');
+  }
+  if (memEl) { memEl.value = [].some.call(memEl.options, function (o) { return o.value === mpPerson; }) ? mpPerson : ''; mpSynced = memEl.value; }
+
+  // people list
+  var cnt = document.getElementById('mpp-count'), list = document.getElementById('mpp-list');
+  var shown = people.filter(function (m) { return !_mpQ || (m.name + ' ' + (m.email || '')).toLowerCase().indexOf(_mpQ) > -1; });
+  var withPlan = people.filter(function (m) { return mpTasksOf(year, month, dept, m.name).length; }).length;
+  if (cnt) cnt.textContent = people.length + (people.length === 1 ? ' person' : ' people') + ' \u00B7 ' + withPlan + ' with a plan';
+  if (list) list.innerHTML = shown.map(function (m) {
+    var ts = mpTasksOf(year, month, dept, m.name).filter(function (t) { return t.status !== 'Cancelled'; });
+    var done = ts.filter(function (t) { return t.status === 'Completed'; }).length;
+    var cls = !ts.length ? 'none' : (done === ts.length ? 'ok' : 'part');
+    return '<button type="button" class="sgp-person' + (m.name === mpPerson ? ' is-sel' : '') + '" onclick="mpPick(\'' + escJs(m.name) + '\')">'
+      + '<span class="hp-av">' + esc(hpInitials(m.name)) + '</span>'
+      + '<span class="sgp-pm"><span class="sgp-pn">' + esc(m.name) + '</span><span class="sgp-ps">' + ts.length + (ts.length === 1 ? ' task' : ' tasks') + '</span></span>'
+      + '<span class="sgp-chip ' + cls + '">' + (ts.length ? done + '/' + ts.length : 'No plan') + '</span></button>';
+  }).join('') || '<div class="hp-empty"><b>' + (_mpQ ? 'No match' : 'No people') + '</b>' + (_mpQ ? 'Try a different name.' : 'No active employees in this department.') + '</div>';
+  sgCenter(list);
+
+  renderMpMain(year, month, dept);
+}
+
+function renderMpMain(year, month, dept) {
+  var head = document.getElementById('mp-head'), listEl = document.getElementById('plan-list'), tools = document.getElementById('mp-tools');
+  if (!dept || !mpPerson) {
+    tools.hidden = true; head.innerHTML = '';
+    listEl.innerHTML = '<div class="hp-empty" style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:48px 16px"><b>' + (DB.settings.depts.length ? 'No people to show' : 'No departments yet') + '</b>' + (DB.settings.depts.length ? 'There are no active people in this department.' : 'An admin adds departments in Settings, then their plans appear here.') + '</div>';
     return;
   }
+  tools.hidden = false;
+  var member = mpPerson, week = document.getElementById('mp-week').value;
+  var status = document.getElementById('mp-status').value, q = (document.getElementById('mp-search').value || '').trim().toLowerCase();
+  var all = mpTasksOf(year, month, dept, member);
+  var canAdd = canEditTask({ dept: dept, member: member });
+  var rec = memberRecordByName(member, dept) || {};
 
-  renderPlanHead();
-  const goal=document.getElementById('mp-goal').value;
-  const member=document.getElementById('mp-member').value;
-  const status=document.getElementById('mp-status').value;
-  const search=document.getElementById('mp-search').value.toLowerCase();
+  // summary
+  var live = all.filter(function (t) { return t.status !== 'Cancelled'; });
+  var done = live.filter(function (t) { return t.status === 'Completed'; }).length;
+  var open = live.filter(function (t) { return t.status !== 'Completed' && t.status !== 'On Hold'; }).length;
+  var late = all.filter(isTaskOverdue).length;
+  var est = all.reduce(function (a, t) { return a + (parseFloat(t.est) || 0); }, 0), act = all.reduce(function (a, t) { return a + (parseFloat(t.actualHrs) || 0); }, 0);
+  var r2 = function (v) { v = Math.round(v * 100) / 100; return v; };
+  var pct = live.length ? Math.round(done / live.length * 100) : 0;
+  head.innerHTML = '<div class="sgp-head"><div class="hp-av">' + esc(hpInitials(member)) + '</div>'
+    + '<div class="sgp-hn"><h2>' + esc(member) + '</h2><p>' + esc(dept) + ' \u00B7 ' + esc(month) + ' ' + esc(monthYearLabel(year, month).replace(month, '').trim()) + (rec.managerName ? ' \u00B7 Reports to ' + esc(rec.managerName) : '') + '</p></div>'
+    + '<div class="sgp-ha"><button class="btn btn-secondary" onclick="exportPlanExcel()" title="Download this view as Excel">Excel</button>'
+    + (canAdd ? '<button class="btn btn-primary" onclick="openAddTask()">+ Add task</button>' : '') + '</div></div>'
+    + '<div class="mp-tiles">'
+    + '<div class="mp-tile"><span>Tasks</span><b>' + all.length + '</b><em>' + (all.length - live.length ? (all.length - live.length) + ' cancelled' : 'this month') + '</em></div>'
+    + '<div class="mp-tile"><span>Completed</span><b>' + done + '</b><em>' + pct + '% of ' + live.length + '</em><div class="mp-prog"><i style="width:' + pct + '%"></i></div></div>'
+    + '<div class="mp-tile"><span>Open</span><b>' + open + '</b><em>to do or in progress</em></div>'
+    + '<div class="mp-tile' + (late ? ' is-late' : '') + '"><span>Overdue</span><b>' + late + '</b><em>past target, not done</em></div>'
+    + '<div class="mp-tile"><span>Hours</span><b>' + r2(act) + ' / ' + r2(est) + '</b><em>actual / estimated</em></div></div>';
 
-  // Everyone can view the plan; who can edit each row is enforced per-row.
-  let tasks=DB.tasks.filter(t=>t.year===year && t.month===month && t.dept===dept);
-  if(week) tasks=tasks.filter(t=>t.week===week);
-  if(goal) tasks=tasks.filter(t=>t.goal===goal);
-  if(member) tasks=tasks.filter(t=>t.member===member);
-  if(status) tasks=tasks.filter(t=>t.status===status);
-  if(search) tasks=tasks.filter(t=>t.action.toLowerCase().includes(search)||(t.subcat||'').toLowerCase().includes(search)||(t.cat||'').toLowerCase().includes(search));
+  // weeks
+  document.getElementById('mp-weeks').innerHTML = '<button type="button" class="mp-wk' + (!week ? ' is-sel' : '') + '" onclick="mpWeek(\'\')">All weeks<i>' + all.length + '</i></button>'
+    + WEEKS.map(function (w) {
+      var n = all.filter(function (t) { return t.week === w; }).length;
+      return '<button type="button" class="mp-wk' + (week === w ? ' is-sel' : '') + '" onclick="mpWeek(\'' + w + '\')">' + w + '<i>' + n + '</i></button>';
+    }).join('');
 
-  // Sort: Week 1 → 2 → 3 …, and within each week newest-added first.
-  tasks.sort((a,b)=>{
-    const wa=WEEKS.indexOf(a.week), wb=WEEKS.indexOf(b.week);
-    if (wa!==wb) return wa-wb;
-    const ca=a.createdAt||'', cb=b.createdAt||'';
-    if (ca!==cb) return ca<cb?1:-1;
-    return 0;
+  // tasks
+  var tasks = all.slice();
+  if (week) tasks = tasks.filter(function (t) { return t.week === week; });
+  if (status) tasks = tasks.filter(function (t) { return t.status === status; });
+  if (q) tasks = tasks.filter(function (t) { return (t.action || '').toLowerCase().indexOf(q) > -1 || (t.subcat || '').toLowerCase().indexOf(q) > -1 || (t.cat || '').toLowerCase().indexOf(q) > -1 || (t.goal || '').toLowerCase().indexOf(q) > -1; });
+  tasks.sort(function (a, b) {
+    var wa = WEEKS.indexOf(a.week), wb = WEEKS.indexOf(b.week);
+    if (wa !== wb) return wa - wb;
+    var ca = a.createdAt || '', cb = b.createdAt || '';
+    return ca === cb ? 0 : (ca < cb ? 1 : -1);
   });
+  if (!tasks.length) {
+    listEl.innerHTML = '<div class="hp-empty" style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:40px 16px;margin-top:14px"><b>' + (all.length ? 'No tasks match' : 'No tasks planned') + '</b>' + (all.length ? 'Change the week, status or search.' : (canAdd ? 'Use \u201C+ Add task\u201D to plan ' + esc(month) + '.' : 'Nothing has been planned for ' + esc(month) + ' yet.')) + '</div>';
+    return;
+  }
+  var html = '', lastWeek = null;
+  tasks.forEach(function (t) {
+    if (t.week !== lastWeek) {
+      lastWeek = t.week;
+      var wn = tasks.filter(function (x) { return x.week === t.week; }).length;
+      html += '<div class="mp-wh">' + esc(t.week || 'No week') + '<span>' + wn + (wn === 1 ? ' task' : ' tasks') + '</span></div>';
+    }
+    html += mpCard(t);
+  });
+  listEl.innerHTML = html;
+  if (hpFlashId) { var _fc = document.getElementById('row-' + hpFlashId); if (_fc) _fc.classList.add('hp-flash'); hpFlashId = null; }
+}
 
-  const cols = visibleCols();
-  if(!tasks.length){tbody.innerHTML=`<tr><td colspan="${cols.length}"><div class="empty"><div class="empty-icon">${sgIc('clipboard')}</div><p>No tasks for this selection.</p></div></td></tr>`;return;}
+function mpCard(t) {
+  var ed = canEditTask(t), mg = canEditMgrTaskFields(t), late = isTaskOverdue(t);
+  var sc = String(t.status || 'Planned').replace(/\s+/g, '-');
+  var id = t.id, isOpen = !!mpOpen[id];
+  var meta = '<span class="goal-pill ' + goalColor(t.goal) + '">' + esc(t.goal) + '</span>'
+    + (t.cat ? '<span>' + esc(t.cat) + (t.subcat ? ' \u203A ' + esc(t.subcat) : '') + '</span>' : '')
+    + '<span>Target ' + esc(formatDate(t.tgtDate)) + '</span><span>' + (t.est || 0) + ' h est</span>'
+    + (t.managerGrade ? '<span>Grade ' + esc(t.managerGrade) + '</span>' : '');
+  var f = function (label, key, type, val, extra) {
+    if (!ed) return '<div><label>' + label + '</label><div class="mpt-ro">' + (val === '' || val == null ? '\u2014' : esc(type === 'date' ? formatDate(val) : val)) + '</div></div>';
+    return '<div' + (extra || '') + '><label>' + label + '</label><input data-f="' + key + '" type="' + type + '" value="' + esc(val == null ? '' : val) + '"' + (type === 'number' ? ' min="0" step="0.5"' : '') + '></div>';
+  };
+  var statusField = ed
+    ? '<div><label>Status</label><select data-f="status" onchange="mpStatusChange(this,\'' + id + '\')">' + MP_STATUS.map(function (x) { return '<option' + (t.status === x ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select></div>'
+    : '<div><label>Status</label><div class="mpt-ro">' + statusBadge(t.status) + '</div></div>';
+  var body = '<h5 class="mpt-h">Status update</h5><div class="mpt-g">' + statusField
+    + f('Completed on', 'compDate', 'date', t.compDate) + f('Actual hours', 'actualHrs', 'number', t.actualHrs || 0) + f('Actual items', 'actualItems', 'number', t.actualItems)
+    + f('Revised target', 'revisedTgtDate', 'date', t.revisedTgtDate) + f('Deviation', 'deviation', 'text', t.deviation, ' class="w2"') + f('Help needed', 'helpNeeded', 'text', t.helpNeeded) + '</div>'
+    + (ed ? '<div class="mpt-bar"><button class="btn btn-primary btn-sm" onclick="mpSave(\'' + id + '\')">Save update</button><span class="sp"></span>'
+        + '<button class="btn btn-secondary btn-sm" onclick="openEditTask(\'' + id + '\')">' + sgIc('edit') + ' Edit task</button>'
+        + '<button class="btn btn-danger btn-sm" onclick="deleteTask(\'' + id + '\')">' + sgIc('trash') + ' Delete</button></div>' : '');
+  // manager feedback
+  var hasC = !!(t.managerComment && String(t.managerComment).trim());
+  if (mg || t.managerGrade || hasC) {
+    body += '<div class="mpt-mgr"><h5 class="mpt-h">Manager feedback</h5>';
+    if (mg) {
+      body += '<span class="mpt-grades">' + ['A', 'B', 'C'].map(function (g) { return '<button type="button" class="mpt-gr' + (t.managerGrade === g ? ' is-on' : '') + '" title="' + esc(gradeTitle(g)) + '" onclick="sgSetGrade(\'' + id + '\',\'' + (t.managerGrade === g ? '' : g) + '\')">' + g + '</button>'; }).join('') + '</span>'
+        + '<span style="font-size:12px;color:var(--text3)">' + (t.managerGrade ? esc(gradeTitle(t.managerGrade)) : 'Choose a grade') + '</span>'
+        + '<textarea data-mc="' + id + '" placeholder="Comment for ' + esc(t.member) + '">' + esc(t.managerComment || '') + '</textarea>'
+        + '<div class="mpt-bar"><button class="btn btn-secondary btn-sm" onclick="mpSaveComment(\'' + id + '\')">Save comment</button></div>';
+    } else {
+      body += (t.managerGrade ? '<div class="mpt-ro"><b>Grade ' + esc(t.managerGrade) + '</b> \u2014 ' + esc(gradeTitle(t.managerGrade).replace(/^[ABC] \u2014 /, '')) + '</div>' : '') + (hasC ? '<div class="mpt-ro">' + esc(t.managerComment) + '</div>' : '');
+    }
+    body += '</div>';
+  }
+  var done = ed && t.status !== 'Completed' && t.status !== 'Cancelled'
+    ? '<button type="button" class="mpt-done" onclick="event.stopPropagation();mpDone(\'' + id + '\')">Mark done</button>' : '';
+  return '<article class="mpt s-' + sc + (late ? ' is-late' : '') + (isOpen ? ' is-open' : '') + '" id="row-' + id + '">'
+    + '<div class="mpt-main" onclick="mpToggle(\'' + id + '\')"><div class="mpt-t"><h4>' + esc(t.action) + '</h4><p>' + meta + '</p></div>'
+    + (late ? '<span class="mpt-late">Overdue</span>' : '') + statusBadge(t.status) + done + '<span class="mpt-chev">\u203A</span></div>'
+    + '<div class="mpt-body">' + body + '</div></article>';
+}
 
-  tbody.innerHTML=tasks.map(t=>`<tr id="row-${t.id}">${cols.map(c=>planCellHtml(t,c.key)).join('')}</tr>`).join('') + planTotalRowHtml(tasks, cols);
+function mpStatusChange(sel, id) {
+  var card = document.getElementById('row-' + id); if (!card) return;
+  var comp = card.querySelector('[data-f="compDate"]');
+  if (sel.value === 'Completed' && comp && !comp.value) comp.value = mpTodayStr();
+}
+function mpSave(id) {
+  var t = DB.tasks.find(function (x) { return x.id === id; }); if (!t) { toast('Task not found'); return; }
+  if (!canEditTask(t)) { toast('You can only edit your own plan'); return; }
+  var card = document.getElementById('row-' + id); if (!card) return;
+  card.querySelectorAll('[data-f]').forEach(function (el) {
+    var k = el.dataset.f, v = el.value;
+    if (k === 'actualHrs') t[k] = parseFloat(v) || 0;
+    else if (k === 'actualItems') t[k] = v === '' ? '' : (parseFloat(v) || 0);
+    else t[k] = v;
+  });
+  if (t.status === 'Completed' && !t.compDate) t.compDate = mpTodayStr();
+  save(); hpFlashId = id; renderPlan(); toast('Update saved');
+}
+function mpDone(id) {
+  var t = DB.tasks.find(function (x) { return x.id === id; }); if (!t) return;
+  if (!canEditTask(t)) { toast('You can only edit your own plan'); return; }
+  t.status = 'Completed'; if (!t.compDate) t.compDate = mpTodayStr();
+  save(); hpFlashId = id; renderPlan(); toast('Marked as completed');
+}
+function mpSaveComment(id) {
+  var t = DB.tasks.find(function (x) { return x.id === id; }); if (!t) return;
+  if (!canEditMgrTaskFields(t)) { toast('Not allowed'); return; }
+  var ta = document.querySelector('[data-mc="' + id + '"]'); if (!ta) return;
+  t.managerComment = ta.value; save(); hpFlashId = id; renderPlan(); toast('Comment saved');
 }
 
 // Total row — shown at the bottom of the Monthly Plan table.
@@ -2066,7 +2580,7 @@ function sgSetGrade(id, val) {
   const t = DB.tasks.find(x=>x.id===id); if (!t) return;
   if (!canEditMgrTaskFields(t)) { toast('Not allowed'); renderPlan(); return; }
   t.managerGrade = val || '';
-  save(); renderPlan(); toast('Grade saved');
+  save(); hpFlashId = id; renderPlan(); toast('Grade saved');
 }
 
 // Compact date field: chip shows the value; clicking expands the picker in-cell.
@@ -2098,9 +2612,14 @@ function sgPickOption(id, val) {
 // Add Task starts from what the Monthly Plan is showing: its Academic Year, Month and
 // Week (and Member / SMART Goal when one is picked), so a task added while Week 2 is
 // selected is a Week 2 task. A filter left on "All…" falls back to today.
+function mpTaskCtx() {
+  var v = function (id) { return (document.getElementById(id) || {}).value || ''; };
+  var el = document.getElementById('tf-context');
+  if (el) el.textContent = [v('tf-member'), v('tf-dept'), v('tf-month') + ' ' + academicYearShort(v('tf-year'))].filter(Boolean).join(' \u00B7 ');
+}
 function openAddTask() {
   editingTaskId=null;
-  document.getElementById('task-modal-title').textContent='Add Task';
+  document.getElementById('task-modal-title').textContent='Add task';
   const mp = id => (document.getElementById(id) || {}).value || '';
   const now = new Date(), thisMonth = MONTHS[now.getMonth()];
   if (!sgPickOption('tf-year', mp('mp-year'))) document.getElementById('tf-year').value = currentAcademicYearGuess();
@@ -2117,13 +2636,14 @@ function openAddTask() {
   document.getElementById('tf-planned').value='Yes';
   document.getElementById('tf-tgtdate').value='';
   const deptEl = document.getElementById('tf-dept');
-  deptEl.value = (currentUser.role === ROLES.MEMBER || currentUser.role === ROLES.DEPT_HEAD) ? (currentUser.dept || currentDept || '') : (currentDept || '');
+  deptEl.value = mp('mp-dept') || ((currentUser.role !== ROLES.ADMIN) ? (currentUser.dept || currentDept || '') : (currentDept || ''));
   populateTaskMemberDropdown();
-  document.getElementById('tf-member').value = (currentUser.role === ROLES.MEMBER) ? currentUser.name : '';
-  if (currentUser.role !== ROLES.MEMBER) sgPickOption('tf-member', mp('mp-member'));
+  document.getElementById('tf-member').value = '';
+  if (!sgPickOption('tf-member', mp('mp-member')) && currentUser.role !== ROLES.ADMIN) sgPickOption('tf-member', currentUser.name);
   document.getElementById('tf-goal').value = '';
   populateTaskGoalDropdown();
   if (sgPickOption('tf-goal', mp('mp-goal'))) populateCatDropdown();
+  mpTaskCtx();
   openModal('task-modal');
 }
 
@@ -2131,7 +2651,7 @@ function openEditTask(id) {
   const t=DB.tasks.find(x=>x.id===id); if(!t) return;
   if(!canEditTask(t)){toast('You can only edit your own plan');return;}
   editingTaskId=id;
-  document.getElementById('task-modal-title').textContent='Edit Task';
+  document.getElementById('task-modal-title').textContent='Edit task';
   document.getElementById('tf-year').value=t.year;
   document.getElementById('tf-month').value=t.month;
   document.getElementById('tf-week').value=t.week;
@@ -2148,6 +2668,7 @@ function openEditTask(id) {
   document.getElementById('tf-planneditems').value=t.plannedItems===''||t.plannedItems==null?'':t.plannedItems;
   document.getElementById('tf-est').value=t.est||'';
   document.getElementById('tf-tgtdate').value=t.tgtDate||'';
+  mpTaskCtx();
   openModal('task-modal');
 }
 
@@ -2198,185 +2719,144 @@ function deleteTask(id) {
 }
 
 // ── REVIEWS ──
-function onRvDeptChange() {
-  const dept = document.getElementById('rv-dept').value;
-  populateSelect('rv-member', reviewScopedMemberNames(dept), 'Select Member…');
-  document.getElementById('rv-member').value = '';
-  renderReviews();
+function onRvDeptChange() { rvPerson = ''; renderReviews(); }
+
+// ══════════ REVIEWS: people list on the left, the month's review on the right ══════════
+var rvPerson = '', rvSynced = '', _rvQ = '';
+
+function rvFillYearMonth() {
+  var y = document.getElementById('rv-year'), m = document.getElementById('rv-month'); if (!y || !m) return;
+  var cy = y.value, cm = m.value;
+  y.innerHTML = sgYearList().map(function (v) { return '<option value="' + esc(v) + '">' + esc(ayLabel(v)) + '</option>'; }).join('');
+  y.value = cy || currentAcademicYear();
+  var months = MONTHS.slice(5).concat(MONTHS.slice(0, 5));
+  m.innerHTML = months.map(function (v) { return '<option value="' + v + '">' + v + '</option>'; }).join('');
+  m.value = cm || MONTHS[new Date().getMonth()];
+}
+function rvSearch(v) { _rvQ = String(v || '').trim().toLowerCase(); renderReviews(); }
+function rvPick(name) {
+  rvPerson = name; renderReviews(); hpSwap();
+  if (window.innerWidth <= 860) { var m = document.getElementById('review-list'); if (m && m.scrollIntoView) m.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+}
+function rvToggle(hd) { var c = hd.closest('.rv-gcard'); if (c) c.classList.toggle('is-open'); }
+// The people this user may open a review for (the rest of the rules are in canViewReview).
+function rvPeopleList(dept) {
+  if (currentUser.role === ROLES.ADMIN) return membersInDept(dept);
+  return reviewScopedMemberNames('').map(function (n) { return memberRecordByName(n) || { name: n, dept: '' }; });
+}
+function rvOf(year, month, p) {
+  return DB.reviews.find(function (r) { return r.year === year && r.month === month && r.member === p.name && (!p.dept || r.dept === p.dept) && canViewReview(r); }) || null;
+}
+// One review's numbers: each SMART Goal's performance = manager score / max score x weightage.
+function rvCalc(r) {
+  var items = r.items || [], rows = [], total = 0, wTotal = 0;
+  groupByGoal(items).forEach(function (grp) {
+    var gMax = grp.rows.reduce(function (a, x) { return a + (parseFloat(x.maxScore) || 0); }, 0);
+    var gMgr = grp.rows.reduce(function (a, x) { return a + (parseFloat(x.mgrScore) || 0); }, 0);
+    var gMem = grp.rows.reduce(function (a, x) { return a + (parseFloat(x.memberScore) || 0); }, 0);
+    var w = parseFloat(grp.weightage) || 0, perf = Math.round((gMax > 0 ? gMgr / gMax : 0) * w);
+    total += perf; wTotal += w;
+    rows.push({ grp: grp, gMax: gMax, gMgr: gMgr, gMem: gMem, w: w, perf: perf });
+  });
+  return { rows: rows, total: total, wTotal: wTotal,
+           mgrDone: items.some(function (i) { return sgScoreEntered(i.mgrScore); }), memDone: items.some(function (i) { return sgScoreEntered(i.memberScore); }) };
+}
+function rvStatus(r) {
+  if (!r) return { cls: 'none', txt: 'Not started', pill: '' };
+  var c = rvCalc(r);
+  if (c.mgrDone) return { cls: c.total >= 80 ? 'ok' : (c.total >= 50 ? 'part' : 'over'), txt: c.total + '%', pill: '<span class="rv-st ok">Manager scored</span>' };
+  if (c.memDone) return { cls: 'wait', txt: 'Awaiting', pill: '<span class="rv-st wait">Awaiting manager score</span>' };
+  return { cls: 'none', txt: 'Draft', pill: '<span class="rv-st draft">Draft</span>' };
 }
 
 function renderReviews() {
-  const addBtn = document.getElementById('rv-add-btn');
-  // Plain Member (no reportees): self-review, filters hidden. Anyone who can
-  // view others' reviews (Admin, Dept Head, or a Manager with reportees) gets
-  // the Department/Member filters to choose whose review to open.
-  const viewOthers = (currentUser.role === ROLES.ADMIN || currentUser.role === ROLES.DEPT_HEAD || amIManager());
-  addBtn.textContent = (currentUser.role === ROLES.MEMBER) ? '+ Submit Self Review' : '+ New Review';
-  document.getElementById('rv-dept').style.display = viewOthers ? '' : 'none';
-  document.getElementById('rv-member').style.display = viewOthers ? '' : 'none';
+  var yEl = document.getElementById('rv-year'), mEl = document.getElementById('rv-month'), dEl = document.getElementById('rv-dept');
+  if (!yEl || !mEl || !dEl) return;
+  rvFillYearMonth();
+  var isAdmin = currentUser.role === ROLES.ADMIN, depts = DB.settings.depts || [];
+  var wrap = document.getElementById('rv-dept-wrap'); if (wrap) wrap.style.display = isAdmin ? '' : 'none';
+  if (isAdmin && (!dEl.value || depts.indexOf(dEl.value) < 0)) dEl.value = depts[0] || '';
+  var year = yEl.value, month = mEl.value, dept = isAdmin ? dEl.value : '';
 
-  const yearF = document.getElementById('rv-year').value;
-  const monthF = document.getElementById('rv-month').value;
-  // A Manager who is a plain Member has no home-dept lock — folding currentDept
-  // in would hide a reportee who sits in another department.
-  // Any manager (a plain member OR a dept head who also manages someone in
-  // another department) must not have the review list locked to a home dept.
-  const mgrView = amIManager();
-  const deptF = document.getElementById('rv-dept').value || (mgrView ? '' : currentDept);
-  const memberF = document.getElementById('rv-member').value;
+  var people = rvPeopleList(dept).slice().sort(function (x, y) { return x.name.localeCompare(y.name); });
+  var memEl = document.getElementById('rv-member');
+  if (memEl && memEl.value && memEl.value !== rvSynced) rvPerson = memEl.value;
+  if (!rvPerson || !people.some(function (p) { return p.name === rvPerson; })) {
+    rvPerson = people.some(function (p) { return p.name === currentUser.name; }) ? currentUser.name : (people[0] ? people[0].name : '');
+  }
+  if (memEl) { memEl.value = [].some.call(memEl.options, function (o) { return o.value === rvPerson; }) ? rvPerson : ''; rvSynced = memEl.value; }
 
-  // Default view is blank — Dept Head / Admin must pick a Member (via filters) before anything shows.
-  // Members viewing their own reviews (dept/member filters hidden) see their data immediately.
-  if (viewOthers && !memberF) {
-    document.getElementById('review-list').innerHTML = `<div class="empty"><div class="empty-icon">${sgIc('search')}</div><p>Select a Member from the filters above to view their review.</p></div>`;
+  var cnt = document.getElementById('rvp-count'), list = document.getElementById('rvp-list');
+  var scored = people.filter(function (p) { var r = rvOf(year, month, p); return r && rvCalc(r).mgrDone; }).length;
+  if (cnt) cnt.textContent = people.length + (people.length === 1 ? ' person' : ' people') + ' \u00B7 ' + scored + ' scored';
+  var shown = people.filter(function (p) { return !_rvQ || (p.name + ' ' + (p.email || '')).toLowerCase().indexOf(_rvQ) > -1; });
+  if (list) list.innerHTML = shown.map(function (p) {
+    var st = rvStatus(rvOf(year, month, p));
+    return '<button type="button" class="sgp-person' + (p.name === rvPerson ? ' is-sel' : '') + '" onclick="rvPick(\'' + escJs(p.name) + '\')">'
+      + '<span class="hp-av">' + esc(hpInitials(p.name)) + '</span>'
+      + '<span class="sgp-pm"><span class="sgp-pn">' + esc(p.name) + '</span><span class="sgp-ps">' + esc(p.dept || '') + '</span></span>'
+      + '<span class="sgp-chip ' + st.cls + '">' + st.txt + '</span></button>';
+  }).join('') || '<div class="hp-empty"><b>' + (_rvQ ? 'No match' : 'No people') + '</b>' + (_rvQ ? 'Try a different name.' : 'No one to review here.') + '</div>';
+  sgCenter(list);
+
+  renderRvMain(year, month, people.filter(function (p) { return p.name === rvPerson; })[0]);
+}
+
+function renderRvMain(year, month, p) {
+  var el = document.getElementById('review-list');
+  if (!p) {
+    el.innerHTML = '<div class="hp-empty" style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:48px 16px"><b>No one to show</b>' + (DB.settings.depts.length ? 'There are no active people to review here.' : 'An admin adds departments in Settings, then reviews appear here.') + '</div>';
+    return;
+  }
+  var r = rvOf(year, month, p), st = rvStatus(r);
+  var head = '<div class="sgp-head"><div class="hp-av">' + esc(hpInitials(p.name)) + '</div>'
+    + '<div class="sgp-hn"><h2>' + esc(p.name) + '</h2><p>' + esc(p.dept || '') + ' \u00B7 ' + esc(monthYearLabel(year, month)) + (r && r.reviewer ? ' \u00B7 Reviewer ' + esc(r.reviewer) : '') + (r && r.date ? ' \u00B7 ' + esc(formatDate(r.date)) : '') + '</p></div>'
+    + (st.pill ? '<div>' + st.pill + '</div>' : '');
+  var canEdit = r ? (canEditMemberScore(r) || canEditMgrScore(r)) : (canEditMemberScore({ member: p.name, dept: p.dept }) || canEditMgrScore({ member: p.name, dept: p.dept }));
+  head += '<div class="sgp-ha">'
+    + (r && canEdit ? '<button class="btn btn-primary" onclick="openReviewModal(\'' + r.id + '\')">' + sgIc('edit') + ' Edit review</button>' : '')
+    + (r && canEditMgrScore(r) ? '<button class="btn btn-danger" onclick="deleteReview(\'' + r.id + '\')">Delete</button>' : '')
+    + '</div></div>';
+
+  if (!r) {
+    var isSelf = p.name === currentUser.name;
+    el.innerHTML = head + '<div class="rv-start"><b>No review for ' + esc(month) + ' yet</b><p>' + (canEdit ? (isSelf ? 'Score your goals for the month and submit your self-review.' : 'Start the review to score ' + esc(p.name) + '\u2019s goals for the month.') : 'It has not been started.') + '</p>'
+      + (canEdit ? '<button class="btn btn-primary" onclick="openReviewModal()">' + (isSelf ? 'Submit self-review' : 'Start review') + '</button>' : '') + '</div>';
     return;
   }
 
-  // Visibility = own + dept-head's own dept + reportees (any dept) + admin(all).
-  let reviews = DB.reviews.filter(canViewReview);
-  if (yearF) reviews = reviews.filter(r => r.year === yearF);
-  if (monthF) reviews = reviews.filter(r => r.month === monthF);
-  if (deptF) reviews = reviews.filter(r => r.dept === deptF);
-  if (memberF) reviews = reviews.filter(r => r.member === memberF);
+  var c = rvCalc(r), canRemark = canEditMemberScore(r) || canEditMgrScore(r), items = r.items || [];
+  var col = c.mgrDone ? pctColor(c.total) : 'var(--text3)';
+  var html = head + '<div class="rv-score"><div class="rv-big"><b style="color:' + col + '">' + (c.mgrDone ? c.total + '%' : '\u2014') + '</b><span>Performance</span></div><div class="rv-bars">'
+    + c.rows.map(function (g) {
+      var pc = g.w > 0 ? Math.round(g.perf / g.w * 100) : 0;
+      return '<div class="rv-bar-r"><span title="' + esc(g.grp.goal) + '">' + esc(g.grp.goal) + ' \u00B7 ' + g.w + '%</span><div class="rv-bar-t"><i style="width:' + Math.min(pc, 100) + '%;background:' + pctColor(pc) + '"></i></div><b style="color:' + (c.mgrDone ? pctColor(pc) : 'var(--text3)') + '">' + (c.mgrDone ? g.perf + '%' : '\u2014') + '</b></div>';
+    }).join('') + '</div></div>';
 
-  if (!reviews.length) {
-    document.getElementById('review-list').innerHTML = `<div class="empty"><div class="empty-icon">${sgIc('chart')}</div><p>${!viewOthers ? 'You have no reviews yet. Click "+ Submit Self Review" to submit yours.' : 'No reviews found for this selection.'}</p></div>`;
-    return;
-  }
-
-  reviews.sort(sgReviewSortKey);
-  let html = '';
-  reviews.forEach(r => {
-    const items = r.items || [];
-    const totalMax  = items.reduce((a,i) => a + (parseFloat(i.maxScore)||0), 0);
-    const totalMem  = items.reduce((a,i) => a + (parseFloat(i.memberScore)||0), 0);
-    const totalMgr  = items.reduce((a,i) => a + (parseFloat(i.mgrScore)||0), 0);
-    const mgrDone = items.some(i => sgScoreEntered(i.mgrScore));
-    const memDone = items.some(i => sgScoreEntered(i.memberScore));
-    const statusPill = mgrDone
-      ? `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--green-lt);color:var(--green);border:1px solid var(--green)">${sgIc('check')} Mgr Scored</span>`
-      : memDone
-        ? `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--blue-lt);color:var(--blue);border:1px solid var(--blue)">${sgIc('hourglass')} Awaiting Mgr Score</span>`
-        : `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--surface2);color:var(--text3);border:1px solid var(--border2)">Draft</span>`;
-
-    const groups = groupByGoal(items);
-
-    // ── Summary of Review table with each SMART Goal's detail table nested directly beneath its row ──
-    const canEditRemark = canEditMemberScore(r) || canEditMgrScore(r);
-    let bodyRows = '';
-    let totalWeightage = 0, totalPerformance = 0;
-    groups.forEach((grp,gi) => {
-      const gMax = grp.rows.reduce((a,x)=>a+(parseFloat(x.maxScore)||0),0);
-      const gMgr = grp.rows.reduce((a,x)=>a+(parseFloat(x.mgrScore)||0),0);
-      const gMem = grp.rows.reduce((a,x)=>a+(parseFloat(x.memberScore)||0),0);
-      const weightage = parseFloat(grp.weightage)||0;
-      const ratio = gMax>0 ? (gMgr/gMax) : 0;
-      const performance = Math.round(ratio * weightage);
-      totalWeightage += weightage;
-      totalPerformance += performance;
-      const desc = grp.rows[0].description || '';
-
-      const detailBody = grp.rows.map(i=>{
-        const hasRemark = !!(i.remark && String(i.remark).trim());
-        const itemIndex = items.indexOf(i);
-        return `<tr>
-          <td>${esc(i.cat)}</td>
-          <td>${esc(i.particulars||'—')}</td>
-          <td style="text-align:center">${esc(i.target||'—')}</td>
-          <td style="text-align:center">${esc(i.actual||'—')}</td>
-          <td style="text-align:center"><button type="button" class="remark-icon-btn ${hasRemark?'has-remark':''}" title="${hasRemark?'View / edit remark':(canEditRemark?'Add remark':'No remark')}" onclick="sgOpenItemRemarkModal('${r.id}',${itemIndex})">${hasRemark?sgIc('note'):sgIc('edit')}</button></td>
-          <td style="text-align:center;font-weight:700">${i.maxScore}</td>
-          <td style="text-align:center"><span class="score-badge ${scoreClass(i.memberScore,i.maxScore)}">${sgScoreEntered(i.memberScore)?i.memberScore:'—'}</span></td>
-          <td style="text-align:center">${sgScoreEntered(i.mgrScore)?`<span class="score-badge ${scoreClass(i.mgrScore,i.maxScore)}">${i.mgrScore}</span>`:'<span style="font-size:11px;color:var(--text3)">—</span>'}</td>
-        </tr>`;
-      }).join('');
-
-      const detailTable = `<table class="tbl tbl-fixed tbl-grouped">
-        <colgroup>
-          <col style="width:13%"><col style="width:33%"><col style="width:8%"><col style="width:8%">
-          <col style="width:8%"><col style="width:8%"><col style="width:11%"><col style="width:11%">
-        </colgroup>
-        <thead><tr>
-          <th>Activity</th><th>Particulars</th>
-          <th class="sg-th-nowrap" style="text-align:center">Target</th>
-          <th class="sg-th-nowrap" style="text-align:center">Actual</th>
-          <th class="sg-th-nowrap" style="text-align:center">Remark</th>
-          <th class="sg-th-nowrap" style="text-align:center">Max</th>
-          <th class="sg-th-nowrap" style="text-align:center">Member Score</th>
-          <th class="sg-th-nowrap" style="text-align:center">Manager Score</th>
-        </tr></thead>
-        <tbody>
-          ${detailBody}
-          <tr class="sg-total-row" style="font-weight:700">
-            <td colspan="5">Total</td>
-            <td style="text-align:center">${gMax}</td>
-            <td style="text-align:center"><span class="score-badge ${scoreClass(gMem,gMax)}">${gMem}</span></td>
-            <td style="text-align:center">${gMgr>0?`<span class="score-badge ${scoreClass(gMgr,gMax)}">${gMgr}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
-          </tr>
-        </tbody>
-      </table>`;
-
-      // Summary rows are a CSS grid (not a <table>): header, rows and total share
-      // one grid-template-columns, so a row can never be laid out narrower than
-      // the header, and each goal's detail panel sits between rows as a plain block.
-      bodyRows += `<div class="sg-sum-row ${gi%2?'alt':''}" role="row" id="sgsum-${r.id}-${gi}" onclick="sgToggleGoalDetail('${r.id}',${gi})" style="display:grid !important">
-          <div class="c" style="color:var(--text3)">${gi+1}</div>
-          <div style="font-weight:600"><span class="sg-sum-caret">▸</span>${esc(grp.goal)}</div>
-          <div class="c">${sgSuccessEyeBtn(r.year, r.dept, r.member, grp.goal, grp.rows[0].goalItemId)}</div>
-          <div style="color:var(--text2)">${esc(desc||'—')}</div>
-          <div class="c" style="font-weight:600">${weightage}%</div>
-          <div class="c" style="font-weight:700;background:${pctColor(performance)}22;color:${pctColor(performance)}">${performance}%</div>
-        </div>
-        <div class="sg-detail-wrap" id="sgd-${r.id}-${gi}"><div class="sg-detail-inner"><div class="sg-detail-panel">${detailTable}</div></div></div>`;
-    });
-
-    const overallHtml = sgOverallHtml(r.remarks);
-    const sheetBHtml = sgSheetBLinkHtml(r.sheetBLink);
-    const helpHtml = sgReviewNoteHtml(sgIc('help'), 'Help Needed', r.helpNeeded);
-    const areasHtml = sgReviewNoteHtml(sgIc('trend'), 'Areas of Improvement', r.areasOfImprovement);
-    const summaryHtml = `<div style="margin-bottom:18px">
-      <div class="review-section-hd">Summary of Review — ${monthYearLabel(r.year,r.month)} <span style="font-weight:400;font-size:11px;color:var(--text3);text-transform:none;letter-spacing:0">— click a SMART Goal to view its details</span></div>
-      ${(overallHtml || sheetBHtml) ? `<div style="margin:10px 0 8px;display:grid;grid-template-columns:minmax(0,1fr) 200px;gap:8px;align-items:start">${overallHtml||'<span></span>'}${sheetBHtml||'<span></span>'}</div>` : ''}
-      <div class="tbl-wrap"><div class="sg-sum" role="table">
-        <div class="sg-sum-hd" role="row">
-          <div class="c">#</div><div>SMART Goal</div><div class="c">Success Measures</div><div>Description</div>
-          <div class="c">Weightage</div><div class="c">Performance</div>
-        </div>
-        ${bodyRows}
-        <div class="sg-sum-total" role="row">
-          <div class="sg-sum-total-lbl">Total</div>
-          <div class="c">${totalWeightage}%</div>
-          <div class="c">${totalPerformance}%</div>
-        </div>
-      </div></div>
-      ${(helpHtml || areasHtml) ? `<div style="margin:12px 0 0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:start">${helpHtml||'<span></span>'}${areasHtml||'<span></span>'}</div>` : ''}
-    </div>`;
-
-    // Collapsed by default: only this header line shows. Click the row to expand details.
-    html += `<div class="card sg-review-card" style="margin-bottom:16px">
-      <div class="card-header sg-review-hd" onclick="toggleReviewCard(this)" style="flex-wrap:wrap;gap:8px">
-        <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
-          <span class="sg-review-chevron">▶</span>
-          <span class="card-title" style="font-weight:700">${esc(academicYearShort(r.year))}</span>
-          <span class="card-title">${esc(r.member)}</span>
-          <span style="font-size:12px;color:var(--text2)">${esc(monthYearLabel(r.year,r.month))}</span>
-          <span style="font-size:11px;color:var(--text3)">${r.date?formatDate(r.date):'—'}</span>
-          <span style="font-size:11px;color:var(--text3)">${esc(r.dept||'')}</span>
-          ${statusPill}
-        </div>
-        <div style="font-size:11px;color:var(--text3)">Reviewer: ${esc(r.reviewer||'—')}</div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap" onclick="event.stopPropagation()">
-          <span class="score-badge" style="background:${pctColor(totalPerformance)}22;color:${pctColor(totalPerformance)};border:1px solid ${pctColor(totalPerformance)}55">Performance: ${totalPerformance}%</span>
-          ${(canEditMemberScore(r)||canEditMgrScore(r))?`<button class="btn btn-secondary btn-sm" onclick="openReviewModal('${r.id}')">${sgIc('edit')} Edit</button>`:''}
-          ${currentUser.role===ROLES.ADMIN||currentUser.role===ROLES.DEPT_HEAD?`<button class="btn btn-danger btn-sm" onclick="deleteReview('${r.id}')">Delete</button>`:''}
-        </div>
-      </div>
-      <div class="card-body" style="display:none">
-        ${summaryHtml}
-      </div>
-    </div>`;
+  c.rows.forEach(function (g) {
+    var grp = g.grp, first = grp.rows[0];
+    html += '<article class="rv-gcard"><div class="rv-gh" onclick="rvToggle(this)"><h3>' + esc(grp.goal) + '</h3><span class="rv-wt">Weightage ' + g.w + '%</span>'
+      + '<span class="score-badge" style="background:' + pctColor(g.gMax > 0 ? g.gMgr / g.gMax * 100 : 0) + '22;color:' + (c.mgrDone ? pctColor(g.gMax > 0 ? g.gMgr / g.gMax * 100 : 0) : 'var(--text3)') + '">' + (c.mgrDone ? g.perf + '% of ' + g.w + '%' : 'Not scored') + '</span>'
+      + sgSuccessEyeBtn(r.year, r.dept, r.member, grp.goal, first.goalItemId) + '<span class="sgp-chev">\u203A</span></div>'
+      + '<div class="rv-gbody"><div class="rv-row rv-hd"><span>Activity</span><span class="c">Target</span><span class="c">Actual</span><span>Remark</span><span class="c">Max</span><span class="c">Member</span><span class="c">Manager</span></div>'
+      + grp.rows.map(function (i) {
+          var idx = items.indexOf(i), hasR = !!(i.remark && String(i.remark).trim());
+          return '<div class="rv-row"><span class="rv-act"><b>' + esc(i.cat) + '</b><small>' + esc(i.particulars || '') + '</small></span>'
+            + '<span class="c rv-t"><small class="rv-lb">Target</small>' + esc(i.target || '\u2014') + '</span><span class="c rv-a"><small class="rv-lb">Actual</small>' + esc(i.actual || '\u2014') + '</span>'
+            + '<span class="rv-rm">' + (hasR ? esc(i.remark) : '<span style="color:var(--text3)">\u2014</span>') + (canRemark ? '<button type="button" title="' + (hasR ? 'Edit remark' : 'Add remark') + '" onclick="sgOpenItemRemarkModal(\'' + r.id + '\',' + idx + ')">' + sgIc('edit') + '</button>' : '') + '</span>'
+            + '<span class="c" style="font-weight:700"><small class="rv-lb">Max</small>' + i.maxScore + '</span>'
+            + '<span class="c"><small class="rv-lb">Member</small><span class="score-badge ' + scoreClass(i.memberScore, i.maxScore) + '">' + (sgScoreEntered(i.memberScore) ? i.memberScore : '\u2014') + '</span></span>'
+            + '<span class="c"><small class="rv-lb">Manager</small>' + (sgScoreEntered(i.mgrScore) ? '<span class="score-badge ' + scoreClass(i.mgrScore, i.maxScore) + '">' + i.mgrScore + '</span>' : '<span style="color:var(--text3)">\u2014</span>') + '</span></div>';
+        }).join('')
+      + '<div class="rv-row" style="font-weight:700;background:var(--surface2);border-radius:8px;padding-left:8px;padding-right:8px"><span style="grid-column:1/5">Total</span><span class="c">' + g.gMax + '</span><span class="c">' + g.gMem + '</span><span class="c">' + (g.gMgr > 0 ? g.gMgr : '\u2014') + '</span></div>'
+      + '</div></article>';
   });
-  document.getElementById('review-list').innerHTML = html;
+
+  var notes = [sgOverallHtml(r.remarks), sgSheetBLinkHtml(r.sheetBLink), sgReviewNoteHtml(sgIc('help'), 'Help Needed', r.helpNeeded), sgReviewNoteHtml(sgIc('trend'), 'Areas of Improvement', r.areasOfImprovement)].filter(Boolean);
+  if (notes.length) html += '<div class="rv-info">' + notes.join('') + '</div>';
+  el.innerHTML = html;
+  // open the first goal so the page never looks collapsed and empty
+  var first = el.querySelector('.rv-gcard'); if (first) first.classList.add('is-open');
 }
 
 // Reviews render collapsed (header line only); clicking the header expands the detail.
@@ -2431,81 +2911,85 @@ function openReviewModal(id) {
     document.getElementById('rf-reviewer').value = currentUser.role !== ROLES.ADMIN ? currentUser.name : '';
   }
 
+  if (!id) {
+    var _p = (typeof rvPerson === 'string' && rvPerson) ? (memberRecordByName(rvPerson) || null) : null;
+    if (_p) {
+      yearEl.value = document.getElementById('rv-year').value; monthEl.value = document.getElementById('rv-month').value;
+      deptEl.value = _p.dept; populateReviewMemberDropdown(); memberEl.value = _p.name;
+      if (currentUser.role !== ROLES.ADMIN && _p.name !== currentUser.name) document.getElementById('rf-reviewer').value = currentUser.name;
+    }
+  }
+  var _isSelf = currentUser.role !== ROLES.ADMIN && memberEl.value === currentUser.name;
+  document.getElementById('rv-modal-title').textContent = id ? 'Edit review' : (_isSelf ? 'Self-review' : 'New review');
+  document.getElementById('rf-context').textContent = [memberEl.value, deptEl.value, (monthEl.value || '') + ' ' + academicYearShort(yearEl.value)].filter(Boolean).join(' \u00B7 ');
   // lock member field for member role
-  const lockMember = currentUser.role === ROLES.MEMBER;
+  const lockMember = currentUser.role !== ROLES.ADMIN && memberEl.value === currentUser.name;
   memberEl.disabled = lockMember;
   deptEl.disabled = lockMember;
   document.getElementById('rf-reviewer-row').style.display = lockMember ? 'none' : '';
 
   openModal('review-modal');
-  if (id) loadGoalsForReview();
+  loadGoalsForReview();
 }
 
 function loadGoalsForReview() {
   const year = document.getElementById('rf-year').value;
   const dept = document.getElementById('rf-dept').value;
   const member = document.getElementById('rf-member').value;
-  if (!year || !dept || !member) { toast('Select Academic Year, Department and Member first'); return; }
+  const host = document.getElementById('review-score-table');
+  if (!year || !dept || !member) { host.innerHTML = ''; return; }
 
   let goalRows = DB.goals.filter(g => g.year===year && g.dept===dept && g.member===member);
   if (!goalRows.length) {
-    document.getElementById('review-score-table').innerHTML = `<p style="color:var(--red);font-size:12px;padding:8px">No SMART Goals found for <strong>${esc(member)}</strong> in <strong>${esc(dept)}</strong> — <strong>${esc(year)}</strong>. Please add SMART Goals for this member first.</p>`;
+    host.innerHTML = `<div class="hp-empty" style="margin-top:14px;border:1px dashed var(--border2);border-radius:12px"><b>No SMART Goals yet</b>${esc(member)} has no goals for ${esc(academicYearShort(year))}. Add goals in the SMART Goals tab first.</div>`;
+    document.getElementById('rv-live').innerHTML = '';
     return;
   }
-
-  // pull existing saved values, if editing
   const existing = editingReviewId ? DB.reviews.find(x=>x.id===editingReviewId) : null;
-  const isMember = currentUser.role === ROLES.MEMBER;
-  // Enable each score column by actual permission on THIS review's member:
-  //  Member score  -> the member themselves, or Admin.
-  //  Manager score -> Admin, that dept's Dept Head, or the assigned Manager.
+  // Member score: the member themselves (or Admin). Manager score: Admin, that dept's head, or the assigned manager.
   const _scopeRef = { member: member, dept: dept };
   const memberDisabled = canEditMemberScore(_scopeRef) ? '' : 'disabled';
   const mgrDisabled   = canEditMgrScore(_scopeRef)   ? '' : 'disabled';
 
-  // group exactly like the SMART Goals tab: one mini-section per SMART Goal (header = goal + weightage bold)
-  const groups = groupByGoal(goalRows);
   let html = '';
-  groups.forEach(grp => {
-    html += `<div class="review-section">
-      <div class="review-section-hd">${esc(grp.goal)} <b>(${grp.weightage}%)</b></div>
-      <div class="tbl-wrap"><table class="tbl tbl-fixed">
-        <colgroup>
-          <col style="width:13%"><col style="width:27%"><col style="width:8%"><col style="width:8%">
-          <col style="width:16%"><col style="width:8%"><col style="width:10%"><col style="width:10%">
-        </colgroup>
-        <thead><tr>
-          <th>Activity</th><th>Particulars</th>
-          <th style="text-align:center">Target</th><th style="text-align:center">Actual</th><th style="text-align:center">Remark</th>
-          <th style="text-align:center">Max Score</th>
-          <th style="text-align:center">Member Score</th>
-          <th style="text-align:center">Manager Score</th>
-        </tr></thead>
-        <tbody class="review-score-group" data-goal="${esc(grp.goal)}" data-max="${grp.rows.reduce((a,g)=>a+(g.maxScore||0),0)}">`;
+  groupByGoal(goalRows).forEach(grp => {
+    html += `<div class="rv-mg"><div class="rv-mgh">${esc(grp.goal)} <span>Weightage ${grp.weightage}%</span></div>
+      <div class="rv-row rv-hd" style="padding:8px 14px 0"><span>Activity</span><span class="c">Target</span><span class="c">Actual</span><span>Remark</span><span class="c">Max</span><span class="c">Member</span><span class="c">Manager</span></div>`;
     grp.rows.forEach(g => {
       const ex = existing?.items?.find(i => i.goalItemId === g.id);
       const maxVal = (ex && typeof ex.maxScore !== 'undefined') ? ex.maxScore : g.maxScore;
-      html += `<tr class="review-score-row" data-goal-id="${g.id}" data-goal-name="${esc(g.goal)}" data-weightage="${g.weightage}" data-default-max="${g.maxScore}">
-        <td>${esc(g.cat)}</td>
-        <td>${esc(g.particulars||'—')}</td>
-        <td style="text-align:center"><input type="text" class="item-target" value="${esc(ex?.target||'')}" style="width:100%;border:1px solid var(--border2);border-radius:4px;padding:3px 6px;font-size:12px;font-family:inherit;text-align:center"></td>
-        <td style="text-align:center"><input type="text" class="item-actual" value="${esc(ex?.actual||'')}" style="width:100%;border:1px solid var(--border2);border-radius:4px;padding:3px 6px;font-size:12px;font-family:inherit;text-align:center"></td>
-        <td style="text-align:center"><input type="text" placeholder="Remark…" class="item-remark" value="${esc(ex?.remark||'')}" style="width:100%;border:1px solid var(--border2);border-radius:4px;padding:3px 7px;font-size:12px;font-family:inherit"></td>
-        <td style="text-align:center"><input class="score-input-sm item-maxscore" type="number" min="0" value="${maxVal}" title="Max Score is fetched from SMART Goals, but can be adjusted here" style="width:100%;max-width:64px"></td>
-        <td style="text-align:center"><input class="score-input-sm item-memberscore" type="number" min="0" value="${(ex && sgScoreEntered(ex.memberScore))?ex.memberScore:''}" ${memberDisabled} style="width:100%;max-width:64px"></td>
-        <td style="text-align:center"><input class="score-input-sm item-mgrscore" type="number" min="0" value="${(ex && sgScoreEntered(ex.mgrScore))?ex.mgrScore:''}" ${mgrDisabled} style="width:100%;max-width:64px"></td>
-      </tr>`;
+      html += `<div class="rv-row review-score-row" data-goal-id="${g.id}" data-goal-name="${esc(g.goal)}" data-weightage="${g.weightage}" data-default-max="${g.maxScore}">
+        <span class="rv-act"><b>${esc(g.cat)}</b><small>${esc(g.particulars||'')}</small></span>
+        <label class="rv-f"><small>Target</small><input type="text" class="item-target" placeholder="Target" value="${esc(ex?.target||'')}"></label>
+        <label class="rv-f"><small>Actual</small><input type="text" class="item-actual" placeholder="Actual" value="${esc(ex?.actual||'')}"></label>
+        <label class="rv-f"><small>Remark</small><input type="text" class="item-remark" placeholder="Remark" value="${esc(ex?.remark||'')}"></label>
+        <label class="rv-f"><small>Max</small><input type="number" min="0" class="item-maxscore" value="${maxVal}" title="Max score comes from SMART Goals and can be adjusted here" oninput="rvPreview()"></label>
+        <label class="rv-f"><small>Member</small><input type="number" min="0" class="item-memberscore" value="${(ex && sgScoreEntered(ex.memberScore))?ex.memberScore:''}" ${memberDisabled} oninput="rvPreview()"></label>
+        <label class="rv-f"><small>Manager</small><input type="number" min="0" class="item-mgrscore" value="${(ex && sgScoreEntered(ex.mgrScore))?ex.mgrScore:''}" ${mgrDisabled} oninput="rvPreview()"></label>
+      </div>`;
     });
-    html += `<tr style="background:var(--surface2);font-weight:700">
-          <td colspan="5">Total</td>
-          <td style="text-align:center;font-size:11px;font-weight:400;color:var(--text3)">recalculated on save</td>
-          <td style="text-align:center;font-weight:400;font-size:11px;color:var(--text3)">saved on submit</td>
-          <td style="text-align:center;font-weight:400;font-size:11px;color:var(--text3)">saved on submit</td>
-        </tr>`;
-    html += `</tbody></table></div></div>`;
+    html += `</div>`;
   });
-  document.getElementById('review-score-table').innerHTML = html;
+  host.innerHTML = html;
   renderReviewAssist();
+  rvPreview();
+}
+// Live total while scoring: the same maths as the saved review (manager score / max x weightage).
+function rvPreview() {
+  const box = document.getElementById('rv-live'); if (!box) return;
+  const by = {};
+  document.querySelectorAll('#review-score-table .review-score-row').forEach(row => {
+    const k = row.dataset.goalName, w = parseFloat(row.dataset.weightage) || 0;
+    const o = by[k] || (by[k] = { w: w, max: 0, mgr: 0, mem: 0, anyM: false });
+    o.max += parseFloat(row.querySelector('.item-maxscore').value) || 0;
+    const mg = row.querySelector('.item-mgrscore').value, me = row.querySelector('.item-memberscore').value;
+    if (mg !== '') { o.mgr += parseFloat(mg) || 0; o.anyM = true; }
+    o.mem += parseFloat(me) || 0;
+  });
+  const goals = Object.keys(by); if (!goals.length) { box.innerHTML = ''; return; }
+  let total = 0, any = false;
+  goals.forEach(k => { const o = by[k]; if (o.anyM) any = true; total += Math.round((o.max > 0 ? o.mgr / o.max : 0) * o.w); });
+  box.innerHTML = any ? `Performance so far <b>${total}%</b><span>from the manager scores entered</span>` : `Performance <b>\u2014</b><span>appears once a manager score is entered</span>`;
 }
 
 function saveReview() {
@@ -2550,7 +3034,7 @@ function saveReview() {
   };
   if (existingId) { const i=DB.reviews.findIndex(x=>x.id===existingId); if(i>-1) DB.reviews[i]=rec; }
   else DB.reviews.push(rec);
-  save(); closeModal('review-modal'); renderReviews();
+  save(); closeModal('review-modal'); renderReviews(); hpFlashNow('.rv-score'); toast('Review saved');
 }
 
 // ── Progressive disclosure of a review's per-SMART-Goal detail tables ──
@@ -2916,6 +3400,8 @@ function sgSaveItemRemark() {
 }
 
 function deleteReview(id) {
+  var r0 = DB.reviews.find(function (r) { return r.id === id; });
+  if (r0 && !canEditMgrScore(r0)) { toast('Only a manager above this person, or an admin, can delete a review'); return; }
   sgConfirm('Are you sure you want to delete this record?', {title:'Delete review', danger:true, okText:'Delete'}).then(function (ok) {
     if (!ok) return;
     DB.reviews=DB.reviews.filter(r=>r.id!==id);
@@ -3239,7 +3725,28 @@ function saveNewAdmin() {
 }
 
 // ── MODALS ──
-function openModal(id) { document.getElementById(id).classList.add('open'); }
+function openModal(id) {
+  var m = document.getElementById(id); m.classList.add('open');
+  setTimeout(function () {
+    var f = m.querySelector('.modal-body input:not([type=hidden]):not([hidden]), .modal-body textarea:not([hidden]), .modal-body select:not([hidden])');
+    if (f && window.innerWidth > 860 && f !== document.activeElement) { try { f.focus(); } catch (e) {} }
+  }, 80);
+}
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  var open = document.querySelectorAll('.modal-backdrop.open'); if (!open.length) return;
+  var top = open[open.length - 1], x = top.querySelector('.modal-close');
+  if (x) x.click(); else closeModal(top.id);
+});
+// Clicking the dimmed area outside a popup closes it (not the Delete confirmation, and not when a drag started inside).
+var _bdDown = null;
+document.addEventListener('mousedown', function (e) { _bdDown = e.target; });
+document.addEventListener('click', function (e) {
+  var t = e.target;
+  if (t !== _bdDown || !t.classList || !t.classList.contains('modal-backdrop') || !t.classList.contains('open')) return;
+  if (/^sg-(confirm|prompt)/.test(t.id)) return;
+  var x = t.querySelector('.modal-close'); if (x) x.click(); else closeModal(t.id);
+});
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
 // ── In-app confirm / prompt (website popup, not the browser's) ──
@@ -3532,7 +4039,7 @@ function resolveUser() {
   for (var i = 0; i < members.length; i++) {
     if ((members[i].email || '').toLowerCase() === currentEmail) { m = members[i]; break; }
   }
-  if (m) currentUser = { name: m.name, dept: m.dept || '', role: m.role || ROLES.MEMBER };
+  if (m) currentUser = { name: m.name, dept: m.dept || '', role: ROLES.MEMBER };
   else   currentUser = { name: (u.email || 'Viewer'), dept: '', role: ROLES.MEMBER };
 }
 
@@ -3591,7 +4098,7 @@ function loadAll(fresh) {
       settings: {
         depts:      s.depts || [],
         members:    [],
-        admins:     s.admins || [],
+        admins:     (s.admins || []).map(function (a) { var e = _hpByEmail[_lc(a.email)]; return { id: a.id, email: a.email, name: e ? e.name : (a.name || a.email) }; }),
         goalNames:  s.goalNames || [],
         categories: s.categories || []
       },
@@ -3912,12 +4419,11 @@ renderUserBadge = function () {
     var labels = { admin: 'Admin', dept_head: 'Dept Head', member: 'Member' };
     el.innerHTML =
       '<span style="font-size:11px;color:var(--text3);margin-right:6px">' + esc(currentUser.name || '') + '</span>' +
-      '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--brand-lt);color:var(--brand);border:1px solid var(--brand-border)">' + (labels[currentUser.role] || '') + '</span>';
+      '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--brand-lt);color:var(--brand);border:1px solid var(--brand-border)">' + (currentUser.role === 'admin' ? 'Admin' : (amIManager() ? 'Manager' : 'Member')) + '</span>';
   }
   var st = document.getElementById('nav-tab-settings'); if (st) st.style.display = canAccessSettings() ? '' : 'none';
   var rv = document.getElementById('nav-tab-reviews');  if (rv) rv.style.display = '';
-  if (currentUser.role === ROLES.MEMBER) currentDept = '';
-  else if (currentUser.role === ROLES.DEPT_HEAD && !currentDept) currentDept = currentUser.dept;
+  if (currentUser.role !== ROLES.ADMIN) currentDept = currentUser.dept || '';
 };
 
 // ── destructive bulk ops are unsafe on shared data ──
@@ -3933,6 +4439,8 @@ function afterLoadRender() {
   renderSidebar();
   renderPage(getCurrentPageId());
   tfInit();
+  if (!window.__hpFirstEnter) { window.__hpFirstEnter = 1; setTimeout(function () { try { hpEnter(); } catch (e) {} }, 60); }
+  try { setTimeout(hpGlide, 200); } catch (e) {}
 }
 function mount() {
   var r = document.getElementById('sg-app');
@@ -4058,10 +4566,12 @@ function switchDashSubtab(which){
   if(r) r.style.display = which==='review' ? '' : 'none';
   if(f) f.style.display = which==='flow' ? '' : 'none';
   var fb=document.getElementById('dash-filter-bar'); if(fb) fb.style.display = which==='flow' ? 'none' : '';
+  var ww=document.getElementById('dash-week-wrap'); if(ww) ww.style.display = which==='review' ? 'none' : '';
   var pd=document.getElementById('page-dashboard'); if(pd) pd.classList.toggle('tf-wide', which==='flow');
   if(which==='flow') tfShow();
   var btns=document.querySelectorAll('#sg-app .dash-subtab-btn');
   Array.prototype.forEach.call(btns, function(b){ b.classList.toggle('active', b.getAttribute('data-subtab')===which); });
+  try { hpEnter(); } catch (e) {}
 }
 try { window.switchDashSubtab = switchDashSubtab; } catch(e){}
 try { window.renderDashboard = renderDashboard; } catch(e){}
@@ -4071,7 +4581,11 @@ try { window.openMgrComment = openMgrComment; } catch(e){}
 try { window.saveMgrComment = saveMgrComment; } catch(e){}
 try { window.sgSetGrade = sgSetGrade; } catch(e){}
 try { window.renderReviews = renderReviews; } catch(e){}
+try { window.rvSearch = rvSearch; window.rvPick = rvPick; window.rvToggle = rvToggle; window.rvPreview = rvPreview; } catch(e){}
 try { window.renderSmartGoals = renderSmartGoals; } catch(e){}
+try { window.mpSearchPeople = mpSearchPeople; window.mpPick = mpPick; window.mpDept = mpDept; window.mpWeek = mpWeek; window.mpToggle = mpToggle; window.mpStatusChange = mpStatusChange; window.mpSave = mpSave; window.mpDone = mpDone; window.mpSaveComment = mpSaveComment; } catch(e){}
+try { window.dbOpenTask = dbOpenTask; window.dbOpenReview = dbOpenReview; } catch(e){}
+try { window.sgpDept = sgpDept; window.sgpSearch = sgpSearch; window.sgpPick = sgpPick; window.sgpToggle = sgpToggle; window.sgpToggleAll = sgpToggleAll; window.sgAgRow = sgAgRow; window.sgAgRemoveRow = sgAgRemoveRow; window.openAddGoalModal = openAddGoalModal; window.saveNewGoal = saveNewGoal; window.openCopyGoals = openCopyGoals; window.sgCpFromChange = sgCpFromChange; window.sgCpUpdate = sgCpUpdate; window.saveCopyGoals = saveCopyGoals; } catch(e){}
 try { window.toggleReviewCard = toggleReviewCard; } catch(e){}
 try { window.sgRefresh = sgRefresh; } catch(e){}
 try { window.saveGoal = saveGoal; } catch(e){}

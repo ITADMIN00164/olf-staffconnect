@@ -1204,6 +1204,484 @@
 #sg-app .hp-lv-b { font-size: 12px; font-weight: 700; color: var(--brand-dark); letter-spacing: .02em; }
 #sg-app .hp-lv-n { font-size: 11px; color: var(--text3); }
 @media (max-width: 860px) { #sg-app .hp-set { grid-template-columns: minmax(0, 1fr); } }
+
+/* ── SMART Goals (HO Plan & Review New) ── */
+#sg-app .sgp-bar { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: flex-end; margin-bottom: 18px; padding: 14px 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 1px 3px rgba(15,23,42,.05); }
+#sg-app .sgp-f-d { flex: 1; min-width: 240px; }
+#sg-app .sgp-sel { appearance: none; -webkit-appearance: none; height: 38px; min-width: 170px; padding: 0 36px 0 14px; border: 1px solid var(--border); border-radius: 10px; font: inherit; font-size: 13px; font-weight: 600; color: var(--text); background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' fill='none' stroke='%2364748B' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 13px center; cursor: pointer; }
+#sg-app .sgp-sel:focus { outline: 0; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-lt); }
+#sg-app .sgp-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+#sg-app .sgp-chip-d { height: 38px; padding: 0 16px; border: 1px solid var(--border); border-radius: 20px; background: var(--surface); color: var(--text2); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .12s, border-color .12s, color .12s; }
+#sg-app .sgp-chip-d:hover { background: var(--brand-lt); border-color: var(--brand-border); }
+#sg-app .sgp-chip-d.is-sel { background: var(--brand); border-color: var(--brand); color: #fff; box-shadow: 0 4px 10px -4px var(--brand); }
+#sg-app .sgp-f { display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-weight: 600; color: var(--text3); letter-spacing: .02em; }
+#sg-app .sgp-layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 18px; align-items: start; }
+#sg-app .sgp-people { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; position: sticky; top: 0; }
+#sg-app .sgp-people-h { padding: 12px; border-bottom: 1px solid var(--border); }
+#sg-app .sgp-people-h input { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 12.5px; background: var(--surface); color: var(--text); box-sizing: border-box; }
+#sg-app .sgp-pt-t { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+#sg-app .sgp-count { margin-top: 8px; font-size: 11.5px; color: var(--text3); }
+#sg-app .sgp-people-list { max-height: calc(100vh - 330px); min-height: 120px; overflow-y: auto; padding: 6px; scrollbar-width: thin; }
+#sg-app .sgp-person { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 1px solid transparent; background: transparent; border-radius: 10px; cursor: pointer; text-align: left; font: inherit; color: inherit; }
+#sg-app .sgp-person:hover { background: var(--brand-lt); }
+#sg-app .sgp-person.is-sel { background: var(--brand-lt); border-color: var(--brand-border); }
+#sg-app .sgp-pm { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+#sg-app .sgp-pn { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#sg-app .sgp-ps { font-size: 11px; color: var(--text3); }
+#sg-app .sgp-chip { flex: 0 0 auto; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface2); color: var(--text3); }
+#sg-app .sgp-chip.ok { background: #DCFCE7; color: #166534; border-color: #86EFAC; }
+#sg-app .sgp-chip.part { background: #FEF3C7; color: #92400E; border-color: #FCD34D; }
+#sg-app .sgp-chip.over { background: #FEE2E2; color: #991B1B; border-color: #FCA5A5; }
+#sg-app .sgp-main { min-width: 0; }
+#sg-app .sgp-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; }
+#sg-app .sgp-head .hp-av { width: 46px; height: 46px; font-size: 15px; }
+#sg-app .sgp-hn { flex: 1; min-width: 180px; }
+#sg-app .sgp-hn h2 { margin: 0; font-size: 17px; font-weight: 700; color: var(--text); letter-spacing: -.2px; }
+#sg-app .sgp-hn p { margin: 2px 0 0; font-size: 12px; color: var(--text3); }
+#sg-app .sgp-ha { display: flex; gap: 8px; flex-wrap: wrap; }
+#sg-app .sgp-meter { margin-top: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 18px; }
+#sg-app .sgp-mt { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+#sg-app .sgp-mt b { font-size: 13px; color: var(--text); }
+#sg-app .sgp-mt span { font-size: 12px; color: var(--text3); }
+#sg-app .sgp-bar-t { display: flex; height: 12px; border-radius: 20px; background: var(--surface2); border: 1px solid var(--border); overflow: hidden; }
+#sg-app .sgp-bar-t i { display: block; height: 100%; }
+#sg-app .sgp-msg { margin-top: 8px; font-size: 12px; font-weight: 600; }
+#sg-app .sgp-msg.ok { color: #166534; } #sg-app .sgp-msg.part { color: #92400E; } #sg-app .sgp-msg.over { color: #991B1B; } #sg-app .sgp-msg.none { color: var(--text3); font-weight: 500; }
+#sg-app .sgp-card { margin-top: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+#sg-app .sgp-ch { display: flex; align-items: center; gap: 12px; padding: 14px 16px; cursor: pointer; }
+#sg-app .sgp-ch:hover { background: var(--surface2); }
+#sg-app .sgp-dot { flex: 0 0 auto; width: 10px; height: 10px; border-radius: 50%; }
+#sg-app .sgp-ct { flex: 1; min-width: 0; }
+#sg-app .sgp-ct h3 { margin: 0; font-size: 14px; font-weight: 700; color: var(--text); }
+#sg-app .sgp-ct p { margin: 2px 0 0; font-size: 12px; color: var(--text3); }
+#sg-app .sgp-w { flex: 0 0 auto; font-size: 13px; font-weight: 700; color: var(--brand-dark); background: var(--brand-lt); border: 1px solid var(--brand-border); border-radius: 20px; padding: 3px 12px; }
+#sg-app .sgp-actions { display: flex; gap: 6px; align-items: center; }
+#sg-app .sgp-chev { color: var(--text3); font-size: 18px; line-height: 1; transition: transform .15s ease; }
+#sg-app .sgp-card.is-open .sgp-chev { transform: rotate(90deg); }
+#sg-app .sgp-body { display: none; border-top: 1px solid var(--border); padding: 6px 16px 14px; }
+#sg-app .sgp-card.is-open .sgp-body { display: block; }
+#sg-app .sgp-act { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr) 70px auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+#sg-app .sgp-act.is-h { font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .04em; padding-bottom: 6px; }
+#sg-app .sgp-act, #sg-app .sgp-act > span { text-align: left; }
+#sg-app .sgp-act .sgp-mx, #sg-app .sgp-act.is-h > span:nth-child(3) { text-align: center; }
+#sg-app .sgp-act b { color: var(--text); font-weight: 600; }
+#sg-app .sgp-act .sgp-pt { color: var(--text2); overflow-wrap: anywhere; }
+#sg-app .sgp-act .sgp-mx { text-align: center; font-weight: 700; }
+#sg-app .sgp-act .sgp-ac { display: flex; gap: 6px; justify-content: flex-end; min-width: 70px; }
+#sg-app .sgp-add { margin-top: 12px; }
+#sg-app .sgp-ctx { margin: 0 0 14px; font-size: 12.5px; color: var(--text3); }
+#sg-app .sgp-hint { display: block; margin-top: 4px; font-size: 11px; color: var(--text3); }
+#sg-app .hp-ag-modal { max-width: 760px; }
+#sg-app .sgp-ag-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 12px; font-weight: 600; color: var(--text); }
+#sg-app .sgp-ag-r { display: grid; grid-template-columns: minmax(0, 1.2fr) 90px minmax(0, 2fr) 32px; gap: 10px; align-items: start; margin-bottom: 8px; }
+#sg-app .sgp-ag-r input, #sg-app .sgp-ag-r textarea { width: 100%; box-sizing: border-box; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: 13px; background: var(--surface); color: var(--text); }
+#sg-app .sgp-ag-r input:focus, #sg-app .sgp-ag-r textarea:focus { outline: 0; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-lt); }
+#sg-app .sgp-ag-r textarea { min-height: 38px; height: 38px; resize: vertical; }
+#sg-app .sgp-prev { border: 1px solid var(--border); border-radius: 10px; padding: 4px 12px; background: var(--surface2); }
+#sg-app .sgp-prev div { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+#sg-app .sgp-prev div:last-child { border-bottom: 0; }
+@media (max-width: 860px) {
+  #sg-app .sgp-layout { grid-template-columns: minmax(0, 1fr); }
+  #sg-app .sgp-people { position: static; }
+  #sg-app .sgp-people-list { max-height: 260px; }
+  #sg-app .sgp-act { grid-template-columns: minmax(0, 1fr) 60px; }
+  #sg-app .sgp-act.is-h { display: none; }
+  #sg-app .sgp-act .sgp-pt { grid-column: 1 / -1; order: 3; }
+  #sg-app .sgp-ag-r { grid-template-columns: minmax(0, 1fr) 80px 32px; }
+  #sg-app .sgp-ag-r .sgp-ag-p { grid-column: 1 / -1; order: 4; }
+}
+
+/* ── Popups, all of them ── */
+@keyframes hpFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes hpPop { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+#sg-app .modal-backdrop { background: rgba(15,23,42,.45); backdrop-filter: blur(3px); }
+#sg-app .modal-backdrop.open { animation: hpFade .15s ease; }
+#sg-app .modal-backdrop.open .modal { animation: hpPop .2s cubic-bezier(.2,.8,.3,1); }
+#sg-app .modal { border-radius: 18px; border: 1px solid var(--border); box-shadow: 0 30px 80px -20px rgba(15,23,42,.5); overflow: hidden; }
+#sg-app .modal-head { padding: 18px 22px; background: var(--surface); align-items: flex-start; gap: 12px; }
+#sg-app .modal-title { display: block; font-size: 16px; font-weight: 700; letter-spacing: -.2px; color: var(--text); }
+#sg-app .modal-sub { display: block; margin-top: 3px; font-size: 12px; font-weight: 500; color: var(--text3); }
+#sg-app .modal-close { flex: 0 0 auto; width: 32px; height: 32px; padding: 0; border-radius: 50%; font-size: 20px; display: grid; place-items: center; color: var(--text3); }
+#sg-app .modal-close:hover { background: var(--brand-lt); color: var(--brand-dark); }
+#sg-app .modal-body { padding: 20px 22px; }
+#sg-app .modal-foot { padding: 14px 22px; background: var(--surface); border-radius: 0; }
+#sg-app .modal .field label { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 600; color: var(--text); }
+#sg-app .modal .field input:not([type=hidden]), #sg-app .modal .field select, #sg-app .modal .field textarea { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font: inherit; font-size: 13.5px; background: var(--surface); color: var(--text); }
+#sg-app .modal .field textarea { min-height: 78px; resize: vertical; }
+#sg-app .modal .field input:focus, #sg-app .modal .field select:focus, #sg-app .modal .field textarea:focus { outline: 0; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-lt); }
+#sg-app .modal-foot .btn { min-width: 96px; justify-content: center; }
+#sg-app .hp-sm-modal { max-width: 500px; }
+#sg-app .sgp-sm-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface2); }
+#sg-app .sgp-sm-row b { display: block; font-size: 13px; color: var(--text); }
+#sg-app .sgp-sm-row span { display: block; font-size: 11.5px; color: var(--text3); margin-top: 1px; }
+#sg-app .sgp-link { border: 0; background: none; padding: 0; font: inherit; font-size: 12px; font-weight: 600; color: var(--brand); cursor: pointer; }
+#sg-app .sgp-link:hover { text-decoration: underline; }
+@media (prefers-reduced-motion: reduce) { #sg-app .modal-backdrop.open, #sg-app .modal-backdrop.open .modal { animation: none; } }
+@media (max-width: 640px) { #sg-app .modal-backdrop { padding: 0; align-items: flex-end; } #sg-app .modal { max-width: none !important; width: 100%; border-radius: 18px 18px 0 0; } }
+
+/* ── Monthly Plan (HO Plan & Review New) ── */
+#sg-app .sgp-sel-w { min-width: 300px; }
+#sg-app .sgp-sel-s { height: 36px; min-width: 130px; font-size: 12.5px; }
+#sg-app .mp-tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 14px; }
+#sg-app .mp-tools[hidden] { display: none; }
+#sg-app .mp-weeks { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 220px; }
+#sg-app .mp-wk { height: 34px; padding: 0 13px; border: 1px solid var(--border); border-radius: 20px; background: var(--surface); color: var(--text2); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+#sg-app .mp-wk:hover { background: var(--brand-lt); border-color: var(--brand-border); }
+#sg-app .mp-wk.is-sel { background: var(--brand); border-color: var(--brand); color: #fff; }
+#sg-app .mp-wk i { font-style: normal; opacity: .75; margin-left: 5px; font-weight: 500; }
+#sg-app .mp-search { height: 36px; min-width: 190px; padding: 0 12px; border: 1px solid var(--border); border-radius: 10px; font: inherit; font-size: 13px; background: var(--surface); color: var(--text); }
+#sg-app .mp-search:focus { outline: 0; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-lt); }
+#sg-app .mp-tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+#sg-app .mp-tile { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; }
+#sg-app .mp-tile span { display: block; font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .04em; }
+#sg-app .mp-tile b { display: block; margin-top: 4px; font-size: 22px; font-weight: 700; color: var(--text); letter-spacing: -.4px; }
+#sg-app .mp-tile em { display: block; margin-top: 2px; font-style: normal; font-size: 11.5px; color: var(--text3); }
+#sg-app .mp-tile.is-late b { color: #B91C1C; }
+#sg-app .mp-prog { height: 6px; margin-top: 8px; border-radius: 6px; background: var(--surface2); border: 1px solid var(--border); overflow: hidden; }
+#sg-app .mp-prog i { display: block; height: 100%; background: #16A34A; }
+#sg-app .mp-wh { display: flex; align-items: baseline; gap: 10px; margin: 18px 2px 8px; font-size: 13px; font-weight: 700; color: var(--text); }
+#sg-app .mp-wh span { font-size: 11.5px; font-weight: 500; color: var(--text3); }
+#sg-app .mpt { position: relative; margin-bottom: 8px; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid #94A3B8; border-radius: 12px; overflow: hidden; }
+#sg-app .mpt.s-Completed { border-left-color: #16A34A; }
+#sg-app .mpt.s-In-Process { border-left-color: #2F6FE4; }
+#sg-app .mpt.s-Pending { border-left-color: #D97706; }
+#sg-app .mpt.s-On-Hold, #sg-app .mpt.s-Cancelled { border-left-color: #94A3B8; }
+#sg-app .mpt.s-Cancelled .mpt-t h4 { text-decoration: line-through; color: var(--text3); }
+#sg-app .mpt.is-late { border-left-color: #DC2626; }
+#sg-app .mpt-main { display: flex; align-items: center; gap: 12px; padding: 12px 14px; cursor: pointer; }
+#sg-app .mpt-main:hover { background: var(--surface2); }
+#sg-app .mpt-t { flex: 1; min-width: 0; }
+#sg-app .mpt-t h4 { margin: 0; font-size: 13.5px; font-weight: 600; color: var(--text); line-height: 1.4; overflow-wrap: anywhere; }
+#sg-app .mpt-t p { margin: 4px 0 0; font-size: 11.5px; color: var(--text3); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+#sg-app .mpt-late { font-size: 10.5px; font-weight: 700; color: #991B1B; background: #FEE2E2; border: 1px solid #FCA5A5; border-radius: 20px; padding: 1px 8px; }
+#sg-app .mpt-done { height: 30px; padding: 0 12px; border: 1px solid #86EFAC; border-radius: 20px; background: #F0FDF4; color: #166534; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+#sg-app .mpt-done:hover { background: #DCFCE7; }
+#sg-app .mpt-chev { color: var(--text3); font-size: 18px; line-height: 1; transition: transform .15s ease; }
+#sg-app .mpt.is-open .mpt-chev { transform: rotate(90deg); }
+#sg-app .mpt-body { display: none; border-top: 1px solid var(--border); padding: 14px 16px 16px; background: var(--surface2); }
+#sg-app .mpt.is-open .mpt-body { display: block; }
+#sg-app .mpt-h { margin: 0 0 8px; font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .05em; }
+#sg-app .mpt-g { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 12px; }
+#sg-app .mpt-g label { display: block; font-size: 11.5px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+#sg-app .mpt-g input, #sg-app .mpt-g select, #sg-app .mpt-mgr textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: 13px; background: var(--surface); color: var(--text); }
+#sg-app .mpt-g input:focus, #sg-app .mpt-g select:focus, #sg-app .mpt-mgr textarea:focus { outline: 0; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-lt); }
+#sg-app .mpt-g .w2 { grid-column: span 2; }
+#sg-app .mpt-ro { font-size: 13px; color: var(--text); padding: 8px 0; min-height: 18px; overflow-wrap: anywhere; }
+#sg-app .mpt-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
+#sg-app .mpt-bar .sp { flex: 1; }
+#sg-app .mpt-mgr { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--border2); }
+#sg-app .mpt-grades { display: inline-flex; gap: 6px; margin-right: 10px; vertical-align: middle; }
+#sg-app .mpt-gr { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); font: inherit; font-weight: 700; color: var(--text2); cursor: pointer; }
+#sg-app .mpt-gr:hover { background: var(--brand-lt); border-color: var(--brand-border); }
+#sg-app .mpt-gr.is-on { background: var(--brand); border-color: var(--brand); color: #fff; }
+#sg-app .mpt-mgr textarea { min-height: 64px; margin-top: 10px; resize: vertical; }
+#sg-app .hp-task-modal { max-width: 720px; }
+@media (max-width: 860px) {
+  #sg-app .mp-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #sg-app .mpt-g { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #sg-app .mpt-main { flex-wrap: wrap; }
+}
+
+/* ── Reviews (HO Plan & Review New) ── */
+#sg-app .sgp-chip.wait { background: #DBEAFE; color: #1E40AF; border-color: #93C5FD; }
+#sg-app .rv-score { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; margin-top: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 20px; }
+#sg-app .rv-big { flex: 0 0 auto; text-align: center; min-width: 120px; }
+#sg-app .rv-big b { display: block; font-size: 38px; font-weight: 700; letter-spacing: -1px; line-height: 1.1; }
+#sg-app .rv-big span { font-size: 11.5px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .05em; }
+#sg-app .rv-bars { flex: 1; min-width: 240px; display: flex; flex-direction: column; gap: 9px; }
+#sg-app .rv-bar-r { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 2fr) 46px; gap: 12px; align-items: center; font-size: 12.5px; }
+#sg-app .rv-bar-r span:first-child { color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#sg-app .rv-bar-t { height: 8px; border-radius: 8px; background: var(--surface2); border: 1px solid var(--border); overflow: hidden; }
+#sg-app .rv-bar-t i { display: block; height: 100%; border-radius: 8px; }
+#sg-app .rv-bar-r b { text-align: right; font-size: 12.5px; }
+#sg-app .rv-st { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; border: 1px solid var(--border); }
+#sg-app .rv-st.ok { background: #DCFCE7; color: #166534; border-color: #86EFAC; }
+#sg-app .rv-st.wait { background: #DBEAFE; color: #1E40AF; border-color: #93C5FD; }
+#sg-app .rv-st.draft { background: var(--surface2); color: var(--text3); }
+#sg-app .rv-gcard { margin-top: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+#sg-app .rv-gh { display: flex; align-items: center; gap: 12px; padding: 13px 16px; cursor: pointer; }
+#sg-app .rv-gh:hover { background: var(--surface2); }
+#sg-app .rv-gh h3 { margin: 0; flex: 1; min-width: 0; font-size: 14px; font-weight: 700; color: var(--text); }
+#sg-app .rv-gh .rv-wt { font-size: 11.5px; color: var(--text3); }
+#sg-app .rv-gbody { display: none; border-top: 1px solid var(--border); padding: 4px 16px 12px; }
+#sg-app .rv-gcard.is-open .rv-gbody { display: block; }
+#sg-app .rv-gcard.is-open .sgp-chev { transform: rotate(90deg); }
+#sg-app .rv-row { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, .9fr) minmax(0, .9fr) minmax(0, 1.8fr) 56px 66px 72px; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+#sg-app .rv-row:last-child { border-bottom: 0; }
+#sg-app .rv-row.rv-hd { font-size: 10.5px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .04em; padding-bottom: 6px; }
+#sg-app .rv-row .c { text-align: center; }
+#sg-app .rv-act b { display: block; font-size: 13px; color: var(--text); font-weight: 600; }
+#sg-app .rv-act small { display: block; margin-top: 2px; font-size: 11.5px; color: var(--text3); overflow-wrap: anywhere; }
+#sg-app .rv-rm { color: var(--text2); overflow-wrap: anywhere; }
+#sg-app .rv-rm button { margin-left: 4px; border: 0; background: none; color: var(--brand); cursor: pointer; padding: 0 2px; }
+#sg-app .rv-info { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+#sg-app .rv-info > p { margin: 0 !important; }
+#sg-app .rv-start { margin-top: 12px; background: var(--surface); border: 1px dashed var(--border2); border-radius: 14px; padding: 40px 20px; text-align: center; }
+#sg-app .rv-start b { display: block; font-size: 15px; color: var(--text); }
+#sg-app .rv-start p { margin: 6px 0 16px; font-size: 12.5px; color: var(--text3); }
+#sg-app .hp-rv-modal { max-width: 980px; }
+#sg-app .rv-live { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 14px 0 4px; padding: 12px 16px; border-radius: 12px; background: var(--brand-lt); border: 1px solid var(--brand-border); font-size: 12.5px; color: var(--text2); }
+#sg-app .rv-live b { font-size: 20px; color: var(--brand-dark); }
+#sg-app .rv-mg { margin-top: 12px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+#sg-app .rv-mgh { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--surface2); font-size: 13px; font-weight: 700; color: var(--text); }
+#sg-app .rv-mgh span { margin-left: auto; font-size: 11.5px; font-weight: 600; color: var(--text3); }
+#sg-app .rv-mg .rv-row { padding: 8px 14px; }
+#sg-app .rv-mg input { width: 100%; box-sizing: border-box; padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; font: inherit; font-size: 12.5px; background: var(--surface); color: var(--text); }
+#sg-app .rv-mg input:disabled { background: var(--surface2); color: var(--text3); }
+#sg-app .rv-mg input:focus { outline: 0; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-lt); }
+#sg-app .rv-mg .rv-row input[type=number] { text-align: center; padding-left: 4px; padding-right: 4px; }
+#sg-app .rv-notes { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+@media (max-width: 860px) {
+  #sg-app .rv-row { grid-template-columns: minmax(0, 1fr) 54px 60px 66px; }
+  #sg-app .rv-row.rv-hd { display: none; }
+  #sg-app .rv-row .rv-t, #sg-app .rv-row .rv-a, #sg-app .rv-row .rv-rm { grid-column: 1 / -1; }
+  #sg-app .rv-info { grid-template-columns: minmax(0, 1fr); }
+  #sg-app .rv-bar-r { grid-template-columns: minmax(0, 1fr) 46px; }
+  #sg-app .rv-bar-t { grid-column: 1 / -1; order: 3; }
+}
+
+/* ── Dashboard (HO Plan & Review New) ── */
+#sg-app .db-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(176px, 1fr)); gap: 12px; }
+#sg-app .db-tile { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; position: relative; overflow: hidden; }
+#sg-app .db-tile::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--tc, var(--brand)); }
+#sg-app .db-tile span { display: block; font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .05em; }
+#sg-app .db-tile b { display: block; margin-top: 6px; font-size: 28px; font-weight: 700; color: var(--text); letter-spacing: -.8px; line-height: 1.1; }
+#sg-app .db-tile em { display: block; margin-top: 4px; font-style: normal; font-size: 12px; color: var(--text3); }
+#sg-app .db-tile .db-d { font-size: 11.5px; font-weight: 700; margin-left: 6px; letter-spacing: 0; }
+#sg-app .db-d.up { color: #166534; } #sg-app .db-d.down { color: #B91C1C; }
+#sg-app .db-prog { height: 6px; margin-top: 10px; border-radius: 6px; background: var(--surface2); border: 1px solid var(--border); overflow: hidden; }
+#sg-app .db-prog i { display: block; height: 100%; border-radius: 6px; }
+#sg-app .db-ins { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; margin-bottom: 14px; }
+#sg-app .db-in { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); font-size: 13px; color: var(--text); line-height: 1.45; }
+#sg-app .db-in i { flex: 0 0 auto; width: 9px; height: 9px; margin-top: 6px; border-radius: 50%; background: var(--text3); }
+#sg-app .db-in.good { background: #F0FDF4; border-color: #BBF7D0; } #sg-app .db-in.good i { background: #16A34A; }
+#sg-app .db-in.warn { background: #FFFBEB; border-color: #FDE68A; } #sg-app .db-in.warn i { background: #D97706; }
+#sg-app .db-in.bad { background: #FEF2F2; border-color: #FECACA; } #sg-app .db-in.bad i { background: #DC2626; }
+#sg-app .db-in b { font-weight: 700; }
+#sg-app .db-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; margin-top: 14px; }
+#sg-app .db-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; margin-top: 14px; overflow: hidden; }
+#sg-app .db-grid .db-card { margin-top: 0; }
+#sg-app .db-ch { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+#sg-app .db-ch h3 { margin: 0; font-size: 14px; font-weight: 700; color: var(--text); }
+#sg-app .db-ch span { font-size: 12px; color: var(--text3); }
+#sg-app .db-cb { padding: 16px 18px; }
+#sg-app .db-stack { display: flex; height: 16px; border-radius: 10px; overflow: hidden; background: var(--surface2); border: 1px solid var(--border); }
+#sg-app .db-stack i { display: block; height: 100%; }
+#sg-app .db-leg { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 16px; margin-top: 14px; }
+#sg-app .db-leg div { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text2); }
+#sg-app .db-leg i { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
+#sg-app .db-leg b { margin-left: auto; color: var(--text); }
+#sg-app .db-cols { display: flex; align-items: flex-end; gap: 8px; height: 170px; padding-top: 8px; }
+#sg-app .db-col { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 6px; }
+#sg-app .db-col .bar { width: 100%; max-width: 34px; border-radius: 6px 6px 2px 2px; min-height: 3px; }
+#sg-app .db-col small { font-size: 10.5px; color: var(--text3); }
+#sg-app .db-col em { font-style: normal; font-size: 11px; font-weight: 700; color: var(--text2); }
+#sg-app .db-col.is-sel small { color: var(--brand-dark); font-weight: 700; }
+#sg-app .db-empty { padding: 28px 10px; text-align: center; font-size: 12.5px; color: var(--text3); }
+#sg-app .db-li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+#sg-app .db-li:last-child { border-bottom: 0; }
+#sg-app .db-li .db-lm { flex: 1; min-width: 0; }
+#sg-app .db-li .db-lm b { display: block; color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#sg-app .db-li .db-lm small { display: block; margin-top: 1px; color: var(--text3); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#sg-app .db-li.is-link { cursor: pointer; margin: 0 -8px; padding-left: 8px; padding-right: 8px; border-radius: 10px; }
+#sg-app .db-li.is-link:hover, #sg-app .db-li.is-link:focus-visible { background: var(--surface2); outline: 0; }
+#sg-app .db-pill { flex: 0 0 auto; font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface2); color: var(--text2); }
+#sg-app .db-pill.bad { background: #FEE2E2; color: #991B1B; border-color: #FCA5A5; }
+#sg-app .db-pill.warn { background: #FEF3C7; color: #92400E; border-color: #FCD34D; }
+#sg-app .db-pill.good { background: #DCFCE7; color: #166534; border-color: #86EFAC; }
+#sg-app .db-pill.wait { background: #DBEAFE; color: #1E40AF; border-color: #93C5FD; }
+#sg-app .db-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+#sg-app .db-tbl th { text-align: left; padding: 0 10px 8px; font-size: 10.5px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--border); white-space: nowrap; }
+#sg-app .db-tbl td { padding: 11px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+#sg-app .db-tbl tr:last-child td { border-bottom: 0; }
+#sg-app .db-tbl .c { text-align: center; }
+#sg-app .db-tbl tbody tr:hover { background: var(--surface2); }
+#sg-app .db-meter { display: flex; align-items: center; gap: 8px; min-width: 120px; }
+#sg-app .db-meter span { flex: 1; height: 7px; border-radius: 7px; background: var(--surface2); border: 1px solid var(--border); overflow: hidden; }
+#sg-app .db-meter span i { display: block; height: 100%; border-radius: 7px; }
+#sg-app .db-meter b { width: 38px; text-align: right; font-size: 12.5px; }
+#sg-app .db-scroll { overflow-x: auto; }
+#sg-app .db-gbar { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 2fr) 46px; gap: 12px; align-items: center; padding: 7px 0; font-size: 12.5px; }
+#sg-app .db-gbar span:first-child { color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#sg-app .db-gbar b { text-align: right; }
+@media (max-width: 860px) {
+  #sg-app .db-grid { grid-template-columns: minmax(0, 1fr); }
+  #sg-app .db-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ── Phones and small screens, and general polish (HO Plan & Review New) ── */
+#sg-app .app-body, #sg-app .page-content { min-width: 0; max-width: 100%; }
+#sg-app .page-content { flex: 1 1 0; }
+@keyframes hpIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+#sg-app .page.active { animation: hpIn .28s ease; }
+@media (prefers-reduced-motion: reduce) { #sg-app .page.active { animation: none; } }
+#sg-app .sgp-people-list { position: relative; }
+#sg-app .btn:focus-visible, #sg-app .sgp-person:focus-visible, #sg-app .sgp-chip-d:focus-visible, #sg-app .mp-wk:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+#sg-app .rv-f { display: block; }
+#sg-app .rv-f small, #sg-app .rv-lb { display: none; }
+
+@media (max-width: 860px) {
+  #sg-app .page-content { padding: 12px; }
+  /* tap targets and no zoom-on-focus on iPhone */
+  #sg-app .btn { min-height: 40px; }
+  #sg-app input:not([type=checkbox]):not([type=radio]), #sg-app select, #sg-app textarea { font-size: 16px; }
+  /* the filter card: two small boxes on a row, the department full width */
+  #sg-app .sgp-bar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 14px; margin-bottom: 14px; }
+  #sg-app .sgp-bar .sgp-f { min-width: 0; }
+  #sg-app .sgp-bar .sgp-f:has(.sgp-sel-w) { grid-column: 1 / -1; }
+  #sg-app .sgp-sel, #sg-app .sgp-sel-w, #sg-app .sgp-sel-s { width: 100%; min-width: 0; height: 42px; }
+  /* people become a sideways strip above the details */
+  #sg-app .sgp-layout { gap: 12px; }
+  #sg-app .sgp-people-h { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+  #sg-app .sgp-pt-t { display: none; }
+  #sg-app .sgp-people-h input { flex: 1; min-width: 0; margin: 0; }
+  #sg-app .sgp-count { margin: 0; white-space: nowrap; font-size: 11px; }
+  #sg-app .sgp-people-list { display: flex; gap: 8px; overflow-x: auto; max-height: none; min-height: 0; padding: 10px 12px; scroll-snap-type: x proximity; scrollbar-width: none; }
+  #sg-app .sgp-people-list::-webkit-scrollbar { display: none; }
+  #sg-app .sgp-person { flex: 0 0 auto; width: auto; min-width: 190px; max-width: 240px; border: 1px solid var(--border); scroll-snap-align: start; }
+  #sg-app .sgp-people-list .hp-empty { width: 100%; padding: 14px; }
+  /* person header */
+  #sg-app .sgp-head { padding: 14px; gap: 12px; }
+  #sg-app .sgp-hn { min-width: 0; flex: 1 1 60%; }
+  #sg-app .sgp-ha { width: 100%; }
+  #sg-app .sgp-ha .btn { flex: 1; justify-content: center; }
+  /* SMART Goals cards */
+  #sg-app .sgp-ch { flex-wrap: wrap; padding: 12px 14px; }
+  #sg-app .sgp-ct { flex: 1 1 70%; }
+  #sg-app .sgp-actions { order: 5; width: 100%; justify-content: flex-end; }
+  #sg-app .sgp-body { padding: 4px 14px 12px; }
+  #sg-app .sgp-act { grid-template-columns: minmax(0, 1fr) auto; }
+  #sg-app .sgp-act.is-h { display: none; }
+  #sg-app .sgp-act .sgp-mx { order: 2; }
+  #sg-app .sgp-act .sgp-pt { grid-column: 1 / -1; order: 3; }
+  #sg-app .sgp-act .sgp-ac { grid-column: 1 / -1; order: 4; justify-content: flex-end; }
+  /* Monthly Plan */
+  #sg-app .mp-tools { gap: 8px; }
+  #sg-app .mp-weeks { flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  #sg-app .mp-weeks::-webkit-scrollbar { display: none; }
+  #sg-app .mp-wk { flex: 0 0 auto; }
+  #sg-app .mp-tools .sgp-sel-s { flex: 1 1 40%; }
+  #sg-app .mp-search { flex: 1 1 100%; height: 42px; }
+  #sg-app .mp-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #sg-app .mp-tile b { font-size: 20px; }
+  #sg-app .mpt-main { flex-wrap: wrap; padding: 12px; }
+  #sg-app .mpt-t { flex: 1 1 100%; }
+  #sg-app .mpt-chev { margin-left: auto; }
+  #sg-app .mpt-body { padding: 12px; }
+  #sg-app .mpt-g { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #sg-app .mpt-bar .sp { display: none; }
+  #sg-app .mpt-g input, #sg-app .mpt-g select { height: 44px; }
+  #sg-app .mpt-bar .btn { flex: 1; justify-content: center; }
+  /* Reviews */
+  #sg-app .rv-score { flex-direction: column; align-items: stretch; gap: 14px; padding: 14px; }
+  #sg-app .rv-big { text-align: left; display: flex; align-items: baseline; gap: 10px; }
+  #sg-app .rv-big b { font-size: 32px; }
+  #sg-app .rv-gh { flex-wrap: wrap; padding: 12px 14px; }
+  #sg-app .rv-gh h3 { flex: 1 1 60%; }
+  #sg-app .rv-gbody { padding: 4px 14px 12px; }
+  #sg-app .rv-row { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px 10px; }
+  #sg-app .rv-row.rv-hd { display: none; }
+  #sg-app .rv-row > .rv-act { grid-column: 1 / -1; }
+  #sg-app .rv-row > .rv-t, #sg-app .rv-row > .rv-a { grid-column: span 3; }
+  #sg-app .rv-row > .rv-rm { grid-column: 1 / -1; }
+  #sg-app .rv-row > .c:not(.rv-t):not(.rv-a) { grid-column: span 2; }
+  #sg-app .rv-row > span[style*="grid-column"] { grid-column: 1 / -1 !important; }
+  #sg-app .rv-lb { display: block; font-size: 10px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; }
+  #sg-app .rv-row > .c { text-align: left; }
+  #sg-app .rv-info { grid-template-columns: minmax(0, 1fr); }
+  #sg-app .rv-start { padding: 28px 16px; }
+  /* review popup: each activity is a small card */
+  #sg-app .rv-mg .rv-row { grid-template-columns: repeat(6, minmax(0, 1fr)); padding: 12px 14px; }
+  #sg-app .rv-mg .rv-row > .rv-act { grid-column: 1 / -1; }
+  #sg-app .rv-mg .rv-row > .rv-f:nth-child(2), #sg-app .rv-mg .rv-row > .rv-f:nth-child(3) { grid-column: span 3; }
+  #sg-app .rv-mg .rv-row > .rv-f:nth-child(4) { grid-column: 1 / -1; }
+  #sg-app .rv-mg .rv-row > .rv-f:nth-child(n+5) { grid-column: span 2; }
+  #sg-app .rv-f small { display: block; font-size: 10px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 3px; }
+  #sg-app .rv-mg input { height: 42px; }
+  #sg-app .rv-live { padding: 10px 14px; }
+  #sg-app .rv-notes .form-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  /* Dashboard */
+  #sg-app .db-ins { grid-template-columns: minmax(0, 1fr); }
+  #sg-app .db-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  #sg-app .db-tile { padding: 12px 14px; }
+  #sg-app .db-tile b { font-size: 22px; }
+  #sg-app .db-cb { padding: 14px; }
+  #sg-app .db-ch { padding: 12px 14px; }
+  #sg-app .db-cols { height: 150px; gap: 4px; }
+  #sg-app .db-leg { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #sg-app .db-meter { min-width: 96px; }
+  #sg-app .db-gbar { grid-template-columns: minmax(0, 1fr) 40px; }
+  #sg-app .db-gbar .db-meter { grid-column: 1 / -1; order: 3; }
+  #sg-app #dash-week-wrap { grid-column: 1 / -1; }
+  #sg-app .sgp-bar-2 { grid-template-columns: minmax(0, 1fr); }
+  /* a compact banner: no strapline, the refresh button is just an icon in the corner */
+  #sg-app #sgHero .sg-hero-sub { display: none; }
+  #sg-app #sgHero.app-nav { padding: 14px; position: relative; }
+  #sg-app #sgHero .sg-hero-lead { padding-right: 52px; flex: 1 1 100%; }
+  #sg-app #sgHero .nav-right { position: absolute; top: 14px; right: 14px; flex: 0 0 auto; width: auto; }
+  #sg-app #sgHero .nav-right .btn-secondary { font-size: 0; gap: 0; min-width: 40px; width: 40px; padding: 0; justify-content: center; }
+  #sg-app #sgHero .nav-right .btn-secondary .sg-refresh-ico { font-size: 16px; display: grid; place-items: center; }
+  /* Settings */
+  #sg-app .hp-card-h { flex-wrap: wrap; }
+}
+@media (max-width: 640px) {
+  #sg-app .modal-body { padding: 16px; }
+  #sg-app .modal-head, #sg-app .modal-foot { padding-left: 16px; padding-right: 16px; }
+  #sg-app .modal-foot { padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); position: sticky; bottom: 0; }
+  #sg-app .modal { max-height: 94dvh; }
+  #sg-app .modal .form-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  #sg-app .sgp-ag-r { grid-template-columns: minmax(0, 1fr) 80px 36px; }
+  #sg-app .modal-foot .btn { flex: 1; }
+}
+
+/* ── Motion (HO Plan & Review New). Everything below is switched off for people who ask their device for less motion. ── */
+#sg-app .btn, #sg-app .sgp-person, #sg-app .sgp-chip-d, #sg-app .mp-wk, #sg-app .hp-row.is-click, #sg-app .mpt-main, #sg-app .sgp-ch, #sg-app .rv-gh, #sg-app .db-li.is-link { transition: background-color .18s ease, border-color .18s ease, color .18s ease, box-shadow .22s ease, transform .15s ease; }
+#sg-app .sgp-card, #sg-app .rv-gcard, #sg-app .mpt, #sg-app .db-tile, #sg-app .db-card, #sg-app .hp-card, #sg-app .mp-tile { transition: box-shadow .25s ease, border-color .2s ease; }
+#sg-app .sgp-card:hover, #sg-app .rv-gcard:hover, #sg-app .mpt:hover, #sg-app .db-card:hover, #sg-app .hp-card:hover { box-shadow: 0 14px 30px -18px rgba(15,23,42,.35); }
+#sg-app #sgHero .nav-tabs { position: relative; }
+#sg-app #sgHero .nav-tab { position: relative; z-index: 1; }
+#sg-app #sgHero .nav-tab.active { background: transparent; box-shadow: none; }
+#sg-app #sgHero .hp-glider { position: absolute; left: 0; top: 0; z-index: 0; border-radius: 12px; background: #fff; box-shadow: 0 6px 14px rgba(15,23,42,.18); pointer-events: none; transition: transform .45s cubic-bezier(.34,1.25,.64,1), width .3s ease, height .3s ease; }
+#sg-app .sgp-main.hp-swap > * { animation: hpSwap .38s cubic-bezier(.22,1,.36,1) backwards; }
+@keyframes hpSwap { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+@keyframes hpUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes hpGrowX { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes hpGrowY { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes hpOpen { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@keyframes hpFlash { 0% { box-shadow: 0 0 0 0 rgba(22,163,74,.55); } 40% { box-shadow: 0 0 0 6px rgba(22,163,74,.22); } 100% { box-shadow: 0 0 0 0 rgba(22,163,74,0); } }
+@keyframes hpSheet { from { transform: translateY(100%); } to { transform: none; } }
+@media (prefers-reduced-motion: no-preference) {
+  #sg-app .btn:active:not(:disabled), #sg-app .sgp-person:active, #sg-app .mp-wk:active, #sg-app .sgp-chip-d:active { transform: scale(.97); }
+  #sg-app .db-tile:hover, #sg-app .mp-tile:hover { transform: translateY(-2px); box-shadow: 0 14px 28px -16px rgba(15,23,42,.35); }
+  #sg-app .btn-primary:hover:not(:disabled) { box-shadow: 0 10px 22px -10px var(--brand); }
+  /* things grow into place whenever a meter or chart is drawn */
+  #sg-app .sgp-bar-t i, #sg-app .rv-bar-t i, #sg-app .db-prog i, #sg-app .mp-prog i, #sg-app .db-stack i, #sg-app .db-meter span i { transform-origin: left center; animation: hpGrowX .7s cubic-bezier(.22,1,.36,1) backwards; }
+  #sg-app .db-col .bar { transform-origin: bottom; animation: hpGrowY .7s cubic-bezier(.22,1,.36,1) backwards; }
+  #sg-app .sgp-card.is-open .sgp-body, #sg-app .mpt.is-open .mpt-body, #sg-app .rv-gcard.is-open .rv-gbody { animation: hpOpen .28s ease; }
+  #sg-app .mpt.hp-flash { animation: hpFlash 1.2s ease-out; }
+  #sg-app .hp-flash-el { animation: hpFlash 1.2s ease-out; }
+  /* a page's pieces rise in one after another when you arrive on it */
+  #sg-app.hp-enter .db-in, #sg-app.hp-enter .db-tile, #sg-app.hp-enter .db-card, #sg-app.hp-enter .mp-tile, #sg-app.hp-enter .sgp-head,
+  #sg-app.hp-enter .sgp-meter, #sg-app.hp-enter .rv-score, #sg-app.hp-enter .hp-card, #sg-app.hp-enter .sgp-people, #sg-app.hp-enter .sgp-bar,
+  #sg-app.hp-enter .sgp-card, #sg-app.hp-enter .rv-gcard, #sg-app.hp-enter .mpt, #sg-app.hp-enter .mp-wh, #sg-app.hp-enter .rv-info > *, #sg-app.hp-enter .mp-tools {
+    animation: hpUp .55s cubic-bezier(.22,1,.36,1) backwards;
+  }
+  #sg-app.hp-enter .sgp-bar { animation-delay: 0s; }
+  #sg-app.hp-enter :is(.db-in, .db-tile, .mp-tile, .sgp-card, .rv-gcard, .mpt, .hp-card):nth-child(1) { animation-delay: .04s; }
+  #sg-app.hp-enter :is(.db-in, .db-tile, .mp-tile, .sgp-card, .rv-gcard, .mpt, .hp-card):nth-child(2) { animation-delay: .09s; }
+  #sg-app.hp-enter :is(.db-in, .db-tile, .mp-tile, .sgp-card, .rv-gcard, .mpt, .hp-card):nth-child(3) { animation-delay: .14s; }
+  #sg-app.hp-enter :is(.db-in, .db-tile, .mp-tile, .sgp-card, .rv-gcard, .mpt, .hp-card):nth-child(4) { animation-delay: .19s; }
+  #sg-app.hp-enter :is(.db-in, .db-tile, .mp-tile, .sgp-card, .rv-gcard, .mpt, .hp-card):nth-child(5) { animation-delay: .24s; }
+  #sg-app.hp-enter :is(.db-in, .db-tile, .mp-tile, .sgp-card, .rv-gcard, .mpt, .hp-card):nth-child(n+6) { animation-delay: .29s; }
+  #sg-app.hp-enter .db-card, #sg-app.hp-enter .sgp-head { animation-delay: .1s; }
+  #sg-app.hp-enter .sgp-meter, #sg-app.hp-enter .rv-score { animation-delay: .16s; }
+  #sg-app.hp-enter .sgp-people { animation-delay: .06s; }
+  #sg-app.hp-enter .sgp-person { animation: hpUp .45s cubic-bezier(.22,1,.36,1) backwards; }
+  #sg-app.hp-enter .sgp-person:nth-child(1) { animation-delay: .1s; } #sg-app.hp-enter .sgp-person:nth-child(2) { animation-delay: .14s; }
+  #sg-app.hp-enter .sgp-person:nth-child(3) { animation-delay: .18s; } #sg-app.hp-enter .sgp-person:nth-child(4) { animation-delay: .22s; }
+  #sg-app.hp-enter .sgp-person:nth-child(n+5) { animation-delay: .26s; }
+  @media (max-width: 640px) { #sg-app .modal-backdrop.open .modal { animation: hpSheet .32s cubic-bezier(.22,1,.36,1); } }
+}
 </style>
 <nav class="app-nav" id="sgHero">
   <span class="pg-blob pg-blob--a" aria-hidden="true"></span>
@@ -1250,24 +1728,18 @@
   <!-- The banner tab already names this page: title kept for screen readers only -->
   <h1 class="sg-vh">Dashboard</h1>
   <p class="sg-vh" id="dash-dept-label">Overview of all SMART Goals and task progress</p>
-  <div class="filter-bar" id="dash-filter-bar">
-    <select id="dash-year-filter" onchange="renderDashboard()"><option value="">All Academic Years</option></select>
-    <select id="dash-month-filter" onchange="renderDashboard()"><option value="">All Months</option></select>
-    <select id="dash-week-filter" onchange="renderDashboard()"><option value="">All Weeks</option></select>
-    <select id="dash-dept-filter" onchange="renderDashboard()"><option value="">All Departments</option></select>
+  <div class="sgp-bar" id="dash-filter-bar">
+    <div class="sgp-f"><span>Academic year</span><select class="sgp-sel" id="dash-year-filter" onchange="renderDashboard()"><option value="">All Academic Years</option></select></div>
+    <div class="sgp-f"><span>Month</span><select class="sgp-sel" id="dash-month-filter" onchange="renderDashboard()"><option value="">All Months</option></select></div>
+    <div class="sgp-f" id="dash-week-wrap"><span>Week</span><select class="sgp-sel sgp-sel-s" id="dash-week-filter" onchange="renderDashboard()"><option value="">All Weeks</option></select></div>
+    <div class="sgp-f"><span>Department</span><select class="sgp-sel sgp-sel-w" id="dash-dept-filter" onchange="renderDashboard()"><option value="">All Departments</option></select></div>
   </div>
 
   <div id="dash-subtab-plan">
-    <div class="card" style="margin-bottom:20px">
-      <div class="card-header"><span class="card-title">Monthly Plan Progress — by Department</span></div>
-      <div class="card-body">
-        <div id="dash-plan-progress"></div>
-      </div>
-    </div>
-
-    <div class="card" id="dash-dq-card">
-      <div class="card-header"><span class="card-title">Target vs Completion</span></div>
-      <div class="card-body"><div id="dash-dataquality"></div></div>
+    <div id="dash-plan-progress"></div>
+    <div class="db-card" id="dash-dq-card">
+      <div class="db-ch"><h3>Data completeness</h3><span>How fully tasks and reviews are filled in</span></div>
+      <div class="db-cb"><div id="dash-dataquality"></div></div>
     </div>
   </div>
 
@@ -1365,79 +1837,77 @@
   </div>
 
   <div id="dash-subtab-review" style="display:none">
-    <div class="card">
-      <div class="card-header"><span class="card-title">Review Overview</span></div>
-      <div class="card-body">
-        <div id="dash-review-score"></div>
-      </div>
-    </div>
+    <div id="dash-review-score"></div>
   </div>
 </div>
 
 <!-- ══════════ SMART GOALS ══════════ -->
 <div id="page-smart-goals" class="page">
   <h1 class="sg-vh">SMART Goals</h1>
-  <p class="sg-vh" id="sg-dept-label">Define goals → activities, specific to each member</p>
-  <div class="filter-bar">
-    <select id="sg-year-filter" onchange="renderSmartGoals()"><option value="">All Academic Years</option></select>
-    <select id="sg-dept-filter" onchange="onSgDeptChange()"><option value="">Select Department…</option></select>
-    <select id="sg-member-filter" onchange="renderSmartGoals()"><option value="">Select Department first…</option></select>
-    <div class="sg-fb-actions">
-      <button class="btn btn-primary" onclick="openGoalModal()">+ Add SMART Goal</button>
-    </div>
+  <p class="sg-vh" id="sg-dept-label">Define goals and activities for each person</p>
+  <div class="sgp-bar sgp-bar-2">
+    <div class="sgp-f"><span>Academic year</span><select class="sgp-sel" id="sg-year-filter" onchange="renderSmartGoals()"></select></div>
+    <div class="sgp-f"><span>Department</span><select class="sgp-sel sgp-sel-w" id="sg-dept-filter" onchange="onSgDeptChange()"><option value="">Select department…</option></select></div>
+    <select id="sg-member-filter" hidden></select>
   </div>
-  <div id="smart-goals-list"></div>
+  <div class="sgp-layout">
+    <aside class="sgp-people">
+      <div class="sgp-people-h"><div class="sgp-pt-t">People</div><input id="sgp-q" type="search" placeholder="Search people" oninput="sgpSearch(this.value)" autocomplete="off"><div id="sgp-count" class="sgp-count"></div></div>
+      <div id="sgp-people-list" class="sgp-people-list"></div>
+    </aside>
+    <section class="sgp-main" id="smart-goals-list"></section>
+  </div>
 </div>
 
 <!-- ══════════ MONTHLY PLAN ══════════ -->
 <div id="page-monthly-plan" class="page">
   <h1 class="sg-vh">Monthly Plan</h1>
-  <p class="sg-vh" id="mp-dept-label">Week-wise task tracking linked to SMART Goals</p>
-  <!-- (The Plan / Status Update / Actions colour legend is gone: the table's own group header says the same.) -->
-  <div class="filter-bar">
-    <select id="mp-year" onchange="renderPlan()"><option value="">Academic Year…</option></select>
-    <select id="mp-month" onchange="renderPlan()"><option value="">Month…</option></select>
-    <select id="mp-dept" onchange="onMpDeptChange()"><option value="">Department…</option></select>
-    <select id="mp-week" onchange="renderPlan()"><option value="">All Weeks</option></select>
-    <select id="mp-goal" onchange="renderPlan()"><option value="">All SMART Goals</option></select>
-    <select id="mp-member" onchange="renderPlan()"><option value="">All Members</option></select>
-    <select id="mp-status" onchange="renderPlan()">
-      <option value="">All Status</option>
-      <option>Planned</option><option>Completed</option><option>In Process</option><option>Pending</option><option>On Hold</option><option>Cancelled</option>
-    </select>
-    <input id="mp-search" type="text" placeholder="Search tasks…" oninput="renderPlan()" style="min-width:160px">
-    <div class="sg-fb-actions">
-      <div class="cols-panel-wrap">
-        <button class="btn btn-secondary" onclick="toggleColsPanel()"><svg class="sg-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.500" y="4" width="17" height="16" rx="2"/><path d="M9.500 4v16M15 4v16"/></svg> Columns</button>
-        <div class="cols-panel" id="cols-panel"></div>
-      </div>
-      <button class="btn btn-secondary" onclick="exportPlanExcel()" title="Download the current view as Excel"><svg class="sg-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v10m0 0 4-4m-4 4-4-4M5 19h14"/></svg> Excel</button>
-      <button class="btn btn-primary" onclick="openAddTask()">+ Add Task</button>
-    </div>
+  <p class="sg-vh" id="mp-dept-label">Week-wise tasks linked to SMART Goals</p>
+  <div class="sgp-bar">
+    <div class="sgp-f"><span>Academic year</span><select class="sgp-sel" id="mp-year" onchange="renderPlan()"></select></div>
+    <div class="sgp-f"><span>Month</span><select class="sgp-sel" id="mp-month" onchange="renderPlan()"></select></div>
+    <div class="sgp-f"><span>Department</span><select class="sgp-sel sgp-sel-w" id="mp-dept" onchange="onMpDeptChange()"><option value="">Department…</option></select></div>
+    <select id="mp-week" hidden><option value="">All Weeks</option></select>
+    <select id="mp-goal" hidden><option value="">All SMART Goals</option></select>
+    <select id="mp-member" hidden><option value="">All Members</option></select>
   </div>
-
-  <div class="plan-tbl-wrap">
-    <table class="plan-tbl">
-      <thead id="plan-thead"></thead>
-      <tbody id="plan-tbody"></tbody>
-    </table>
+  <div class="sgp-layout">
+    <aside class="sgp-people">
+      <div class="sgp-people-h"><div class="sgp-pt-t">People</div><input id="mpp-q" type="search" placeholder="Search people" oninput="mpSearchPeople(this.value)" autocomplete="off"><div id="mpp-count" class="sgp-count"></div></div>
+      <div id="mpp-list" class="sgp-people-list"></div>
+    </aside>
+    <section class="sgp-main">
+      <div id="mp-head"></div>
+      <div class="mp-tools" id="mp-tools" hidden>
+        <div class="mp-weeks" id="mp-weeks"></div>
+        <select class="sgp-sel sgp-sel-s" id="mp-status" onchange="renderPlan()" aria-label="Filter tasks by status">
+          <option value="">All status</option>
+          <option>Planned</option><option>Completed</option><option>In Process</option><option>Pending</option><option>On Hold</option><option>Cancelled</option>
+        </select>
+        <input class="mp-search" id="mp-search" type="search" placeholder="Search tasks" oninput="renderPlan()" autocomplete="off">
+      </div>
+      <div id="plan-list"></div>
+    </section>
   </div>
 </div>
 
 <!-- ══════════ REVIEWS ══════════ -->
 <div id="page-reviews" class="page">
   <h1 class="sg-vh">Monthly Reviews</h1>
-  <p class="sg-vh" id="rv-dept-label">Self-review by member · Manager score by Dept Head, Admin, or the assigned reporting manager</p>
-  <div class="filter-bar" id="rv-filter-bar">
-    <select id="rv-year" onchange="renderReviews()"><option value="">All Academic Years</option></select>
-    <select id="rv-month" onchange="renderReviews()"><option value="">All Months</option></select>
-    <select id="rv-dept" onchange="onRvDeptChange()"><option value="">All Depts</option></select>
-    <select id="rv-member" onchange="renderReviews()"><option value="">Select Member…</option></select>
-    <div class="sg-fb-actions">
-      <button class="btn btn-primary" id="rv-add-btn" onclick="openReviewModal()">+ New Review</button>
-    </div>
+  <p class="sg-vh" id="rv-dept-label">Self-review by member. Manager score by the department head, an admin, or the reporting manager.</p>
+  <div class="sgp-bar">
+    <div class="sgp-f"><span>Academic year</span><select class="sgp-sel" id="rv-year" onchange="renderReviews()"></select></div>
+    <div class="sgp-f"><span>Month</span><select class="sgp-sel" id="rv-month" onchange="renderReviews()"></select></div>
+    <div class="sgp-f" id="rv-dept-wrap"><span>Department</span><select class="sgp-sel sgp-sel-w" id="rv-dept" onchange="onRvDeptChange()"><option value="">Department…</option></select></div>
+    <select id="rv-member" hidden><option value="">Select Member…</option></select>
   </div>
-  <div id="review-list"></div>
+  <div class="sgp-layout">
+    <aside class="sgp-people">
+      <div class="sgp-people-h"><div class="sgp-pt-t">People</div><input id="rvp-q" type="search" placeholder="Search people" oninput="rvSearch(this.value)" autocomplete="off"><div id="rvp-count" class="sgp-count"></div></div>
+      <div id="rvp-list" class="sgp-people-list"></div>
+    </aside>
+    <section class="sgp-main" id="review-list"></section>
+  </div>
 </div>
 
 <!-- ══════════ SETTINGS ══════════ -->
@@ -1465,112 +1935,79 @@
 </div><!-- /app-body -->
 
 <!-- ══════════ MODALS ══════════ -->
-<div class="modal-backdrop" id="task-modal">
-  <div class="modal sg-task-modal">
+<div class="modal-backdrop" id="task-modal" onclick="if(event.target===this)closeModal('task-modal')">
+  <div class="modal hp-task-modal">
     <div class="modal-head">
-      <span class="modal-title" id="task-modal-title">Add Task</span>
+      <div><span class="modal-title" id="task-modal-title">Add task</span><span class="modal-sub" id="tf-context"></span></div>
       <button class="modal-close" onclick="closeModal('task-modal')">×</button>
     </div>
     <div class="modal-body">
-      <p style="font-size:12px;color:var(--text3);margin-bottom:16px">Fields marked <span style="color:var(--red)">*</span> are mandatory.</p>
-
-      <!-- Line 1: Year / Month / Week / Dept / Member -->
-      <div class="sg-tf-row sg-tf-5">
-        <div class="field"><label>Academic Year <span class="req">*</span></label><select id="tf-year"></select></div>
-        <div class="field"><label>Month <span class="req">*</span></label><select id="tf-month"></select></div>
+      <select id="tf-year" hidden></select><select id="tf-month" hidden></select>
+      <select id="tf-dept" hidden onchange="populateTaskMemberDropdown();populateTaskGoalDropdown()"><option value="">Select Department…</option></select>
+      <select id="tf-member" hidden onchange="populateTaskGoalDropdown()"><option value="">Select Member…</option></select>
+      <div class="form-grid" style="grid-template-columns:1fr 2fr 2fr;margin-bottom:14px">
         <div class="field"><label>Week <span class="req">*</span></label><select id="tf-week"></select></div>
-        <div class="field">
-          <label>Department <span class="req">*</span></label>
-          <select id="tf-dept" onchange="populateTaskMemberDropdown();populateTaskGoalDropdown()"><option value="">Select Department…</option></select>
-        </div>
-        <div class="field">
-          <label>Member <span class="req">*</span></label>
-          <select id="tf-member" onchange="populateTaskGoalDropdown()"><option value="">Select Member…</option></select>
-        </div>
-      </div>
-
-      <div style="height:1px;background:var(--border);margin-bottom:14px"></div>
-
-      <!-- Line 2: SMART Goal / Activity / Sub-Activity -->
-      <div class="sg-tf-row sg-tf-goal">
         <div class="field"><label>SMART Goal <span class="req">*</span></label><select id="tf-goal" onchange="populateCatDropdown()"><option value="">Select…</option></select></div>
         <div class="field"><label>Activity <span class="req">*</span></label><select id="tf-cat"><option value="">Select…</option></select></div>
-        <div class="field"><label>Sub-Activity</label><input id="tf-subcat" placeholder="(optional)"></div>
       </div>
-
-      <div style="margin-bottom:14px">
-        <div class="field"><label>Action Point <span class="req">*</span></label><textarea id="tf-action" placeholder="Describe the task / action to be done…"></textarea></div>
+      <div class="field" style="margin-bottom:14px"><label>Action point <span class="req">*</span></label><textarea id="tf-action" placeholder="What will be done?"></textarea></div>
+      <div class="form-grid" style="grid-template-columns:2fr 1fr 1fr 1.4fr;margin-bottom:14px">
+        <div class="field"><label>Sub-activity</label><input id="tf-subcat" placeholder="Optional" autocomplete="off"></div>
+        <div class="field"><label>Planned</label><select id="tf-planned"><option value="Yes">Yes</option><option value="No">No</option></select></div>
+        <div class="field"><label>Items</label><input id="tf-planneditems" type="number" min="0" placeholder="Optional"></div>
+        <div class="field"><label>Est. hours <span class="req">*</span></label><input id="tf-est" type="number" step="0.5" min="0" placeholder="0"></div>
       </div>
-
-      <!-- Line 4: Planned Status / Planned Items / Est. Hrs / Target Date -->
-      <div class="sg-tf-row sg-tf-4" style="margin-bottom:0">
-        <div class="field"><label>Planned Status <span class="req">*</span></label><select id="tf-planned"><option value="Yes">Yes</option><option value="No">No</option></select></div>
-        <div class="field"><label>Planned Items</label><input id="tf-planneditems" type="number" min="0" placeholder="(optional)"></div>
-        <div class="field"><label>Est. Hrs <span class="req">*</span></label><input id="tf-est" type="number" step="0.5" min="0" placeholder="0"></div>
-        <div class="field"><label>Target Date <span class="req">*</span></label><input id="tf-tgtdate" type="date"></div>
-      </div>
+      <div class="field" style="max-width:240px"><label>Target date <span class="req">*</span></label><input id="tf-tgtdate" type="date"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeModal('task-modal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveTask()">Save Task</button>
+      <button class="btn btn-primary" onclick="saveTask()">Save task</button>
     </div>
   </div>
 </div>
 
-<div class="modal-backdrop" id="goal-modal">
-  <div class="modal">
+<div class="modal-backdrop" id="goal-modal" onclick="if(event.target===this)closeModal('goal-modal')">
+  <div class="modal hp-sm-modal">
     <div class="modal-head">
-      <span class="modal-title" id="goal-modal-title">Add SMART Goal</span>
+      <div><span class="modal-title" id="goal-modal-title">Add activity</span><span class="modal-sub" id="gf-context"></span></div>
       <button class="modal-close" onclick="closeModal('goal-modal')">×</button>
     </div>
     <div class="modal-body">
-      <p style="font-size:12px;color:var(--text3);margin-bottom:16px">Fields marked <span style="color:var(--red)">*</span> are mandatory.</p>
-
-      <div class="field" style="margin-bottom:14px"><label>Academic Year <span class="req">*</span></label><select id="gf-year"></select></div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
-        <div class="field"><label>Department <span class="req">*</span></label><select id="gf-dept" onchange="populateGoalMemberDropdown()"><option value="">Select…</option></select></div>
-        <div class="field"><label>Team Member <span class="req">*</span></label><select id="gf-member"><option value="">Select…</option></select></div>
+      <select id="gf-year" hidden></select>
+      <select id="gf-dept" hidden onchange="populateGoalMemberDropdown()"><option value="">Select…</option></select>
+      <select id="gf-member" hidden><option value="">Select…</option></select>
+      <input id="gf-goal" type="hidden"><input id="gf-weightage" type="hidden"><textarea id="gf-description" hidden></textarea>
+      <div class="form-grid" style="grid-template-columns:2fr 1fr;margin-bottom:14px">
+        <div class="field"><label>Activity <span class="req">*</span></label><input id="gf-cat" list="cats-list" placeholder="e.g. Reports" autocomplete="off"></div>
+        <div class="field"><label>Max score <span class="req">*</span></label><input id="gf-maxscore" type="number" min="0" placeholder="e.g. 10"></div>
       </div>
-
-      <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px">
-        <div class="field"><label>SMART Goal <span class="req">*</span></label><input id="gf-goal" placeholder="e.g. Program Implementation"></div>
-        <div class="field"><label>Weightage (%) <span class="req">*</span></label><input id="gf-weightage" type="number" min="0" max="100" placeholder="e.g. 25"></div>
-      </div>
-
-      <div class="field" style="margin-bottom:14px"><label>Description</label><textarea id="gf-description" placeholder="(optional) — description of this SMART Goal"></textarea></div>
-
-      <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px">
-        <div class="field"><label>Activity <span class="req">*</span></label><input id="gf-cat" placeholder="e.g. BA & Product"></div>
-        <div class="field"><label>Max Score <span class="req">*</span></label><input id="gf-maxscore" type="number" min="0" placeholder="e.g. 10"></div>
-      </div>
-
-      <div class="field"><label>Particulars</label><textarea id="gf-particulars" placeholder="(optional) — specific to this Activity"></textarea></div>
+      <div class="field"><label>Particulars</label><textarea id="gf-particulars" placeholder="Optional. What exactly is expected for this activity."></textarea></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeModal('goal-modal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveGoal()">Save</button>
+      <button class="btn btn-primary" onclick="saveGoal()">Save activity</button>
     </div>
   </div>
 </div>
 
-<div class="modal-backdrop" id="goalgroup-modal">
-  <div class="modal" style="max-width:460px">
+<div class="modal-backdrop" id="goalgroup-modal" onclick="if(event.target===this)closeModal('goalgroup-modal')">
+  <div class="modal hp-sm-modal">
     <div class="modal-head">
-      <span class="modal-title">Edit SMART Goal</span>
+      <div><span class="modal-title">Edit SMART Goal</span><span class="modal-sub" id="gg-context"></span></div>
       <button class="modal-close" onclick="closeModal('goalgroup-modal')">×</button>
     </div>
     <div class="modal-body">
-      <p style="font-size:12px;color:var(--text3);margin-bottom:6px" id="gg-context"></p>
-      <p style="font-size:11px;color:var(--text3);margin-bottom:16px">Changes apply to every activity under this SMART Goal.</p>
-      <div class="field" style="margin-bottom:14px"><label>SMART Goal <span class="req">*</span></label><input id="gg-goal" list="goalnames-list" placeholder="e.g. Program Implementation"></div>
-      <div class="field" style="margin-bottom:14px"><label>Description</label><textarea id="gg-description" placeholder="(optional) — description of this SMART Goal"></textarea></div>
-      <div class="field" style="margin-bottom:14px"><label>Success Measures</label><button type="button" class="btn btn-secondary btn-sm" id="gg-success-btn" style="align-self:flex-start" onclick="sgEditGroupSuccessMeasures()">+ Add Success Measures</button></div>
-      <div class="field"><label>Weightage (%) <span class="req">*</span></label><input id="gg-weightage" type="number" min="0" max="100" placeholder="e.g. 25"></div>
+      <div class="form-grid" style="grid-template-columns:2fr 1fr;margin-bottom:14px">
+        <div class="field"><label>SMART Goal <span class="req">*</span></label><input id="gg-goal" list="goalnames-list" placeholder="e.g. Program Implementation" autocomplete="off"></div>
+        <div class="field"><label>Weightage (%) <span class="req">*</span></label><input id="gg-weightage" type="number" min="1" max="100" placeholder="e.g. 25"><span class="sgp-hint" id="gg-hint"></span></div>
+      </div>
+      <div class="field" style="margin-bottom:16px"><label>Description</label><textarea id="gg-description" placeholder="Optional. What this goal is about."></textarea></div>
+      <div class="sgp-sm-row"><div><b>Success measures</b><span>How this goal is judged.</span></div><button type="button" class="btn btn-secondary btn-sm" id="gg-success-btn" onclick="sgEditGroupSuccessMeasures()">+ Add Success Measures</button></div>
+      <p class="sgp-hint" style="margin-top:14px">Changes apply to every activity under this goal.</p>
     </div>
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeModal('goalgroup-modal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveGoalGroup()">Save</button>
+      <button class="btn btn-primary" onclick="saveGoalGroup()">Save goal</button>
     </div>
   </div>
 </div>
@@ -1640,44 +2077,35 @@
   </div>
 </div>
 
-<div class="modal-backdrop" id="review-modal">
-  <div class="modal" style="max-width:1120px">
+<div class="modal-backdrop" id="review-modal" onclick="if(event.target===this)closeModal('review-modal')">
+  <div class="modal hp-rv-modal">
     <div class="modal-head">
-      <span class="modal-title">Monthly Review</span>
+      <div><span class="modal-title" id="rv-modal-title">Monthly review</span><span class="modal-sub" id="rf-context"></span></div>
       <button class="modal-close" onclick="closeModal('review-modal')">×</button>
     </div>
     <div class="modal-body">
-      <div class="form-grid" style="margin-bottom:14px">
-        <div class="field"><label>Academic Year <span class="req">*</span></label><select id="rf-year"></select></div>
-        <div class="field"><label>Month <span class="req">*</span></label><select id="rf-month"></select></div>
-        <div class="field"><label>Department <span class="req">*</span></label><select id="rf-dept" onchange="populateReviewMemberDropdown()"><option value="">Select…</option></select></div>
-        <div class="field"><label>Team Member <span class="req">*</span></label><select id="rf-member"><option value="">Select…</option></select></div>
-        <div class="field"><label>Review Date</label><input id="rf-date" type="date"></div>
+      <select id="rf-year" hidden></select><select id="rf-month" hidden></select>
+      <select id="rf-dept" hidden onchange="populateReviewMemberDropdown()"><option value="">Select…</option></select>
+      <select id="rf-member" hidden><option value="">Select…</option></select>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr;margin-bottom:6px" id="rf-reviewer-row">
+        <div class="field"><label>Reviewer</label><input id="rf-reviewer" placeholder="Manager name" autocomplete="off"></div>
+        <div class="field"><label>Review date</label><input id="rf-date" type="date"></div>
       </div>
-      <div class="form-grid" style="margin-bottom:16px" id="rf-reviewer-row">
-        <div class="field"><label>Reviewer (Manager)</label><input id="rf-reviewer" placeholder="Manager name"></div>
-        <div class="field form-full"><label>Overall Remarks</label><input id="rf-remarks" placeholder="Overall comment…"></div>
-      </div>
-      <div class="form-grid" style="margin-bottom:16px">
-        <div class="field form-full"><label>Sheet B Link</label><input id="rf-sheetb" type="url" placeholder="https://docs.google.com/…"></div>
-      </div>
-      <div class="form-grid" style="margin-bottom:16px">
-        <div class="field form-full"><label>Help Needed</label><input id="rf-helpneeded" placeholder="What help is needed…"></div>
-        <div class="field form-full"><label>Areas of Improvement</label><input id="rf-areas" placeholder="Areas to improve…"></div>
-      </div>
-      <div class="section-label">Score each SMART Goal / Activity</div>
-      <p style="font-size:12px;color:var(--text3);margin-bottom:12px">
-        Select year, dept &amp; member above, then click <strong>Load Goals</strong>.
-        <span style="color:var(--green);font-weight:600">Member Score</span> = filled by team member &nbsp;·&nbsp;
-        <span style="color:var(--blue);font-weight:600">Manager Score</span> = filled by Dept Head / Admin.
-      </p>
-      <button class="btn btn-secondary" style="margin-bottom:14px" onclick="loadGoalsForReview()"><svg class="sg-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.300 5.700M20 4v7h-7"/></svg> Load Goals</button>
       <div id="review-assist"></div>
+      <div class="rv-live" id="rv-live"></div>
       <div id="review-score-table"></div>
+      <div class="rv-notes">
+        <div class="field"><label>Overall remarks</label><textarea id="rf-remarks" placeholder="Overall comment on the month"></textarea></div>
+        <div class="form-grid" style="grid-template-columns:1fr 1fr;margin-top:12px">
+          <div class="field"><label>Help needed</label><textarea id="rf-helpneeded" placeholder="What help is needed?"></textarea></div>
+          <div class="field"><label>Areas of improvement</label><textarea id="rf-areas" placeholder="What can be better?"></textarea></div>
+        </div>
+        <div class="field" style="margin-top:12px"><label>Sheet B link</label><input id="rf-sheetb" type="url" placeholder="https://docs.google.com/…" autocomplete="off"></div>
+      </div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeModal('review-modal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveReview()">Save Review</button>
+      <button class="btn btn-primary" onclick="saveReview()">Save review</button>
     </div>
   </div>
 </div>
@@ -1754,6 +2182,48 @@
     <div class="hp-dm-bar"><span id="dm-count"></span><input id="dm-search" type="search" placeholder="Search people" oninput="renderDeptMembers()"></div>
     <div id="dm-list" class="hp-dm-list"></div>
     <div class="modal-foot"><button class="btn btn-secondary" onclick="closeModal('dept-members-modal')">Close</button></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="add-goal-modal" onclick="if(event.target===this)closeModal('add-goal-modal')">
+  <div class="modal hp-ag-modal">
+    <div class="modal-head">
+      <div><span class="modal-title">Add SMART Goal</span><span class="modal-sub" id="ag-context"></span></div>
+      <button class="modal-close" onclick="closeModal('add-goal-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid" style="grid-template-columns:2fr 1fr;margin-bottom:14px">
+        <div class="field"><label>SMART Goal <span class="req">*</span></label><input id="ag-goal" list="goalnames-list" placeholder="e.g. Program Implementation" autocomplete="off"></div>
+        <div class="field"><label>Weightage (%) <span class="req">*</span></label><input id="ag-weightage" type="number" min="1" max="100" placeholder="e.g. 25"><span class="sgp-hint" id="ag-remaining"></span></div>
+      </div>
+      <div class="field" style="margin-bottom:16px"><label>Description</label><textarea id="ag-description" placeholder="Optional. What this goal is about."></textarea></div>
+      <div class="sgp-ag-h"><span>Activities <span class="req">*</span></span><button type="button" class="btn btn-secondary btn-sm" onclick="sgAgRow()">+ Add activity</button></div>
+      <div id="ag-acts"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('add-goal-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveNewGoal()">Save goal</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="copy-goals-modal" onclick="if(event.target===this)closeModal('copy-goals-modal')">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-head">
+      <div><span class="modal-title">Copy goals</span><span class="modal-sub" id="cp-context"></span></div>
+      <button class="modal-close" onclick="closeModal('copy-goals-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid" style="grid-template-columns:1fr 1fr;margin-bottom:14px">
+        <div class="field"><label>Copy from</label><select id="cp-from" onchange="sgCpFromChange()"></select></div>
+        <div class="field"><label>Academic year</label><select id="cp-year" onchange="sgCpUpdate()"></select></div>
+      </div>
+      <div id="cp-preview"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('copy-goals-modal')">Cancel</button>
+      <button class="btn btn-primary" id="cp-go" onclick="saveCopyGoals()">Copy goals</button>
+    </div>
   </div>
 </div>
 
