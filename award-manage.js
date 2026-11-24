@@ -1290,6 +1290,59 @@ function fileToBase64(file) {
   });
 }
 
+// Phone photos are often 3-8 MB (12+ megapixels). Sent as base64 they grow by a third,
+// and the Apps Script has to decode all of it before Drive even sees the file, so a
+// raw photo can take 20-60 s on field mobile data. Here the picture is shrunk in the
+// browser first (longest side IMG_MAX_SIDE px, JPEG) - usually to 200-500 KB, which
+// is plenty for an award photo. Anything the browser can't decode (e.g. HEIC on
+// Chrome), or that would come out bigger, is sent as it is.
+const IMG_MAX_SIDE = 1600;
+const IMG_QUALITY  = 0.82;
+const IMG_SKIP_BELOW = 350 * 1024;          // already small → don't touch it
+
+function loadImageEl(file) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload  = () => { URL.revokeObjectURL(url); res(img); };
+    img.onerror = (e) => { URL.revokeObjectURL(url); rej(e); };
+    img.src = url;
+  });
+}
+
+async function compressImage(file) {
+  const original = { blob: file, mimeType: file.type || "image/jpeg",
+                     ext: (file.name.match(/\.[a-z0-9]+$/i) || [".jpg"])[0] };
+  try {
+    if (!/^image\/(jpeg|png|webp|bmp)$/i.test(file.type || "")) return original;   // gif/svg/heic etc.
+    if (file.size <= IMG_SKIP_BELOW) return original;
+    const img = await loadImageEl(file);     // browsers apply the photo's EXIF rotation here
+    const w0 = img.naturalWidth, h0 = img.naturalHeight;
+    if (!w0 || !h0) return original;
+    const scale = Math.min(1, IMG_MAX_SIDE / Math.max(w0, h0));
+    const w = Math.round(w0 * scale), h = Math.round(h0 * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#fff";                  // PNG transparency → white, not black, in a JPEG
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h);
+    const blob = await new Promise(r => canvas.toBlob(r, "image/jpeg", IMG_QUALITY));
+    if (!blob || blob.size >= file.size) return original;
+    return { blob, mimeType: "image/jpeg", ext: ".jpg" };
+  } catch (e) {
+    console.warn("Image not compressed, sending original:", e);
+    return original;
+  }
+}
+
+// Compress + base64 in one go. Returns { data (base64, no prefix), mimeType, ext }.
+async function prepareImage(file) {
+  const c = await compressImage(file);
+  const dataUrl = await fileToBase64(c.blob);
+  return { data: dataUrl.split(",")[1], mimeType: c.mimeType, ext: c.ext };
+}
+
 function driveId(url) {
   return (String(url || "").match(/[-\w]{25,}/) || [])[0] || "";
 }
@@ -1298,6 +1351,11 @@ window.awmUploadImage = async function (index, file) {
   if (!file) return;
   const cell = document.getElementById("imgcell-" + index);
   const rec  = currentRecords[index];
+
+  // Start shrinking the picture right away, while the server checks below run,
+  // so the two waits overlap instead of adding up.
+  const prepared = prepareImage(file);
+  prepared.catch(() => {});                 // handled where it is awaited
 
   // Guard: this record may have been verified (locked) since the page loaded.
   // Check Awarded Data BEFORE uploading anything, so a stale page can't push a new
@@ -1347,17 +1405,16 @@ window.awmUploadImage = async function (index, file) {
 
   cell.innerHTML = '<span class="img-status">Uploading…</span>';
   try {
-    const dataUrl = await fileToBase64(file);
-    const ext = (file.name.match(/\.[a-z0-9]+$/i) || [".jpg"])[0];
+    const img = await prepared;
     const safeName = (currentRecords[index].fullName || "image").replace(/[^\w]+/g, "_");
 
     const payload = {
       action: "uploadImage",
       month: selectedMonth.replace("-", " ").toUpperCase(),
       district: document.getElementById("awmDistrict").value,
-      fileName: `${safeName}_${Date.now()}${ext}`,
-      mimeType: file.type || "image/jpeg",
-      data: dataUrl.split(",")[1],
+      fileName: `${safeName}_${Date.now()}${img.ext}`,
+      mimeType: img.mimeType,
+      data: img.data,
       replaceId: (deleteOld && driveId(existingUrl)) || null   // the Apps Script deletes this file once the new one is stored
     };
 
@@ -1958,15 +2015,14 @@ window.awmApi = {
   hasRejected: function () { return hasRejected; },
   // One picture for many records (the IT admin's bulk verify): stored once in Drive.
   uploadSharedImage: async function (file, month, district) {
-    const dataUrl = await fileToBase64(file);
-    const ext = (file.name.match(/\.[a-z0-9]+$/i) || [".jpg"])[0];
+    const img = await prepareImage(file);
     const payload = {
       action: "uploadImage",
       month: String(month || "").replace("-", " ").toUpperCase(),
       district: district,
-      fileName: "SU_shared_" + Date.now() + ext,
-      mimeType: file.type || "image/jpeg",
-      data: dataUrl.split(",")[1],
+      fileName: "SU_shared_" + Date.now() + img.ext,
+      mimeType: img.mimeType,
+      data: img.data,
       replaceId: null
     };
     const res = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
