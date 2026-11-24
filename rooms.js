@@ -879,6 +879,7 @@ function loadFragment() {
 }
 function openPopup(roomId) {
   if (document.getElementById('rbOverlay')) return;
+  if (!canUseSpaces()) { alert('Book a Space is available to Pune HO staff.'); return; }
   if (!document.getElementById('rbOvStyle')) { var st = document.createElement('style'); st.id = 'rbOvStyle'; st.textContent = OV_CSS; document.head.appendChild(st); }
   var ov = document.createElement('div'); ov.id = 'rbOverlay'; ov.className = 'rb-ov';
   ov.innerHTML = '<div class="rb-ovbg" data-ovclose></div><div class="rb-ovdlg" id="rbDialog" role="dialog" aria-modal="true" aria-label="Spaces" tabindex="-1"><div id="rbHostBody"><div class="rb-ovload"><i></i><span>Opening Spaces...</span></div></div></div>';
@@ -923,13 +924,37 @@ function peek(cb) {
     }, function () { cb(null); });
   });
 }
+// ── who gets Book a Space: staff whose Location in the Employees table is Pune HO (the IT admin too, to manage the spaces) ──
+function isPuneHO(emp) {
+  var loc = String((emp && emp.Location) || '').toLowerCase().replace(/[^a-z]+/g, ' ').trim();
+  return /^pune (ho|head office)\b/.test(loc) || loc === 'pune ho';
+}
+function canUseSpaces() {
+  var api = window.olfRooms, me = api && api.user ? api.user() : null;
+  if (me && me.isAdmin) return true;
+  return isPuneHO(window.__olfEmployee);
+}
+function applyGate() {
+  var b = document.getElementById('homeRooms'); if (!b) return;
+  var ok = window.__olfEmployeeLoaded ? canUseSpaces() : false;
+  if (b.hidden === ok) b.hidden = !ok;
+  if (ok) homeTile();
+}
+document.addEventListener('olf:profile-ready', function () { applyGate(); });
+[1500, 4000, 9000].forEach(function (ms) { setTimeout(applyGate, ms); });
+applyGate();
+
 // the small dot on the top-bar button: green when some room is free, red when all are busy, grey when closed
 function homeTile() {
-  if (!document.getElementById('tbRoomsDot') || document.hidden) return;
+  var b = document.getElementById('homeRooms');
+  if (!b || document.hidden) return;
+  if (b.hidden) { if (window.__olfEmployeeLoaded && canUseSpaces()) b.hidden = false; else return; }
+  if (!canUseSpaces()) return;
   peek(function (r) {
-    var d = document.getElementById('tbRoomsDot'), b = document.getElementById('tbRoomsBtn'); if (!d || !r) return;
-    d.className = 'tb-rooms-dot' + (r.shut ? ' shut' : (r.free ? '' : ' busy')); d.hidden = false;
-    if (b) { var t = r.shut ? r.shut : r.free + ' of ' + r.total + ' spaces free now'; b.title = 'Spaces. ' + t; b.setAttribute('aria-label', 'Spaces. ' + t); }
+    var d = document.getElementById('homeRoomsPill'), bt = document.getElementById('homeRooms'); if (!d || !r) return;
+    d.className = 'hm-space-pill' + (r.shut ? ' shut' : (r.free ? '' : ' busy')); d.hidden = false;
+    d.textContent = r.shut ? 'Closed' : (r.free ? r.free + ' free now' : 'All busy now');
+    if (bt) bt.setAttribute('aria-label', 'Book a Space. ' + (r.shut ? r.shut : r.free + ' of ' + r.total + ' spaces free now'));
   });
 }
 setTimeout(homeTile, 2500); setTimeout(homeTile, 8000);

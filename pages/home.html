@@ -42,6 +42,14 @@
         </div>
     </section>
 
+    <!-- ── Book a Space: opens the Spaces popup (rooms.js). Hidden unless the person is Pune HO staff. ── -->
+    <button type="button" class="hm-space" id="homeRooms" data-open-rooms hidden aria-label="Book a Space">
+        <span class="hm-space-ico" aria-hidden="true"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M18 6.500l6 2.500v17.500l-6 2.500z" fill="#C4B5FD"/><rect x="2.500" y="2.500" width="21" height="27.500" rx="4" fill="#7C3AED"/><path d="M6.500 6h13.500a1 1 0 0 1 1 1v21H6.500z" fill="#EDE9FE"/><g class="tbr-leaf"><path d="M6.500 6l8.500-2.600v26L6.500 28z" fill="#A78BFA"/><circle cx="12.200" cy="17.500" r="1.200" fill="#F5F3FF"/></g><circle cx="23" cy="23" r="8.300" fill="#fff"/><circle cx="23" cy="23" r="7" fill="#F59E0B"/><circle cx="23" cy="23" r="5.300" fill="#FFFBEB"/><path d="M23 19.600V23l2.500 1.600" stroke="#B45309" stroke-width="1.700" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <span class="hm-space-txt"><b>Book a Space</b><small>Interview, Meeting, CEO, COO and CoS spaces</small></span>
+        <span class="hm-space-pill" id="homeRoomsPill" hidden></span>
+        <span class="hm-space-go">Book now <i aria-hidden="true">→</i></span>
+    </button>
+
     <!-- ── Upcoming events (from Program Calendar) ──
          Hidden until app.js finds something in the today/tomorrow window. -->
     <div class="upcoming-section hm-section" id="upcomingSection" style="display:none;">
@@ -516,6 +524,33 @@ html[data-theme="dark"] .hm-facts-lead { border-bottom-color: var(--hairline); }
     .hm .hm-empty-ico { width: 46px; height: 46px; border-radius: 14px; margin-bottom: 2px; }
     .hm .hm-empty-ico .hm-i { width: 23px; height: 23px; }
     .hm .hm-empty-title { font-size: 14.5px; }
+}
+
+/* ── Book a Space strip ── */
+.hm-space { display: flex; align-items: center; gap: 14px; width: 100%; margin: 0 0 18px; padding: 14px 18px; text-align: left; font: inherit; color: inherit; cursor: pointer;
+    background: var(--surface, #fff); border: 1px solid var(--hairline, rgba(15,23,42,.1)); border-radius: 18px; box-shadow: var(--shadow-sm, 0 6px 18px -10px rgba(15,23,42,.25));
+    transition: transform .18s ease, box-shadow .2s ease, border-color .2s ease; -webkit-tap-highlight-color: transparent; }
+.hm-space[hidden] { display: none; }
+.hm-space:hover { transform: translateY(-2px); border-color: rgba(124,58,237,.4); box-shadow: 0 14px 26px -14px rgba(124,58,237,.5); }
+.hm-space:focus-visible { outline: 2px solid #7C3AED; outline-offset: 2px; }
+.hm-space-ico { flex: none; width: 46px; height: 46px; display: grid; place-items: center; border-radius: 14px; background: #F3EEFF; }
+.hm-space-ico svg { width: 30px; height: 30px; overflow: visible; }
+.hm-space-ico .tbr-leaf { transform-box: fill-box; transform-origin: 0 50%; transition: transform .35s cubic-bezier(.34,1.3,.64,1); }
+.hm-space:hover .tbr-leaf { transform: scaleX(.4); }
+.hm-space-txt { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.hm-space-txt b { white-space: nowrap; font-size: 15.5px; font-weight: 800; letter-spacing: -.2px; }
+.hm-space-txt small { font-size: 12.5px; color: var(--text-soft, #5A6577); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hm-space-pill { flex: none; padding: 4px 12px; border-radius: 99px; font-size: 12px; font-weight: 800; background: #DCFCE7; color: #15803D; white-space: nowrap; }
+.hm-space-pill[hidden] { display: none; }
+.hm-space-pill.busy { background: #FEE2E2; color: #B91C1C; }
+.hm-space-pill.shut { background: #E2E8F0; color: #475569; }
+.hm-space-go { flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: 12px; font-size: 13.5px; font-weight: 800; color: #fff; background: linear-gradient(135deg, #7C3AED, #4F8EF7); }
+.hm-space-go i { font-style: normal; transition: transform .15s; }
+.hm-space:hover .hm-space-go i { transform: translateX(3px); }
+@media (max-width: 640px) {
+    .hm-space { padding: 12px 14px; gap: 12px; border-radius: 16px; margin-bottom: 14px; }
+    .hm-space-txt small { display: none; }
+    .hm-space-go { padding: 8px 12px; font-size: 13px; }
 }
 </style>
 
