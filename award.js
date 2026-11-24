@@ -3269,13 +3269,26 @@ window.AWARD_CONFIG = {
     });
   }
 
-  function kpiHtml(icon, tone, count, label, hint) {
+  function kpiHtml(icon, tone, count, label, hint, sub) {
     return '<div class="kpi kpi-' + tone + '">' +
              '<span class="kpi-ico"><i class="aw-icon" data-aw-icon="' + icon + '" aria-hidden="true"></i></span>' +
              '<div class="kpi-text"><b data-count="' + count + '">' + count.toLocaleString() + "</b>" +
              "<small>" + escapeHtml(label) + "</small>" +
              (hint ? "<em>" + escapeHtml(hint) + "</em>" : "") + "</div>" +
+             (sub ? '<div class="kpi-sub"><span class="kpi-chip">' + escapeHtml(sub[0]) + "</span>" + subDistrictsHtml(sub) + "</div>" : "") +
            "</div>";
+  }
+
+  // The districts line: a button that opens the list when there is something to list.
+  function subDistrictsHtml(sub) {
+    if (!sub[2]) return '<span class="kpi-chip">' + escapeHtml(sub[1]) + "</span>";
+    return '<button type="button" class="kpi-dl" data-kpi-dist="' + escapeHtml(sub[2]) + '">' + escapeHtml(sub[1]) + '<i aria-hidden="true">›</i></button>';
+  }
+
+  // "120 gifts, 5 districts" for one card, from the figures gathered for it.
+  function subText(g, name) {
+    var d = Object.keys(g.d).length;
+    return [g.g.toLocaleString() + (g.g === 1 ? " gift" : " gifts"), d + (d === 1 ? " district" : " districts"), d ? name : ""];
   }
 
   var PIPE = [
@@ -3286,6 +3299,29 @@ window.AWARD_CONFIG = {
     { key: "stopped",  label: "Declined",   cls: "pipe-stopped",  stages: ["declined", "rejected"] }
   ];
 
+  var kpiGroups = {};
+  function closeKpiPop() { var o = document.getElementById("kpi-pop"); if (o) o.remove(); }
+  function openKpiPop(name) {
+    var g = kpiGroups[name]; if (!g) return;
+    closeKpiPop();
+    var list = Object.keys(g.d).map(function (k) { return g.d[k]; }).sort(function (a, b) { return (b.g - a.g) || a.district.localeCompare(b.district); });
+    var host = document.querySelector(".award-page") || document.body;
+    var o = document.createElement("div");
+    o.id = "kpi-pop"; o.className = "kpi-pop";
+    o.innerHTML = '<div class="kpi-pop-card" role="dialog" aria-modal="true"><div class="kpi-pop-h"><div><b>' + escapeHtml(name) +
+      ' – districts</b><small>' + list.length + (list.length === 1 ? " district" : " districts") + " · " + g.g.toLocaleString() + (g.g === 1 ? " gift" : " gifts") +
+      '</small></div><button type="button" class="kpi-pop-x" aria-label="Close">×</button></div><div class="kpi-pop-b"><table><thead><tr><th>District</th><th>State</th><th class="n">Requisitions</th><th class="n">Gifts</th></tr></thead><tbody>' +
+      list.map(function (d) { return "<tr><td>" + escapeHtml(d.district) + "</td><td>" + escapeHtml(d.state) + '</td><td class="n">' + d.reqs + '</td><td class="n"><b>' + d.g.toLocaleString() + "</b></td></tr>"; }).join("") +
+      "</tbody></table></div></div>";
+    o.addEventListener("click", function (e) { if (e.target === o || e.target.closest(".kpi-pop-x")) closeKpiPop(); });
+    host.appendChild(o);
+  }
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeKpiPop(); });
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest ? e.target.closest("[data-kpi-dist]") : null;
+    if (b) openKpiPop(b.getAttribute("data-kpi-dist"));
+  });
+
   function renderReqSummary(rows) {
     var box = document.getElementById("req-summary");
     if (!box) return;
@@ -3293,9 +3329,22 @@ window.AWARD_CONFIG = {
 
     var count = {};
     PIPE.forEach(function (p) { count[p.key] = 0; });
-    var asked = 0, got = 0;
+    var asked = 0, got = 0, sent = 0;
+    var G = { all: { g: 0, d: {} }, wait: { g: 0, d: {} }, move: { g: 0, d: {} }, sent: { g: 0, d: {} }, done: { g: 0, d: {} } };
+    function tally(k, n, dist, row) {
+      G[k].g += n;
+      var e = G[k].d[dist] || (G[k].d[dist] = { district: placeOf(row).district || "(no district)", state: placeOf(row).state || "", g: 0, reqs: 0 });
+      e.g += n; e.reqs += 1;
+    }
     rows.forEach(function (row) {
       var st = stageOf(row);
+      var gd = (placeOf(row).state || "") + "|" + (placeOf(row).district || "(no district)");
+      tally("all", askedOf(row), gd, row);
+      if (st === "submitted" || st === "on_hold") tally("wait", askedOf(row), gd, row);
+      if (st === "approved" || st === "acknowledged" || st === "ho_approved" || st === "dispatched") tally("move", askedOf(row), gd, row);
+      if (st === "dispatched") tally("sent", askedOf(row), gd, row);
+      if (st === "received") tally("done", deliveredOf(row), gd, row);
+      if (st === "dispatched") sent += 1;
       PIPE.forEach(function (p) { if (p.stages.indexOf(st) !== -1) count[p.key] += 1; });
       asked += askedOf(row);
       got += deliveredOf(row);
@@ -3315,10 +3364,11 @@ window.AWARD_CONFIG = {
 
     box.innerHTML =
       '<div class="kpis">' +
-        kpiHtml("doc", "total", total, total === 1 ? "Requisition" : "Requisitions", "") +
-        kpiHtml("clock", "wait", count.pending + count.held, "Waiting", "pending or on hold") +
-        kpiHtml("truck", "move", count.moving, "In progress", "verified to dispatched") +
-        kpiHtml("done", "good", count.done, "Received", "") +
+        kpiHtml("doc", "total", total, total === 1 ? "Requisition" : "Requisitions", "", subText(G.all, "Requisitions")) +
+        kpiHtml("clock", "wait", count.pending + count.held, "Waiting", "pending or on hold", subText(G.wait, "Waiting")) +
+        kpiHtml("truck", "move", count.moving, "In progress", "verified to dispatched", subText(G.move, "In progress")) +
+        kpiHtml("truck", "sent", sent, "Dispatched", "sent, not yet received", subText(G.sent, "Dispatched")) +
+        kpiHtml("done", "good", count.done, "Received", "", subText(G.done, "Received")) +
         '<div class="kpi kpi-ring">' +
           '<svg class="ring" viewBox="0 0 64 64" aria-hidden="true">' +
             '<circle class="ring-bg" cx="32" cy="32" r="26"/>' +
@@ -3327,11 +3377,13 @@ window.AWARD_CONFIG = {
           "</svg>" +
           '<div class="kpi-text"><b><span data-count="' + pct + '">' + pct + '</span>%</b>' +
             "<small>Delivered</small><em>" + got.toLocaleString() + " of " + asked.toLocaleString() + "</em></div>" +
+            '<div class="kpi-sub"><span class="kpi-chip">' + escapeHtml(subText(G.done, "Delivered")[0]) + "</span>" + subDistrictsHtml(subText(G.done, "Delivered")) + "</div>" +
         "</div>" +
       "</div>" +
       (total ? '<div class="pipe"><div class="pipe-bar">' + segments + '</div><div class="pipe-legend">' +
                legend + "</div></div>" : "");
     box.hidden = false;
+    kpiGroups = { Requisitions: G.all, Waiting: G.wait, "In progress": G.move, Dispatched: G.sent, Received: G.done, Delivered: G.done };
     paintIcons();
     runCounters(box);
   }
