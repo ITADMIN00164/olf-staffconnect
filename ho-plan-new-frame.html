@@ -20,21 +20,53 @@
     var st = pd.documentElement.getAttribute('style');
     if (st) document.documentElement.setAttribute('style', st);
     Array.prototype.forEach.call(pd.head.querySelectorAll('style, link[rel="stylesheet"]'), function (n) {
+      if (n.hasAttribute && (n.hasAttribute('data-theme-generated') || n.id === 'olfThemeChrome')) return;
       document.head.appendChild(n.cloneNode(true));
     });
     window.SMART_GOALS_USER = P.SMART_GOALS_USER || null;
   } catch (e) { console.warn('[HO new] could not read the app shell', e); }
 })();
 </script>
+<script src="theme.js"></script>
+<script>
+(function () {
+  // Follow the app's Light / Dark / System switch while this frame is open.
+  try {
+    var P = window.parent;
+    if (!P || P === window || !P.OLFTheme || !window.OLFTheme) return;
+    var sync = function () { var pp = P.OLFTheme.get(); if (window.OLFTheme.get() !== pp) window.OLFTheme.set(pp); };
+    new MutationObserver(sync).observe(P.document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    sync();
+  } catch (e) {}
+})();
+</script>
 </head>
 <body>
 <div id="hpNewRoot"></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="sg-supabase-new.js?v=2"></script>
-<script src="smartgoal-new.js?v=11"></script>
 <script>
 (function () {
-  fetch('pages/ho-plan-new-app.html?v=hp10', { cache: 'no-cache' })
+  // On a phone the frame fills the screen between the top bar and the bottom bar, then scrolls inside itself.
+  function fit() {
+    try {
+      var P = window.parent, fe = window.frameElement;
+      if (!fe || P === window) return;
+      if (P.innerWidth > 860) { fe.style.height = ''; return; }
+      var nav = P.document.querySelector('.m-nav'), navH = 0;
+      if (nav && P.getComputedStyle(nav).display !== 'none') navH = nav.getBoundingClientRect().height;
+      var top = Math.max(fe.getBoundingClientRect().top, 0);
+      fe.style.height = Math.max(320, Math.round(P.innerHeight - top - navH)) + 'px';
+    } catch (e) {}
+  }
+  window.addEventListener('load', function () { fit(); setTimeout(fit, 400); setTimeout(fit, 1500); });
+  try { window.parent.addEventListener('resize', fit); window.parent.addEventListener('orientationchange', function () { setTimeout(fit, 250); }); } catch (e) {}
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="sg-supabase-new.js?v=2"></script>
+<script src="smartgoal-new.js?v=28"></script>
+<script>
+(function () {
+  fetch('pages/ho-plan-new-app.html?v=hp26', { cache: 'no-cache' })
     .then(function (r) { return r.text(); })
     .then(function (html) {
       document.getElementById('hpNewRoot').innerHTML = html;
