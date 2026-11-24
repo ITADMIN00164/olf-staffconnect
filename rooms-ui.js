@@ -456,6 +456,33 @@ window.RB_HTML = `<!-- =========================================================
 #rb-app .pg-blob { display: none; }
 #rb-app .pg-hero { backdrop-filter: none; -webkit-backdrop-filter: none; }
 #rb-app .rb-scene { box-shadow: 0 0 0 2px #CBD5E3, 0 22px 34px -18px rgba(15,23,42,.30); }
+/* ── phone: a compact two-row header and labels you can actually read ── */
+@media (max-width: 760px) {
+  #rb-app .pg-hero { position: relative; display: block; padding: 12px 12px 12px; margin-bottom: 8px; border-radius: 18px; }
+  #rb-app .pg-hero-lead { gap: 10px; padding-right: 48px; margin-bottom: 10px; }
+  #rb-app .pg-hero-ico { width: 40px; height: 40px; border-radius: 12px; flex: none; }
+  #rb-app .pg-hero-ico svg, #rb-app .pg-hero-ico .hero-color-ico { width: 24px; height: 24px; }
+  #rb-app .pg-hero-title { font-size: 20px; margin: 0; }
+  #rb-app .pg-hero-sub { font-size: 12px; line-height: 1.3; margin: 1px 0 0; opacity: .95; }
+  #rb-app .pg-hero-actions { display: block; }
+  #rb-app .rb-xclose { position: absolute; top: 12px; right: 12px; width: 38px; height: 38px; min-height: 0; padding: 0; justify-content: center; font-size: 0; gap: 0; }
+  #rb-app .rb-xclose svg { width: 18px; height: 18px; }
+  #rb-app .rb-dnav { display: flex; flex-wrap: nowrap; gap: 6px; width: 100%; margin-bottom: 8px; }
+  #rb-app .rb-dnav .rb-sqb { width: 38px; flex: none; }
+  #rb-app .rb-dnav .rb-datebtn { order: 0; flex: 1 1 auto; min-width: 0; padding: 0 10px; justify-content: flex-start; }
+  #rb-app .rb-dnav #rb-prev { order: 1; } #rb-app .rb-dnav .rb-datebtn { order: 2; } #rb-app .rb-dnav #rb-next { order: 3; } #rb-app .rb-dnav #rb-today { order: 4; flex: none; padding: 0 12px; }
+  #rb-app .rb-dnav .pg-btn { min-height: 38px; height: 38px; font-size: 13px; border-radius: 12px; }
+  #rb-app .rb-tabs { display: flex; flex-wrap: nowrap; gap: 6px; width: 100%; }
+  #rb-app .rb-tabs .pg-btn { min-height: 38px; height: 38px; font-size: 13px; border-radius: 12px; padding: 0 10px; flex: 1 1 0; justify-content: center; white-space: nowrap; }
+  #rb-app #rb-free { flex: 1.3 1 0; }
+  #rb-app .rb-tabs .pg-btn.rb-xclose { position: absolute; top: 12px; right: 12px; flex: none; width: 38px; height: 38px; padding: 0; font-size: 0; gap: 0; }
+  #rb-app .rb-tabs .pg-btn.rb-xclose svg { width: 18px; height: 18px; }
+  /* labels on the plan: bigger, on a light chip so walls never cut through them */
+  #rb-app .rb-scene.sm-scale .rb-fl b { font-size: calc(13.5px / var(--k)); letter-spacing: .03em; padding: calc(2px / var(--k)) calc(7px / var(--k)); border-radius: calc(7px / var(--k)); background: rgba(255,255,255,.88); text-shadow: none; box-shadow: 0 1px 4px rgba(15,23,42,.18); }
+  #rb-app .rb-scene.sm-scale .rb-fl small { display: inline-block; font-size: calc(10px / var(--k)); padding: calc(1.5px / var(--k)) calc(7px / var(--k)); }
+  #rb-app .rb-scene.sm-scale .rb-fl { gap: calc(4px / var(--k)); }
+  #rb-app .rb-scene.sm-scale .rb-rm.sm .rb-fl { flex-direction: column; justify-content: center; align-items: center; padding: 0; gap: calc(3px / var(--k)); }
+}
 </style>
 
 <section class="pg-hero">
