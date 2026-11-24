@@ -231,6 +231,9 @@ function monthsForYear(year) {
   const startYear = parseInt(String(year).split("-")[0], 10);
   if (isNaN(startYear)) return [];
   const out = [];
+  // AY 2026-27 also carries Apr-2026 and May-2026, the two months before it began,
+  // so events held then can be logged too.
+  if (startYear === 2026) out.push("Apr-2026", "May-2026");
   for (let i = 0; i < 12; i++) {
     const mi = (AY_START_MONTH - 1 + i) % 12;
     const yr = startYear + (AY_START_MONTH - 1 + i >= 12 ? 1 : 0);

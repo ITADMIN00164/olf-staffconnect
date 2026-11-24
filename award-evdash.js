@@ -104,6 +104,7 @@ function ayOfMonth(m) { const o = monthOrder(m); if (o === null) return null; co
 function monthsOf(ay) {
   const y = parseInt(str(ay).split("-")[0], 10), out = [];
   if (isNaN(y)) return out;
+  if (y === 2026) out.push("Apr-2026", "May-2026");   // the two months before AY 2026-27 began, kept like any other month
   for (let i = 0; i < 12; i++) {
     const mi = (AY_START_MONTH - 1 + i) % 12;
     out.push(MONTH_NAMES[mi] + "-" + (y + (AY_START_MONTH - 1 + i >= 12 ? 1 : 0)));
