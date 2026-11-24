@@ -694,21 +694,25 @@ function setRoute(id) {
 }
 function placeTip(e) {
   var t = $('rb-tip2'); if (!t || t.hidden) return;
-  var w = t.offsetWidth, hgt = t.offsetHeight, x = e.clientX + 18, y = e.clientY + 18;
+  var w = t._w || (t._w = t.offsetWidth), hgt = t._hh || (t._hh = t.offsetHeight), x = e.clientX + 18, y = e.clientY + 18;
   if (x + w > window.innerWidth - 8) x = e.clientX - w - 14;
   if (y + hgt > window.innerHeight - 8) y = e.clientY - hgt - 14;
   t.style.left = Math.max(8, x) + 'px'; t.style.top = Math.max(8, y) + 'px';
 }
 function showTip(rm, e) {
   var t = $('rb-tip2'); if (!t || S.rmodal || S.modal || S.calOpen || S.view !== 'day') return;
-  clearTimeout(tipTimer); setRoute(rm.getAttribute('data-room'));
-  var html = tipHtml(rm.getAttribute('data-room')); if (t._h !== html) { t.innerHTML = html; t._h = html; }
+  clearTimeout(tipTimer);
+  var rid = rm.getAttribute('data-room');
+  if (t._room !== rid || t.hidden) {
+    t._room = rid; setRoute(rid);
+    var html = tipHtml(rid); if (t._h !== html) { t.innerHTML = html; t._h = html; t._w = 0; t._hh = 0; }
+  }
   if (t.hidden) { t.hidden = false; t.classList.remove('in'); void t.offsetWidth; t.classList.add('in'); }
   placeTip(e);
 }
 function hideTip(now) {
   clearTimeout(tipTimer);
-  var go = function () { setRoute(''); var t = $('rb-tip2'); if (t && !t.hidden) { t.hidden = true; t.classList.remove('in'); t._h = ''; } };
+  var go = function () { setRoute(''); var t = $('rb-tip2'); if (t && !t.hidden) { t.hidden = true; t.classList.remove('in'); t._h = ''; t._room = ''; } };
   if (now === true) go(); else tipTimer = setTimeout(go, 160);   // a short grace period, so crossing a wall or a gap does not make it flicker
 }
 
@@ -803,7 +807,6 @@ function bind() {
     if (rm) showTip(rm, e);
     else hideTip();
   });
-  root.addEventListener('pointermove', camMove);
   root.addEventListener('pointerleave', function () { hideTip(); camReset(); }); root.addEventListener('pointerdown', function () { hideTip(true); });
   window.removeEventListener('pointerup', onPointerUp); window.addEventListener('pointerup', onPointerUp);
   // tiles lean toward the pointer
@@ -852,6 +855,7 @@ var OV_CSS = '.rb-ov{position:fixed;inset:0;z-index:3900;display:flex;align-item
   + '@keyframes rbovin{from{opacity:0}to{opacity:1}}@keyframes rbovdlg{from{opacity:0;transform:translateY(18px) scale(.985)}to{opacity:1;transform:none}}'
   + '.rb-ovload{display:flex;align-items:center;justify-content:center;gap:10px;min-height:260px;color:#5A6577;font-weight:600;font-family:inherit}.rb-ovload i{width:18px;height:18px;border-radius:50%;border:3px solid #C7D2E6;border-top-color:#2F6FE4;animation:rbspin .8s linear infinite}@keyframes rbspin{to{transform:rotate(360deg)}}'
   + 'html.rb-ovopen{overflow:hidden}'
+  + 'html.rb-ovopen body>*:not(#rbOverlay):not(script):not(style):not(link){visibility:hidden!important}'
   + '@media (max-width:760px){.rb-ov{padding:0}.rb-ovdlg{width:100%;height:100%;border-radius:0;padding:10px}}'
   + '@media (prefers-reduced-motion:reduce){.rb-ov,.rb-ovdlg,.rb-ovload i{animation:none}}';
 var fragCache = null, lastFocus = null;

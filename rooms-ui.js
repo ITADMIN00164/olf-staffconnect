@@ -445,6 +445,17 @@ window.RB_HTML = `<!-- =========================================================
 /* ── small rooms: keep the name clear of the glass wall in front ── */
 #rb-app .rb-rm.sm .rb-fl { justify-content: flex-start; padding-top: 6px; padding-bottom: 0; gap: 3px; }
 #rb-app .rb-rm.sm .rb-fl b { font-size: 14px; }
+/* ── speed: no filters or blurs on the 3D walls, no per-frame animations on the map ── */
+#rb-app .rb-bx::before { filter: none; background: rgba(15,23,42,.16); }
+#rb-app .rb-bx .bs { filter: none; background-image: linear-gradient(180deg, rgba(255,255,255,.08), rgba(15,23,42,.40)); }
+#rb-app .rb-bx .bw { filter: none; background-image: linear-gradient(180deg, rgba(255,255,255,.14), rgba(15,23,42,.28)); }
+#rb-app .rb-scene.rb-intro .rb-bx { animation: none; }
+#rb-app .rb-scene { transition: none; }
+#rb-app .rb-lamp.busy, #rb-app .rb-lamp.mine { animation: none !important; }
+#rb-app .rb-modal { backdrop-filter: none; -webkit-backdrop-filter: none; }
+#rb-app .pg-blob { display: none; }
+#rb-app .pg-hero { backdrop-filter: none; -webkit-backdrop-filter: none; }
+#rb-app .rb-scene { box-shadow: 0 0 0 2px #CBD5E3, 0 22px 34px -18px rgba(15,23,42,.30); }
 </style>
 
 <section class="pg-hero">
