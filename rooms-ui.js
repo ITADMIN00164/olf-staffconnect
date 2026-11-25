@@ -283,7 +283,7 @@ window.RB_HTML = `<!-- =========================================================
 #rb-app .rb-day { margin: 14px 0 4px; font-size: 12px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--rb-text3); }
 #rb-app .rb-empty { padding: 44px 16px; text-align: center; color: var(--rb-text3); }
 #rb-app .rb-empty b { display: block; font-size: 15px; color: var(--rb-text); margin-bottom: 4px; }
-#rb-app .rb-rr { display: grid; grid-template-columns: 38px minmax(0, 1.4fr) minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--rb-border); }
+#rb-app .rb-rr { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--rb-border); }
 #rb-app .rb-rr:last-child { border-bottom: 0; }
 #rb-app .rb-rr .rb-ri2 { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: var(--rb-surface2); color: var(--rb-text2); font-size: 19px; }
 #rb-app .rb-rr input[type=text] { width: 100%; padding: 8px 10px; border: 1px solid var(--rb-border2); border-radius: 10px; background: var(--rb-surface); color: var(--rb-text); font: inherit; font-size: 14px; }

@@ -613,25 +613,16 @@ function drawRooms() {
   host.innerHTML = '<div class="rb-sec"><div class="rb-card">' + S.rooms.map(function (r, i) {
     return '<div class="rb-rr" data-room="' + r.id + '"><span class="rb-ri2">' + ic(r.icon) + '</span>'
       + '<label><span style="display:block;font-size:12px;color:var(--rb-text3)">Name</span><input type="text" class="rb-rn-in" maxlength="40" value="' + esc(r.name) + '"></label>'
-      + '<label><span style="display:block;font-size:12px;color:var(--rb-text3)">Short label</span><input type="text" class="rb-rl-in" maxlength="40" value="' + esc(r.label) + '"></label>'
       + '<span class="rb-swt"><input type="checkbox" class="rb-ra-in" ' + (r.active ? 'checked' : '') + ' id="rb-act-' + r.id + '"><label for="rb-act-' + r.id + '">Bookable</label></span>'
-      + '<span style="display:flex;gap:6px"><button type="button" class="rb-btn sq" data-up="' + r.id + '" aria-label="Move up" ' + (i === 0 ? 'disabled' : '') + '>' + ic('left').replace('M15 5l-7 7 7 7', 'M5 15l7-7 7 7') + '</button><button type="button" class="rb-btn sq" data-down="' + r.id + '" aria-label="Move down" ' + (i === S.rooms.length - 1 ? 'disabled' : '') + '>' + ic('left').replace('M15 5l-7 7 7 7', 'M5 9l7 7 7-7') + '</button><button type="button" class="rb-btn pri" data-save="' + r.id + '">Save</button></span></div>';
+      + '<button type="button" class="rb-btn pri" data-save="' + r.id + '">Save</button></div>';
   }).join('') + '</div><p class="rb-note">Switching a space off hides it from the day view. Bookings already made stay as they are.</p></div>';
 }
 function saveRoom(id, orderOverride) {
   var row = root.querySelector('.rb-rr[data-room="' + id + '"]'); if (!row) return;
   var name = row.querySelector('.rb-rn-in').value.trim();
   if (!name) { toast('A space needs a name.', 'err'); return; }
-  var cfg = { name: name, label: row.querySelector('.rb-rl-in').value.trim(), active: row.querySelector('.rb-ra-in').checked, order: orderOverride != null ? orderOverride : roomById(id).order };
+  var cfg = { name: name, label: roomById(id).label || '', active: row.querySelector('.rb-ra-in').checked, order: orderOverride != null ? orderOverride : roomById(id).order };
   api.saveConfig(id, cfg).then(function () { S.cfg[id] = cfg; buildRooms(); drawRooms(); toast('Saved ' + name, 'ok'); }).catch(function (e) { toast(errText(e), 'err'); });
-}
-function moveRoom(id, dir) {
-  var i = -1; S.rooms.forEach(function (r, n) { if (r.id === id) i = n; });
-  var j = i + dir; if (i < 0 || j < 0 || j >= S.rooms.length) return;
-  var a = S.rooms[i], b = S.rooms[j];
-  Promise.all([api.saveConfig(a.id, { name: a.name, label: a.label, active: a.active, order: j }), api.saveConfig(b.id, { name: b.name, label: b.label, active: b.active, order: i })])
-    .then(function () { S.cfg[a.id] = { name: a.name, label: a.label, active: a.active, order: j }; S.cfg[b.id] = { name: b.name, label: b.label, active: b.active, order: i }; buildRooms(); drawRooms(); })
-    .catch(function (e) { toast(errText(e), 'err'); });
 }
 
 // ── POPUP: booking details, edit, cancel ──
@@ -838,8 +829,6 @@ function bind() {
     var blk = t.closest('[data-bk]'); if (blk) { showDetails(blk.getAttribute('data-bk')); return; }
     if (t.closest('#rb-past')) { S.showPast = !S.showPast; drawMine(); return; }
     var sv = t.closest('[data-save]'); if (sv) { saveRoom(sv.getAttribute('data-save')); return; }
-    var up = t.closest('[data-up]'); if (up) { moveRoom(up.getAttribute('data-up'), -1); return; }
-    var dn = t.closest('[data-down]'); if (dn) { moveRoom(dn.getAttribute('data-down'), 1); return; }
     // popup
     if (t.closest('[data-close]')) { closeModal(); return; }
     if (t === $('rb-modal')) { closeModal(); return; }
