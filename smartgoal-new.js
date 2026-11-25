@@ -2249,6 +2249,21 @@ function renderPlan() {
     dEl.value = (currentUser.role !== ROLES.ADMIN && depts.indexOf(currentUser.dept) > -1) ? currentUser.dept : (depts[0] || '');
     refreshMpDeptScopedDropdowns();
   }
+  // Only an admin can look at other departments here: everyone else is kept to their own, and sees it as a label.
+  var _mw = dEl.closest ? dEl.closest('.sgp-f') : null, _ms = document.getElementById('mp-dept-static');
+  if (currentUser.role !== ROLES.ADMIN) {
+    var own = depts.indexOf(currentUser.dept) > -1 ? currentUser.dept : '';
+    if (dEl.value !== own) { dEl.value = own; mpPerson = ''; refreshMpDeptScopedDropdowns(); }
+    if (_mw) {
+      if (!_ms) {
+        _ms = document.createElement('div'); _ms.id = 'mp-dept-static'; _ms.className = 'sgp-f';
+        _ms.innerHTML = '<span>Department</span><div class="sgp-static"></div>';
+        _mw.parentNode.insertBefore(_ms, _mw.nextSibling);
+      }
+      _ms.querySelector('.sgp-static').textContent = own || currentUser.dept || '—';
+      _mw.hidden = true; _ms.hidden = false;
+    }
+  } else if (_mw) { _mw.hidden = false; if (_ms) _ms.hidden = true; }
   var year = yEl.value, month = mEl.value, dept = dEl.value;
 
   var people = membersInDept(dept).slice().sort(function (x, y) { return x.name.localeCompare(y.name); });
