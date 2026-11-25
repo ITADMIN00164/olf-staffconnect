@@ -2446,6 +2446,10 @@ function renderGenericLog(tbodyId, rawData, sourceName, deleteFnName) {
    PO ID | PO Name | District | Program Name | Test Cycle | Preferred Month | Fixed Date
    plus plan_month (YYYYMM): the month the exam counts in on the Monthly tab.
    Fixed Date decides the month; Preferred Month is the fallback.
+   Nov 2026: the exams belong to the DISTRICT. The Monthly review shows a PO every exam of
+   their districts and counts each district exam once for PM / DM / District. "Completed"
+   ticks live in academic_exam_done (keyed by District + Program + Test Cycle) and are never
+   touched by an upload, edit or delete here.
 ==================================== */
 
 const ACAD_COLUMNS = [
@@ -2624,6 +2628,7 @@ async function uploadAcademic() {
             message: `This replaces all ${acadRows.length} current rows with the ${rows.length} rows in this file `
                 + `(academic year ${ay}–${String(ay + 1).slice(2)}).`
                 + (noMonth ? ` ${noMonth} rows have no usable Fixed Date or Preferred Month and will be marked "Needs attention".` : "")
+                + " Exams already ticked Completed by POs are kept as they are (an exam is matched by District + Program + Test Cycle, so keep those names the same)."
                 + " Continue?",
             type: "warning", confirmText: "Replace", cancelText: "Cancel"
         });

@@ -1468,7 +1468,7 @@
   var MO_GOALS = [
     { key: "G1", title: "Academic Programs", weight: 40, rows: [
       { lvl: 0, label: "Exams planned this month", w: 40, academic: true,
-        note: "Planned: from Admin \u2192 Academic Plan \u00B7 click the number to see the exams. Done: enter how many of them were completed." } ] },
+        note: "Planned: the district's exams from Admin \u2192 Academic Plan. Done: click a number and tick each exam when it is completed \u2014 a tick counts for every PO, PM and DM of that district." } ] },
 
     { key: "G2", title: "Life Skills Programs", weight: 20, rows: [
       // Core = the 5 core clubs (Spelling Bee joined the core in Nov 2026), compared with the sum of their 5 targets.
@@ -1852,9 +1852,60 @@
     var v = ((moW0().sections || {}).M || {})[fid];
     return v == null ? "" : v;
   }
-  function moG1Done() {
+  // G1 done = exams ticked Completed for the unit's districts this month (shared, see acadFromRows).
+  // Months from before the ticks: nothing ticked + a number typed in the old box -> that number.
+  function moG1Legacy() {
     var v = moValue("M_G1_DONE");
     return (v === undefined || v === null || v === "") ? "" : num(v);
+  }
+  function moG1Done() {
+    var ac = MVIEW && MVIEW.academic;
+    if (!ac || ac.doneCount == null) return moG1Legacy();
+    if (ac.doneCount > 0) return ac.doneCount;
+    var old = moG1Legacy();
+    return old !== "" ? old : 0;
+  }
+  function moG1IsLegacy() { var ac = MVIEW && MVIEW.academic; return !!ac && ac.doneCount === 0 && moG1Legacy() !== ""; }
+  // The G1 row's Target / Done / % / Score cells
+  function moG1Cells(r) {
+    var ac = MVIEW.academic, n = ac ? acadTotal(ac) : 0, o = { target: "", done: moDash(), pct: moDash(), score: moDash() };
+    if (ac == null) { o.target = moPill("Unavailable", "pr-mo-na", "The Academic Plan could not be loaded"); return o; }
+    o.target = n ? '<button type="button" class="pr-mo-link" title="See the exams">' + n + "</button>" : "0";
+    var extra = (ac.extraDone || []).length;
+    if (!n && !extra) {               // no exams planned this month = nothing asked -> full score
+      o.done = '<span class="pr-mut" title="No exams in the Academic Plan for this month \u2014 full score">\u2014</span>';
+      o.pct = "100%"; o.score = fmtNum(r.w); return o;
+    }
+    var dv = moG1Done(), legacy = moG1IsLegacy();
+    var tip = legacy ? "Typed earlier in the old \u201Cexams completed\u201D box \u2014 tick the exams in the list to replace it"
+                     : "Exams ticked Completed for the district \u2014 click to see or tick them";
+    o.done = '<button type="button" class="pr-mo-link pr-mo-g1done" title="' + esc(tip) + '">' + (dv === "" ? "\u2014" : fmtNum(dv)) + "</button>"
+      + (legacy ? '<div class="pr-mo-sub">entered earlier</div>' : !ac.doneOk ? '<div class="pr-mo-sub pr-list-warn">ticks not available</div>' : "")
+      + (n && dv !== "" && dv > n ? '<div class="pr-mo-over">More than planned</div>' : "");
+    if (!n) { o.pct = "100%"; o.score = fmtNum(r.w); return o; }
+    var g1 = moPctScore(dv, n, r.w);
+    if (g1) { o.pct = fmtNum(g1.pct) + "%"; o.score = fmtNum(g1.score); }
+    return o;
+  }
+  function moG1Foot() {
+    var ac = MVIEW.academic;
+    if (ac == null) return "Academic Plan unavailable";
+    var n = acadTotal(ac);
+    if (!n) return "No exams planned \u2014 full score";
+    var dv = moG1Done();
+    return n + " exam" + (n === 1 ? "" : "s") + " planned" + (dv !== "" ? " \u00B7 " + fmtNum(dv) + " completed" : "");
+  }
+  // After a tick: redraw the G1 row and the score cards
+  function moRefreshG1() {
+    var tr = document.querySelector('#prMoBody tr[data-g1="1"]'), g = MO_GOALS[0];
+    if (tr) {
+      var c = moG1Cells(g.rows[0]);
+      tr.cells[2].innerHTML = c.target; tr.cells[3].innerHTML = c.done; tr.cells[4].innerHTML = c.pct; tr.cells[5].innerHTML = c.score;
+      tr.querySelectorAll(".pr-mo-link").forEach(function (b) { b.addEventListener("click", openAcadList); });
+    }
+    var foot = document.querySelector('#prMoBody .pr-card[data-goal="G1"] .pr-wkcard-foot span');
+    if (foot) foot.textContent = moG1Foot();
+    moRefreshScores();
   }
   // Sheet B rule: % done = done / target, capped at 100%; score = weight x % done
   function moPctScore(done, target, weight) {
@@ -2014,7 +2065,7 @@
     MO_GOALS.forEach(function (g) {
       var gs = moGoalScore(g, rp), acad = MVIEW.academic;
       if (gs.score != null) { total += gs.score; totalN++; if (g.key !== "G1") others += gs.score; }
-      var foot = g.key === "G1" ? (acad == null ? "Academic Plan unavailable" : (acadTotal(acad) ? acadTotal(acad) + " exam" + (acadTotal(acad) === 1 ? "" : "s") + " planned" : "No exams planned \u2014 full score"))
+      var foot = g.key === "G1" ? moG1Foot()
                : g.key === "G4" ? moG4Foot()
                : (gs.scored ? gs.scored + " of " + gs.total + " parts scored" : (MVIEW.targets && MVIEW.targets.rowsInMonth ? "Needs data or targets" : "No targets for this month"));
       cards += '<div class="pr-card" data-goal="' + g.key + '"><div class="pr-card-k">' + g.key + " \u00B7 " + esc(g.title) + '</div><div class="pr-card-v">'
@@ -2051,28 +2102,14 @@
       var item = esc(r.label) + (sub ? '<div class="pr-mo-sub">' + esc(sub) + "</div>" : "");
       var entIdx = null;
       if (r.community) { MO_ENT.push({ g: g, r: r }); entIdx = MO_ENT.length - 1; }
-      var rowOpen = '<tr class="' + cls + '" data-secrow="m' + g.key + '"' + (r.compliance ? ' data-comp="1"' : "");
+      var rowOpen = '<tr class="' + cls + '" data-secrow="m' + g.key + '"' + (r.compliance ? ' data-comp="1"' : "") + (r.academic ? ' data-g1="1"' : "");
       var row = '<td class="pr-item">' + item + "</td>";
       if (r.head) return (out += rowOpen + ">" + row + '<td colspan="5"></td></tr>');
       var done, target = "", pct = moDash(), score = moDash();
 
       if (r.academic) {
-        var ac = MVIEW.academic, n = ac ? acadTotal(ac) : 0;
-        target = ac == null ? moPill("Unavailable", "pr-mo-na", "The Academic Plan could not be loaded")
-               : (n ? '<button type="button" class="pr-mo-link" title="See the exams">' + n + "</button>" : "0");
-        var dv = moG1Done(), canEd = canEditSelf(MVIEW);
-        if (ac && n) {
-          done = canEd
-            ? '<input type="number" min="0" step="1" inputmode="numeric" class="pr-mo-num" placeholder="0" data-wc="' + moW0().code
-              + '" data-fid="M_G1_DONE" data-target="' + n + '" data-weight="' + r.w + '" value="' + (dv === "" ? "" : dv) + '">'
-              + (dv !== "" && dv > n ? '<div class="pr-mo-over">More than planned</div>' : "")
-            : (dv === "" ? moPill("Not entered", "pr-mo-entry", "Entered by the person under review") : fmtNum(dv));
-          var g1 = moPctScore(dv, n, r.w);
-          if (g1) { pct = fmtNum(g1.pct) + "%"; score = fmtNum(g1.score); }
-        } else if (ac && !n) {           // no exams planned this month = nothing asked -> full score
-          done = '<span class="pr-mut" title="No exams in the Academic Plan for this month \u2014 full score">\u2014</span>';
-          pct = "100%"; score = fmtNum(r.w);
-        } else done = moDash();
+        var g1c = moG1Cells(r);
+        target = g1c.target; done = g1c.done; pct = g1c.pct; score = g1c.score;
       } else if (r.compliance) {
         var cc = moComplianceCells(g, r, rp);
         done = cc.done; target = String(r.target); pct = cc.pct; score = cc.score;
@@ -2145,98 +2182,197 @@
   }
 
 
-  /* ---------- Academic Plan (G1): exams planned in a month ----------
-     PO      -> that PO's own rows.
-     PM / DM -> every row in the districts assigned to them (not a sum of
-                their POs), and District -> rows of that district.
-     For those roll-ups each exam is counted once per district: when two POs
-     share a district the plan lists the same exam under both of them. */
+  /* ---------- Academic Plan (G1): the DISTRICT's exams, completed once per district (Nov 2026) ----------
+     Target  The Academic Plan (academic_targets) is uploaded PO-wise, but the exams belong to the
+             district: a PO sees every exam of the districts they are assigned to (Assignments), and
+             PM / DM / District count each district's exam once. Same exam = same district + program +
+             test cycle (the exam key), whichever PO row it came from.
+     Done    academic_exam_done: one row per completed exam, written when any PO of the district ticks
+             it in the exam list (any PO of that district, or itadmin, can untick). Shared: every PO,
+             PM and DM of the district sees the tick. The row keeps the month it counts in (counts_in,
+             frozen when ticked) and no plan upload / edit ever touches it, so re-uploading the plan
+             can't change what POs already marked.
+             A month's Done = ticks of the unit's districts with counts_in = that month.
+     Older months: when nothing is ticked for a month but a number was typed in the old
+             "exams completed" box (M_G1_DONE), that number is still used. */
+  function acadNorm(s) { return String(s == null ? "" : s).replace(/\s+/g, " ").trim().toLowerCase(); }
+  function acadKey(district, program, test) { return normDist(district) + "|" + acadNorm(program) + "|" + acadNorm(test); }
+  function acadYm(ym) { ym = String(ym || ""); return ym.length === 6 ? MON_SHORT[Number(ym.slice(4)) - 1] + " " + ym.slice(0, 4) : ym; }
+  function acadToday() { var d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+
+  // All completed exams (small table: one row per exam done in a year). ok = false when the table is missing.
+  async function sbGetAcadDone() {
+    try { return { ok: true, rows: await fetchAll(function () { return db().from("academic_exam_done").select("*"); }) }; }
+    catch (e) { console.warn("academic_exam_done not loaded (run sql/2026-11-25-academic-exam-done.sql):", e); return { ok: false, rows: [] }; }
+  }
   async function sbGetAcademic(unit, value, month) {
     await loadOrg();
-    var rows = await fetchAll(function () { return db().from("academic_targets").select("*").eq("plan_month", month); });
-    return acadFromRows(rows, unit, value);
+    var r = await Promise.all([
+      fetchAll(function () { return db().from("academic_targets").select("*").eq("plan_month", month); }),
+      sbGetAcadDone()
+    ]);
+    var list = acadFromRows(r[0], unit, value, r[1], month);
+    list.args = [unit, value, month];
+    return list;
   }
-  // The month's academic_targets rows -> the exam list for one unit (also used by Monthly Summary).
-  function acadFromRows(rows, unit, value) {
-    var lc = function (s) { return String(s == null ? "" : s).trim().toLowerCase(); };
-    var item = function (r) { return { program: r.program_name || "", test: r.test_cycle || "", date: r.fixed_date || "",
-                                       pref: r.preferred_month || "", district: r.district || "", pos: [] }; };
-    var out = [];
-    if (unit === "PO") {
-      var id = normId(value);
-      rows.filter(function (r) { return normId(r.po_id) === id; })
-          .forEach(function (r) { var it = item(r); it.pos.push(r.po_name || r.po_id); out.push(it); });
-    } else {
-      // PM / DM / District. POs sharing a district each list the district's exams, often with
-      // different test-cycle labels or dates for the same exam (e.g. "Test 1" / "Test 2" / "Test —").
-      // So per district + program, the month's exam count = the most exams any ONE PO lists for it.
-      // (One PO listing Test 1 and Test 2 in the same month still counts 2.)
-      var districts = unit === "District" ? [value] : ((person(value) || {}).assigned_districts || []);
-      var dk = {}; districts.forEach(function (d) { dk[normDist(d)] = 1; });
-      var groups = {};
-      rows.forEach(function (r) {
-        if (!dk[normDist(r.district)]) return;
-        var k = normDist(r.district) + "|" + lc(r.program_name);
-        var gr = groups[k] = groups[k] || { program: r.program_name || "", district: r.district || "", byPo: {}, order: [] };
-        var who = r.po_name || r.po_id || "(no PO)";
-        if (!gr.byPo[who]) { gr.byPo[who] = []; gr.order.push(who); }
-        gr.byPo[who].push({ test: r.test_cycle || "", date: r.fixed_date || "", pref: r.preferred_month || "" });
-      });
-      Object.keys(groups).forEach(function (k) {
-        var gr = groups[k];
-        out.push({ program: gr.program, district: gr.district, count: Math.max.apply(null, gr.order.map(function (w) { return gr.byPo[w].length; })),
-                   byPo: gr.order.map(function (w) { return { po: w, tests: gr.byPo[w] }; }),
-                   date: gr.order.map(function (w) { return gr.byPo[w].map(function (t) { return t.date; }).filter(Boolean).sort()[0] || ""; }).filter(Boolean).sort()[0] || "",
-                   pos: gr.order });
+  // Districts whose exams a unit carries: Assignments first; a PO missing there falls back to their own plan rows.
+  function acadDistrictsOf(unit, value, rows) {
+    if (unit === "District") return [value];
+    var p = person(value), d = ((p && p.assigned_districts) || []).slice();
+    if (!d.length && unit === "PO") {
+      var id = normId(value), seen = {};
+      (rows || []).forEach(function (r) {
+        if (normId(r.po_id) === id && !seen[normDist(r.district)]) { seen[normDist(r.district)] = 1; d.push(r.district); }
       });
     }
-    out.sort(function (a, b) { return (a.date || "9").localeCompare(b.date || "9") || a.district.localeCompare(b.district) || a.program.localeCompare(b.program); });
+    return d;
+  }
+  // One month's academic_targets rows -> the unit's exam list, one item per district exam.
+  // done = { ok, rows } from academic_exam_done; leave it out when only the planned count is needed.
+  function acadFromRows(rows, unit, value, done, month) {
+    var districts = acadDistrictsOf(unit, value, rows), dk = {};
+    districts.forEach(function (d) { dk[normDist(d)] = 1; });
+    var doneRows = (done && done.rows) || [], doneByKey = {};
+    doneRows.forEach(function (d) { doneByKey[d.exam_key] = d; });
+    var out = [], seen = {};
+    (rows || []).forEach(function (r) {
+      if (!dk[normDist(r.district)]) return;
+      var key = acadKey(r.district, r.program_name, r.test_cycle), who = r.po_name || r.po_id || "";
+      if (seen[key]) { if (who && seen[key].pos.indexOf(who) < 0) seen[key].pos.push(who); return; }
+      out.push(seen[key] = { key: key, program: r.program_name || "", test: r.test_cycle || "", date: r.fixed_date || "",
+                             pref: r.preferred_month || "", district: r.district || "", month: String(r.plan_month || month || ""),
+                             count: 1, pos: who ? [who] : [], done: doneByKey[key] || null });
+    });
+    out.sort(function (a, b) {
+      return (a.date || "9").localeCompare(b.date || "9") || a.district.localeCompare(b.district)
+          || a.program.localeCompare(b.program) || a.test.localeCompare(b.test);
+    });
+    // Done this month = the districts' ticks counted in this month (also ones the plan has since moved or dropped)
+    var counted = doneRows.filter(function (d) { return dk[normDist(d.district)] && String(d.counts_in) === String(month); });
+    out.districts = districts;
+    out.month = String(month || "");
+    out.doneOk = !!(done && done.ok);
+    out.doneCount = done && done.ok ? counted.length : null;
+    out.extraDone = counted.filter(function (d) { return !seen[d.exam_key]; });
     return out;
   }
 
-  // Exams planned: a PO's own rows count 1 each; a roll-up item carries its own count.
+  // Exams planned: one per district exam.
   function acadTotal(list) { return (list || []).reduce(function (a, it) { return a + (it.count || 1); }, 0); }
 
   function fmtDay(iso) {
     if (!iso) return "";
     var p = iso.split("-"); return Number(p[2]) + " " + MON_SHORT[Number(p[1]) - 1] + " " + p[0];
   }
+
+  /* ---------- who may tick ---------- */
+  function acadViewer() {
+    var e = currentEmail(); if (!e || !ORG) return null;
+    return ORG.people.filter(function (p) { return String(p.email || "").trim().toLowerCase() === e; })[0] || null;
+  }
+  // Any PO of that district (Assignments), or itadmin.
+  function acadCanTick(district) {
+    if (prIsAdmin()) return true;
+    var me = acadViewer();
+    return !!me && me.designation === "PO" && overlaps(me.assigned_districts, [district]);
+  }
+
+  /* ---------- the exam list (click the planned / done number) ---------- */
   function openAcadList() {
-    var list = (MVIEW && MVIEW.academic) || [], h = (MVIEW && MVIEW.header) || {};
+    var list = (MVIEW && MVIEW.academic) || [], h = (MVIEW && MVIEW.header) || {}, month = String(MVIEW.month);
     var who = h.unit === "PO" ? (h.po && h.po.name) : (h.manager || h.district || "");
-    var roll = h.unit !== "PO";
+    var showDist = h.unit !== "PO" || (list.districts || []).length > 1;
     var monIdx = function (s) { return MON_SHORT.map(function (m) { return m.toLowerCase(); }).indexOf(String(s || "").trim().slice(0, 3).toLowerCase()) + 1; };
     var dateHtml = function (t) {
       var off = t.date && t.pref && monIdx(t.pref) !== Number(t.date.slice(5, 7));
       return t.date ? esc(fmtDay(t.date)) + (off ? '<div class="pr-list-warn" title="The plan\'s Preferred Month differs from the Fixed Date">Preferred month: ' + esc(t.pref) + "</div>" : "")
-                    : '<span class="pr-mut">No date</span><div class="pr-list-warn">Preferred month: ' + esc(t.pref) + "</div>";
+                    : '<span class="pr-mut">No date</span>' + (t.pref ? '<div class="pr-list-warn">Preferred month: ' + esc(t.pref) + "</div>" : "");
     };
-    $("prListTitle").textContent = "Exams planned \u2014 " + monthLabel(MVIEW.month) + (who ? " \u00B7 " + who : "") + " (" + acadTotal(list) + ")";
-    var head, body;
-    if (!roll) {
-      head = "<tr><th>#</th><th>Program</th><th>Test cycle</th><th>Date</th></tr>";
-      body = list.map(function (e, i) {
-        return '<tr class="pr-row"><td>' + (i + 1) + "</td><td>" + esc(e.program) + "</td><td>" + esc(e.test) + "</td><td>" + dateHtml(e) + "</td></tr>";
-      }).join("");
-    } else {
-      head = '<tr><th>#</th><th>Program</th><th>District</th><th class="pr-num">Exams</th><th>As listed by each PO</th></tr>';
-      body = list.map(function (e, i) {
-        var lines = e.byPo.map(function (b) {
-          return '<div class="pr-acad-po"><b>' + esc(b.po) + ":</b> " + b.tests.map(function (t) {
-            return esc(t.test || "Test ?") + " \u00B7 " + (t.date ? esc(fmtDay(t.date)) : '<span class="pr-mut">no date</span>')
-              + (t.pref && (!t.date || monIdx(t.pref) !== Number(t.date.slice(5, 7))) ? ' <span class="pr-list-warn">(pref. ' + esc(t.pref) + ")</span>" : "");
-          }).join("; ") + "</div>";
-        }).join("");
-        return '<tr class="pr-row"><td>' + (i + 1) + "</td><td>" + esc(e.program) + "</td><td>" + esc(e.district) + '</td><td class="pr-num"><b>' + e.count + "</b></td><td>" + lines + "</td></tr>";
-      }).join("");
-    }
+    var anyCan = false;
+    var tick = function (key, district, rec) {
+      var can = list.doneOk && acadCanTick(district), on = !!rec;
+      if (can) anyCan = true;
+      var meta = rec ? '<div class="pr-mo-sub">by ' + esc(rec.marked_by_name || rec.marked_by_email || "—")
+        + (rec.marked_at ? " · " + esc(fmtDay(String(rec.marked_at).slice(0, 10))) : "")
+        + (String(rec.counts_in) !== month ? ' · <span class="pr-list-warn">counted in ' + esc(acadYm(rec.counts_in)) + "</span>" : "") + "</div>" : "";
+      return '<label class="pr-acad-tick' + (on ? " is-on" : "") + (can ? "" : " is-ro") + '"><input type="checkbox" data-akey="' + esc(key) + '"'
+        + (on ? " checked" : "") + (can ? "" : " disabled") + "><span>" + (on ? "Completed" : "Not done") + "</span></label>" + meta;
+    };
+    var head = "<tr><th>#</th><th>Program</th><th>Test cycle</th>" + (showDist ? "<th>District</th>" : "") + "<th>Date</th><th>Status</th></tr>";
+    var body = list.map(function (e, i) {
+      return '<tr class="pr-row"><td>' + (i + 1) + "</td><td>" + esc(e.program) + "</td><td>" + esc(e.test || "—") + "</td>"
+        + (showDist ? "<td>" + esc(e.district) + "</td>" : "") + "<td>" + dateHtml(e) + "</td><td>" + tick(e.key, e.district, e.done) + "</td></tr>";
+    }).join("");
+    (list.extraDone || []).forEach(function (d) {
+      body += '<tr class="pr-row"><td>+</td><td>' + esc(d.program_name) + '<div class="pr-list-warn">Completed this month, no longer in this month’s plan</div></td><td>'
+        + esc(d.test_cycle || "—") + "</td>" + (showDist ? "<td>" + esc(d.district) + "</td>" : "")
+        + "<td>" + (d.exam_date ? esc(fmtDay(String(d.exam_date))) : '<span class="pr-mut">No date</span>') + "</td><td>" + tick(d.exam_key, d.district, d) + "</td></tr>";
+    });
+    var doneTxt = list.doneCount != null ? list.doneCount + " of " + acadTotal(list) + " completed" : acadTotal(list) + " planned";
+    $("prListTitle").textContent = "Exams — " + monthLabel(month) + (who ? " · " + who : "") + " (" + doneTxt + ")";
     $("prListBody").innerHTML = '<table class="pr-tbl"><thead>' + head + "</thead><tbody>" + body + "</tbody></table>";
-    $("prListNote").textContent = roll
-      ? "POs in the same district list the same exams, sometimes with different test cycles or dates. Each program counts the most exams any one PO lists for it this month."
-      : "From Admin \u2192 Academic Plan.";
+    var dn = (list.districts || []).join(", ");
+    $("prListNote").textContent = !list.doneOk
+      ? "Completed ticks are not available yet (the academic_exam_done table is missing — run sql/2026-11-25-academic-exam-done.sql)."
+      : "These are the district's exams. A tick counts for the whole district" + (dn ? " (" + dn + ")" : "")
+        + ": every PO, PM and DM there sees it. Re-uploading the Academic Plan never changes a tick."
+        + (anyCan ? "" : " Only POs of the district can tick.");
+    $("prListBody").querySelectorAll("input[data-akey]").forEach(function (cb) {
+      cb.addEventListener("change", function () { acadToggle(cb.dataset.akey, cb.checked, cb); });
+    });
     $("prListModal").hidden = false;
   }
   function closeAcadList() { $("prListModal").hidden = true; }
+
+  var ACAD_BUSY = false;
+  async function acadToggle(key, on, cb) {
+    var list = (MVIEW && MVIEW.academic) || [];
+    if (ACAD_BUSY) { cb.checked = !on; return; }
+    var it = list.filter(function (x) { return x.key === key; })[0] || null;
+    var rec = it ? it.done : (list.extraDone || []).filter(function (d) { return d.exam_key === key; })[0];
+    var district = it ? it.district : rec && rec.district;
+    if (!acadCanTick(district)) { cb.checked = !on; toast("Only POs of " + district + " can change this."); return; }
+    var ask = function (title, message) {
+      return window.showAppConfirm ? window.showAppConfirm({ title: title, message: message, type: "warning", confirmText: "Yes", cancelText: "Cancel" })
+                                   : Promise.resolve(window.confirm(title + "\n\n" + message));
+    };
+    var name = it ? it.program + (it.test ? " · " + it.test : "") : rec ? rec.program_name + (rec.test_cycle ? " · " + rec.test_cycle : "") : "";
+    if (on && it && it.date && it.date > acadToday()
+        && !(await ask("Mark as completed?", name + " is planned for " + fmtDay(it.date) + ", which is still ahead. Mark it completed anyway?"))) { cb.checked = false; return; }
+    if (!on && !(await ask("Untick this exam?", name + " will show as not done for every PO, PM and DM of " + district + "."))) { cb.checked = true; return; }
+    ACAD_BUSY = true;
+    $("prListBody").querySelectorAll("input[data-akey]").forEach(function (x) { x.disabled = true; });
+    try {
+      if (on) {
+        var me = acadViewer();
+        var row = { exam_key: key, district: it.district, program_name: it.program, test_cycle: it.test || "",
+                    counts_in: it.month || String(MVIEW.month), exam_date: it.date || null,
+                    marked_by_id: me ? me.emp_id : "", marked_by_name: me ? me.name : (prIsAdmin() ? "IT Admin" : ""), marked_by_email: currentEmail() };
+        var ins = await db().from("academic_exam_done").insert(row);
+        if (ins.error && ins.error.code !== "23505") throw ins.error;          // 23505: another PO ticked it first
+      } else {
+        var del = await db().from("academic_exam_done").delete().eq("exam_key", key);
+        if (del.error) throw del.error;
+      }
+      toast(on ? "Marked completed for " + district + "." : "Unticked.");
+    } catch (e) {
+      console.error("Exam tick failed:", e);
+      toast("Couldn’t save the tick — please try again.");
+    } finally {
+      ACAD_BUSY = false;
+    }
+    await acadReload();
+  }
+  // Re-read the list after a tick and refresh G1 in place (unsaved edits elsewhere on the page stay).
+  async function acadReload() {
+    var a = MVIEW && MVIEW.academic && MVIEW.academic.args;
+    if (!a) { loadMonthlyView(); return; }
+    try { MVIEW.academic = await sbGetAcademic(a[0], a[1], a[2]); }
+    catch (e) { toast("Couldn’t reload the exams."); return; }
+    MSUM.cache = {}; MSUM.data = null;
+    moRefreshG1();
+    if (!$("prListModal").hidden) openAcadList();
+  }
 
 
   /* ---------- G2 / G3 / G5 targets (g1_g2_g3_target_sheet) ----------
@@ -3013,7 +3149,7 @@
          A1  mood
          B1-B5  a status for every action carried from last month's G
          G2-G6  at least one action for next month
-         M_G1_DONE  exams completed (only when exams are planned)
+         (G1 exams completed is not a write point any more: POs tick the district's exams, Nov 2026)
          every typed goal entry in MO_GOALS (POM clusters, the 8 G5 Yes/No, Case Study)
          G4  at least one activity, each with name / weight / target / done, weights = 10
          (A2 "anything on your mind" and G1 "blocker" are optional text)
@@ -3070,7 +3206,7 @@
 
     if (!["G2", "G3", "G4", "G5", "G6"].some(function (k) { return msumHas(G[k]); })) miss.push("At least one action for next month", "mG", "G2");
 
-    if (examsPlanned > 0 && !msumHas(M.M_G1_DONE)) miss.push("G1 Exams completed", "mG1", "M_G1_DONE");
+    // G1 exams completed is no longer typed: it comes from the district's ticks, so it is not a write point.
 
     msumGoalFields().forEach(function (f) { if (!msumHas(M[f.fid])) miss.push(f.label, f.grp, f.fid); });
 
@@ -3281,8 +3417,9 @@
      The total is scaled to 100 (G1-G4 total x 100 / 90); each goal keeps its own weight.
 
      Where each number comes from
-       G1     Target = exams in the Academic Plan for the period's months, added up.
-              Done   = "exams completed" saved on each month's Monthly review, added up.
+       G1     Target = the districts' exams in the Academic Plan for the period's months, added up.
+              Done   = exams ticked Completed for those districts in each month, added up
+                       (a month with no ticks uses the number typed in the old box, if any).
        G2/G3  Quarterly tab, Month 1-3 columns = that month's Monthly figures (as on the Monthly tab).
               Quarter total / Yearly (Q1-Q4) / Whole Year = their own uploads:
                 achieved -> Admin > Data > "Quarter & Whole-Year data" (Vinoba + Staff Connect files)
@@ -3372,19 +3509,23 @@
       sc.empId ? fetchAll(function () { return db().from("review_responses").select("*").eq("emp_id", sc.empId).in("period_code", qCodes.concat(mCodes)); }) : NONE,
       sc.blockKeys.length ? safe("vinoba_qy_v", fetchAll(function () { return db().from("vinoba_qy_v").select("*").eq("year", ay).in("block_key", sc.blockKeys); })) : NONE,
       sc.distKeys.length ? safe("staffconnect_qy_v", fetchAll(function () { return db().from("staffconnect_qy_v").select("*").eq("year", ay).in("district_key", sc.distKeys); })) : NONE,
-      safe("qy_targets", fetchAll(function () { return db().from("qy_targets").select("*").eq("year", ay); }))
+      safe("qy_targets", fetchAll(function () { return db().from("qy_targets").select("*").eq("year", ay); })),
+      sbGetAcadDone()
     ]);
-    var acadRows = q[0], own = sectionsByCode(q[1]), vin = q[2], scr = q[3], tgt = q[4];
+    var acadRows = q[0], own = sectionsByCode(q[1]), vin = q[2], scr = q[3], tgt = q[4], acadDone = q[5];
 
+    // G1 per month exactly as the Monthly tab: planned = district exams, done = the district's ticks
+    // counted in that month (or, for a month with no ticks, the number typed in the old box).
     function g1For(mcodes) {
       var planned = null, done = 0, any = false;
-      if (acadRows) {
-        planned = 0;
-        mcodes.forEach(function (m) { planned += acadTotal(acadFromRows(acadRows.filter(function (r) { return String(r.plan_month) === m; }), unit, value)); });
-      }
       mcodes.forEach(function (m) {
+        var list = acadRows ? acadFromRows(acadRows.filter(function (r) { return String(r.plan_month) === m; }), unit, value, acadDone, m) : null;
+        if (list) planned = (planned || 0) + acadTotal(list);
+        var ticked = list && list.doneCount != null ? list.doneCount : 0;
         var v = ((own[m + "00"] || {}).M || {}).M_G1_DONE;
-        if (v !== undefined && v !== null && v !== "") { any = true; done += num(v); }
+        if (ticked > 0) { any = true; done += ticked; }
+        else if (v !== undefined && v !== null && v !== "") { any = true; done += num(v); }
+        else if (list && list.doneCount != null && acadTotal(list) > 0 && m <= qyNowCode()) any = true;   // planned, none ticked -> 0
       });
       return { target: planned, done: any ? done : "" };
     }
@@ -3557,7 +3698,7 @@
         var sub = skipNote ? skipNote
                 : (r.community && opts.qy) ? "Quarter / year: the 9 metrics below (no POM clusters), scored out of 20 \u2014 G3's full weight, since Kathavli is not used."
                 : g.key === "G4" ? "Month columns: the Monthly G4. Quarter / year: activities entered by the reviewer."
-                : r.academic ? "Target: exams in the Academic Plan for the period. Done: exams completed, from the Monthly reviews."
+                : r.academic ? "Target: the district's exams in the Academic Plan for the period. Done: exams ticked Completed for the district on the Monthly tab."
                 : (r.note || "");
         var lbl = r.academic ? "Exams planned vs completed" : r.label;
         body += '<tr class="pr-row pr-hidden pr-mo-l' + r.lvl + '" data-secrow="' + gid + '"><td class="pr-item">' + esc(lbl)

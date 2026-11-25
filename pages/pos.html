@@ -1304,6 +1304,12 @@
         .pr-list-warn{color:var(--warn);font-size:11.5px;}
         .pr-acad-po{font-size:12px;line-height:1.55;white-space:normal;}
         .pr-acad-po b{font-weight:600;color:var(--ink);}
+        .pr-acad-tick{display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 11px 0 8px;border:1px solid var(--l);border-radius:999px;font-size:12.5px;font-weight:600;color:var(--mut);background:transparent;cursor:pointer;white-space:nowrap;}
+        .pr-acad-tick input{width:16px;height:16px;margin:0;accent-color:var(--good);cursor:pointer;}
+        .pr-acad-tick.is-on{color:var(--good-ink);background:var(--good-soft);border-color:var(--good-line);}
+        .pr-acad-tick.is-ro{cursor:default;opacity:.85;}
+        .pr-acad-tick.is-ro input{cursor:default;}
+        .pr-mo-g1done{min-width:28px;}
         #prSumModalDl::before,.pr-sum-dl::before{content:"";width:15px;height:15px;background:currentColor;-webkit-mask:var(--fr-dl) center/contain no-repeat;mask:var(--fr-dl) center/contain no-repeat;}
         .pr-addbox{width:min(640px,94vw);}
         .pr-addform{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-height:60vh;overflow:auto;padding:2px;}
@@ -1816,7 +1822,7 @@
                     <div class="pos-src-tile" style="background:#eef3fe;"><span class="fr-ico fr-i-cap" aria-hidden="true"></span></div>
                     <div class="pos-src-titles">
                         <div class="pos-src-title">Academic Plan</div>
-                        <div class="pos-src-sub">Exams per PO and district, with test cycle and date. Feeds Monthly → G1 Academic Programs.</div>
+                        <div class="pos-src-sub">Exams per district (listed for each PO there), with test cycle and date. Feeds Monthly → G1 Academic Programs. Re-uploading never changes the exams POs have ticked Completed.</div>
                     </div>
                     <button type="button" class="pos-btn pos-btn-ghost" onclick="window.POSAdmin.downloadAcadCurrent()"><span class="pos-ico pos-ico-dl" aria-hidden="true"></span><span>Download current</span></button>
                     <button type="button" class="pos-btn pos-btn-ghost" onclick="window.POSAdmin.downloadAcadSample()"><span class="pos-ico pos-ico-dl" aria-hidden="true"></span><span>Sample</span></button>
