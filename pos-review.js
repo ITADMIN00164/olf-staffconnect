@@ -2248,7 +2248,10 @@
      district is counted unless the district is already fully covered.
      Posts per teacher is a ratio: fixed at 1 for PM / DM / District.
      District recognition event: once per district (highest PO value).
-     A target of 0 means "not set". */
+     A target of 0 means "not set".
+     Nov 2026: a district with its own row in district_targets for the month (Admin > Targets,
+     Level: District) uses that row instead of its PO rows. A district without one falls back
+     to the PO rows as above, so months uploaded before keep their numbers. */
   var TGT_LABEL = {
     story_telling: "Story Telling", poetry_recitation: "Poetry Recitation", creative_writing: "Creative Writing",
     spoken_english: "Spoken English", spelling_bee: "Spelling Bee", morning_assembly: "Morning Assembly",
@@ -2281,9 +2284,18 @@
 
     var districts = unit === "District" ? [value] : ((person(value) || {}).assigned_districts || []);
     var contributors = [];
+    var drows = await fetchAll(function () { return db().from("district_targets").select("*").eq("year", y).eq("month", m); })
+      .catch(function (e) { console.warn("district_targets not loaded (PO rows are used):", e); return []; });
+    out.rowsInMonth += drows.length;
     districts.forEach(function (dn) {
       var dk = normDist(dn), dist = ORG.distByKey[dk];
       var dBlocks = dist ? dist.blocks.map(normBlock) : [];
+      var drow = drows.filter(function (x) { return normDist(x.district) === dk; })[0];
+      if (drow) {                       // the district's own target row wins
+        contributors.push({ r: drow, name: "District target", blocks: dBlocks, district: dist ? dist.name : dn, dTotal: dBlocks.length,
+                            status: "counted", note: "District row (Admin \u2192 Targets, Level: District)" });
+        return;
+      }
       var cand = rows.filter(function (x) { return normDist(x.district) === dk; }).map(function (x) {
         var p = person(x.po_id);
         var bl = p ? (p.assigned_blocks || []).map(normBlock).filter(function (b) { return dBlocks.indexOf(b) >= 0; }) : [];
@@ -2480,7 +2492,8 @@
                 + '</td><td class="pr-num">' + (p.value == null ? "" : fmtNum(p.value)) + '</td><td><span class="' + s[1] + '">' + s[0] + "</span>"
                 + (p.note ? '<div class="pr-list-warn">' + esc(p.note) + "</div>" : "") + "</td></tr>"; }).join("")
           + '<tr class="pr-row pr-tgt-total"><td colspan="3">Total</td><td class="pr-num">' + fmtNum(c.value) + "</td><td></td></tr></tbody></table>";
-        note = c.perDistrict ? "Counted once per district (the highest PO value)." : "PO rows of the districts, added up. A PO whose blocks are all covered by another PO is not counted.";
+        note = (c.perDistrict ? "Counted once per district (the highest PO value)." : "PO rows of the districts, added up. A PO whose blocks are all covered by another PO is not counted.")
+          + " A district with its own row (Admin \u2192 Targets, Level: District) uses that row instead of its POs.";
         if (!c.parts.length) note = "No PO rows for these districts in this month's targets.";
       }
     }
@@ -3264,7 +3277,8 @@
      QUARTERLY · YEARLY · WHOLE YEAR TABS  (Nov 2026)
      Academic year = June to May ("2026-27" = Jun 2026 to May 2027).
        Q1 Jun-Aug · Q2 Sep-Nov · Q3 Dec-Feb · Q4 Mar-May
-     Only G1-G4 are shown (weights 40 / 20 / 20 / 10, so out of 90). G5 is not part of these views.
+     Only G1-G4 are shown (weights 40 / 20 / 20 / 10 = 90). G5 is not part of these views.
+     The total is scaled to 100 (G1-G4 total x 100 / 90); each goal keeps its own weight.
 
      Where each number comes from
        G1     Target = exams in the Academic Plan for the period's months, added up.
@@ -3274,8 +3288,8 @@
                 achieved -> Admin > Data > "Quarter & Whole-Year data" (Vinoba + Staff Connect files)
                 targets  -> Admin > G2 · G3 · G5 Targets > "Quarter & Whole-Year targets"
                             (PO view = PO rows, District view = district rows, PM / DM = their districts' rows)
-              Kathavli stories = the monthly Visit & Activity counts added up (it is a count of stories).
-              POM transformed clusters = typed on the Quarterly / Whole Year review by the person under review.
+              Kathavli stories and POM transformed clusters are not used for a quarter / year: G3 there is
+              the Online + Offline community score (the other 9 metrics) scaled to G3's full weight of 20.
        G4     Quarterly tab, Month 1-3 = Monthly G4. Quarter total and Whole Year = activities typed by
               the reviewer (the person who fills H) on that review. Yearly shows each quarter's entry.
 
@@ -3288,7 +3302,11 @@
      Done = the reviewer's points (H, and G4 here) saved too.
      ====================================================================== */
   var QY_GOALS = MO_GOALS.filter(function (g) { return g.key !== "G5"; });
-  var QY_MAX = QY_GOALS.reduce(function (a, g) { return a + g.weight; }, 0);          // 90
+  var QY_MAX = QY_GOALS.reduce(function (a, g) { return a + g.weight; }, 0);          // 90 (G1-G4 weights)
+  var QY_OUTOF = 100;                                                                  // totals are shown out of 100
+  function qyScale(total) { return total * QY_OUTOF / QY_MAX; }
+  // G3 lines not used for a quarter / year
+  var QY_SKIP = { "G3|Vinoba Kathavli Stories": 1, "G3|POM transformed clusters": 1 };
   var QY_QM = { 1: [6, 7, 8], 2: [9, 10, 11], 3: [12, 1, 2], 4: [3, 4, 5] };
   var QY_YM = [6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5];
   var QDIRTY = {};                 // { periodCode: { fieldId: value } } — Quarterly + Whole Year reviews
@@ -3354,10 +3372,9 @@
       sc.empId ? fetchAll(function () { return db().from("review_responses").select("*").eq("emp_id", sc.empId).in("period_code", qCodes.concat(mCodes)); }) : NONE,
       sc.blockKeys.length ? safe("vinoba_qy_v", fetchAll(function () { return db().from("vinoba_qy_v").select("*").eq("year", ay).in("block_key", sc.blockKeys); })) : NONE,
       sc.distKeys.length ? safe("staffconnect_qy_v", fetchAll(function () { return db().from("staffconnect_qy_v").select("*").eq("year", ay).in("district_key", sc.distKeys); })) : NONE,
-      safe("qy_targets", fetchAll(function () { return db().from("qy_targets").select("*").eq("year", ay); })),
-      sc.empId ? fetchAll(function () { return db().from("visitandactivity_data").select("*").eq("emp_id", sc.empId).eq("week", 0).in("year", [ay, ay + 1]); }) : NONE
+      safe("qy_targets", fetchAll(function () { return db().from("qy_targets").select("*").eq("year", ay); }))
     ]);
-    var acadRows = q[0], own = sectionsByCode(q[1]), vin = q[2], scr = q[3], tgt = q[4], va = q[5];
+    var acadRows = q[0], own = sectionsByCode(q[1]), vin = q[2], scr = q[3], tgt = q[4];
 
     function g1For(mcodes) {
       var planned = null, done = 0, any = false;
@@ -3381,8 +3398,6 @@
         if (vrows.length) rp.vinoba = out.vinoba;
         if (srows.length) { rp.staffConnect = out.staffConnect; rp.extra = out.extra; }
       }
-      var kv = va.filter(function (r) { return mcodes.indexOf("" + r.year + pad2(Number(r.month))) >= 0; });
-      if (kv.length) rp.visit = { "Kathawli Yes": kv.reduce(function (a, r) { return a + num(r.kathavli_yes); }, 0) };
       return rp;
     }
     function targetsFor(p) {
@@ -3410,7 +3425,7 @@
       var prevCode = p === "FY" ? qyCode(ay - 1, "FY") : (p === 1 ? qyCode(ay - 1, 4) : qyCode(ay, p - 1));
       var carry = { B1: "", B2: "", B3: "", B4: "", B5: "" };
       applyCarry(carry, (own[prevCode] || {}).G);
-      return { p: p, ay: ay, code: code, months: mcodes, g1: g1For(mcodes), prevSections: own[prevCode] || {},
+      return { p: p, ay: ay, code: code, months: mcodes, g1: g1For(mcodes), prevSections: own[prevCode] || {}, qy: true,
                future: mcodes[0] > qyNowCode(),                 // not started yet: shown as "—", never scored
                view: { header: sc.header, unitEmpId: sc.empId, month: code, academic: null, targets: targetsFor(p),
                        weeks: [{ week: 0, code: code, sections: own[code] || {}, readPoints: rpFor(p, mcodes), prefill: {}, carryForward: carry }] } };
@@ -3460,6 +3475,26 @@
           var e4 = moG4Eval();
           out.rows["G4|Other activities"] = { t: null, d: null, p: null, s: e4.score, g4: e4 };
           score = e4.score;
+        } else if (g.key === "G3" && per.qy) {
+          // Quarter / year: no Kathavli, no POM clusters. Community = average of the other 9 metrics, x 20.
+          var mets = g.rows.filter(function (x) { return x.lvl === 2 && x.t && !QY_SKIP["G3|" + x.label]; }), ach = [];
+          g.rows.forEach(function (r) {
+            if (r.head) return;
+            var k = "G3|" + r.label;
+            if (QY_SKIP[k]) { out.rows[k] = { skip: true }; return; }
+            if (r.community) return;
+            var ev = moEval(g, r, rp);
+            out.rows[k] = { t: ev.tg.state === "ok" ? ev.tg.value : (ev.full ? 0 : null), d: ev.st.kind === "num" ? ev.st.value : null, p: ev.pct, s: null };
+          });
+          mets.forEach(function (x) {
+            var t = moTarget(x), st = moRowState(x, rp);
+            if (t.state === "ok" && st.kind === "num") ach.push(Math.min(st.value / t.value, 1));
+            else if (t.state === "notset" && moNoTargetFull()) ach.push(1);
+          });
+          var cp = ach.length ? ach.reduce(function (a, b) { return a + b; }, 0) / ach.length : null;
+          var crow = g.rows.filter(function (x) { return x.community; })[0];
+          out.rows["G3|" + crow.label] = { t: null, d: null, p: cp, s: cp == null ? null : g.weight * cp };
+          score = cp == null ? null : g.weight * cp;
         } else {
           g.rows.forEach(function (r) {
             if (r.head) return;
@@ -3507,8 +3542,8 @@
           + '<td class="pr-num qy-sc' + tc + '" data-p="' + i + '">' + (x.sHtml != null ? x.sHtml : (x.hideS ? "" : qyFmt(x.s))) + "</td>";
       }).join("");
     };
-    var body = '<tr class="qy-totrow"><td class="pr-item">Total score<div class="pr-mo-sub">G1–G4 · out of ' + QY_MAX + '</div></td><td class="pr-num">' + QY_MAX + "</td>"
-      + cellsFor(function (c) { return { sHtml: c.ev.n ? fmtNum(r2(c.ev.total)) + '<small> / ' + QY_MAX + "</small>" : '<span class="pr-mut">—</span>' }; }, true) + "</tr>";
+    var body = '<tr class="qy-totrow"><td class="pr-item">Total score<div class="pr-mo-sub">G1\u2013G4 (out of ' + QY_MAX + ') scaled to ' + QY_OUTOF + '</div></td><td class="pr-num">' + QY_OUTOF + "</td>"
+      + cellsFor(function (c) { return { sHtml: c.ev.n ? fmtNum(r2(qyScale(c.ev.total))) + '<small> / ' + QY_OUTOF + "</small>" : '<span class="pr-mut">\u2014</span>' }; }, true) + "</tr>";
     QY_GOALS.forEach(function (g) {
       var gid = opts.id + g.key;
       body += '<tr class="pr-grp qy-goal" data-grp="' + gid + '" data-goal="' + g.key + '"><td class="pr-item"><span class="pr-caret">▸</span><span class="pr-grp-k">' + g.key + "</span>" + esc(g.title) + "</td>"
@@ -3518,14 +3553,19 @@
         if (r.head) return;
         var key = g.key + "|" + (g.key === "G4" ? "Other activities" : r.label);
         var weighted = (r.lvl === 0 && r.w > 0) || r.community;
-        var sub = g.key === "G4" ? "Month columns: the Monthly G4. Quarter / year: activities entered by the reviewer."
+        var skipNote = QY_SKIP[key] && opts.qy ? "Not used for a quarter / year (month columns only)." : "";
+        var sub = skipNote ? skipNote
+                : (r.community && opts.qy) ? "Quarter / year: the 9 metrics below (no POM clusters), scored out of 20 \u2014 G3's full weight, since Kathavli is not used."
+                : g.key === "G4" ? "Month columns: the Monthly G4. Quarter / year: activities entered by the reviewer."
                 : r.academic ? "Target: exams in the Academic Plan for the period. Done: exams completed, from the Monthly reviews."
                 : (r.note || "");
         var lbl = r.academic ? "Exams planned vs completed" : r.label;
         body += '<tr class="pr-row pr-hidden pr-mo-l' + r.lvl + '" data-secrow="' + gid + '"><td class="pr-item">' + esc(lbl)
           + (sub ? '<div class="pr-mo-sub">' + esc(sub) + "</div>" : "") + "</td>"
           + '<td class="pr-num">' + (r.w != null ? r.w : "") + "</td>"
-          + cellsFor(function (c) { var x = c.ev.rows[key] || {}; return { t: x.t, d: x.d, p: x.p, s: x.s, hideS: !weighted }; }, false) + "</tr>";
+          + cellsFor(function (c) { var x = c.ev.rows[key] || {};
+              if (x.skip) return { t: null, d: null, p: null, sHtml: weighted ? '<span class="pr-mut" title="Not used for a quarter / year">n/a</span>' : "" };
+              return { t: x.t, d: x.d, p: x.p, s: x.s, hideS: !weighted }; }, false) + "</tr>";
       });
     });
     return '<div class="qy-wrap"><table class="' + cls + '" data-qy="' + opts.id + '"><thead>' + h1 + h2 + "</thead><tbody>" + body + "</tbody></table></div>";
@@ -3562,7 +3602,7 @@
     }).join("") + "</div>";
   }
   function qyGoalCards(ev, totalLabel, foot) {
-    var items = [{ goal: "TOTAL", label: totalLabel, v: ev.n ? ev.total : null, max: QY_MAX,
+    var items = [{ goal: "TOTAL", label: totalLabel, v: ev.n ? qyScale(ev.total) : null, max: QY_OUTOF,
                    foot: foot || (ev.n === QY_GOALS.length ? "All goals scored" : ev.n ? "Partial — " + ev.n + " of " + QY_GOALS.length + " goals scored" : "Shown once targets and data are in") }];
     QY_GOALS.forEach(function (g) { items.push({ goal: g.key, label: g.key + " · " + g.title, v: ev.goals[g.key], max: g.weight }); });
     return qyCards(items);
@@ -3612,16 +3652,6 @@
     return out;
   }
   function qyVal(per, fid) { return qyWith(per.view, QDIRTY, function () { return moValue(fid); }); }
-  function qyPomSection(id, per, editable, word) {
-    var h = per.view.header, who = sectionWho({ k: "A", write: true }, h.unit, h), code = per.code;
-    var v = qyVal(per, "M_G3_POMCLUSTERS");
-    var cell = editable
-      ? '<input type="number" min="0" step="any" inputmode="decimal" class="pr-mo-ent qy-ent" placeholder="0" data-wc="' + code + '" data-fid="M_G3_POMCLUSTERS" value="' + (v === "" || v == null ? "" : v) + '">'
-      : (v === "" || v == null ? moPill("Not entered", "pr-mo-entry", "Entered by the person under review") : fmtNum(v));
-    return qyGroupHead(id, "G3", "POM transformed clusters", who)
-      + '<tr class="pr-row pr-hidden" data-secrow="' + id + 'G3"><td class="pr-item">POM transformed clusters this ' + word
-      + '<div class="pr-mo-sub">Used for this line in G3 (the ' + word + ' column). Not in any upload, so it is typed here.</div></td><td colspan="5">' + cell + "</td></tr>";
-  }
   function qyG4Section(id, per, editable, word) {
     var h = per.view.header, code = per.code;
     var who = sectionWho({ k: "H", write: true }, h.unit, h);
@@ -3674,7 +3704,6 @@
       if (carried && !msumHas(b.status)) self.push("B" + n + " status");
     });
     if (!["G2", "G3", "G4", "G5", "G6"].some(function (k) { return msumHas(G[k]); })) self.push("At least one action for next " + word);
-    if (!msumHas(M.M_G3_POMCLUSTERS)) self.push("G3 POM transformed clusters");
     var acts = G4_SLOTS.map(function (i) {
       var x = { name: msumTxt(M["M_G4_" + i + "_NAME"]), w: M["M_G4_" + i + "_W"], t: M["M_G4_" + i + "_T"], d: M["M_G4_" + i + "_D"] };
       x.used = !!x.name || msumHas(x.w) || msumHas(x.t) || msumHas(x.d);
@@ -3712,7 +3741,7 @@
     if (!h.selfEmpId) return '<div class="pr-panel"><div class="pr-empty">Reviews are written per PO, PM or DM — a district has no review of its own. Open a PO, PM or DM to write the ' + qyRevName(word) + " review.</div></div>";
     var S = qySec(word), selfOk = canEditSelf(per.view), mgrOk = canEditManager(per.view);
     var body = qyWriteSection(id, S.A, per, selfOk) + qyWriteSection(id, S.B, per, selfOk)
-      + qyPomSection(id, per, selfOk, word) + qyG4Section(id, per, mgrOk, word)
+      + qyG4Section(id, per, mgrOk, word)
       + qyWriteSection(id, S.G, per, selfOk) + qyWriteSection(id, S.H, per, mgrOk);
     var head = '<tr><th class="pr-item">Review — this ' + word + '</th><th class="pr-num">Weight</th><th class="pr-num">Target</th><th class="pr-num">Done</th><th class="pr-num">% done</th><th class="pr-num">Score</th></tr>';
     var html = '<div class="pr-tablewrap qy-revwrap"><table class="pr-tbl pr-mo-tbl qy-rev"><thead>' + head + "</thead><tbody>" + body + "</tbody></table></div>";
@@ -3881,19 +3910,19 @@
         cols.push({ label: "Quarter total", sub: qLabel, ev: qev, tot: true });
         $("prQCards").innerHTML = qyGoalCards(qev, "Quarter score · " + qLabel);
         $("prQMatrix").innerHTML = '<p class="qy-hint">Click <b>+</b> on a column to see target, done and % done. Click a goal to see its lines. Month columns are the Monthly figures; the Quarter total uses this quarter\'s own uploads and entries.</p>'
-          + qyMatrix(cols, { id: "q", open: (QY_OPEN.q = QY_OPEN.q || { 3: true }) });
+          + qyMatrix(cols, { id: "q", qy: true, open: (QY_OPEN.q = QY_OPEN.q || { 3: true }) });
         qyBindMatrix("#prQMatrix");
       };
       paint();
       qyBindAfter("#prQBody", per, "quarter", paint, function () { qyLoad(k); });
     } else if (k === "yearly") {
       var cols = [1, 2, 3, 4].map(function (q) { return { label: "Q" + q, sub: qyQRange(q) + (y.periods[q].future ? " \u00B7 not yet" : ""), ev: qyEval(y.periods[q], {}) }; });
-      var cards = cols.map(function (c, i) { return { goal: "G" + (i + 1), label: "Q" + (i + 1) + " · " + qyQRange(i + 1), v: c.ev.n ? c.ev.total : null, max: QY_MAX,
+      var cards = cols.map(function (c, i) { return { goal: "G" + (i + 1), label: "Q" + (i + 1) + " · " + qyQRange(i + 1), v: c.ev.n ? qyScale(c.ev.total) : null, max: QY_OUTOF,
         foot: c.ev.future ? "Not started yet" : c.ev.n ? c.ev.n + " of " + QY_GOALS.length + " goals scored" : "No data yet" }; });
       html += qyCards(cards);
       if (y.missing.length) html += qyDataNotes(y.periods[1], "quarter", y.missing);
       html += '<p class="qy-hint">Each quarter: G1 from the Academic Plan and the Monthly reviews, G2 · G3 from that quarter\'s uploads, G4 from that quarter\'s review. Click <b>+</b> on a quarter for target, done and % done.</p>';
-      html += '<div id="prYMatrix">' + qyMatrix(cols, { id: "y", open: (QY_OPEN.y = QY_OPEN.y || {}) }) + "</div>";
+      html += '<div id="prYMatrix">' + qyMatrix(cols, { id: "y", qy: true, open: (QY_OPEN.y = QY_OPEN.y || {}) }) + "</div>";
       body.innerHTML = html;
       qyBindMatrix("#prYMatrix");
     } else {
@@ -3907,7 +3936,7 @@
       var paintF = function () {
         var ev = qyEval(fy, QDIRTY);
         $("prFCards").innerHTML = qyGoalCards(ev, open ? "Year to date · " + yLabel : "Year score · " + yLabel);
-        $("prFMatrix").innerHTML = qyMatrix([{ label: open ? "Year to date" : "Whole year", sub: yLabel, ev: ev, tot: true }], { id: "f", fixed: true });
+        $("prFMatrix").innerHTML = qyMatrix([{ label: open ? "Year to date" : "Whole year", sub: yLabel, ev: ev, tot: true }], { id: "f", qy: true, fixed: true });
         qyBindMatrix("#prFMatrix");
       };
       paintF();

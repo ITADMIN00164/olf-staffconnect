@@ -1856,37 +1856,43 @@
                     <div class="pos-src-tile" style="background:#ecfdf3;"><span class="fr-ico fr-i-target" aria-hidden="true"></span></div>
                     <div class="pos-src-titles">
                         <div class="pos-src-title">G2 · G3 · G5 Targets</div>
-                        <div class="pos-src-sub">Monthly targets per PO. PM, DM and District targets are added up from their districts' PO rows, skipping blocks counted twice.</div>
+                        <div class="pos-src-sub">Level PO: monthly targets per PO (PO reviews). Level District: one row per district — District, PM and DM reviews use it; a district without a row adds up its PO rows, skipping blocks counted twice.</div>
                     </div>
-                    <button type="button" class="pos-btn pos-btn-ghost" onclick="window.POSAdmin.downloadTgtCurrent()"><span class="pos-ico pos-ico-dl" aria-hidden="true"></span><span>Download month</span></button>
-                    <button type="button" class="pos-btn pos-btn-ghost" onclick="window.POSAdmin.downloadTgtSample()"><span class="pos-ico pos-ico-dl" aria-hidden="true"></span><span>Sample</span></button>
+                    <button type="button" class="pos-btn pos-btn-ghost" onclick="window.POSAdmin.tgtDownloadAny()"><span class="pos-ico pos-ico-dl" aria-hidden="true"></span><span>Download month</span></button>
+                    <button type="button" class="pos-btn pos-btn-ghost" onclick="window.POSAdmin.tgtSampleAny()"><span class="pos-ico pos-ico-dl" aria-hidden="true"></span><span>Sample</span></button>
                 </div>
                 <div class="pos-src-controls">
-                    <div class="pos-field"><label>Year</label><select id="posTgtYear" class="pos-sel" onchange="window.POSAdmin.onTgtPeriodChange()"></select></div>
-                    <div class="pos-field"><label>Month</label><select id="posTgtMonth" class="pos-sel" onchange="window.POSAdmin.onTgtPeriodChange()"><option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option><option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option><option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option><option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option></select></div>
+                    <div class="pos-field"><label>Level</label><select id="posTgtLevel" class="pos-sel" onchange="window.POSAdmin.onTgtLevelChange()"><option value="PO">PO</option><option value="District">District</option></select></div>
+                    <div class="pos-field"><label>Year</label><select id="posTgtYear" class="pos-sel" onchange="window.POSAdmin.onTgtPeriodChangeAll()"></select></div>
+                    <div class="pos-field"><label>Month</label><select id="posTgtMonth" class="pos-sel" onchange="window.POSAdmin.onTgtPeriodChangeAll()"><option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option><option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option><option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option><option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option></select></div>
                     <div class="pos-field pos-field--grow">
-                        <label>Targets Excel for this month</label>
+                        <label id="posTgtFileLabel">Targets Excel for this month</label>
                         <label class="pos-file">
                             <input type="file" id="posTgtFile" accept=".xlsx,.xls,.csv" onchange="window.POSAdmin.onFilePicked(this)">
                             <span class="pos-file-icon" aria-hidden="true"></span>
                             <span class="pos-file-text">Choose an Excel file</span>
                         </label>
                     </div>
-                    <button type="button" class="pos-btn pos-btn-primary" id="posTgtUploadBtn" onclick="window.POSAdmin.uploadTargets()">Upload</button>
+                    <button type="button" class="pos-btn pos-btn-primary" id="posTgtUploadBtn" onclick="window.POSAdmin.tgtUploadAny()">Upload</button>
                 </div>
                 <!-- What the picked month holds and what Upload will do (pos.js tgtRenderStatus) -->
                 <div class="pos-tgt-status" id="posTgtStatus" aria-live="polite"><span class="pos-tgt-st-text">Loading…</span></div>
-                <div class="pos-last pos-last--empty" style="justify-content:flex-start;">Re-uploading a month replaces all of its rows · Rules: PM rows are skipped · "Posts per month / per teacher" must be 1 for every PO · a target of 0 means "not set".</div>
+                <!-- Level: District (pos.js loadDistTargets) -->
+                <div class="pos-tgt-status" id="posTgtDStatus" aria-live="polite" style="display:none;"><span class="pos-tgt-st-text">Loading…</span></div>
+                <div class="pos-last pos-last--empty" id="posTgtRules" style="justify-content:flex-start;">Re-uploading a month replaces all of its rows · Rules: PM rows are skipped · "Posts per month / per teacher" must be 1 for every PO · a target of 0 means "not set".</div>
             </div>
-            <div class="table-toolbar">
+            <div class="table-toolbar" id="posTgtToolbar">
                 <div class="table-meta" id="posTgtMeta">Loading…</div>
                 <div class="toolbar-right" style="gap:8px;">
                     <input type="search" id="posTgtSearch" class="pos-acad-search" placeholder="Search PO, district…" oninput="window.POSAdmin.renderTargetsTable()">
                     <button class="btn-add" onclick="window.POSAdmin.openTgtModal()">+ Add PO</button>
                 </div>
             </div>
-            <div class="pos-scroll-wrap pos-tgt-wrap" style="max-height:560px;">
+            <div class="pos-scroll-wrap pos-tgt-wrap" id="posTgtWrap" style="max-height:560px;">
                 <table><thead id="posTgtThead"></thead><tbody id="posTgtTbody"></tbody></table>
+            </div>
+            <div class="pos-scroll-wrap pos-tgt-wrap" id="posTgtDWrap" style="max-height:560px;display:none;">
+                <table><thead id="posTgtDThead"></thead><tbody id="posTgtDTbody"></tbody></table>
             </div>
 
             <!-- QUARTER & WHOLE-YEAR TARGETS (Nov 2026) — pos.js uploadQyTargets, table qy_targets.

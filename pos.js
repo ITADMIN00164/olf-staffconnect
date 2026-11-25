@@ -3733,6 +3733,231 @@ async function deleteQyTargets() {
 }
 
 /* ====================================
+   MONTHLY DISTRICT TARGETS (Nov 2026) — district_targets
+   Same card as the PO targets, Level: District. One row per district per month.
+   The review uses a district's own row for District / PM / DM views; a district
+   without one falls back to adding up its PO rows (the rule above).
+   Check column: the month's PO rows of that district added up vs the district row.
+   Table: sql/2026-11-25-district-month-targets.sql
+==================================== */
+const DTGT_TABLE = "district_targets";
+// targets that can be added up across POs (ratios, per-district events and % can't)
+const DTGT_ADDABLE = TGT_NUM.filter(c => !["posts_per_teacher", "district_recognition_event", "compliance_pct"].includes(c.db));
+let dtgtRows = [], dtgtSeq = 0, dtgtLoaded = null;
+
+function tgtLevel() { return document.getElementById("posTgtLevel")?.value === "District" ? "District" : "PO"; }
+function dtgtNd(s) { return String(s || "").replace(/\s+/g, " ").trim().toLowerCase(); }
+
+// Level picker: show the PO pieces or the District pieces of the card
+function onTgtLevelChange() {
+    const dist = tgtLevel() === "District";
+    ["posTgtStatus", "posTgtRules", "posTgtToolbar", "posTgtWrap"].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = dist ? "none" : ""; });
+    ["posTgtDStatus", "posTgtDWrap"].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = dist ? "" : "none"; });
+    const lbl = document.getElementById("posTgtFileLabel");
+    if (lbl) lbl.textContent = dist ? "District targets Excel for this month" : "Targets Excel for this month";
+    if (dist) loadDistTargets(); else tgtRenderStatus();
+}
+async function onTgtPeriodChangeAll() {
+    await onTgtPeriodChange();
+    if (tgtLevel() === "District") loadDistTargets();
+}
+function tgtUploadAny() { return tgtLevel() === "District" ? uploadDistTargets() : uploadTargets(); }
+function tgtDownloadAny() { return tgtLevel() === "District" ? downloadDistTargets() : downloadTgtCurrent(); }
+function tgtSampleAny() { return tgtLevel() === "District" ? downloadDistSample() : downloadTgtSample(); }
+
+async function loadDistTargets() {
+    const p = tgtPicked();
+    if (!p.year || !p.month) return;
+    const seq = ++dtgtSeq;
+    dtgtLoaded = null;
+    renderDistTargets();
+    try {
+        const { data, error } = await posSupabase.from(DTGT_TABLE).select("*").eq("year", p.year).eq("month", p.month).order("district").range(0, 4999);
+        if (error) throw error;
+        if (seq !== dtgtSeq) return;
+        dtgtRows = data || [];
+        dtgtLoaded = { year: p.year, month: p.month };
+        renderDistTargets();
+    } catch (err) {
+        if (seq !== dtgtSeq) return;
+        dtgtRows = [];
+        renderDistTargets(qyTableMissing(err)
+            ? "The district targets table is not in Supabase yet. Run sql/2026-11-25-district-month-targets.sql in the Supabase SQL editor first."
+            : "Couldn't load: " + friendlyDbError(err));
+    }
+}
+
+// PO rows of the same month (tgtRows) added up per district vs the district row
+function dtgtCheck(drow) {
+    const p = tgtPicked();
+    if (!(tgtCur && tgtCur.year === p.year && tgtCur.month === p.month)) return { cls: "warn", text: "PO rows still loading" };
+    const pos = tgtRows.filter(r => dtgtNd(r.district) === dtgtNd(drow.district));
+    if (!pos.length) return { cls: "warn", text: "No PO rows for this district this month" };
+    const diffs = [];
+    DTGT_ADDABLE.forEach(c => {
+        const sum = pos.reduce((a, r) => a + (Number(r[c.db]) || 0), 0), dv = drow[c.db] == null ? null : Number(drow[c.db]);
+        if (dv == null && !sum) return;
+        if (Math.abs((dv || 0) - sum) > 1e-9) diffs.push(`${c.short}: POs ${sum.toLocaleString("en-IN")} · district ${dv == null ? "blank" : dv.toLocaleString("en-IN")}`);
+    });
+    return diffs.length ? { cls: "warn", text: `POs add up differently on ${diffs.length} target${diffs.length === 1 ? "" : "s"}`, title: diffs.join("\n") + `\n\n(${pos.length} PO row${pos.length === 1 ? "" : "s"})` }
+                        : { ok: true, text: `Matches ${pos.length} PO row${pos.length === 1 ? "" : "s"}` };
+}
+
+function renderDistTargets(errorText) {
+    const p = tgtPicked();
+    const st = document.getElementById("posTgtDStatus"), th = document.getElementById("posTgtDThead"), tb = document.getElementById("posTgtDTbody");
+    const btn = document.getElementById("posTgtUploadBtn");
+    const loaded = dtgtLoaded && dtgtLoaded.year === p.year && dtgtLoaded.month === p.month;
+    if (btn && !btn.disabled && tgtLevel() === "District") btn.textContent = loaded && dtgtRows.length ? "Replace month" : "Upload";
+    if (st) {
+        const last = dtgtRows.reduce((a, r) => (r.updated_at > a ? r.updated_at : a), "");
+        st.className = "pos-tgt-status" + (loaded && dtgtRows.length ? " has-data" : "");
+        st.innerHTML = errorText ? `<span class="pos-tgt-st-text">${escHtml(errorText)}</span>`
+            : !loaded ? `<span class="pos-tgt-st-text">Loading ${escHtml(p.label)}…</span>`
+            : dtgtRows.length
+                ? `<span class="pos-tgt-st-dot is-on" aria-hidden="true"></span><span class="pos-tgt-st-text"><b>${escHtml(p.label)}</b> has ${dtgtRows.length} district row${dtgtRows.length === 1 ? "" : "s"}${last ? " · last updated " + new Date(last).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}. District, PM and DM reviews use these; a district without a row adds up its PO rows. Uploading again replaces the month.</span>
+                   <button type="button" class="pos-btn pos-btn-ghost" onclick="window.POSAdmin.deleteDistTargets()">Delete month</button>`
+                : `<span class="pos-tgt-st-dot" aria-hidden="true"></span><span class="pos-tgt-st-text">No district targets for <b>${escHtml(p.label)}</b> yet. Until you upload them, District, PM and DM reviews add up the PO rows.</span>`;
+    }
+    if (!th || !tb) return;
+    th.innerHTML = "<tr><th>Check vs PO rows</th><th>District</th>" + TGT_NUM.map(c => `<th class="pos-num" title="${escHtml(c.excel)}">${escHtml(c.short)}</th>`).join("") + "</tr>";
+    tb.innerHTML = loaded && dtgtRows.length
+        ? dtgtRows.map(r => {
+            const ck = dtgtCheck(r);
+            const chk = ck.ok ? `<span class="pos-tgt-ok" title="${escHtml(ck.text)}">OK</span>`
+                              : `<span class="pos-tgt-flag ${ck.cls}" title="${escHtml(ck.title || ck.text)}">${escHtml(ck.text)}</span>`;
+            return `<tr><td class="pos-tgt-check">${chk}</td><td>${escHtml(r.district)}</td>`
+                + TGT_NUM.map(c => { const v = r[c.db]; return `<td class="pos-num${v === 0 ? " pos-zero" : ""}">${v == null ? "" : Number(v).toLocaleString("en-IN", { maximumFractionDigits: 4 }) + (c.pct ? "%" : "")}</td>`; }).join("")
+                + "</tr>";
+        }).join("")
+        : `<tr><td colspan="${TGT_NUM.length + 2}" class="empty-state">${loaded ? "No district rows for this month." : "Loading…"}</td></tr>`;
+}
+
+async function downloadDistSample() {
+    const XLSX = await loadXLSX();
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["District"].concat(TGT_NUM.map(c => c.excel))]), "Sheet1");
+    XLSX.writeFile(wb, "district_targets_sample.xlsx");
+}
+async function downloadDistTargets() {
+    const p = tgtPicked();
+    if (!dtgtRows.length) { window.notify(`No district targets saved for ${p.label || "this month"}.`, "warning"); return; }
+    const XLSX = await loadXLSX();
+    const aoa = [["District"].concat(TGT_NUM.map(c => c.excel))]
+        .concat(dtgtRows.map(r => [r.district].concat(TGT_NUM.map(c => r[c.db] == null ? "" : (c.pct ? r[c.db] + "%" : r[c.db])))));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), "Sheet1");
+    XLSX.writeFile(wb, `District_Targets_${p.label.replace(/\s+/g, "_")}.xlsx`);
+}
+
+async function uploadDistTargets() {
+    const { year, month, label } = tgtPicked();
+    const fileInput = document.getElementById("posTgtFile");
+    const file = fileInput && fileInput.files[0];
+    if (!year || !month) { window.notify("Pick the year and month first.", "warning"); return; }
+    if (!file) { window.notify("Select a file first.", "warning"); return; }
+    const btn = document.getElementById("posTgtUploadBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "Uploading…"; }
+    try {
+        const XLSX = await loadXLSX();
+        const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const fileHeaders = (XLSX.utils.sheet_to_json(ws, { header: 1 })[0] || []).map(h => String(h || "").trim()).filter(h => h);
+        const required = ["District"].concat(TGT_NUM.filter(c => !c.optional).map(c => c.excel));
+        const known = new Set(TGT_ALL.map(c => c.excel).concat(["District", "State"]));     // PO ID / PO Name / PM columns are ignored
+        const missing = required.filter(h => !fileHeaders.includes(h)), extra = fileHeaders.filter(h => !known.has(h));
+        if (missing.length || extra.length) {
+            await window.showAppAlert({ title: "Column mismatch", type: "error", okText: "OK",
+                message: "This file's columns don't match the district targets format.\n\n" + (missing.length ? "Missing: " + missing.join(", ") + "\n" : "")
+                    + (extra.length ? "Unexpected: " + extra.join(", ") + "\n" : "") + "\nDownload the sample to see the expected headers." });
+            return;
+        }
+        const json = XLSX.utils.sheet_to_json(ws, { raw: false, defval: "" });
+        const distNames = new Map(posData.districts.map(d => [dtgtNd(d.name), d.name]));
+        const rows = [], bad = [];
+        json.forEach((r, i) => {
+            if (required.every(h => String(r[h] || "").trim() === "")) return;          // blank line
+            const name = String(r["District"] || "").trim();
+            if (!name) { bad.push(`Row ${i + 2}: District is empty`); return; }
+            const known = distNames.get(dtgtNd(name));
+            if (!known) { bad.push(`Row ${i + 2}: "${name}" is not a district in Locations`); return; }
+            const o = { year, month, district: known };
+            TGT_NUM.forEach(c => {
+                const n = tgtNum(r[c.excel]);
+                if (Number.isNaN(n)) bad.push(`${known}: "${c.excel}" is not a number ("${r[c.excel]}")`);
+                o[c.db] = Number.isNaN(n) ? null : n;
+            });
+            rows.push(o);
+        });
+        if (bad.length) {
+            await window.showAppAlert({ title: "File not accepted", type: "error", okText: "OK",
+                message: bad.slice(0, 12).join("\n") + (bad.length > 12 ? `\n…and ${bad.length - 12} more` : "") + "\n\nNothing was saved." });
+            return;
+        }
+        if (!rows.length) { window.notify("No district rows found in the file.", "warning"); return; }
+        const dups = rows.map(o => o.district).filter((d, i, a) => a.indexOf(d) !== i);
+        if (dups.length) {
+            await window.showAppAlert({ title: "File not accepted", type: "error", okText: "OK",
+                message: "Each district must appear once. Repeated: " + [...new Set(dups)].join(", ") + "\n\nNothing was saved." });
+            return;
+        }
+        const forMonth = q => q.eq("year", year).eq("month", month);
+        const { count, error: cntErr } = await forMonth(posSupabase.from(DTGT_TABLE).select("id", { count: "exact", head: true }));
+        if (cntErr) throw cntErr;
+        const ok = await window.showAppConfirm({
+            title: count ? `Replace district targets for ${label}?` : `Upload district targets for ${label}?`,
+            message: (count ? `${label} already has ${count} district rows. All of them will be replaced by the ` : "This will save ") + `${rows.length} district rows in this file. PO targets are not touched. Continue?`,
+            type: "warning", confirmText: count ? "Replace" : "Upload", cancelText: "Cancel"
+        });
+        if (!ok) return;
+        const by = currentAdminEmail(), now = new Date().toISOString();
+        rows.forEach(o => { o.updated_by = by; o.updated_at = now; });
+        // new rows in first; the month's old rows out only after every batch succeeded
+        const { data: last, error: lastErr } = await forMonth(posSupabase.from(DTGT_TABLE).select("id")).order("id", { ascending: false }).limit(1);
+        if (lastErr) throw lastErr;
+        const maxOldId = last && last.length ? last[0].id : null;
+        try {
+            for (let i = 0; i < rows.length; i += 200) {
+                const { error } = await posSupabase.from(DTGT_TABLE).insert(rows.slice(i, i + 200));
+                if (error) throw error;
+            }
+        } catch (err) {
+            let undo = forMonth(posSupabase.from(DTGT_TABLE).delete());
+            if (maxOldId != null) undo = undo.gt("id", maxOldId);
+            await undo;
+            throw err;
+        }
+        if (maxOldId != null) {
+            const { error } = await forMonth(posSupabase.from(DTGT_TABLE).delete()).lte("id", maxOldId);
+            if (error) throw error;
+        }
+        window.notify(`${rows.length} district rows saved for ${label}.`, "success");
+        fileInput.value = ""; refreshFileLabel(fileInput);
+        await loadDistTargets();
+    } catch (err) {
+        console.error("District targets upload failed:", err);
+        window.notify(qyTableMissing(err) ? "The district targets table is not in Supabase yet. Run sql/2026-11-25-district-month-targets.sql first." : friendlyDbError(err), "error");
+    } finally {
+        if (btn) btn.disabled = false;
+        renderDistTargets();
+    }
+}
+
+async function deleteDistTargets() {
+    const { year, month, label } = tgtPicked();
+    if (!dtgtRows.length) return;
+    const ok = await window.showAppConfirm({
+        title: "Delete district targets?", message: `Delete all ${dtgtRows.length} district rows of ${label}? District, PM and DM reviews will go back to adding up the PO rows.`,
+        type: "error", confirmText: "Delete", cancelText: "Cancel"
+    });
+    if (!ok) return;
+    const { error } = await posSupabase.from(DTGT_TABLE).delete().eq("year", year).eq("month", month);
+    if (error) { window.notify(friendlyDbError(error), "error"); return; }
+    window.notify("District targets deleted.", "success");
+    loadDistTargets();
+}
+
+/* ====================================
    EXPORT
 ==================================== */
 
@@ -3764,5 +3989,6 @@ window.POSAdmin = {
     onTgtPeriodChange,
     openTgtModal, onTgtPoIdChange, closeTgtModal, saveTgtRow, deleteTgtRow,
     downloadQyDataSample, uploadQyData, deleteQyData, loadQyDataLog,
-    loadQyTargets, downloadQyTgtSample, downloadQyTgtCurrent, uploadQyTargets, deleteQyTargets
+    loadQyTargets, downloadQyTgtSample, downloadQyTgtCurrent, uploadQyTargets, deleteQyTargets,
+    onTgtLevelChange, onTgtPeriodChangeAll, tgtUploadAny, tgtDownloadAny, tgtSampleAny, deleteDistTargets
 };
