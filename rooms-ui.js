@@ -483,6 +483,116 @@ window.RB_HTML = `<!-- =========================================================
   #rb-app .rb-scene.sm-scale .rb-fl { gap: calc(4px / var(--k)); }
   #rb-app .rb-scene.sm-scale .rb-rm.sm .rb-fl { flex-direction: column; justify-content: center; align-items: center; padding: 0; gap: calc(3px / var(--k)); }
 }
+#rb-app .rb-qk { margin: 0 0 10px; font-size: 13px; font-weight: 700; color: var(--rb-text2); }
+#rb-app .rb-qk.live { color: #15803D; }
+#rb-app .rb-qk.live::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 50%; background: #22C55E; box-shadow: 0 0 0 3px rgba(34,197,94,.25); vertical-align: 1px; }
+#rb-app .rb-form { margin-top: 0; margin-bottom: 16px; }
+/* ── the space popup: a coloured header for its state, one clear card, one big button ── */
+#rb-app .rb-dlg.rb-rdlg { max-width: 440px; padding: 0; border-radius: 26px; overflow: hidden auto; border: 0; box-shadow: 0 40px 90px -30px rgba(15,23,42,.6); }
+#rb-app .rb-rdlg .rb-panel.rb-sp { margin: 0; padding: 0; border: 0; background: none; }
+#rb-app .rb-sph { position: relative; display: flex; align-items: center; gap: 14px; padding: 20px 20px 22px; color: #fff; overflow: hidden; background: linear-gradient(135deg, #10B981, #0EA5A4); }
+#rb-app .rb-sph.busy { background: linear-gradient(135deg, #F43F5E, #F97316); }
+#rb-app .rb-sph.mine { background: linear-gradient(135deg, #2F6FE4, #7C3AED); }
+#rb-app .rb-sph.closed { background: linear-gradient(135deg, #64748B, #94A3B8); }
+#rb-app .rb-sph::after { content: ""; position: absolute; right: -40px; top: -60px; width: 190px; height: 190px; border-radius: 50%; background: rgba(255,255,255,.14); pointer-events: none; }
+#rb-app .rb-spi { flex: none; width: 50px; height: 50px; display: grid; place-items: center; border-radius: 16px; background: rgba(255,255,255,.22); box-shadow: inset 0 1px 0 rgba(255,255,255,.35); position: relative; z-index: 1; }
+#rb-app .rb-spi svg { width: 27px; height: 27px; stroke: #fff; }
+#rb-app .rb-spt { position: relative; z-index: 1; min-width: 0; }
+#rb-app .rb-spt h3 { margin: 0; font-size: 21px; font-weight: 800; letter-spacing: -.5px; color: #fff; }
+#rb-app .rb-sps { display: inline-block; margin-top: 5px; padding: 3px 12px; border-radius: 99px; background: rgba(255,255,255,.24); font-size: 12.5px; font-weight: 800; }
+#rb-app .rb-sph .rb-x { position: absolute; top: 14px; right: 14px; z-index: 2; background: rgba(255,255,255,.2); border: 0; color: #fff; }
+#rb-app .rb-sph .rb-x:hover { background: rgba(255,255,255,.34); }
+#rb-app .rb-spb { padding: 18px 20px 22px; background: var(--rb-surface); }
+#rb-app .rb-bz { display: flex; align-items: center; gap: 12px; padding: 14px; margin-bottom: 14px; border-radius: 16px; background: #FEF2F2; border: 1px solid #FECACA; }
+#rb-app .rb-bz.mine { background: #EFF6FF; border-color: #BFDBFE; }
+#rb-app .rb-av { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; background: #F43F5E; color: #fff; font-size: 13px; font-weight: 800; }
+#rb-app .rb-bz.mine .rb-av { background: #2F6FE4; }
+#rb-app .rb-bzt { min-width: 0; color: #1E293B; }
+#rb-app .rb-bzt b { display: block; font-size: 15px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#rb-app .rb-bzt small { color: #64748B; font-size: 12.5px; }
+#rb-app .rb-bk { margin: 0 0 6px; }
+#rb-app .rb-when { margin-bottom: 14px; }
+#rb-app .rb-lv { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 800; color: #15803D; text-transform: uppercase; letter-spacing: .06em; }
+#rb-app .rb-lv::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #22C55E; box-shadow: 0 0 0 3px rgba(34,197,94,.25); }
+#rb-app .rb-lv.n { color: var(--rb-text2); }
+#rb-app .rb-lv.n::before { background: #94A3B8; box-shadow: 0 0 0 3px rgba(148,163,184,.25); }
+#rb-app .rb-tm { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+#rb-app .rb-tm b { font-size: 26px; font-weight: 800; letter-spacing: -.8px; }
+#rb-app .rb-tm span { font-size: 13.5px; font-weight: 700; color: var(--rb-text2); }
+#rb-app .rb-seg { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 14px; }
+#rb-app .rb-seg .rb-chip { height: 42px; padding: 0 4px; border-radius: 12px; font-size: 13.5px; font-weight: 700; justify-content: center; }
+#rb-app .rb-seg .rb-chip.on { background: linear-gradient(135deg, #2F6FE4, #7C3AED); border-color: transparent; color: #fff; box-shadow: 0 8px 18px -8px rgba(79,70,229,.7); }
+#rb-app .rb-seg .rb-chip:disabled { opacity: .4; }
+#rb-app .rb-go { display: flex; align-items: center; justify-content: center; width: 100%; height: 54px; border: 0; border-radius: 16px; background: linear-gradient(135deg, #10B981, #0EA5A4); color: #fff; font-size: 17px; font-weight: 800; letter-spacing: -.2px; cursor: pointer; box-shadow: 0 16px 28px -14px rgba(16,185,129,.8); transition: transform .15s, box-shadow .2s; }
+#rb-app .rb-go:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 20px 32px -14px rgba(16,185,129,.9); }
+#rb-app .rb-go:active:not(:disabled) { transform: scale(.98); }
+#rb-app .rb-go:disabled { opacity: .6; cursor: default; }
+#rb-app .rb-go.off { margin-bottom: 14px; background: linear-gradient(135deg, #F43F5E, #F97316); box-shadow: 0 16px 28px -14px rgba(244,63,94,.8); height: 48px; font-size: 15px; }
+#rb-app .rb-more { margin: 12px 0 0; text-align: center; }
+#rb-app .rb-spb .rb-field { margin-top: 12px; }
+#rb-app .rb-spb .rb-go { margin-top: 16px; }
+#rb-app .rb-ds { margin-top: 12px; border: 1px solid var(--rb-border); border-radius: 14px; background: var(--rb-surface); }
+#rb-app .rb-ds > summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 13px 14px; cursor: pointer; font-size: 14px; font-weight: 700; list-style: none; }
+#rb-app .rb-ds > summary::-webkit-details-marker { display: none; }
+#rb-app .rb-ds > summary::after { content: "›"; font-size: 20px; line-height: 1; color: var(--rb-text3); transition: transform .15s; }
+#rb-app .rb-ds[open] > summary::after { transform: rotate(90deg); }
+#rb-app .rb-ds > summary em { margin-left: auto; font-style: normal; font-weight: 600; font-size: 12.5px; color: var(--rb-text3); }
+#rb-app .rb-dsb { padding: 0 14px 14px; }
+#rb-app .rb-dsb .rb-rhint { margin: 0 0 18px; }
+#rb-app .rb-dsb .rb-li .t { flex: 0 0 128px; }
+@media (max-width: 760px) {
+  #rb-app .rb-dlg.rb-rdlg { max-width: none; border-radius: 26px 26px 0 0; padding: 0; }
+  #rb-app .rb-rdlg::before { display: none; }
+  #rb-app .rb-tm b { font-size: 24px; }
+}
+/* ── present / not present (CEO, COO, CoS) ── */
+#rb-app .rb-sph.present { background: linear-gradient(135deg, #F59E0B, #D97706); }
+#rb-app .rb-rm.present { --st: rgba(245,158,11,.24); --ring: rgba(217,119,6,.6); --glow: rgba(251,191,36,.3); }
+#rb-app .rb-rm.present .rb-fl small { background: linear-gradient(135deg, #FBBF24, #D97706); box-shadow: 0 6px 12px -6px rgba(217,119,6,.7); }
+#rb-app .rb-lamp.present { background: radial-gradient(circle at 35% 30%, #FEF3C7, #F59E0B 55%, #B45309); box-shadow: 0 0 0 3px rgba(255,255,255,.9), 0 0 16px 4px rgba(245,158,11,.8); }
+#rb-app .rb-tip2 .st.present { background: #D97706; }
+#rb-app .rb-pr { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 14px; margin-bottom: 14px; border-radius: 16px; background: #F8FAFC; border: 1px solid var(--rb-border); }
+#rb-app .rb-pr.on { background: #FFFBEB; border-color: #FDE68A; }
+#rb-app .rb-prh b { display: block; font-size: 14.5px; font-weight: 800; color: #1E293B; }
+#rb-app .rb-prh small { font-size: 12px; color: #64748B; }
+#rb-app .rb-prs { display: inline-flex; padding: 3px; border-radius: 12px; background: #E2E8F0; }
+#rb-app .rb-prs button { height: 34px; padding: 0 14px; border: 0; border-radius: 10px; background: transparent; color: #475569; font-size: 13px; font-weight: 800; cursor: pointer; transition: background .15s, color .15s, box-shadow .15s; }
+#rb-app .rb-prs button.on { background: #fff; color: #1E293B; box-shadow: 0 2px 8px rgba(15,23,42,.15); }
+#rb-app .rb-pr.on .rb-prs button.on { background: #F59E0B; color: #fff; }
+#rb-app .rb-pn { text-align: center; padding: 6px 4px 2px; line-height: 1.45; }
+/* ── choosing the start time: a "Starts" row that opens a grid of times, no dragging ── */
+#rb-app .rb-st { display: flex; align-items: center; gap: 10px; width: 100%; height: 48px; padding: 0 14px; margin-bottom: 12px; border: 1px solid var(--rb-border); border-radius: 14px; background: var(--rb-surface); color: var(--rb-text); font-size: 14px; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+#rb-app .rb-st:hover { border-color: #A5B4FC; box-shadow: 0 6px 16px -10px rgba(79,70,229,.6); }
+#rb-app .rb-st span { color: var(--rb-text2); font-weight: 600; }
+#rb-app .rb-st b { margin-left: auto; font-size: 15px; font-weight: 800; }
+#rb-app .rb-st i { width: 9px; height: 9px; border-right: 2px solid var(--rb-text3); border-bottom: 2px solid var(--rb-text3); transform: rotate(45deg) translate(-2px, -2px); transition: transform .15s; }
+#rb-app .rb-st[aria-expanded="true"] i { transform: rotate(-135deg) translate(-2px, -2px); }
+#rb-app .rb-sg { max-height: 232px; overflow-y: auto; margin: -4px 0 12px; padding: 8px; border: 1px solid var(--rb-border); border-radius: 14px; background: var(--rb-surface); overscroll-behavior: contain; }
+#rb-app .rb-sr { display: grid; grid-template-columns: 44px 1fr; align-items: center; gap: 8px; padding: 4px 0; }
+#rb-app .rb-sr > span { font-size: 12px; font-weight: 800; color: var(--rb-text3); text-align: right; }
+#rb-app .rb-sc-w { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+#rb-app .rb-sc { height: 38px; border: 1px solid var(--rb-border); border-radius: 10px; background: var(--rb-surface); color: var(--rb-text); font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background .12s, border-color .12s, transform .1s; }
+#rb-app .rb-sc:hover:not(:disabled) { background: #EEF2FF; border-color: #A5B4FC; }
+#rb-app .rb-sc:active:not(:disabled) { transform: scale(.96); }
+#rb-app .rb-sc.on { background: linear-gradient(135deg, #2F6FE4, #7C3AED); border-color: transparent; color: #fff; }
+#rb-app .rb-sc:disabled { color: var(--rb-text3); background: repeating-linear-gradient(135deg, rgba(148,163,184,.14) 0 4px, transparent 4px 8px); cursor: not-allowed; text-decoration: line-through; }
+#rb-app .rb-go.ghost { margin-bottom: 14px; background: transparent; color: #2F6FE4; border: 1.5px solid #2F6FE4; box-shadow: none; height: 46px; font-size: 15px; }
+#rb-app .rb-go.ghost:hover { background: #EFF6FF; box-shadow: none; }
+/* ── minute-level times: the start panel and the day bar ── */
+#rb-app .rb-sg { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; max-height: none; overflow: visible; margin: -4px 0 12px; padding: 12px; border: 1px solid var(--rb-border); border-radius: 14px; background: var(--rb-surface); }
+#rb-app .rb-tp { flex: 1 1 140px; display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: var(--rb-text2); }
+#rb-app .rb-tp input, #rb-app .rb-custom input { height: 40px; padding: 0 10px; border: 1px solid var(--rb-border); border-radius: 10px; background: var(--rb-surface); color: var(--rb-text); font: inherit; font-size: 15px; font-weight: 700; }
+#rb-app .rb-ab { margin: 14px 0 4px; }
+#rb-app .rb-ab-t { position: relative; height: 14px; border-radius: 8px; background: #E2E8F0; overflow: hidden; }
+#rb-app .rb-ab-b { position: absolute; top: 0; bottom: 0; background: #F87171; }
+#rb-app .rb-ab-b.me { background: #60A5FA; }
+#rb-app .rb-ab-s { position: absolute; top: 2px; bottom: 2px; border-radius: 6px; background: linear-gradient(135deg, #2F6FE4, #7C3AED); box-shadow: 0 0 0 1.5px #fff; }
+#rb-app .rb-ab-n { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #0F172A; }
+#rb-app .rb-ab-l { position: relative; height: 16px; margin-top: 3px; font-size: 11px; font-weight: 700; color: var(--rb-text3); }
+#rb-app .rb-ab-l span { position: absolute; top: 0; }
+#rb-app .rb-ab-ul { margin: 6px 0 0; padding: 0; list-style: none; font-size: 12.5px; color: var(--rb-text2); }
+#rb-app .rb-ab-ul li { padding: 2px 0; }
+#rb-app .rb-ab-ul b { color: var(--rb-text); font-weight: 700; margin-right: 4px; }
 </style>
 
 <section class="pg-hero">
@@ -520,8 +630,8 @@ window.RB_HTML = `<!-- =========================================================
 </div>
 
 <div class="rb-cal" id="rb-cal" role="dialog" aria-label="Pick a date" hidden></div>
-<div class="rb-modal rb-xmodal" id="rb-xmodal" aria-hidden="true"><div class="rb-dlg rb-xdlg" role="dialog" aria-modal="true" aria-label="Room booking"><div class="rb-dh"><div><h3 id="rb-xtitle">My bookings</h3><p id="rb-xsub"></p></div><button type="button" class="rb-x" data-xclose aria-label="Close">x</button></div><div class="rb-db"><div id="rb-v-mine" hidden></div><div id="rb-v-rooms" hidden></div></div></div></div>
-<div class="rb-modal rb-rmodal" id="rb-rmodal" aria-hidden="true"><div class="rb-dlg rb-rdlg" id="rb-rdlg" role="dialog" aria-modal="true" aria-label="Room"><div id="rb-panel"></div></div></div>
+<div class="rb-modal rb-xmodal" id="rb-xmodal" aria-hidden="true"><div class="rb-dlg rb-xdlg" role="dialog" aria-modal="true" aria-label="Space booking"><div class="rb-dh"><div><h3 id="rb-xtitle">My bookings</h3><p id="rb-xsub"></p></div><button type="button" class="rb-x" data-xclose aria-label="Close">x</button></div><div class="rb-db"><div id="rb-v-mine" hidden></div><div id="rb-v-rooms" hidden></div></div></div></div>
+<div class="rb-modal rb-rmodal" id="rb-rmodal" aria-hidden="true"><div class="rb-dlg rb-rdlg" id="rb-rdlg" role="dialog" aria-modal="true" aria-label="Space"><div id="rb-panel"></div></div></div>
 <div class="rb-modal" id="rb-modal" aria-hidden="true"><div class="rb-dlg" id="rb-dlg" role="dialog" aria-modal="true"></div></div>
 <div class="rb-tip2" id="rb-tip2" role="tooltip" hidden></div>
 <div class="rb-toast" id="rb-toast" role="status" aria-live="polite"></div>

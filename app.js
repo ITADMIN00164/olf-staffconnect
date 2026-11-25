@@ -1465,6 +1465,16 @@ window.olfGetEmployees = async function () {
 ==================================== */
 
 const RB_OPEN = 9 * 60, RB_CLOSE = 19 * 60, RB_STEP = 15, RB_HORIZON_DAYS = 30;
+// The CEO, COO and CoS spaces can be marked "present". While one is, that space cannot be booked today.
+const RB_PRESENCE_IDS = ["ceo", "coo", "cos"];
+function rbPresenceMap(snap) {
+    const out = {};
+    snap.forEach(d => {
+        const v = d.data() || {};
+        out[d.id] = { present: v.present === true, byName: String(v.byName || v.by || ""), at: v.at && v.at.toMillis ? v.at.toMillis() : 0 };
+    });
+    return out;
+}
 
 function rbPad(n) { return n < 10 ? "0" + n : String(n); }
 function rbIst() {
@@ -1484,20 +1494,34 @@ function rbSlotIds(roomId, date, startMin, endMin) {
     return ids;
 }
 // Checks the rules of the booking itself. The Firestore rules repeat the important ones.
-function rbValidate(b) {
-    if (!b || !b.roomId) throw new Error("Choose a room.");
+function rbValidate(b, opts) {
+    if (!b || !b.roomId) throw new Error("Choose a space.");
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(b.date || ""))) throw new Error("Choose a date.");
     if (!Number.isInteger(b.startMin) || !Number.isInteger(b.endMin)) throw new Error("Choose a start and end time.");
-    if (b.startMin % RB_STEP || b.endMin % RB_STEP) throw new Error("Times move in 15-minute steps.");
     if (b.startMin < RB_OPEN || b.endMin > RB_CLOSE || b.endMin <= b.startMin) throw new Error("Choose a time between 9:00 am and 7:00 pm.");
-    if (rbDay(b.date).getUTCDay() === 0) throw new Error("Rooms are closed on Sundays.");
+    if (rbDay(b.date).getUTCDay() === 0) throw new Error("Spaces are closed on Sundays.");
     const now = rbIst();
     if (b.date < now.date || (b.date === now.date && b.endMin <= now.min)) throw new Error("That time has already passed.");
+    if (b.date === now.date && b.startMin < now.min - 2 && !(opts && opts.allowPastStart)) throw new Error("That start time has already passed.");
     const last = new Date(rbDay(now.date).getTime() + RB_HORIZON_DAYS * 86400000);
     if (rbDay(b.date) > last) throw new Error("You can book up to " + RB_HORIZON_DAYS + " days ahead.");
     const title = String(b.title || "").trim();
     if (!title) throw new Error("Enter a title.");
     if (title.length > 120) throw new Error("Keep the title under 120 characters.");
+}
+// Bookings are exact minutes. A clash is checked against one small record per space and date (roomDays), inside a transaction.
+function rbDayRef(roomId, date) { return doc(db, "roomDays", roomId + "_" + date); }
+function rbHit(items, s, e, exceptId) {
+    for (const id of Object.keys(items || {})) {
+        if (id === exceptId) continue;
+        const it = items[id];
+        if (it && it.s < e && s < it.e) return it;
+    }
+    return null;
+}
+// Older bookings were kept in 15-minute slot records. They still count: any block they hold that touches the new time is taken.
+function rbLegacyIds(roomId, date, s, e) {
+    return rbSlotIds(roomId, date, Math.floor(s / RB_STEP) * RB_STEP, Math.ceil(e / RB_STEP) * RB_STEP);
 }
 function rbCleanAttendees(list) {
     return (Array.isArray(list) ? list : []).slice(0, 30).map(a => ({
@@ -1511,6 +1535,18 @@ window.olfRooms = {
         const u = window.__olfUser || {};
         const email = String(u.email || auth.currentUser?.email || "").toLowerCase();
         return { email, name: u.displayName || auth.currentUser?.displayName || email, isAdmin: email === ORG_ADMIN_EMAIL };
+    },
+
+    // Who is in: anyone signed in can see it and can change it.
+    async loadPresence() { return rbPresenceMap(await getDocs(collection(db, "roomPresence"))); },
+    watchPresence(onData, onError) {
+        return onSnapshot(collection(db, "roomPresence"), snap => onData(rbPresenceMap(snap)), err => { if (onError) onError(err); });
+    },
+    async setPresence(roomId, present) {
+        const me = this.user();
+        if (!me.email) throw new Error("Sign in again to do this.");
+        if (RB_PRESENCE_IDS.indexOf(roomId) < 0) throw new Error("This space has no present setting.");
+        await setDoc(doc(db, "roomPresence", roomId), { present: !!present, by: me.email, byName: me.name, at: serverTimestamp() });
     },
 
     async loadConfig() {
@@ -1545,21 +1581,28 @@ window.olfRooms = {
 
     async createBooking(b) {
         const me = this.user();
-        if (!me.email) throw new Error("Sign in again to book a room.");
+        if (!me.email) throw new Error("Sign in again to book a space.");
         rbValidate(b);
-        const ref = doc(collection(db, "roomBookings"));
-        const slots = rbSlotIds(b.roomId, b.date, b.startMin, b.endMin);
+        const ref = doc(collection(db, "roomBookings")), dayRef = rbDayRef(b.roomId, b.date);
+        const legacy = rbLegacyIds(b.roomId, b.date, b.startMin, b.endMin);
         await runTransaction(db, async (tx) => {
-            const snaps = await Promise.all(slots.map(id => tx.get(doc(db, "roomSlots", id))));
-            if (snaps.some(sn => sn.exists())) throw new Error("SLOT_TAKEN");
+            if (RB_PRESENCE_IDS.indexOf(b.roomId) > -1 && b.date === rbIst().date) {
+                const ps = await tx.get(doc(db, "roomPresence", b.roomId));
+                if (ps.exists() && ps.data().present === true) throw new Error("This person is present, so the space can not be booked today.");
+            }
+            const ds = await tx.get(dayRef);
+            const items = ds.exists() ? (ds.data().items || {}) : {};
+            if (rbHit(items, b.startMin, b.endMin)) throw new Error("SLOT_TAKEN");
+            const ls = await Promise.all(legacy.map(id => tx.get(doc(db, "roomSlots", id))));
+            if (ls.some(sn => sn.exists())) throw new Error("SLOT_TAKEN");
             tx.set(ref, {
-                roomId: b.roomId, date: b.date, startMin: b.startMin, endMin: b.endMin,
+                roomId: b.roomId, date: b.date, startMin: b.startMin, endMin: b.endMin, v: 2,
                 title: String(b.title).trim(), notes: String(b.notes || "").slice(0, 500),
                 attendees: rbCleanAttendees(b.attendees),
                 bookedBy: me.email, bookedByName: me.name,
                 createdAt: serverTimestamp(), updatedAt: serverTimestamp()
             });
-            slots.forEach(id => tx.set(doc(db, "roomSlots", id), { bookingId: ref.id, roomId: b.roomId, date: b.date, by: me.email }));
+            tx.set(dayRef, { items: Object.assign({}, items, { [ref.id]: { s: b.startMin, e: b.endMin, by: me.email } }) });
         });
         return ref.id;
     },
@@ -1574,16 +1617,19 @@ window.olfRooms = {
             const old = cur.data();
             if (old.bookedBy !== me.email) throw new Error("You can only change your own bookings.");
             const next = Object.assign({}, old, b, { roomId: old.roomId, date: old.date });
-            rbValidate(next);
-            const oldIds = rbSlotIds(old.roomId, old.date, old.startMin, old.endMin);
-            const newIds = rbSlotIds(old.roomId, old.date, next.startMin, next.endMin);
-            const added = newIds.filter(x => oldIds.indexOf(x) < 0);
-            const snaps = await Promise.all(added.map(sid => tx.get(doc(db, "roomSlots", sid))));
-            if (snaps.some(sn => sn.exists())) throw new Error("SLOT_TAKEN");
-            oldIds.filter(x => newIds.indexOf(x) < 0).forEach(sid => tx.delete(doc(db, "roomSlots", sid)));
-            added.forEach(sid => tx.set(doc(db, "roomSlots", sid), { bookingId: id, roomId: old.roomId, date: old.date, by: old.bookedBy }));
+            rbValidate(next, { allowPastStart: next.startMin === old.startMin || next.startMin === old.fromMin });
+            const dayRef = rbDayRef(old.roomId, old.date);
+            const ds = await tx.get(dayRef);
+            const items = ds.exists() ? (ds.data().items || {}) : {};
+            if (rbHit(items, next.startMin, next.endMin, id)) throw new Error("SLOT_TAKEN");
+            const oldLegacy = old.v === 2 ? [] : rbSlotIds(old.roomId, old.date, old.startMin, old.endMin);
+            const newLegacy = rbLegacyIds(old.roomId, old.date, next.startMin, next.endMin).filter(x => oldLegacy.indexOf(x) < 0);
+            const ls = await Promise.all(newLegacy.map(sid => tx.get(doc(db, "roomSlots", sid))));
+            if (ls.some(sn => sn.exists())) throw new Error("SLOT_TAKEN");
+            oldLegacy.forEach(sid => tx.delete(doc(db, "roomSlots", sid)));
+            tx.set(dayRef, { items: Object.assign({}, items, { [id]: { s: next.startMin, e: next.endMin, by: old.bookedBy } }) });
             tx.update(ref, {
-                startMin: next.startMin, endMin: next.endMin,
+                startMin: next.startMin, endMin: next.endMin, v: 2, fromMin: null, toMin: null,
                 title: String(next.title).trim(), notes: String(next.notes || "").slice(0, 500),
                 attendees: rbCleanAttendees(next.attendees), updatedAt: serverTimestamp()
             });
@@ -1599,7 +1645,13 @@ window.olfRooms = {
             if (!cur.exists()) return;
             const old = cur.data();
             if (old.bookedBy !== me.email && !me.isAdmin) throw new Error("You can only cancel your own bookings.");
-            rbSlotIds(old.roomId, old.date, old.startMin, old.endMin).forEach(sid => tx.delete(doc(db, "roomSlots", sid)));
+            const dayRef = rbDayRef(old.roomId, old.date);
+            const ds = await tx.get(dayRef);
+            if (old.v !== 2) rbSlotIds(old.roomId, old.date, old.startMin, old.endMin).forEach(sid => tx.delete(doc(db, "roomSlots", sid)));
+            if (ds.exists()) {
+                const items = Object.assign({}, ds.data().items || {});
+                if (items[id]) { delete items[id]; tx.set(dayRef, { items }); }
+            }
             tx.delete(ref);
         });
     },

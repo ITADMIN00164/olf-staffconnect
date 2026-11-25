@@ -2,7 +2,7 @@
 //
 // How to use:
 //   1. Open Firebase console > Firestore Database > Rules.
-//   2. Paste the three "match" blocks below INSIDE your existing
+//   2. Paste the "match" blocks below INSIDE your existing
 //      "match /databases/{database}/documents { ... }" block, and add the two
 //      helper functions next to your other functions (skip any you already have
 //      with the same name).
@@ -10,12 +10,14 @@
 //
 // What they do:
 //   - Anyone signed in can read rooms, bookings and slots (needed for the day view).
-//   - You can create a booking only as yourself, only in 9:00 am - 7:00 pm, in 15-minute steps.
+//   - You can create a booking only as yourself, only in 9:00 am - 7:00 pm, to the minute.
 //   - You can change or delete only your own bookings. The IT admin can delete anyone's.
-//   - Each 15-minute slot is its own document with a fixed id (roomId_date_HHMM).
-//     A slot can only be created if it does not exist yet, which is what stops two
-//     people booking the same time.
+//   - Each space and date has one small record (roomDays) of its bookings. The app checks it inside a
+//     transaction, which is what stops two people booking the same minutes. Older bookings kept in
+//     15-minute slot records (roomSlots) are still honoured.
 //   - Only the IT admin can rename or switch off rooms.
+//   - Anyone signed in can mark the CEO, COO and CoS spaces present or not present (roomPresence).
+//     This needs the new roomPresence block below: paste it too, or Present / Not present will not save.
 
     function rbSignedIn() { return request.auth != null && request.auth.token.email != null; }
     function rbMe() { return request.auth.token.email.lower(); }
@@ -33,7 +35,6 @@
         && request.resource.data.title is string
         && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120
         && request.resource.data.startMin is int && request.resource.data.endMin is int
-        && request.resource.data.startMin % 15 == 0 && request.resource.data.endMin % 15 == 0
         && request.resource.data.startMin >= 540 && request.resource.data.endMin <= 1140
         && request.resource.data.endMin > request.resource.data.startMin;
       allow update: if rbSignedIn()
@@ -44,10 +45,47 @@
         && request.resource.data.title is string
         && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120
         && request.resource.data.startMin is int && request.resource.data.endMin is int
-        && request.resource.data.startMin % 15 == 0 && request.resource.data.endMin % 15 == 0
         && request.resource.data.startMin >= 540 && request.resource.data.endMin <= 1140
         && request.resource.data.endMin > request.resource.data.startMin;
       allow delete: if rbSignedIn() && (resource.data.bookedBy == rbMe() || rbAdmin());
+    }
+
+    // Who is in the office: the CEO, COO and CoS spaces can be marked present. Anyone signed in can see it and change it.
+    match /roomPresence/{roomId} {
+      allow read: if rbSignedIn();
+      allow create, update: if rbSignedIn()
+        && roomId in ['ceo', 'coo', 'cos']
+        && request.resource.data.present is bool
+        && request.resource.data.by == rbMe();
+      allow delete: if false;
+    }
+
+    // One small record per space and date, holding that day's bookings as { bookingId: { s: start, e: end, by: email } } in exact minutes.
+    // The booking code checks it inside a transaction so two bookings can never overlap. Each person can only add, change or remove
+    // their own entry (the IT admin can remove anyone's), and only one entry at a time.
+    function rbDayDiff() { return request.resource.data.items.diff(resource.data.items); }
+    match /roomDays/{dayId} {
+      allow read: if rbSignedIn();
+      allow create: if rbSignedIn()
+        && request.resource.data.keys().hasOnly(['items'])
+        && request.resource.data.items.size() == 1
+        && request.resource.data.items[request.resource.data.items.keys()[0]].by == rbMe();
+      allow update: if rbSignedIn()
+        && request.resource.data.keys().hasOnly(['items'])
+        && rbDayDiff().affectedKeys().size() == 1
+        && (
+          (rbDayDiff().addedKeys().size() == 1
+            && request.resource.data.items[rbDayDiff().addedKeys().toList()[0]].by == rbMe())
+          || (rbDayDiff().removedKeys().size() == 1
+            && (resource.data.items[rbDayDiff().removedKeys().toList()[0]].by == rbMe() || rbAdmin()))
+          || (rbDayDiff().changedKeys().size() == 1
+            && resource.data.items[rbDayDiff().changedKeys().toList()[0]].by == rbMe()
+            && request.resource.data.items[rbDayDiff().changedKeys().toList()[0]].by == rbMe())
+        );
+      // If Publish reports an error on the two rules above, or bookings fail with "permission denied", use this simpler version instead
+      // (any signed-in person may write the record, so it checks less):
+      //   allow create, update: if rbSignedIn() && request.resource.data.keys().hasOnly(['items']);
+      allow delete: if false;
     }
 
     match /roomSlots/{slotId} {
