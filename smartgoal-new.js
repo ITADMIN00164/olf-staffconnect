@@ -1519,7 +1519,26 @@ function dbRenderReview() {
     + dbCard(tDept ? 'People in ' + esc(tDept) : 'Departments', refMonth ? 'performance in ' + refMonth + ' and the two months before' : '', table);
 }
 
+// Only an admin can look at other departments on the Dashboard: everyone else is kept to their own, and sees it as a label.
+function dashLockDept() {
+  var dEl = document.getElementById('dash-dept-filter'); if (!dEl) return;
+  var w = dEl.closest ? dEl.closest('.sgp-f') : null, st = document.getElementById('dash-dept-static');
+  if (currentUser.role !== ROLES.ADMIN) {
+    var depts = DB.settings.depts || [], own = depts.indexOf(currentUser.dept) > -1 ? currentUser.dept : '';
+    if (dEl.value !== own) dEl.value = own;
+    if (w) {
+      if (!st) {
+        st = document.createElement('div'); st.id = 'dash-dept-static'; st.className = 'sgp-f';
+        st.innerHTML = '<span>Department</span><div class="sgp-static"></div>';
+        w.parentNode.insertBefore(st, w.nextSibling);
+      }
+      st.querySelector('.sgp-static').textContent = own || currentUser.dept || '—';
+      w.hidden = true; st.hidden = false;
+    }
+  } else if (w) { w.hidden = false; if (st) st.hidden = true; }
+}
 function renderDashboard() {
+  dashLockDept();
   const year = document.getElementById('dash-year-filter')?.value || '';
   const month = document.getElementById('dash-month-filter')?.value || '';
   const deptFilter = document.getElementById('dash-dept-filter')?.value || currentDept;
