@@ -2386,7 +2386,8 @@
      District recognition event: once per district (highest PO value).
      A target of 0 means "not set".
      Nov 2026: a district with its own row in district_targets for the month (Admin > Targets,
-     Level: District) uses that row instead of its PO rows. A district without one falls back
+     Level: District) uses that row instead of its PO rows. Per column: a blank cell in the district
+     row falls back to that district's PO rows (ops plans carry no Kathawli / visits / case study). A district without one falls back
      to the PO rows as above, so months uploaded before keep their numbers. */
   var TGT_LABEL = {
     story_telling: "Story Telling", poetry_recitation: "Poetry Recitation", creative_writing: "Creative Writing",
@@ -2419,7 +2420,7 @@
     }
 
     var districts = unit === "District" ? [value] : ((person(value) || {}).assigned_districts || []);
-    var contributors = [];
+    var groups = [];                    // per district: its own target row (if any) + its PO rows after the block check
     var drows = await fetchAll(function () { return db().from("district_targets").select("*").eq("year", y).eq("month", m); })
       .catch(function (e) { console.warn("district_targets not loaded (PO rows are used):", e); return []; });
     out.rowsInMonth += drows.length;
@@ -2427,11 +2428,8 @@
       var dk = normDist(dn), dist = ORG.distByKey[dk];
       var dBlocks = dist ? dist.blocks.map(normBlock) : [];
       var drow = drows.filter(function (x) { return normDist(x.district) === dk; })[0];
-      if (drow) {                       // the district's own target row wins
-        contributors.push({ r: drow, name: "District target", blocks: dBlocks, district: dist ? dist.name : dn, dTotal: dBlocks.length,
-                            status: "counted", note: "District row (Admin \u2192 Targets, Level: District)" });
-        return;
-      }
+      var dc = drow ? { r: drow, name: "District target", blocks: dBlocks, district: dist ? dist.name : dn, dTotal: dBlocks.length,
+                        status: "counted", note: "District row (Admin \u2192 Targets, Level: District)" } : null;
       var cand = rows.filter(function (x) { return normDist(x.district) === dk; }).map(function (x) {
         var p = person(x.po_id);
         var bl = p ? (p.assigned_blocks || []).map(normBlock).filter(function (b) { return dBlocks.indexOf(b) >= 0; }) : [];
@@ -2453,13 +2451,22 @@
             c.blocks.forEach(function (b) { if (!covered[b]) covered[b] = c.name; });
           }
         }
-        contributors.push(c);
       });
+      groups.push({ dc: dc, pos: cand });
     });
 
-    out.unitRows = contributors.length;
+    out.unitRows = groups.reduce(function (a, g) { return a + (g.dc ? 1 : 0) + g.pos.length; }, 0);
     TGT_KEYS.forEach(function (k) {
       if (k === "posts_per_teacher") { out.cols[k] = { value: 1, fixed: true, parts: [] }; return; }
+      // A district row's value wins for this column; a blank cell in it (e.g. Kathawli, visits, case
+      // study - not in the ops plan) falls back to that district's PO rows, as if it had no district row.
+      var contributors = [];
+      groups.forEach(function (g) {
+        if (g.dc && tnum(g.dc.r[k]) != null) contributors.push(g.dc);
+        else g.pos.forEach(function (c) {
+          contributors.push(g.dc ? Object.assign({}, c, { note: (c.note ? c.note + " \u00B7 " : "") + "district row blank here, PO rows used" }) : c);
+        });
+      });
       var perDistrict = k === "district_recognition_event", parts = [], total = 0, best = {};
       contributors.forEach(function (c) {
         var v = tnum(c.r[k]);
