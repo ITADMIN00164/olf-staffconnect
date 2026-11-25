@@ -3667,31 +3667,34 @@
     if (v === null || v === undefined || v === "") return '<span class="pr-mut">—</span>';
     return pct ? fmtNum(Math.round(v * 1000) / 10) + "%" : fmtNum(r2(v));
   }
+  // Column groups take turns between two tints; the total column has its own colour.
+  function qyGrpCls(c, i) { return c.tot ? " qy-tot" : (i % 2 ? " qy-alt" : " qy-base"); }
   function qyMatrix(cols, opts) {
     var open = opts.open || {}, cls = "pr-tbl pr-mo-tbl qy-tbl";
     cols.forEach(function (c, i) { if (open[i] || opts.fixed) cls += " qy-o" + i; });
     var h1 = '<tr><th class="pr-item" rowspan="2">Item</th><th class="pr-num" rowspan="2">Weight</th>', h2 = "<tr>";
     cols.forEach(function (c, i) {
       var o = !!(open[i] || opts.fixed);
-      h1 += '<th class="qy-ph' + (c.tot ? " qy-tot" : "") + '" data-p="' + i + '" colspan="' + (o ? 4 : 1) + '"><div class="qy-phin">'
+      var gc = qyGrpCls(c, i);
+      h1 += '<th class="qy-ph' + gc + '" data-p="' + i + '" colspan="' + (o ? 4 : 1) + '"' + (c.tip ? ' title="' + esc(c.tip) + '"' : "") + '><div class="qy-phin">'
         + (opts.fixed ? "" : '<button type="button" class="qy-tog" data-p="' + i + '" aria-expanded="' + o + '" title="Show / hide target, done and % done">' + (o ? "−" : "+") + "</button>")
-        + '<span class="qy-plbl">' + esc(c.label) + (c.sub ? '<small>' + esc(c.sub) + "</small>" : "") + "</span></div></th>";
-      h2 += '<th class="pr-num qy-det" data-p="' + i + '">Target</th><th class="pr-num qy-det" data-p="' + i + '">Done</th>'
-        + '<th class="pr-num qy-det" data-p="' + i + '">% done</th><th class="pr-num qy-sc' + (c.tot ? " qy-tot" : "") + '" data-p="' + i + '">Score</th>';
+        + '<span class="qy-plbl">' + esc(c.label) + "</span>" + (c.future ? '<span class="qy-future">Not yet</span>' : "") + "</div></th>";
+      h2 += '<th class="pr-num qy-det' + gc + '" data-p="' + i + '">Target</th><th class="pr-num qy-det' + gc + '" data-p="' + i + '">Done</th>'
+        + '<th class="pr-num qy-det' + gc + '" data-p="' + i + '">% done</th><th class="pr-num qy-sc' + gc + '" data-p="' + i + '">Score</th>';
     });
     h1 += "</tr>"; h2 += "</tr>";
     var cellsFor = function (get, scoreOnly) {
       return cols.map(function (c, i) {
         var x = get(c) || {};
-        var tc = c.tot ? " qy-tot" : "";
+        var tc = qyGrpCls(c, i);
         return '<td class="pr-num qy-det' + tc + '" data-p="' + i + '">' + (scoreOnly ? "" : qyFmt(x.t)) + "</td>"
           + '<td class="pr-num qy-det' + tc + '" data-p="' + i + '">' + (scoreOnly ? "" : qyFmt(x.d)) + "</td>"
           + '<td class="pr-num qy-det' + tc + '" data-p="' + i + '">' + (scoreOnly ? "" : qyFmt(x.p, true)) + "</td>"
           + '<td class="pr-num qy-sc' + tc + '" data-p="' + i + '">' + (x.sHtml != null ? x.sHtml : (x.hideS ? "" : qyFmt(x.s))) + "</td>";
       }).join("");
     };
-    var body = '<tr class="qy-totrow"><td class="pr-item">Total score<div class="pr-mo-sub">G1\u2013G4 (out of ' + QY_MAX + ') scaled to ' + QY_OUTOF + '</div></td><td class="pr-num">' + QY_OUTOF + "</td>"
-      + cellsFor(function (c) { return { sHtml: c.ev.n ? fmtNum(r2(qyScale(c.ev.total))) + '<small> / ' + QY_OUTOF + "</small>" : '<span class="pr-mut">\u2014</span>' }; }, true) + "</tr>";
+    var body = '<tr class="qy-totrow"><td class="pr-item" title="G1\u2013G4 (out of ' + QY_MAX + ') scaled to ' + QY_OUTOF + '">Total score</td><td class="pr-num">' + QY_OUTOF + "</td>"
+      + cellsFor(function (c) { return { sHtml: c.ev.n ? fmtNum(r2(qyScale(c.ev.total))) : '<span class="pr-mut">\u2014</span>' }; }, true) + "</tr>";
     QY_GOALS.forEach(function (g) {
       var gid = opts.id + g.key;
       body += '<tr class="pr-grp qy-goal" data-grp="' + gid + '" data-goal="' + g.key + '"><td class="pr-item"><span class="pr-caret">▸</span><span class="pr-grp-k">' + g.key + "</span>" + esc(g.title) + "</td>"
@@ -3708,8 +3711,7 @@
                 : r.academic ? "Target: the district's exams in the Academic Plan for the period. Done: exams ticked Completed for the district on the Monthly tab."
                 : (r.note || "");
         var lbl = r.academic ? "Exams planned vs completed" : r.label;
-        body += '<tr class="pr-row pr-hidden pr-mo-l' + r.lvl + '" data-secrow="' + gid + '"><td class="pr-item">' + esc(lbl)
-          + (sub ? '<div class="pr-mo-sub">' + esc(sub) + "</div>" : "") + "</td>"
+        body += '<tr class="pr-row pr-hidden pr-mo-l' + r.lvl + '" data-secrow="' + gid + '"><td class="pr-item"' + (sub ? ' title="' + esc(sub) + '"' : "") + ">" + esc(lbl) + "</td>"
           + '<td class="pr-num">' + (r.w != null ? r.w : "") + "</td>"
           + cellsFor(function (c) { var x = c.ev.rows[key] || {};
               if (x.skip) return { t: null, d: null, p: null, sHtml: weighted ? '<span class="pr-mut" title="Not used for a quarter / year">n/a</span>' : "" };
@@ -4053,23 +4055,21 @@
       html += qyStatusBanner(per, "quarter", qLabel) + qyReviewTable("q", per, "quarter");
       body.innerHTML = html;
       var paint = function () {
-        var cols = d.months.map(function (mp, i) { return { label: "Month " + (i + 1), sub: qyMonLabel(mp.month) + (mp.future ? " \u00B7 not yet" : ""), ev: qyEval({ view: mp.view, future: mp.future }, {}) }; });
+        var cols = d.months.map(function (mp, i) { return { label: qyMonLabel(mp.month), tip: "Month " + (i + 1) + " \u00B7 the Monthly figures", future: mp.future, ev: qyEval({ view: mp.view, future: mp.future }, {}) }; });
         var qev = qyEval(per, QDIRTY);
-        cols.push({ label: "Quarter total", sub: qLabel, ev: qev, tot: true });
+        cols.push({ label: "Q" + d.q + " total", tip: qLabel + " \u00B7 this quarter's own uploads and entries", ev: qev, tot: true });
         $("prQCards").innerHTML = qyGoalCards(qev, "Quarter score · " + qLabel);
-        $("prQMatrix").innerHTML = '<p class="qy-hint">Click <b>+</b> on a column to see target, done and % done. Click a goal to see its lines. Month columns are the Monthly figures; the Quarter total uses this quarter\'s own uploads and entries.</p>'
-          + qyMatrix(cols, { id: "q", qy: true, open: (QY_OPEN.q = QY_OPEN.q || { 3: true }) });
+        $("prQMatrix").innerHTML = qyMatrix(cols, { id: "q", qy: true, open: (QY_OPEN.q = QY_OPEN.q || { 3: true }) });
         qyBindMatrix("#prQMatrix");
       };
       paint();
       qyBindAfter("#prQBody", per, "quarter", paint, function () { qyLoad(k); });
     } else if (k === "yearly") {
-      var cols = [1, 2, 3, 4].map(function (q) { return { label: "Q" + q, sub: qyQRange(q) + (y.periods[q].future ? " \u00B7 not yet" : ""), ev: qyEval(y.periods[q], {}) }; });
+      var cols = [1, 2, 3, 4].map(function (q) { return { label: "Q" + q + " \u00B7 " + qyQRange(q), future: y.periods[q].future, ev: qyEval(y.periods[q], {}) }; });
       var cards = cols.map(function (c, i) { return { goal: "G" + (i + 1), label: "Q" + (i + 1) + " · " + qyQRange(i + 1), v: c.ev.n ? qyScale(c.ev.total) : null, max: QY_OUTOF,
         foot: c.ev.future ? "Not started yet" : c.ev.n ? c.ev.n + " of " + QY_GOALS.length + " goals scored" : "No data yet" }; });
       html += qyCards(cards);
       if (y.missing.length) html += qyDataNotes(y.periods[1], "quarter", y.missing);
-      html += '<p class="qy-hint">Each quarter: G1 from the Academic Plan and the Monthly reviews, G2 · G3 from that quarter\'s uploads, G4 from that quarter\'s review. Click <b>+</b> on a quarter for target, done and % done.</p>';
       html += '<div id="prYMatrix">' + qyMatrix(cols, { id: "y", qy: true, open: (QY_OPEN.y = QY_OPEN.y || {}) }) + "</div>";
       body.innerHTML = html;
       qyBindMatrix("#prYMatrix");
@@ -4084,7 +4084,7 @@
       var paintF = function () {
         var ev = qyEval(fy, QDIRTY);
         $("prFCards").innerHTML = qyGoalCards(ev, open ? "Year to date · " + yLabel : "Year score · " + yLabel);
-        $("prFMatrix").innerHTML = qyMatrix([{ label: open ? "Year to date" : "Whole year", sub: yLabel, ev: ev, tot: true }], { id: "f", qy: true, fixed: true });
+        $("prFMatrix").innerHTML = qyMatrix([{ label: (open ? "Year to date" : "Whole year") + " \u00B7 " + yLabel, ev: ev, tot: true }], { id: "f", qy: true, fixed: true });
         qyBindMatrix("#prFMatrix");
       };
       paintF();
