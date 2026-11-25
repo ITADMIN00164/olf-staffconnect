@@ -1,5 +1,5 @@
 /* OLF Staff Connect - Spaces: room booking (rooms.js)
- * Five rooms, 15-minute slots, instant booking by any signed-in person.
+ * Five spaces, bookings to the exact minute, instant booking by any signed-in person.
  * All data goes through window.olfRooms (defined in app.js, backed by Firestore),
  * so this file never touches Firebase itself. Everything is namespaced under #rb-app.
  */
@@ -13,7 +13,7 @@ var ROOMS0 = [
   { id: 'coo',       name: 'COO Space',      label: 'COO',        icon: 'case' },
   { id: 'cos',       name: 'CoS Space',      label: 'Chief of Staff', icon: 'board' }
 ];
-var OPEN = 9 * 60, CLOSE = 19 * 60, STEP = 15, CELLS = (CLOSE - OPEN) / STEP, HORIZON = 30;
+var OPEN = 9 * 60, CLOSE = 19 * 60, HORIZON = 30;
 var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 var DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 var DURS = [[15, '15 min'], [30, '30 min'], [45, '45 min'], [60, '1 hour'], [90, '1.5 hours'], [120, '2 hours']];
@@ -53,7 +53,7 @@ var S = null;
 function fresh() {
   return { date: ist().date, view: 'day', rooms: [], cfg: {}, bookings: [], loading: true, selRoom: null, sel: null, drag: null,
            draft: { title: '', notes: '', att: [], more: false, err: '' }, freshId: null, mine: null, showPast: false, staff: null,
-           unsub: null, timer: null, clockT: null, me: null, modal: null, at: null, route: '' };
+           unsub: null, timer: null, clockT: null, me: null, modal: null, at: null, route: '', presence: {}, unsubP: null };
 }
 
 // ── rooms (the five defaults, with any admin changes on top) ──
@@ -78,18 +78,64 @@ function dayState(date) {
   if (date > addDays(now.date, HORIZON)) return { open: false, why: 'You can book up to ' + HORIZON + ' days ahead.' };
   return { open: true };
 }
-function cellBooking(roomId, k) {
-  var m = OPEN + k * STEP;
-  for (var i = 0; i < S.bookings.length; i++) { var b = S.bookings[i]; if (b.roomId === roomId && b.startMin <= m && m < b.endMin) return b; }
+// ── who is in: the CEO, COO and CoS spaces can be marked "present"; while one is, it cannot be booked today ──
+var PRES = { ceo: 'CEO', coo: 'COO', cos: 'CoS' };
+function hasPresence(id) { return !!PRES[id]; }
+function isPresent(id) { var p = S && S.presence && S.presence[id]; return !!(p && p.present); }
+function presentToday(id) { return isPresent(id) && S.date === ist().date; }
+function setPresence(id, on) {
+  var prev = S.presence[id];
+  S.presence[id] = { present: on, byName: S.me.name || S.me.email, at: Date.now() };
+  if (on && S.sel && S.sel.room === id) S.sel = null;
+  drawDay();
+  if (!api.setPresence) return;
+  api.setPresence(id, on).catch(function (e) { if (!alive()) return; S.presence[id] = prev; toast(errText(e), 'err'); drawDay(); });
+}
+// Bookings are exact minutes. Older ones (made before this) were kept in 15-minute blocks; those made "from now" also carry the exact minutes.
+function normBookings(list) {
+  (list || []).forEach(function (b) {
+    if (b.v !== 2 && Number.isInteger(b.fromMin) && Number.isInteger(b.toMin)) { b.startMin = b.fromMin; b.endMin = b.toMin; }   // older bookings made "from now"
+  });
+  return list || [];
+}
+function overlapsB(b, s, e) { return b.startMin < e && s < b.endMin; }
+function conflictAt(roomId, s, e, exceptId) {
+  for (var i = 0; i < S.bookings.length; i++) { var b = S.bookings[i]; if (b.roomId === roomId && b.id !== exceptId && overlapsB(b, s, e)) return b; }
   return null;
 }
-function cellFree(roomId, k) {
-  if (k < 0 || k >= CELLS) return false;
-  var st = dayState(S.date); if (!st.open) return false;
-  if (cellBooking(roomId, k)) return false;
+function pad2(n) { return (n < 10 ? '0' : '') + n; }
+function hhmm(m) { return pad2(Math.floor(m / 60)) + ':' + pad2(m % 60); }
+function toMinutes(v) { var m = /^(\d{1,2}):(\d{2})$/.exec(String(v || '')); return m ? (+m[1]) * 60 + (+m[2]) : NaN; }
+// can a booking start at minute s (and last at least a minute)?
+function bookableFrom(roomId, s) {
+  if (!dayState(S.date).open) return false;
+  if (s < OPEN || s >= CLOSE) return false;
+  var now = ist(); if (S.date === now.date && s < now.min) return false;
+  if (presentToday(roomId)) return false;
+  return !conflictAt(roomId, s, s + 1);
+}
+// how many minutes are free from s (to the next booking, or closing time)
+function runFrom(roomId, s) {
+  var lim = CLOSE;
+  S.bookings.forEach(function (b) { if (b.roomId === roomId && b.startMin >= s && b.startMin < lim) lim = b.startMin; });
+  return Math.max(0, lim - s);
+}
+// the first minute a booking can start: now (on today), or opening time; skips over bookings
+function nextStart(roomId) {
+  var now = ist(), m = S.date === now.date ? Math.max(OPEN, now.min) : OPEN;
+  for (var g = 0; g < 80 && m < CLOSE; g++) {
+    var hit = conflictAt(roomId, m, m + 1);
+    if (!hit) return bookableFrom(roomId, m) ? m : -1;
+    m = hit.endMin;
+  }
+  return -1;
+}
+// The first free stretch of a space (from the slot running now, on today), one hour long where it fits.
+function selFrom(id, st, isNow) { return { room: id, s: st, len: Math.max(1, Math.min(60, runFrom(id, st))), now: !!isNow }; }
+function firstFreeSel(id) {
+  var m = nextStart(id); if (m < 0) return null;
   var now = ist();
-  if (S.date === now.date && OPEN + k * STEP < now.min) return false;   // a slot that has already started cannot be booked
-  return true;
+  return selFrom(id, m, S.date === now.date && m === Math.max(OPEN, now.min) && now.min >= OPEN);
 }
 function roomBookings(roomId) { return S.bookings.filter(function (b) { return b.roomId === roomId; }).sort(function (a, b) { return a.startMin - b.startMin; }); }
 
@@ -104,7 +150,7 @@ function toast(msg, kind) {
 }
 function errText(e) {
   var m = e && e.message ? e.message : String(e || '');
-  if (m === 'SLOT_TAKEN') return 'Someone just booked that time. Pick another slot.';
+  if (m === 'SLOT_TAKEN') return 'Someone just booked that time. The next free time is shown instead.';
   if (/permission|insufficient/i.test(m)) return 'You do not have permission to do that.';
   return m || 'Something went wrong. Try again.';
 }
@@ -120,7 +166,7 @@ function glide() {}
 function openX(v) {
   var m = $('rb-xmodal'); if (!m) return;
   $('rb-xtitle').textContent = v === 'rooms' ? 'Manage spaces' : 'My bookings';
-  $('rb-xsub').textContent = v === 'rooms' ? 'Rename, reorder or switch rooms on and off.' : 'Your upcoming and recent bookings.';
+  $('rb-xsub').textContent = v === 'rooms' ? 'Rename, reorder or switch spaces on and off.' : 'Your upcoming and recent bookings.';
   $('rb-v-mine').hidden = v !== 'mine'; $('rb-v-rooms').hidden = v !== 'rooms';
   var cb = m.querySelector('.rb-x'); if (cb) cb.innerHTML = ic('x');
   m.classList.add('open'); m.setAttribute('aria-hidden', 'false');
@@ -158,6 +204,7 @@ function statusOf(r) {
   }
   if (S.date === now.date && now.min >= CLOSE) return { cls: 'closed', txt: 'Closed for today' };
   if (S.date === now.date && now.min < OPEN) { var f = bs[0]; return { cls: 'free', txt: 'Opens at ' + fmin(OPEN) }; }
+  if (S.date === now.date && isPresent(r.id)) return { cls: 'present', txt: 'Present, not available' };
   if (S.date === now.date) {
     var cur = null, nxt = null;
     bs.forEach(function (b) { if (b.startMin <= now.min && now.min < b.endMin) cur = b; else if (b.startMin > now.min && (!nxt || b.startMin < nxt.startMin)) nxt = b; });
@@ -181,7 +228,7 @@ function drawTiles() {
     else if (nxt) line = '<span class="big">Next: ' + esc(nxt.title) + '</span><span class="cd">At ' + fmin(nxt.startMin) + ', in ' + dur(nxt.startMin - now.min) + '</span>';
     else if (bs.length) line = '<span class="big">' + bs.length + (bs.length === 1 ? ' booking' : ' bookings') + '</span><span class="cd">' + esc(s.txt) + '</span>';
     else line = '<span class="big">' + (s.cls === 'closed' ? esc(s.txt || 'Closed') : 'Nothing booked') + '</span>' + (s.cls === 'closed' ? '' : '<span class="cd">Free all day</span>');
-    var canNow = today && !cur && s.cls === 'free' && cellFree(r.id, Math.max(0, Math.ceil((Math.max(OPEN, now.min) - OPEN) / STEP)));
+    var canNow = today && !cur && s.cls === 'free' && bookableFrom(r.id, now.min);
     var quick = canNow ? '<button type="button" class="rb-quick" data-quick="' + r.id + '">' + ic('bolt') + ' Book now</button>'
       : '<button type="button" class="rb-quick" data-pick="' + r.id + '"' + (dayState(S.date).open ? '' : ' disabled') + '>' + ic('clock') + ' Choose a time</button>';
     var band = s.cls === 'busy' ? 'In use' : (s.cls === 'closed' ? 'Closed' : 'Available');
@@ -241,6 +288,8 @@ function countUp(el) {
 // The office plan, in pixels on a 760 x 480 floor: a column down the left wall (interview, meeting, CEO, COO) behind glass, open floor with the entrance at the top, a long wall down the middle, and CoS in the bottom-right corner.
 var MW = 660, MH = 520, WT = 9, MLEFT = 230, MW0 = 660, COSW = 170;
 var MAPPOS = { interview: [0, 0, 16.6], meeting: [0, 16.6, 37.5], ceo: [0, 54.1, 29.2], coo: [0, 83.3, 16.7] };
+// On a big screen the walls stand up in front of the rooms behind them, so the rooms are given more even heights and the glass between them is lower.
+var MAPPOS_D = { interview: [0, 0, 22], meeting: [0, 22, 26], ceo: [0, 48, 26], coo: [0, 74, 26] };
 var PAL = { wood: '#A8774D', walnut: '#7A5233', shelf: '#A9794A', chair: '#394458', sofa: '#3E8E8B', screen: '#1F2937', pot: '#C9714A', wall: '#F7F9FC', table: '#B9824F' };
 var WHF = 1;
 function bx(x, y, w, h, z, c, cls) { return '<div class="rb-bx' + (cls ? ' ' + cls : '') + '" style="left:' + x + 'px;top:' + y + 'px;width:' + w + 'px;height:' + h + 'px;--h:' + Math.max(3, Math.round(z * WHF)) + 'px;--c:' + c + '"><i class="bt"></i><i class="bs"></i><i class="bw"></i></div>'; }
@@ -278,7 +327,7 @@ function drawMap() {
     MIDX = Math.round(MW / 2) + 50;
   } else {
     // desktop: the plan is drawn to the size of the card, so it fills it edge to edge, down to the bottom of the page
-    WHF = 1; rxd = 52; camZ = -4;
+    WHF = .85; rxd = 52; camZ = -4;
     stage.style.height = ''; stage.style.paddingTop = '56px';
     if (!S.mapAvail) { var av = mapAvail(map); if (av > 300) S.mapAvail = av; }
     map.style.height = Math.max(S.mapAvail || 600, 420) + 'px';
@@ -296,7 +345,7 @@ function drawMap() {
   sc.style.setProperty('--rx', rxd + 'deg'); sc.style.setProperty('--rz', camZ + 'deg');
   sc.style.setProperty('--k', k.toFixed(3)); sc.style.width = MW + 'px'; sc.style.height = MH + 'px';
   var rects = {}, walls = '', doors = '';
-  Object.keys(MAPPOS).forEach(function (id) { var p = MAPPOS[id]; rects[id] = [0, Math.round(p[1] / 100 * MH), MLEFT, Math.round(p[2] / 100 * MH)]; });
+  Object.keys(MAPPOS).forEach(function (id) { var p = (mobile ? MAPPOS : MAPPOS_D)[id]; rects[id] = [0, Math.round(p[1] / 100 * MH), MLEFT, Math.round(p[2] / 100 * MH)]; });
   rects.cos = [MW - COSW, Math.round(.708 * MH), COSW, MH - Math.round(.708 * MH)];
   var mid = MIDX, el = mid - 20, er = mid + 20;
   // outer walls, with a gap in the top wall for the entrance
@@ -308,7 +357,7 @@ function drawMap() {
     var r = rects[id], m = r[1] + Math.round(r[3] / 2), g = 20;
     walls += wallBox(MLEFT, r[1], WT, m - g - r[1], 42, 'glass') + wallBox(MLEFT, m + g, WT, r[1] + r[3] - m - g, 42, 'glass');
     doors += '<div class="rb-door" style="left:' + (MLEFT - 2) + 'px;top:' + (m - g) + 'px;width:' + (WT + 4) + 'px;height:' + (2 * g) + 'px"></div>';
-    if (r[1] > 0) walls += wallBox(0, r[1] - Math.round(WT / 2), MLEFT, WT, 38, 'glass');
+    if (r[1] > 0) walls += wallBox(0, r[1] - Math.round(WT / 2), MLEFT, WT, mobile ? 38 : 22, 'glass');
   });
   var c = rects.cos, cm = c[1] + Math.round(c[3] / 2);
   walls += wallBox(c[0] - WT, c[1] - WT, c[2] + WT, WT, 38, 'glass') + wallBox(c[0] - WT, c[1] - WT, WT, cm - 20 - c[1] + WT, 42, 'glass') + wallBox(c[0] - WT, cm + 20, WT, c[1] + c[3] - cm - 20, 42, 'glass');
@@ -320,8 +369,8 @@ function drawMap() {
     return '<div class="rb-bb rb-lampw" style="left:' + Math.round(lx) + 'px;top:' + ly + 'px;--z:' + Math.round(34 * WHF) + 'px"><i class="rb-lamp ' + cls + '"></i></div>';
   }).join('');
   var floors = vis.map(function (r) {
-    var q = rects[r.id] || [260, 150, 150, 100], s = statusOf(r), cur = curBooking(r), mine = !!(cur && S.me && cur.bookedBy === S.me.email);
-    var pill = small ? (s.cls === 'busy' ? (mine ? 'Yours' : 'In use') : (s.cls === 'closed' ? 'Closed' : 'Free')) : (q[3] < 100 ? (s.cls === 'busy' ? (mine ? 'Yours' : 'In use') : (s.cls === 'closed' ? 'Closed' : 'Available')) : (s.cls === 'free' ? s.txt.replace('Free for the rest of the day', 'Free all day') : (mine ? s.txt.replace('In use', 'Yours') : s.txt)));
+    var q = rects[r.id] || [260, 150, 150, 100], s = statusOf(r), cur = s.cls === 'present' ? null : curBooking(r), mine = !!(cur && S.me && cur.bookedBy === S.me.email);
+    var pill = s.cls === 'present' ? 'Present' : small ? (s.cls === 'busy' ? (mine ? 'Yours' : 'In use') : (s.cls === 'closed' ? 'Closed' : 'Free')) : (q[3] < 100 ? (s.cls === 'busy' ? (mine ? 'Yours' : 'In use') : (s.cls === 'closed' ? 'Closed' : 'Available')) : (s.cls === 'free' ? s.txt.replace('Free for the rest of the day', 'Free all day') : (mine ? s.txt.replace('In use', 'Yours') : s.txt)));
     var tv = viewMin(), prog = (cur && tv !== null && !small && q[3] >= 100) ? '<span class="rb-prog' + (mine ? ' mine' : '') + '"><i style="width:' + Math.max(4, Math.min(100, Math.round((tv - cur.startMin) / (cur.endMin - cur.startMin) * 100))) + '%"></i></span>' : '';
     var who = (cur && !small && q[3] >= 100) ? '<span class="rb-fw">' + esc(cur.title) + ' \u00B7 ' + esc(shortWho(cur.bookedByName || cur.bookedBy)) + '</span>' : '';
     return '<div class="rb-rm ' + s.cls + (mine ? ' mine' : '') + (q[3] < 100 ? ' sm' : '') + (S.selRoom === r.id ? ' on' : '') + '" data-room="' + r.id + '" tabindex="0" role="button" aria-label="' + esc(r.name + ', ' + s.txt) + '" style="left:' + q[0] + 'px;top:' + q[1] + 'px;width:' + q[2] + 'px;height:' + q[3] + 'px">'
@@ -343,21 +392,15 @@ function drawMap() {
   sc.innerHTML = routeSvg + floors + doors + walls + lamps + '<div class="rb-gate" style="left:' + Math.round((el + er) / 2) + 'px;top:-' + Math.round(WT / 2) + 'px"><div class="rb-leaf"><i></i></div></div>';
   setRoute(S.route);
 }
-function openRoomModal() { var m = $('rb-rmodal'); if (!m) return; m.classList.add('open'); m.setAttribute('aria-hidden', 'false'); S.rmodal = true; var d = $('rb-rdlg'); if (d) { d.scrollTop = 0; setTimeout(function () { var f = $('rb-title') || d.querySelector('.rb-x'); if (f) { try { f.focus({ preventScroll: true }); } catch (e) {} } }, 60); } }
+function openRoomModal() { var m = $('rb-rmodal'); if (!m) return; m.classList.add('open'); m.setAttribute('aria-hidden', 'false'); S.rmodal = true; var d = $('rb-rdlg'); if (d) { d.scrollTop = 0; setTimeout(function () { var f = d.querySelector('.rb-x'); if (f) { try { f.focus({ preventScroll: true }); } catch (e) {} } }, 60); } }
 function closeRoomModal() {
   var m = $('rb-rmodal'); if (!m) return;
   m.classList.remove('open'); m.setAttribute('aria-hidden', 'true'); S.rmodal = false;
   S.selRoom = null; S.sel = null; S.draft = { title: '', notes: '', att: [], more: false, err: '' };
   drawTiles(); drawMap();
 }
-function selectRoom(id) { S.selRoom = id; S.sel = null; S.draft.err = ''; drawTiles(); drawMap(); drawPanel(); openRoomModal(); }
-function quickBook(id) {
-  var now = ist(), k = Math.max(0, Math.ceil((Math.max(OPEN, now.min) - OPEN) / STEP));
-  if (S.date !== now.date || !cellFree(id, k)) { selectRoom(id); return; }
-  S.selRoom = id; S.sel = { room: id, a: k, z: cellFree(id, k + 1) ? k + 1 : k }; S.draft.err = '';
-  drawTiles(); drawMap(); keepFocus(drawPanel);
-  openRoomModal();
-}
+function selectRoom(id) { S.openStart = false; S.selRoom = id; S.sel = (S.date === ist().date && curBooking(roomById(id))) ? null : firstFreeSel(id); S.draft.err = ''; drawTiles(); drawMap(); drawPanel(); openRoomModal(); }
+function quickBook(id) { selectRoom(id); }
 function confetti(x, y) {
   var host = $('rb-conf'); if (!host || reduced()) return;
   var cols = ['#2F6FE4', '#1FA39A', '#FBBF24', '#F0605A', '#8B5CF6', '#4ADE80'], h = '';
@@ -371,64 +414,96 @@ function drawPanel() {
   var room = S.selRoom ? roomById(S.selRoom) : null;
   if (!room || !room.active) {
     S.selRoom = null;
-    host.innerHTML = '<p class="rb-note">' + (st.open ? 'Pick a space to see its day, then drag across free time to book it.' : esc(st.why)) + '</p>';
+    host.innerHTML = '<p class="rb-note">' + (st.open ? 'Pick a space to book it.' : esc(st.why)) + '</p>';
     return;
   }
-  var cells = '', i;
-  for (i = 0; i < CELLS; i++) {
-    var free = cellFree(room.id, i), booked = !!cellBooking(room.id, i);
-    cells += '<div class="rb-c ' + (booked ? 'bk' : (free ? 'free' : 'off')) + (S.sel && S.sel.room === room.id && i >= S.sel.a && i <= S.sel.z ? ' sel' : '') + '" data-k="' + i + '"></div>';
+  var me = S.me.email;
+  var rs = statusOf(room), cur = curBooking(room), mine = !!(cur && cur.bookedBy === me), today = S.date === now.date;
+  var cls = rs.cls === 'busy' ? (mine ? 'mine' : 'busy') : rs.cls;
+  if (!S.sel && !(today && cur) && !presentToday(room.id)) S.sel = firstFreeSel(room.id);   // a space that has just become free offers its booking form
+  var label = !st.open ? 'Closed' : (rs.cls === 'free' && today) ? 'Free now' : (mine ? String(rs.txt).replace('In use', 'Yours') : (rs.txt || ' '));
+  var head = '<div class="rb-sph ' + cls + '"><span class="rb-spi">' + ic(room.icon) + '</span><div class="rb-spt"><h3>' + esc(room.name) + '</h3><span class="rb-sps">' + esc(label) + '</span></div>'
+    + '<button type="button" class="rb-x" data-rclose aria-label="Close">' + ic('x') + '</button></div>';
+  var pres = '';
+  if (hasPresence(room.id)) {
+    var pp = S.presence[room.id] || {}, onP = !!pp.present, role = PRES[room.id];
+    var whoP = pp.byName ? 'Set by ' + pp.byName + (pp.at ? ' at ' + fmin(new Date(pp.at + 5.5 * 3600000).getUTCHours() * 60 + new Date(pp.at + 5.5 * 3600000).getUTCMinutes()) : '') : 'Anyone can change this';
+    pres = '<div class="rb-pr' + (onP ? ' on' : '') + '"><div class="rb-prh"><b>' + esc(role) + (onP ? ' is present' : ' is not present') + '</b><small>' + esc(whoP) + '</small></div>'
+      + '<div class="rb-prs" role="group" aria-label="' + esc(role) + ' presence"><button type="button" data-presence="1" class="' + (onP ? 'on' : '') + '">Present</button><button type="button" data-presence="0" class="' + (!onP ? 'on' : '') + '">Not present</button></div></div>';
   }
-  var bs = roomBookings(room.id), me = S.me.email;
-  var blocks = bs.map(function (b) {
-    var mine = b.bookedBy === me;
-    return '<button type="button" class="rb-blk' + (mine ? ' me' : '') + (S.freshId === b.id ? ' fresh' : '') + '" data-bk="' + esc(b.id) + '" style="left:' + ((b.startMin - OPEN) / (CLOSE - OPEN) * 100) + '%;width:' + ((b.endMin - b.startMin) / (CLOSE - OPEN) * 100) + '%" title="' + esc(b.title + ' - ' + fmin(b.startMin) + ' to ' + fmin(b.endMin)) + '"><span class="rb-in">' + esc(initials(b.bookedByName || b.bookedBy)) + '</span>' + esc(b.title) + '</button>';
-  }).join('');
-  var nowMark = (S.date === now.date && now.min >= OPEN && now.min <= CLOSE) ? '<div class="rb-now" style="left:' + ((now.min - OPEN) / (CLOSE - OPEN) * 100) + '%"></div>' : '';
-  var hours = ''; for (i = 0; i < 10; i++) hours += '<span>' + ((9 + i) % 12 || 12) + '</span>';
-  var list = bs.length ? '<div class="rb-list">' + bs.map(function (b) {
-    return '<button type="button" class="rb-li" data-bk="' + esc(b.id) + '"><span class="t">' + fmin(b.startMin) + ' - ' + fmin(b.endMin) + '</span><span class="m"><b>' + esc(b.title) + '</b><small>' + esc(b.bookedByName || b.bookedBy) + (b.attendees && b.attendees.length ? ' with ' + b.attendees.length + ' other' + (b.attendees.length > 1 ? 's' : '') : '') + '</small></span>' + (b.bookedBy === me ? '<span class="rb-tag me">Yours</span>' : '') + '</button>';
-  }).join('') + '</div>' : '';
-  var rs = statusOf(room);
-  host.innerHTML = '<div class="rb-panel"><div class="rb-ph"><div class="rb-phl"><span class="rb-mi2 ' + rs.cls + '">' + ic(room.icon) + '</span><div><h3>' + esc(room.name) + '</h3><span class="rb-phs ' + rs.cls + '">' + esc(rs.cls === 'free' && S.date === ist().date ? 'Available now' : (rs.txt || ' ')) + '</span></div></div><button type="button" class="rb-x" data-rclose aria-label="Close">' + ic('x') + '</button></div>'
-    + '<p class="rb-rhint">' + (st.open ? 'Drag across free time to book. Times move in 15-minute steps.' : esc(st.why)) + '</p>'
-    + '<div class="rb-stripw"><div class="rb-hrs">' + hours + '</div><div class="rb-strip' + (st.open ? '' : ' dis') + '" id="rb-strip">' + cells + blocks + nowMark + '</div></div>'
-    + '<div id="rb-form"></div>' + (S.loading ? '<p class="rb-note">Loading the day...</p>' : (bs.length || !st.open ? '' : '<p class="rb-note">Nothing booked yet. The whole day is free.</p>')) + list + '</div>';
+  var busy = '';
+  if (today && cur) {
+    busy = '<div class="rb-bz ' + cls + '"><span class="rb-av">' + esc(initials(cur.bookedByName || cur.bookedBy)) + '</span><div class="rb-bzt"><b>' + esc(cur.title) + '</b><small>' + esc(mine ? 'You' : (cur.bookedByName || cur.bookedBy)) + ' \u00B7 ' + fmin(cur.startMin) + ' to ' + fmin(cur.endMin) + '</small></div></div>'
+      + (mine ? '<button type="button" class="rb-go off" data-free-now="' + esc(cur.id) + '">Mark as free now</button>' : '');
+  }
+  var later = (today && cur && firstFreeSel(room.id) && !S.sel) ? '<button type="button" class="rb-go ghost" data-later="1">Book a later time</button>' : '';
+  host.innerHTML = '<div class="rb-panel rb-sp">' + head + '<div class="rb-spb">' + (st.open ? pres + (presentToday(room.id) ? '<p class="rb-note rb-pn">' + esc(PRES[room.id]) + ' is present, so this space cannot be booked today. Use the arrows at the top to book another day.</p>' : busy + later + '<div id="rb-form"></div>') : '<p class="rb-note">' + esc(st.why) + '</p>') + '</div></div>';
   drawForm(); paintSel();
 }
-function selTimes() { return S.sel ? { s: OPEN + S.sel.a * STEP, e: OPEN + (S.sel.z + 1) * STEP } : null; }
+function selTimes() {
+  if (!S.sel) return null;
+  var now = ist(), s0 = S.sel.now ? Math.max(OPEN, now.min) : S.sel.s;
+  var e0 = Math.min(CLOSE, s0 + S.sel.len);
+  return { s: s0, e: e0, len: e0 - s0, live: !!S.sel.now && S.date === now.date };
+}
+// The start times of a space for the day, hour by hour. Taken times are greyed out.
+// "Starts": Start now (when it is free now), or any minute you type.
+function startPanel(id, t) {
+  if (!S.openStart) return '';
+  var now = ist(), canNow = S.date === now.date && now.min >= OPEN && bookableFrom(id, now.min);
+  return '<div class="rb-sg">' + (canNow ? '<button type="button" class="rb-btn" data-startnow="1">Start now</button>' : '')
+    + '<label class="rb-tp"><span>Start time</span><input type="time" id="rb-st-time" min="09:00" max="18:59" step="60" value="' + hhmm(t.s) + '"></label>'
+    + '<button type="button" class="rb-btn pri" id="rb-st-set">Set</button></div>';
+}
+function setStart(m) {
+  var id = S.selRoom, now = ist();
+  if (isNaN(m)) { toast('Enter a start time.'); return; }
+  if (m < OPEN || m >= CLOSE) { toast('Spaces are open from ' + fmin(OPEN) + ' to ' + fmin(CLOSE) + '.'); return; }
+  if (S.date === now.date && m < now.min) { toast('That time has already passed.'); return; }
+  var hit = conflictAt(id, m, m + 1);
+  if (hit) { toast('Taken from ' + fmin(hit.startMin) + ' to ' + fmin(hit.endMin) + ' (' + (hit.title || 'booked') + '). Pick another time.'); return; }
+  readDraft();
+  var keep = S.sel ? S.sel.len : 60;
+  S.sel = { room: id, s: m, len: Math.max(1, Math.min(keep, runFrom(id, m))), now: false, picked: true };
+  S.openStart = false; drawForm();
+}
+// a thin bar of the day: what is booked, what you chose, and now
+function dayBar(id, t) {
+  var span = CLOSE - OPEN, now = ist(), me = S.me.email, bs = roomBookings(id), segs = '';
+  function pc(m) { return Math.max(0, Math.min(100, (m - OPEN) / span * 100)).toFixed(2); }
+  bs.forEach(function (b) { segs += '<i class="rb-ab-b' + (b.bookedBy === me ? ' me' : '') + '" style="left:' + pc(b.startMin) + '%;width:' + ((Math.min(b.endMin, CLOSE) - Math.max(b.startMin, OPEN)) / span * 100).toFixed(2) + '%"></i>'; });
+  var sel = '<i class="rb-ab-s" style="left:' + pc(t.s) + '%;width:' + Math.max(1, (t.e - t.s) / span * 100).toFixed(2) + '%"></i>';
+  var nowM = (S.date === now.date && now.min >= OPEN && now.min <= CLOSE) ? '<i class="rb-ab-n" style="left:' + pc(now.min) + '%"></i>' : '';
+  var lab = '<div class="rb-ab-l"><span style="left:0">9</span><span style="left:30%">12</span><span style="left:60%">3</span><span style="left:90%">6</span></div>';
+  var list = bs.slice(0, 3).map(function (b) { return '<li><b>' + fmin(b.startMin) + ' to ' + fmin(b.endMin) + '</b> ' + esc(b.title) + '</li>'; }).join('') + (bs.length > 3 ? '<li>+' + (bs.length - 3) + ' more</li>' : '');
+  return '<div class="rb-ab"><div class="rb-ab-t">' + segs + sel + nowM + '</div>' + lab + (bs.length ? '<ul class="rb-ab-ul">' + list + '</ul>' : '') + '</div>';
+}
 function drawForm() {
   var host = $('rb-form'); if (!host) return;
   if (!S.sel) { host.innerHTML = ''; return; }
   var t = selTimes(), room = roomById(S.sel.room), d = S.draft;
-  // how long this room stays free from the chosen start; longer presets that would clash are greyed out
-  var run = 0; for (var fk = S.sel.a; fk < CELLS && cellFree(S.sel.room, fk); fk++) run += STEP;
-  var len = t.e - t.s, preset = false;
-  var chips = DURS.map(function (x) { var on = x[0] === len && !d.custom; preset = preset || x[0] === len; return '<button type="button" class="rb-chip' + (on ? ' on' : '') + '" data-dur="' + x[0] + '"' + (x[0] > run ? ' disabled' : '') + '>' + x[1] + '</button>'; }).join('')
-    + '<button type="button" class="rb-chip' + (d.custom || !preset ? ' on' : '') + '" data-custom="1">Custom</button>';
-  var custom = (d.custom || !preset) ? '<div class="rb-custom"><label>Hours<input type="number" id="rb-ch" min="0" max="10" step="1" inputmode="numeric" value="' + Math.floor(len / 60) + '"></label><label>Minutes<select id="rb-cm">' + [0, 15, 30, 45].map(function (m) { return '<option value="' + m + '"' + (m === len % 60 ? ' selected' : '') + '>' + m + '</option>'; }).join('') + '</select></label><button type="button" class="rb-btn pri" id="rb-cset">Set time</button><span class="rb-chint">Free for up to ' + dur(Math.min(run, CLOSE - t.s)) + ' from ' + fmin(t.s) + '</span></div>' : '';
+  var run = runFrom(S.sel.room, t.s), len = t.len, live = t.live, preset = false;
+  var LEN = [[15, '15 min'], [30, '30 min'], [60, '1 hour'], [120, '2 hours']];
+  var chips = LEN.map(function (x) { var on = x[0] === len && !d.custom; preset = preset || x[0] === len; return '<button type="button" class="rb-chip' + (on ? ' on' : '') + '" data-dur="' + x[0] + '"' + (x[0] > run ? ' disabled' : '') + '>' + x[1] + '</button>'; }).join('')
+    + '<button type="button" class="rb-chip' + (d.custom || !preset ? ' on' : '') + '" data-custom="1">Other</button>';
+  var custom = (d.custom || !preset) ? '<div class="rb-custom"><label>Hours<input type="number" id="rb-ch" min="0" max="10" step="1" inputmode="numeric" value="' + Math.floor(len / 60) + '"></label><label>Minutes<input type="number" id="rb-cm" min="0" max="59" step="1" inputmode="numeric" value="' + (len % 60) + '"></label><button type="button" class="rb-btn" id="rb-cset">Set</button></div>' : '';
   var att = d.att.map(function (a, i) { return '<span class="rb-pill">' + esc(a.name || a.email) + '<button type="button" data-rm="' + i + '" aria-label="Remove ' + esc(a.name || a.email) + '">' + ic('x') + '</button></span>'; }).join('');
-  host.innerHTML = '<div class="rb-form">'
-    + '<div class="rb-sum">' + ic('clock') + '<b id="rb-sum">' + esc(fmin(t.s) + ' to ' + fmin(t.e)) + '</b><span>' + dur(t.e - t.s) + ' in ' + esc(room.name) + ', ' + esc(shortDate(S.date)) + '</span></div>'
-    + '<div class="rb-chips" role="group" aria-label="Length of the booking">' + chips + '</div>' + custom
-    + '<label class="rb-field' + (d.err ? ' bad' : '') + '"><span>Title</span><input type="text" id="rb-title" maxlength="120" placeholder="What is the booking for?" autocomplete="off" value="' + esc(d.title) + '">' + (d.err ? '<p class="rb-err">' + esc(d.err) + '</p>' : '') + '</label>'
-    + (d.more ? '<div class="rb-field"><span>People coming (optional)</span><div class="rb-sug"><input type="text" id="rb-attq" placeholder="Search by name" autocomplete="off"><ul id="rb-sugl" hidden></ul></div><div class="rb-att">' + att + '</div></div>'
-        + '<label class="rb-field"><span>Notes (optional)</span><textarea id="rb-notes" maxlength="500" placeholder="Anything people should know">' + esc(d.notes) + '</textarea></label>'
-      : '<p style="margin:10px 0 0"><button type="button" class="rb-link" id="rb-more">Add people and notes</button></p>')
-    + '<div class="rb-act"><button type="button" class="rb-btn pri" id="rb-book">Book ' + esc(room.name) + '</button><button type="button" class="rb-btn" id="rb-clear">Clear</button></div></div>';
+  var btn = '<button type="button" class="rb-go" id="rb-book">' + (live ? 'Book now' : 'Book ' + esc(fmin(t.s))) + '</button>';
+  host.innerHTML = '<div class="rb-bk">'
+    + '<div class="rb-when">' + (live ? '' : '<span class="rb-lv n">' + (S.sel.picked ? 'The time you picked' : 'Next free time') + '</span>')
+    + '<div class="rb-tm"><b id="rb-sum">' + esc((live ? 'Now' : fmin(t.s)) + ' to ' + fmin(t.e)) + '</b></div></div>'
+    + '<button type="button" class="rb-st" id="rb-st-btn" aria-expanded="' + (S.openStart ? 'true' : 'false') + '"><span>Starts</span><b>' + esc(live ? 'Now' : fmin(t.s)) + '</b><i aria-hidden="true"></i></button>' + startPanel(S.sel.room, t)
+    + '<div class="rb-chips rb-seg" role="group" aria-label="How long">' + chips + '</div>' + custom
+    + dayBar(S.sel.room, t)
+    + (d.more
+      ? '<label class="rb-field' + (d.err ? ' bad' : '') + '"><span>Title (optional)</span><input type="text" id="rb-title" maxlength="120" placeholder="What is the booking for?" autocomplete="off" value="' + esc(d.title) + '">' + (d.err ? '<p class="rb-err">' + esc(d.err) + '</p>' : '') + '</label>'
+        + '<div class="rb-field"><span>People coming (optional)</span><div class="rb-sug"><input type="text" id="rb-attq" placeholder="Search by name" autocomplete="off"><ul id="rb-sugl" hidden></ul></div><div class="rb-att">' + att + '</div></div>'
+        + '<label class="rb-field"><span>Notes (optional)</span><textarea id="rb-notes" maxlength="500" placeholder="Anything people should know">' + esc(d.notes) + '</textarea></label>' + btn
+      : btn + '<p class="rb-more"><button type="button" class="rb-link" id="rb-more">Add a title, people or notes</button></p>')
+    + '</div>';
 }
 function drawDay() { drawBar(); drawStats(); drawTiles(); drawMap(); keepFocus(drawPanel); }
-function paintSel() {
-  var strip = $('rb-strip'); if (!strip) return;
-  Array.prototype.forEach.call(strip.querySelectorAll('.rb-c'), function (c) { var k = +c.getAttribute('data-k'); c.classList.toggle('sel', !!S.sel && S.sel.room === S.selRoom && k >= S.sel.a && k <= S.sel.z); });
-  var t = selTimes(), b = $('rb-sum');
-  if (t && b) { b.textContent = fmin(t.s) + ' to ' + fmin(t.e); }
-  var wrap = strip.parentNode, tip = wrap.querySelector('.rb-tip');
-  if (!t || !S.sel || S.sel.room !== S.selRoom) { if (tip) tip.remove(); return; }
-  if (!tip) { tip = document.createElement('div'); tip.className = 'rb-tip'; wrap.appendChild(tip); }
-  tip.textContent = fmin(t.s) + ' - ' + fmin(t.e) + ' (' + dur(t.e - t.s) + ')';
-  tip.style.left = Math.min(88, Math.max(12, ((S.sel.a + S.sel.z + 1) / 2) / CELLS * 100)) + '%';
-}
+function paintSel() { /* the form redraws the day bar itself */ }
 
 // ── data ──
 function watch() {
@@ -439,13 +514,13 @@ function watch() {
   S.unsub = api.watchDay(d, function (list) {
     if (!alive()) { cleanup(); return; }
     if (d !== S.date) return;
-    S.bookings = list || []; S.loading = false;
-    if (S.sel && !S.pending && !selStillFree()) { S.sel = null; toast('That time was just taken. Pick another slot.', 'err'); }
+    S.bookings = normBookings(list); S.loading = false;
+    if (S.sel && !S.pending && !selStillFree()) { S.sel = null; toast('Someone just booked part of that time. The next free time is shown instead.', 'err'); }
     if (S.view === 'day') drawDay();
   }, function (err) { if (!alive()) return; S.loading = false; toast('Could not load the bookings. ' + errText(err), 'err'); if (S.view === 'day') drawDay(); });
 }
-function selStillFree() { if (!S.sel) return true; for (var k = S.sel.a; k <= S.sel.z; k++) if (cellBooking(S.sel.room, k)) return false; return true; }
-function cleanup() { if (S) { if (S.unsub) { try { S.unsub(); } catch (e) {} S.unsub = null; } if (S.timer) { clearInterval(S.timer); S.timer = null; } if (S.clockT) { clearInterval(S.clockT); S.clockT = null; } } }
+function selStillFree() { if (!S.sel) return true; var t = selTimes(); return !conflictAt(S.sel.room, t.s, t.e); }
+function cleanup() { if (S) { if (S.unsub) { try { S.unsub(); } catch (e) {} S.unsub = null; } if (S.unsubP) { try { S.unsubP(); } catch (e) {} S.unsubP = null; } if (S.timer) { clearInterval(S.timer); S.timer = null; } if (S.clockT) { clearInterval(S.clockT); S.clockT = null; } } }
 function goDate(d) {
   S.at = null;
   closeCal(); if (d === S.date) return; S.date = d; S.sel = null; S.draft.err = ''; watch(); drawBar(); }
@@ -455,33 +530,28 @@ function freeNow() {
   if (dow(now.date) === 0) { toast('Spaces are closed on Sundays. They open again on Monday at 9:00 am.'); return; }
   if (now.min >= CLOSE) { toast('Spaces are closed for today. They open at ' + fmin(OPEN) + '.'); return; }
   var go = function () {
-    var start = Math.max(OPEN, Math.ceil(now.min / STEP) * STEP), k = (start - OPEN) / STEP, found = null;
-    visibleRooms().forEach(function (r) { if (!found && cellFree(r.id, k)) found = r; });
-    if (!found) { toast('Every space is busy right now. Try a later slot.'); return; }
-    var z = cellFree(found.id, k + 1) ? k + 1 : k;
-    S.selRoom = found.id; S.sel = { room: found.id, a: k, z: z }; S.draft.err = '';
+    var found = null, at = Math.max(OPEN, now.min);
+    visibleRooms().forEach(function (r) { if (!found && bookableFrom(r.id, at)) found = r; });
+    if (!found) { toast('Every space is busy right now. Try a later time.'); return; }
+    S.selRoom = found.id; S.sel = selFrom(found.id, at, now.min >= OPEN); S.openStart = false; S.draft.err = '';
     drawTiles(); keepFocus(drawPanel);
-    var tile = root.querySelector('.rb-tile[data-room="' + found.id + '"]');
-    if (tile && !reduced()) { tile.classList.add('rb-pop'); setTimeout(function () { tile.classList.remove('rb-pop'); }, 1900); }
     openRoomModal();
-    var t = $('rb-title'); if (t) { try { t.focus({ preventScroll: true }); } catch (e) {} }
   };
   if (S.date !== now.date) { S.date = now.date; watch(); drawBar(); var wait = setInterval(function () { if (!S.loading) { clearInterval(wait); go(); } }, 60); setTimeout(function () { clearInterval(wait); }, 3000); }
   else go();
 }
 
-function setSel(room, a, z) { S.sel = { room: room, a: a, z: z }; }
 function extendBy(minutes) {
   if (!S.sel) return;
-  var cells = minutes / STEP, z = S.sel.a + cells - 1;
-  if (z >= CELLS) { toast('That runs past 7:00 pm.'); return; }
-  for (var k = S.sel.a; k <= z; k++) if (!cellFree(S.sel.room, k)) { toast('Another booking is in the way.'); return; }
-  S.sel.z = z; drawForm(); paintSel();
+  var t = selTimes(), run = runFrom(S.sel.room, t.s);
+  if (t.s + minutes > CLOSE) { toast('That runs past ' + fmin(CLOSE) + '.'); return; }
+  if (minutes > run) { toast('Only ' + run + ' minute' + (run === 1 ? ' is' : 's are') + ' free from ' + fmin(t.s) + '.'); return; }
+  S.sel.len = minutes; drawForm();
 }
 function setCustom() {
   readDraft();
-  var hh = Math.floor(+($('rb-ch') || {}).value || 0), mm = +($('rb-cm') || {}).value || 0, total = hh * 60 + mm;
-  if (hh < 0 || total < STEP) { toast('Enter at least 15 minutes.'); return; }
+  var hh = Math.floor(+($('rb-ch') || {}).value || 0), mm = Math.floor(+($('rb-cm') || {}).value || 0), total = hh * 60 + mm;
+  if (hh < 0 || mm < 0 || mm > 59 || total < 1) { toast('Enter how long, for example 0 hours and 20 minutes.'); return; }
   S.draft.custom = true; extendBy(total);
 }
 function readDraft() { var t = $('rb-title'), n = $('rb-notes'); if (t) S.draft.title = t.value; if (n) S.draft.notes = n.value; }
@@ -490,7 +560,7 @@ function book() {
   readDraft();
   var t = selTimes(); if (!t) return;
   var title = S.draft.title.trim();
-  if (!title) { S.draft.err = 'Enter a title for the booking.'; keepFocus(drawForm); var i = $('rb-title'); if (i) i.focus(); return; }
+  if (!title) title = 'Quick booking';
   S.draft.err = '';
   var btn = $('rb-book'), burstAt = null;
   if (btn) { var br = btn.getBoundingClientRect(); burstAt = { x: br.left + br.width / 2, y: br.top + br.height / 2 }; btn.disabled = true; btn.textContent = 'Booking...'; }
@@ -502,7 +572,7 @@ function book() {
     S.freshId = id; S.sel = null; S.draft = { title: '', notes: '', att: [], more: false, err: '' };
     var rm = $('rb-rmodal'); if (rm) { rm.classList.remove('open'); rm.setAttribute('aria-hidden', 'true'); } S.rmodal = false; S.selRoom = null;
     if (burstAt) confetti(burstAt.x, burstAt.y);
-    toast('Booked ' + room.name + ', ' + fmin(t.s) + ' to ' + fmin(t.e), 'ok');
+    toast('Booked ' + room.name + ', ' + (t.live ? 'now' : fmin(t.s)) + ' to ' + fmin(t.e), 'ok');
     drawDay(); setTimeout(function () { S.freshId = null; }, 1500);
   }).catch(function (e) {
     S.pending = false;
@@ -517,7 +587,7 @@ function book() {
 function loadMine() {
   var host = $('rb-v-mine'); if (!host) return;
   host.innerHTML = '<div class="rb-card"><div class="rb-empty">Loading your bookings...</div></div>';
-  api.myBookings().then(function (list) { if (!alive()) return; S.mine = list || []; drawMine(); }).catch(function (e) { if (!alive()) return; host.innerHTML = '<div class="rb-card"><div class="rb-empty"><b>Could not load your bookings</b>' + esc(errText(e)) + '</div></div>'; });
+  api.myBookings().then(function (list) { if (!alive()) return; S.mine = normBookings(list); drawMine(); }).catch(function (e) { if (!alive()) return; host.innerHTML = '<div class="rb-card"><div class="rb-empty"><b>Could not load your bookings</b>' + esc(errText(e)) + '</div></div>'; });
 }
 function drawMine() {
   var host = $('rb-v-mine'); if (!host) return;
@@ -539,7 +609,7 @@ function drawMine() {
 // ── ADMIN: ROOMS ──
 function drawRooms() {
   var host = $('rb-v-rooms'); if (!host) return;
-  if (!S.me.isAdmin) { host.innerHTML = '<div class="rb-card"><div class="rb-empty"><b>Admins only</b>Only an admin can change the rooms.</div></div>'; return; }
+  if (!S.me.isAdmin) { host.innerHTML = '<div class="rb-card"><div class="rb-empty"><b>Admins only</b>Only an admin can change the spaces.</div></div>'; return; }
   host.innerHTML = '<div class="rb-sec"><div class="rb-card">' + S.rooms.map(function (r, i) {
     return '<div class="rb-rr" data-room="' + r.id + '"><span class="rb-ri2">' + ic(r.icon) + '</span>'
       + '<label><span style="display:block;font-size:12px;color:var(--rb-text3)">Name</span><input type="text" class="rb-rn-in" maxlength="40" value="' + esc(r.name) + '"></label>'
@@ -586,17 +656,24 @@ function showDetails(id) {
 // "End now": the person leaves early, so the booking is cut at the next 15-minute mark and the rest of the time is freed
 function endPoint(b) {
   var now = ist(); if (b.date !== now.date || b.startMin > now.min || now.min >= b.endMin) return 0;
-  var e = Math.floor(now.min / STEP) * STEP + STEP; return (e > b.startMin && e < b.endMin) ? e : 0;
+  return Math.max(now.min, b.startMin + 1);
+}
+// "Mark as free now" ends it at this minute
+function freeNowEnd(id, btn) {
+  var b = findBooking(id); if (!b) return; var e = endPoint(b); if (!e) { toast('There is nothing left to free up.'); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Freeing...'; }
+  doEnd(id, true);
 }
 function confirmEnd(id) {
   var b = findBooking(id); if (!b) return; var e = endPoint(b); if (!e) { closeModal(); toast('There is nothing left to free up.'); return; }
-  openModal('<div class="rb-dh"><div><h3>End this booking now?</h3><p>' + esc(b.title) + ', ' + esc(roomById(b.roomId).name) + '</p></div><button type="button" class="rb-x" data-close aria-label="Close">' + ic('x') + '</button></div><div class="rb-db"><p style="margin:0 0 4px;color:var(--rb-text2)">The booking will end at <b>' + fmin(e) + '</b> instead of ' + fmin(b.endMin) + '. The room is free for everyone from ' + fmin(e) + ' to ' + fmin(b.endMin) + '.</p><div class="rb-act"><button type="button" class="rb-btn pri" data-yes-end="' + esc(b.id) + '" data-first>Yes, end it</button><button type="button" class="rb-btn" data-close>Keep it</button></div></div>');
+  openModal('<div class="rb-dh"><div><h3>End this booking now?</h3><p>' + esc(b.title) + ', ' + esc(roomById(b.roomId).name) + '</p></div><button type="button" class="rb-x" data-close aria-label="Close">' + ic('x') + '</button></div><div class="rb-db"><p style="margin:0 0 4px;color:var(--rb-text2)">The booking will end now, at <b>' + fmin(e) + '</b>, instead of ' + fmin(b.endMin) + '. The space is free for everyone from ' + fmin(e) + '.</p><div class="rb-act"><button type="button" class="rb-btn pri" data-yes-end="' + esc(b.id) + '" data-first>Yes, end it</button><button type="button" class="rb-btn" data-close>Keep it</button></div></div>');
 }
-function doEnd(id) {
+function doEnd(id, quiet) {
   var b = findBooking(id); if (!b) return; var e = endPoint(b); if (!e) { closeModal(); return; }
-  api.updateBooking(id, { startMin: b.startMin, endMin: e, title: b.title, notes: b.notes || '', attendees: b.attendees || [] }).then(function () {
-    if (!alive()) return; closeModal(); toast('Booking ended. The space is free from ' + fmin(e) + '.', 'ok'); if (S.view === 'mine') loadMine();
-  }).catch(function (x) { if (!alive()) return; toast(errText(x), 'err'); closeModal(); });
+  var justBegan = ist().min <= b.startMin;   // started this very minute: nothing was used, so it is simply removed
+  (justBegan ? api.cancelBooking(id) : api.updateBooking(id, { startMin: b.startMin, endMin: e, title: b.title, notes: b.notes || '', attendees: b.attendees || [] })).then(function () {
+    if (!alive()) return; closeModal(); toast(quiet ? 'Marked as free.' : (justBegan ? 'Booking removed. The space is free now.' : 'Booking ended. The space is free from ' + fmin(e) + '.'), 'ok'); if (S.view === 'mine') loadMine();
+  }).catch(function (x) { if (!alive()) return; toast(errText(x), 'err'); closeModal(); drawDay(); });
 }
 function confirmCancel(id) {
   var b = findBooking(id); if (!b) return;
@@ -605,7 +682,6 @@ function confirmCancel(id) {
 function doCancel(id) {
   api.cancelBooking(id).then(function () { if (!alive()) return; closeModal(); toast('Booking cancelled', 'ok'); if (S.view === 'mine') loadMine(); }).catch(function (e) { if (!alive()) return; toast(errText(e), 'err'); closeModal(); });
 }
-function timeOptions(from, to, sel) { var o = ''; for (var m = from; m <= to; m += STEP) o += '<option value="' + m + '"' + (m === sel ? ' selected' : '') + '>' + fmin(m) + '</option>'; return o; }
 function editBooking(id) {
   var b = findBooking(id); if (!b) return;
   var att = (b.attendees || []).slice();
@@ -613,16 +689,18 @@ function editBooking(id) {
   var pills = function () { return S.editDraft.att.map(function (a, i) { return '<span class="rb-pill">' + esc(a.name || a.email) + '<button type="button" data-ermv="' + i + '" aria-label="Remove ' + esc(a.name || a.email) + '">' + ic('x') + '</button></span>'; }).join(''); };
   openModal('<div class="rb-dh"><div><h3>Edit booking</h3><p>' + esc(roomById(b.roomId).name) + ', ' + esc(longDate(b.date)) + '</p></div><button type="button" class="rb-x" data-close aria-label="Close">' + ic('x') + '</button></div><div class="rb-db">'
     + '<label class="rb-field" id="rb-e-tf"><span>Title</span><input type="text" id="rb-e-title" maxlength="120" value="' + esc(b.title) + '" data-first><p class="rb-err" id="rb-e-err" hidden></p></label>'
-    + '<div class="rb-row2"><label class="rb-field"><span>Starts</span><select id="rb-e-s">' + timeOptions(OPEN, CLOSE - STEP, b.startMin) + '</select></label><label class="rb-field"><span>Ends</span><select id="rb-e-e">' + timeOptions(OPEN + STEP, CLOSE, b.endMin) + '</select></label></div>'
+    + '<div class="rb-row2"><label class="rb-field"><span>Starts</span><input type="time" id="rb-e-s" min="09:00" max="18:59" step="60" value="' + hhmm(b.startMin) + '"></label><label class="rb-field"><span>Ends</span><input type="time" id="rb-e-e" min="09:01" max="19:00" step="60" value="' + hhmm(b.endMin) + '"></label></div>'
     + '<div class="rb-field"><span>People coming (optional)</span><div class="rb-sug"><input type="text" id="rb-e-attq" placeholder="Search by name" autocomplete="off"><ul id="rb-e-sugl" hidden></ul></div><div class="rb-att" id="rb-e-att">' + pills() + '</div></div>'
     + '<label class="rb-field"><span>Notes (optional)</span><textarea id="rb-e-notes" maxlength="500">' + esc(b.notes || '') + '</textarea></label>'
     + '<div class="rb-act"><button type="button" class="rb-btn pri" data-e-save="' + esc(id) + '">Save changes</button><button type="button" class="rb-btn" data-close>Back</button></div></div>');
 }
 function saveEdit(id) {
-  var title = $('rb-e-title').value.trim(), s = +$('rb-e-s').value, e = +$('rb-e-e').value, err = $('rb-e-err');
+  var title = $('rb-e-title').value.trim(), s = toMinutes($('rb-e-s').value), e = toMinutes($('rb-e-e').value), err = $('rb-e-err');
   var fail = function (m) { err.textContent = m; err.hidden = false; $('rb-e-tf').classList.add('bad'); };
   if (!title) return fail('Enter a title for the booking.');
+  if (isNaN(s) || isNaN(e)) return fail('Enter a start and an end time.');
   if (e <= s) return fail('The end time must be after the start time.');
+  if (s < OPEN || e > CLOSE) return fail('Spaces are open from ' + fmin(OPEN) + ' to ' + fmin(CLOSE) + '.');
   var b = findBooking(id);
   api.updateBooking(id, { startMin: s, endMin: e, title: title, notes: $('rb-e-notes').value.trim(), attendees: S.editDraft.att }).then(function () {
     if (!alive()) return; closeModal(); toast('Booking updated', 'ok'); if (S.view === 'mine') loadMine();
@@ -681,6 +759,7 @@ function tipHtml(id) {
   var r = roomById(id), t = viewMin(), bs = roomBookings(id), cur = null, nxt = null;
   bs.forEach(function (b) { if (t !== null && b.startMin <= t && t < b.endMin) cur = b; else if ((t === null || b.startMin > t) && (!nxt || b.startMin < nxt.startMin)) nxt = b; });
   var stt = statusOf(r), mine = !!(cur && cur.bookedBy === S.me.email), cls = stt.cls === 'busy' ? (mine ? 'mine' : 'busy') : stt.cls;
+  if (stt.cls === 'present') cur = null;   // a space marked present only says so
   var h = '<b>' + esc(r.name) + (S.at != null ? ' <small style="display:inline;opacity:.7">at ' + fmin(S.at) + '</small>' : '') + '</b><span class="st ' + cls + '">' + esc(mine ? stt.txt.replace('In use', 'Yours') : stt.txt) + '</span>';
   if (cur) h += '<span class="ti">' + esc(cur.title) + '</span><small>' + esc(cur.bookedByName || cur.bookedBy) + ' \u00B7 ' + fmin(cur.startMin) + ' to ' + fmin(cur.endMin) + '</small>';
   if (nxt) h += '<span class="nx"><span class="ti">' + (t !== null ? 'Next: ' : (cur ? 'Also: ' : 'First: ')) + esc(nxt.title) + '</span><small>' + fmin(nxt.startMin) + ' to ' + fmin(nxt.endMin) + ' \u00B7 ' + esc(nxt.bookedByName || nxt.bookedBy) + '</small></span>';
@@ -746,7 +825,13 @@ function bind() {
     var chip = t.closest('[data-dur]'); if (chip) { readDraft(); S.draft.custom = false; extendBy(+chip.getAttribute('data-dur')); return; }
     if (t.closest('[data-custom]')) { readDraft(); S.draft.custom = !S.draft.custom; drawForm(); return; }
     if (t.closest('#rb-cset')) { setCustom(); return; }
-    if (t.closest('#rb-more')) { readDraft(); S.draft.more = true; drawForm(); var q = $('rb-attq'); if (q) q.focus(); return; }
+    if (t.closest('#rb-more')) { readDraft(); S.draft.more = true; drawForm(); var q = $('rb-title'); if (q) q.focus(); return; }
+    var sb = t.closest('#rb-st-btn'); if (sb) { S.openStart = !S.openStart; drawForm(); return; }
+    if (t.closest('#rb-st-set')) { setStart(toMinutes(($('rb-st-time') || {}).value)); return; }
+    if (t.closest('[data-startnow]') && S.selRoom) { var nw = ist(); readDraft(); S.sel = selFrom(S.selRoom, Math.max(OPEN, nw.min), true); S.openStart = false; drawForm(); return; }
+    var lt = t.closest('[data-later]'); if (lt && S.selRoom) { S.sel = firstFreeSel(S.selRoom); S.openStart = false; drawPanel(); return; }
+    var pb = t.closest('[data-presence]'); if (pb && S.selRoom) { setPresence(S.selRoom, pb.getAttribute('data-presence') === '1'); return; }
+    var fr = t.closest('[data-free-now]'); if (fr) { freeNowEnd(fr.getAttribute('data-free-now'), fr); return; }
     var rm = t.closest('[data-rm]'); if (rm) { readDraft(); S.draft.att.splice(+rm.getAttribute('data-rm'), 1); drawForm(); return; }
     if (t.closest('#rb-book')) { book(); return; }
     if (t.closest('#rb-clear')) { S.sel = null; S.draft = { title: '', notes: '', att: [], more: false, err: '' }; drawForm(); paintSel(); return; }
@@ -783,23 +868,10 @@ function bind() {
     else if (e.key === 'Escape' && S.rmodal) { closeRoomModal(); e.stopPropagation(); }
     else if (e.key === 'Escape' && S.view !== 'day') { setView('day'); e.stopPropagation(); }
     if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('rb-rm')) { e.preventDefault(); selectRoom(e.target.getAttribute('data-room')); }
-    if (e.key === 'Enter' && e.target.id === 'rb-ch') { e.preventDefault(); setCustom(); }
+    if ((e.key === 'Enter' && (e.target.id === 'rb-ch' || e.target.id === 'rb-cm'))) { e.preventDefault(); setCustom(); }
+    if (e.key === 'Enter' && e.target.id === 'rb-st-time') { e.preventDefault(); setStart(toMinutes(e.target.value)); }
     if (e.key === 'Enter' && e.target.id === 'rb-title') { e.preventDefault(); book(); }
     if (e.key === 'Enter' && e.target.id === 'rb-e-title') { e.preventDefault(); var b = root.querySelector('[data-e-save]'); if (b) b.click(); }
-  });
-  // drag across free time to choose a time
-  root.addEventListener('pointerdown', function (e) {
-    var c = e.target.closest('.rb-c'); if (!c || !S.selRoom) return;
-    var k = +c.getAttribute('data-k'); if (!cellFree(S.selRoom, k)) { if (c.classList.contains('off') && dayState(S.date).open) toast('That time has passed.'); return; }
-    readDraft(); S.drag = { start: k, moved: false }; setSel(S.selRoom, k, k); drawForm(); paintSel();
-  });
-  root.addEventListener('pointermove', function (e) {
-    if (!S.drag) return;
-    var el = document.elementFromPoint(e.clientX, e.clientY), c = el && el.closest ? el.closest('.rb-c') : null; if (!c) return;
-    var k = +c.getAttribute('data-k'), a = Math.min(S.drag.start, k), z = Math.max(S.drag.start, k);
-    for (var q = a; q <= z; q++) if (!cellFree(S.selRoom, q)) return;
-    if (k !== S.drag.start) S.drag.moved = true;
-    if (!S.sel || S.sel.a !== a || S.sel.z !== z) { setSel(S.selRoom, a, z); paintSel(); }
   });
   root.addEventListener('pointermove', function (e) {
     if (e.pointerType === 'touch') return;
@@ -807,8 +879,8 @@ function bind() {
     if (rm) showTip(rm, e);
     else hideTip();
   });
+  root.addEventListener('toggle', function (e) { var n = e.target; if (!n || !n.id) return; if (n.id === 'rb-d-strip') S.openStrip = n.open; }, true);
   root.addEventListener('pointerleave', function () { hideTip(); camReset(); }); root.addEventListener('pointerdown', function () { hideTip(true); });
-  window.removeEventListener('pointerup', onPointerUp); window.addEventListener('pointerup', onPointerUp);
   // tiles lean toward the pointer
   root.addEventListener('pointermove', function (e) {
     var tile = e.target.closest ? e.target.closest('.rb-tile') : null; if (!tile || e.pointerType === 'touch' || reduced() || window.innerWidth <= 760) return;
@@ -817,13 +889,6 @@ function bind() {
   });
   root.addEventListener('pointerout', function (e) { var tile = e.target.closest ? e.target.closest('.rb-tile') : null; if (tile && !tile.contains(e.relatedTarget)) tile.style.transform = ''; });
   window.removeEventListener('resize', onResize); window.addEventListener('resize', onResize);
-}
-function onPointerUp() {
-  if (!S || !S.drag || !alive()) return;
-  var d = S.drag; S.drag = null;
-  if (!d.moved && S.sel && S.sel.a === S.sel.z && cellFree(S.sel.room, S.sel.a + 1)) S.sel.z = S.sel.a + 1;   // a tap starts a 30-minute booking
-  drawForm(); paintSel();
-  var t = $('rb-title'); if (t && !S.draft.title) { try { t.focus({ preventScroll: true }); } catch (x) {} }
 }
 function onResize() { if (alive()) { glide(); S.mapAvail = 0; if (S && S.view === 'day') drawMap(); } }
 
@@ -840,6 +905,7 @@ function mount() {
   S.selRoom = null;
   setView('day');
   watch();
+  if (api.watchPresence) S.unsubP = api.watchPresence(function (m) { if (!alive()) return; S.presence = m || {}; if (S.view === 'day') drawDay(); }, function () {});
   api.loadConfig().then(function (cfg) { if (!alive()) return; S.cfg = cfg || {}; buildRooms(); if (S.view === 'day') drawDay(); if (S.view === 'rooms') drawRooms(); }).catch(function () {});
   // keep "now" and "free until" honest while the page stays open
   S.timer = setInterval(function () { if (!alive()) { cleanup(); return; } if (S.view === 'day' && !S.drag && !S.modal) { var a = document.activeElement; if (a && a.closest && a.closest('#rb-form')) { drawBar(); drawStats(); drawTiles(); drawMap(); return; } drawDay(); } }, 30000);
@@ -914,11 +980,14 @@ function peek(cb) {
   var shut = dow(now.date) === 0 ? 'Closed on Sundays' : (now.min >= CLOSE ? 'Closed for today' : (now.min < OPEN ? 'Opens at ' + fmin(OPEN) : ''));
   if (shut) { cb({ shut: shut, map: all }); return; }
   (api.loadConfig ? api.loadConfig().catch(function () { return {}; }) : Promise.resolve({})).then(function (cfg) {
-    cfg = cfg || {}; var done = false, un = null;
+    return (api.loadPresence ? api.loadPresence().catch(function () { return {}; }) : Promise.resolve({})).then(function (pm) { return [cfg, pm]; });
+  }).then(function (both) {
+    var cfg = both[0] || {}, pm = both[1] || {}, done = false, un = null;
     un = api.watchDay(now.date, function (list) {
       if (done) return; done = true; setTimeout(function () { try { if (un) un(); } catch (e) {} }, 0);
       var rooms = ROOMS0.filter(function (r) { return (cfg[r.id] || {}).active !== false; }), busy = {}, map = {}, next = null;
-      (list || []).forEach(function (b) { if (b.startMin <= now.min && now.min < b.endMin) busy[b.roomId] = 1; else if (b.startMin > now.min && (next === null || b.startMin < next)) next = b.startMin; });
+      Object.keys(pm).forEach(function (k) { if (pm[k] && pm[k].present && PRES[k]) busy[k] = 1; });
+      normBookings(list).forEach(function (b) { if (b.startMin <= now.min && now.min < b.endMin) busy[b.roomId] = 1; else if (b.startMin > now.min && (next === null || b.startMin < next)) next = b.startMin; });
       ROOMS0.forEach(function (r) { map[r.id] = (cfg[r.id] || {}).active === false ? 'closed' : (busy[r.id] ? 'busy' : 'free'); });
       cb({ free: rooms.filter(function (r) { return !busy[r.id]; }).length, total: rooms.length, map: map, nextIn: next === null ? 0 : next - now.min });
     }, function () { cb(null); });
