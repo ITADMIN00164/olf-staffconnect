@@ -1662,6 +1662,20 @@ function renderSmartGoals() {
   var depts = sgpDeptList();
   // open on a department, and on a person, so the page is never an empty box
   if (!deptEl.value || depts.indexOf(deptEl.value) < 0) { deptEl.value = depts[0] || ''; setSgMemberOptions(); memEl.value = ''; }
+  // Only an admin can look at other departments here, so everyone else gets their department as a plain label, not a dropdown.
+  var _dw = deptEl.closest ? deptEl.closest('.sgp-f') : null;
+  if (_dw) {
+    var _st = document.getElementById('sg-dept-static');
+    if (currentUser.role !== ROLES.ADMIN) {
+      if (!_st) {
+        _st = document.createElement('div'); _st.id = 'sg-dept-static'; _st.className = 'sgp-f';
+        _st.innerHTML = '<span>Department</span><div class="sgp-static"></div>';
+        _dw.parentNode.insertBefore(_st, _dw.nextSibling);
+      }
+      _st.querySelector('.sgp-static').textContent = deptEl.value || currentUser.dept || '—';
+      _dw.hidden = true; _st.hidden = false;
+    } else { _dw.hidden = false; if (_st) _st.hidden = true; }
+  }
   var dept = deptEl.value;
   if (dept && !memEl.value) {
     var names = scopedMemberNames(dept).slice().sort(function (x, y) { return x.localeCompare(y); });
