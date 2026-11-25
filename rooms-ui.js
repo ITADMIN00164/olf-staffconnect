@@ -378,18 +378,6 @@ window.RB_HTML = `<!-- =========================================================
 #rb-app .rb-rm.mine .rb-fl small { background: #2F6FE4; }
 #rb-app .rb-rm.mine .rb-md { background: #2F6FE4; }
 #rb-app .rb-fw { display: block; max-width: 92%; margin-top: 3px; padding: 0 6px; font-size: 11.5px; font-weight: 700; color: #3B4658; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 0 5px #fff, 0 0 5px #fff; }
-#rb-app .rb-tip2 { position: fixed; z-index: 5600; max-width: 290px; padding: 12px 14px; border-radius: 14px; background: #111B2E; color: #fff; box-shadow: 0 18px 40px -12px rgba(0,0,0,.65); pointer-events: none; font-size: 12.5px; line-height: 1.4; }
-#rb-app .rb-tip2.in { animation: rbfade .14s ease; }
-#rb-app .rb-tip2[hidden] { display: none; }
-#rb-app .rb-tip2 b { display: block; font-size: 14.5px; font-weight: 800; letter-spacing: -.2px; }
-#rb-app .rb-tip2 .st { display: inline-block; margin: 5px 0 7px; padding: 2px 10px; border-radius: 99px; font-weight: 800; font-size: 11px; background: #1F9D5C; }
-#rb-app .rb-tip2 .st.busy { background: #D92D20; }
-#rb-app .rb-tip2 .st.mine { background: #2F6FE4; }
-#rb-app .rb-tip2 .st.closed { background: #64748B; }
-#rb-app .rb-tip2 .ti { display: block; font-weight: 700; font-size: 13px; }
-#rb-app .rb-tip2 small { display: block; opacity: .8; font-size: 12px; }
-#rb-app .rb-tip2 .nx { display: block; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.14); }
-#rb-app .rb-tip2 em { display: block; margin-top: 8px; font-style: normal; opacity: .65; font-size: 11.5px; }
 #rb-app .rb-note2 { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 4; max-width: 90%; padding: 9px 20px; border-radius: 99px; background: rgba(15,23,42,.9); color: #fff; font-size: 13px; font-weight: 700; text-align: center; box-shadow: 0 12px 26px -10px rgba(15,23,42,.6); animation: rbrise .3s cubic-bezier(.22,1,.36,1); }
 #rb-app .rb-note2[hidden] { display: none; }
 /* ── cleaner colours: pastel floors instead of striped wood, soft gradient name pills ── */
@@ -550,7 +538,6 @@ window.RB_HTML = `<!-- =========================================================
 #rb-app .rb-rm.present { --st: rgba(245,158,11,.24); --ring: rgba(217,119,6,.6); --glow: rgba(251,191,36,.3); }
 #rb-app .rb-rm.present .rb-fl small { background: linear-gradient(135deg, #FBBF24, #D97706); box-shadow: 0 6px 12px -6px rgba(217,119,6,.7); }
 #rb-app .rb-lamp.present { background: radial-gradient(circle at 35% 30%, #FEF3C7, #F59E0B 55%, #B45309); box-shadow: 0 0 0 3px rgba(255,255,255,.9), 0 0 16px 4px rgba(245,158,11,.8); }
-#rb-app .rb-tip2 .st.present { background: #D97706; }
 #rb-app .rb-pr { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 14px; margin-bottom: 14px; border-radius: 16px; background: #F8FAFC; border: 1px solid var(--rb-border); }
 #rb-app .rb-pr.on { background: #FFFBEB; border-color: #FDE68A; }
 #rb-app .rb-prh b { display: block; font-size: 14.5px; font-weight: 800; color: #1E293B; }
@@ -633,7 +620,6 @@ window.RB_HTML = `<!-- =========================================================
 <div class="rb-modal rb-xmodal" id="rb-xmodal" aria-hidden="true"><div class="rb-dlg rb-xdlg" role="dialog" aria-modal="true" aria-label="Space booking"><div class="rb-dh"><div><h3 id="rb-xtitle">My bookings</h3><p id="rb-xsub"></p></div><button type="button" class="rb-x" data-xclose aria-label="Close">x</button></div><div class="rb-db"><div id="rb-v-mine" hidden></div><div id="rb-v-rooms" hidden></div></div></div></div>
 <div class="rb-modal rb-rmodal" id="rb-rmodal" aria-hidden="true"><div class="rb-dlg rb-rdlg" id="rb-rdlg" role="dialog" aria-modal="true" aria-label="Space"><div id="rb-panel"></div></div></div>
 <div class="rb-modal" id="rb-modal" aria-hidden="true"><div class="rb-dlg" id="rb-dlg" role="dialog" aria-modal="true"></div></div>
-<div class="rb-tip2" id="rb-tip2" role="tooltip" hidden></div>
 <div class="rb-toast" id="rb-toast" role="status" aria-live="polite"></div>
 <div class="rb-conf" id="rb-conf" aria-hidden="true"></div>
 </div>

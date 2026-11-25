@@ -746,43 +746,20 @@ function calClick(t) {
 }
 
 // ── hover card: who is in a room now and what is next ──
-function tipHtml(id) {
-  var r = roomById(id), t = viewMin(), bs = roomBookings(id), cur = null, nxt = null;
-  bs.forEach(function (b) { if (t !== null && b.startMin <= t && t < b.endMin) cur = b; else if ((t === null || b.startMin > t) && (!nxt || b.startMin < nxt.startMin)) nxt = b; });
-  var stt = statusOf(r), mine = !!(cur && cur.bookedBy === S.me.email), cls = stt.cls === 'busy' ? (mine ? 'mine' : 'busy') : stt.cls;
-  if (stt.cls === 'present') cur = null;   // a space marked present only says so
-  var h = '<b>' + esc(r.name) + (S.at != null ? ' <small style="display:inline;opacity:.7">at ' + fmin(S.at) + '</small>' : '') + '</b><span class="st ' + cls + '">' + esc(mine ? stt.txt.replace('In use', 'Yours') : stt.txt) + '</span>';
-  if (cur) h += '<span class="ti">' + esc(cur.title) + '</span><small>' + esc(cur.bookedByName || cur.bookedBy) + ' \u00B7 ' + fmin(cur.startMin) + ' to ' + fmin(cur.endMin) + '</small>';
-  if (nxt) h += '<span class="nx"><span class="ti">' + (t !== null ? 'Next: ' : (cur ? 'Also: ' : 'First: ')) + esc(nxt.title) + '</span><small>' + fmin(nxt.startMin) + ' to ' + fmin(nxt.endMin) + ' \u00B7 ' + esc(nxt.bookedByName || nxt.bookedBy) + '</small></span>';
-  else if (!cur) h += '<small>Nothing booked' + (t !== null ? ' for the rest of the day' : '') + '</small>';
-  return h + '<em>Click to see the day and book</em>';
-}
 var tipTimer = null;
 function setRoute(id) {
   if (S) S.route = id || '';
   Array.prototype.forEach.call(document.querySelectorAll('#rb-scene .rb-route'), function (p) { p.classList.toggle('on', !!id && p.getAttribute('data-r') === id); });
 }
-function placeTip(e) {
-  var t = $('rb-tip2'); if (!t || t.hidden) return;
-  var w = t._w || (t._w = t.offsetWidth), hgt = t._hh || (t._hh = t.offsetHeight), x = e.clientX + 18, y = e.clientY + 18;
-  if (x + w > window.innerWidth - 8) x = e.clientX - w - 14;
-  if (y + hgt > window.innerHeight - 8) y = e.clientY - hgt - 14;
-  t.style.left = Math.max(8, x) + 'px'; t.style.top = Math.max(8, y) + 'px';
-}
-function showTip(rm, e) {
-  var t = $('rb-tip2'); if (!t || S.rmodal || S.modal || S.calOpen || S.view !== 'day') return;
+// Hovering a space lights the walking route to its door. (There is no hover card: the space's own popup has the details.)
+function showTip(rm) {
+  if (S.rmodal || S.modal || S.calOpen || S.view !== 'day') return;
   clearTimeout(tipTimer);
-  var rid = rm.getAttribute('data-room');
-  if (t._room !== rid || t.hidden) {
-    t._room = rid; setRoute(rid);
-    var html = tipHtml(rid); if (t._h !== html) { t.innerHTML = html; t._h = html; t._w = 0; t._hh = 0; }
-  }
-  if (t.hidden) { t.hidden = false; t.classList.remove('in'); void t.offsetWidth; t.classList.add('in'); }
-  placeTip(e);
+  setRoute(rm.getAttribute('data-room'));
 }
 function hideTip(now) {
   clearTimeout(tipTimer);
-  var go = function () { setRoute(''); var t = $('rb-tip2'); if (t && !t.hidden) { t.hidden = true; t.classList.remove('in'); t._h = ''; t._room = ''; } };
+  var go = function () { setRoute(''); };
   if (now === true) go(); else tipTimer = setTimeout(go, 160);   // a short grace period, so crossing a wall or a gap does not make it flicker
 }
 
