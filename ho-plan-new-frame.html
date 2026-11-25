@@ -7,7 +7,10 @@
 <!-- A separate copy of HO Plan & Review. It runs in its own frame, so its
      scripts, element ids and saved data cannot clash with the live tab.
      It reads and writes the hp_ tables only, never the live ones. -->
-<style>html,body,#hpNewRoot{margin:0;height:100%;background:transparent;}</style>
+<style>html,body,#hpNewRoot{margin:0;height:100%;background:transparent;}
+/* The app scales itself with html zoom by window width. This frame copies those styles, but it already sits inside the zoomed app,
+   so zooming again here made everything about 10% smaller than the live tab. */
+html{zoom:1 !important;}</style>
 <script>
 (function () {
   // Borrow the app's styles and theme from the page that holds this frame.
@@ -66,7 +69,7 @@
 <script src="smartgoal-new.js?v=31"></script>
 <script>
 (function () {
-  fetch('pages/ho-plan-new-app.html?v=hp27', { cache: 'no-cache' })
+  fetch('pages/ho-plan-new-app.html?v=hp30', { cache: 'no-cache' })
     .then(function (r) { return r.text(); })
     .then(function (html) {
       document.getElementById('hpNewRoot').innerHTML = html;
