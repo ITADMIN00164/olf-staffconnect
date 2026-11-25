@@ -633,7 +633,7 @@
   // Called by pos.js after an assignment is added, edited or marked resigned, so the
   // Dashboard stops using the org structure it cached when it first opened.
   var ORG_STALE = false;
-  function orgChanged() { ORG = null; ORG_STALE = true; MSUM.cache = {}; MSUM.data = null; }
+  function orgChanged() { ORG = null; ORG_STALE = true; MSUM.cache = {}; MSUM.data = null; QV = { quarterly: null, yearly: null, wholeyear: null }; }
 
   function mount() {
     var root = $("ftrRoot"); if (!root) return;
@@ -644,7 +644,7 @@
     ORG_STALE = false;
     root.dataset.mounted = "1";
     if (!window.posSupabase) { prBody('<div class="pr-empty pr-error">Supabase client not loaded — check that pos-supabase.js is included.</div>'); return; }
-    wireNav(); wireFilters(); wireMonthly(); sumWire(); msumWire();
+    wireNav(); wireFilters(); wireMonthly(); sumWire(); msumWire(); qyWire();
     if ($("prModalSave")) $("prModalSave").addEventListener("click", saveTextModal);
     wireWeekDates();
     if ($("prModalClose")) $("prModalClose").addEventListener("click", closeTextModal);
@@ -666,10 +666,11 @@
         btns.forEach(function (x) { x.classList.remove("is-active"); });
         b.classList.add("is-active");
         var v = b.dataset.view;
-        ["weekly", "summary", "monthly", "mosum"].forEach(function (name) {
+        ["weekly", "summary", "monthly", "mosum", "quarterly", "yearly", "wholeyear"].forEach(function (name) {
           var el = $("pr" + name.charAt(0).toUpperCase() + name.slice(1)); if (el) el.hidden = (name !== v);
         });
         if (v === "monthly") moSyncFromWeekly();
+        if (QY_TABS[v]) qySyncFrom(v);
         if (v === "mosum") msumOnOpen();
       });
     });
@@ -702,6 +703,7 @@
       moFillFromBase();
       sumFillFromBase();
       msumFillFromBase();
+      qyFillFromBase();
       prBody('<div class="pr-empty">Choose a review unit, a value and a month, then open the review.</div>');
     }).catch(function (e) {
       prBody('<div class="pr-empty pr-error">Couldn\'t load base data: ' + esc(e.message || String(e)) + '</div>');
@@ -1394,7 +1396,8 @@
     });
   }
   function markDirty(wc, fid, val) {
-    var map = /00$/.test(wc) ? MDIRTY : DIRTY;   // YYYYMM00 = Monthly tab, weeks 01-05 = Weekly
+    // <AY>9q00 / <AY>9900 = Quarterly / Whole Year, YYYYMM00 = Monthly tab, weeks 01-05 = Weekly
+    var map = qyIsCode(wc) ? QDIRTY : (/00$/.test(wc) ? MDIRTY : DIRTY);
     (map[wc] = map[wc] || {})[fid] = val;
     try { window.dispatchEvent(new Event("pr-dirty")); } catch (e) { /* older browsers: the phone layer simply keeps Save visible */ }
   }
@@ -3256,6 +3259,669 @@
         "Monthly_Review_" + month + "_" + place + ($("prMsUnit").value ? "_" + $("prMsUnit").value : "") + "_" + MSUM_LBL[st].replace(/\s+/g, ""));
     }).catch(function (e) { toast(e.message || String(e)); });
   }
+
+  /* ======================================================================
+     QUARTERLY · YEARLY · WHOLE YEAR TABS  (Nov 2026)
+     Academic year = June to May ("2026-27" = Jun 2026 to May 2027).
+       Q1 Jun-Aug · Q2 Sep-Nov · Q3 Dec-Feb · Q4 Mar-May
+     Only G1-G4 are shown (weights 40 / 20 / 20 / 10, so out of 90). G5 is not part of these views.
+
+     Where each number comes from
+       G1     Target = exams in the Academic Plan for the period's months, added up.
+              Done   = "exams completed" saved on each month's Monthly review, added up.
+       G2/G3  Quarterly tab, Month 1-3 columns = that month's Monthly figures (as on the Monthly tab).
+              Quarter total / Yearly (Q1-Q4) / Whole Year = their own uploads:
+                achieved -> Admin > Data > "Quarter & Whole-Year data" (Vinoba + Staff Connect files)
+                targets  -> Admin > G2 · G3 · G5 Targets > "Quarter & Whole-Year targets"
+                            (PO view = PO rows, District view = district rows, PM / DM = their districts' rows)
+              Kathavli stories = the monthly Visit & Activity counts added up (it is a count of stories).
+              POM transformed clusters = typed on the Quarterly / Whole Year review by the person under review.
+       G4     Quarterly tab, Month 1-3 = Monthly G4. Quarter total and Whole Year = activities typed by
+              the reviewer (the person who fills H) on that review. Yearly shows each quarter's entry.
+
+     Review sections A / B / G / H are the Monthly ones with "quarter" / "year" wording, saved in
+     review_responses under their own period codes:
+       quarter  <AY>9<q>00   e.g. 20269100 = 2026-27 Q1
+       year     <AY>9900     e.g. 20269900 = 2026-27 whole year
+     A month code never has 9 as its 5th digit, so these never clash with weeks or months.
+     Status rules are the Monthly ones: Partially done = the person's own points saved,
+     Done = the reviewer's points (H, and G4 here) saved too.
+     ====================================================================== */
+  var QY_GOALS = MO_GOALS.filter(function (g) { return g.key !== "G5"; });
+  var QY_MAX = QY_GOALS.reduce(function (a, g) { return a + g.weight; }, 0);          // 90
+  var QY_QM = { 1: [6, 7, 8], 2: [9, 10, 11], 3: [12, 1, 2], 4: [3, 4, 5] };
+  var QY_YM = [6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5];
+  var QDIRTY = {};                 // { periodCode: { fieldId: value } } — Quarterly + Whole Year reviews
+  var QV = { quarterly: null, yearly: null, wholeyear: null };   // last loaded payload per tab
+
+  function qyAyOf(code) { var y = Number(String(code).substring(0, 4)), m = Number(String(code).substring(4, 6)); return m >= 6 ? y : y - 1; }
+  function qyAyLabel(ay) { return ay + "-" + String(ay + 1).slice(2); }
+  function qyMonthCode(ay, m) { return "" + (m >= 6 ? ay : ay + 1) + pad2(m); }
+  function qyQMonths(ay, q) { return QY_QM[q].map(function (m) { return qyMonthCode(ay, m); }); }
+  function qyYMonths(ay) { return QY_YM.map(function (m) { return qyMonthCode(ay, m); }); }
+  function qyCode(ay, p) { return p === "FY" ? ay + "9900" : ay + "9" + p + "00"; }
+  function qyIsCode(c) { return /^\d{4}9\d00$/.test(String(c)); }
+  function qyWeekOf(p) { return p === "FY" ? 9 : Number(p); }      // "week" column of the quarter / year uploads
+  function qyMonLabel(code) { return MON_SHORT[Number(code.substring(4, 6)) - 1] + " " + code.substring(0, 4); }
+  function qyQRange(q) { var m = QY_QM[q]; return MON_SHORT[m[0] - 1] + "–" + MON_SHORT[m[2] - 1]; }
+  function qyCurAy() { var d = new Date(); return d.getMonth() + 1 >= 6 ? d.getFullYear() : d.getFullYear() - 1; }
+  function qyCurQ() { var m = new Date().getMonth() + 1; for (var q = 1; q <= 4; q++) if (QY_QM[q].indexOf(m) >= 0) return q; return 1; }
+  // true while the academic year is still running (Whole Year shows "year to date")
+  function qyYearOpen(ay) { var d = new Date(), c = "" + d.getFullYear() + pad2(d.getMonth() + 1); return c <= (ay + 1) + "05"; }
+  function qyNowCode() { var d = new Date(); return "" + d.getFullYear() + pad2(d.getMonth() + 1); }
+  function qyTnum(v) { var n = Number(v); return (v === null || v === undefined || v === "" || isNaN(n)) ? null : n; }
+
+  /* ---------- who / what is under review (same rules as sbGetWeeklyView) ---------- */
+  function qyScope(unit, value) {
+    var self = null, districts, blockNames, team = [];
+    if (unit === "PO") {
+      self = person(value);
+      if (!self) throw new Error("No active assignment found for " + value + ".");
+      districts = self.assigned_districts || [];
+      blockNames = self.assigned_blocks || [];
+    } else if (unit === "PM" || unit === "DM") {
+      self = person(value);
+      if (!self) throw new Error("No active assignment found for " + value + ".");
+      districts = self.assigned_districts || [];
+      blockNames = blocksOfDistricts(districts);
+      team = peopleOver("PO", districts);
+    } else {
+      districts = [value];
+      blockNames = blocksOfDistricts(districts);
+      team = peopleOver("PO", districts);
+    }
+    return { unit: unit, value: value, self: self, districts: districts, blockNames: blockNames, team: team,
+             blockKeys: blockNames.map(normBlock), distKeys: districts.map(normDist),
+             empId: self ? self.emp_id : "", header: buildHeader(unit, value, self, districts, blockNames, team) };
+  }
+
+  /* ---------- one academic year of quarter / year data for a unit ----------
+     -> { periods: { 1, 2, 3, 4, FY: period payload }, missing, acadOk }
+     A period payload looks like a Monthly payload (so the Monthly scoring code can run on it):
+       { p, ay, code, months, g1: {target, done}, prevSections,
+         view: { header, month: code, academic: null, targets, weeks: [{ week 0, code, sections, readPoints, carryForward }] } } */
+  async function sbGetQyYear(unit, value, ay) {
+    await loadOrg();
+    var sc = qyScope(unit, value), flag = { missing: [] };
+    var months = qyYMonths(ay);
+    var qCodes = [1, 2, 3, 4].map(function (q) { return qyCode(ay, q); }).concat([qyCode(ay, "FY"), qyCode(ay - 1, 4), qyCode(ay - 1, "FY")]);
+    var mCodes = months.map(function (m) { return m + "00"; });
+    var NONE = Promise.resolve([]);
+    var safe = function (name, p) { return p.catch(function (e) { console.warn(name + " not loaded:", e); flag.missing.push(name); return []; }); };
+    var q = await Promise.all([
+      fetchAll(function () { return db().from("academic_targets").select("*").in("plan_month", months); })
+        .catch(function (e) { console.warn("Academic plan not loaded:", e); return null; }),
+      sc.empId ? fetchAll(function () { return db().from("review_responses").select("*").eq("emp_id", sc.empId).in("period_code", qCodes.concat(mCodes)); }) : NONE,
+      sc.blockKeys.length ? safe("vinoba_qy_v", fetchAll(function () { return db().from("vinoba_qy_v").select("*").eq("year", ay).in("block_key", sc.blockKeys); })) : NONE,
+      sc.distKeys.length ? safe("staffconnect_qy_v", fetchAll(function () { return db().from("staffconnect_qy_v").select("*").eq("year", ay).in("district_key", sc.distKeys); })) : NONE,
+      safe("qy_targets", fetchAll(function () { return db().from("qy_targets").select("*").eq("year", ay); })),
+      sc.empId ? fetchAll(function () { return db().from("visitandactivity_data").select("*").eq("emp_id", sc.empId).eq("week", 0).in("year", [ay, ay + 1]); }) : NONE
+    ]);
+    var acadRows = q[0], own = sectionsByCode(q[1]), vin = q[2], scr = q[3], tgt = q[4], va = q[5];
+
+    function g1For(mcodes) {
+      var planned = null, done = 0, any = false;
+      if (acadRows) {
+        planned = 0;
+        mcodes.forEach(function (m) { planned += acadTotal(acadFromRows(acadRows.filter(function (r) { return String(r.plan_month) === m; }), unit, value)); });
+      }
+      mcodes.forEach(function (m) {
+        var v = ((own[m + "00"] || {}).M || {}).M_G1_DONE;
+        if (v !== undefined && v !== null && v !== "") { any = true; done += num(v); }
+      });
+      return { target: planned, done: any ? done : "" };
+    }
+    function rpFor(p, mcodes) {
+      var wk = qyWeekOf(p), rp = {};
+      var vrows = vin.filter(function (r) { return Number(r.week) === wk; }).map(function (r) { return Object.assign({}, r, { week: wk }); });
+      // the Staff Connect file of a quarter holds several months: count them all
+      var srows = scr.filter(function (r) { return Number(r.week) === wk; }).map(function (r) { return Object.assign({}, r, { week: wk, event_month: null }); });
+      if (vrows.length || srows.length) {
+        var out = buildReadPoints(wk, false, sc.blockKeys, sc.distKeys, "", vrows, srows, [], [], [], []);
+        if (vrows.length) rp.vinoba = out.vinoba;
+        if (srows.length) { rp.staffConnect = out.staffConnect; rp.extra = out.extra; }
+      }
+      var kv = va.filter(function (r) { return mcodes.indexOf("" + r.year + pad2(Number(r.month))) >= 0; });
+      if (kv.length) rp.visit = { "Kathawli Yes": kv.reduce(function (a, r) { return a + num(r.kathavli_yes); }, 0) };
+      return rp;
+    }
+    function targetsFor(p) {
+      var pname = p === "FY" ? "FY" : "Q" + p;           // qy_targets.period: 'Q1'..'Q4' / 'FY'
+      var rows = tgt.filter(function (r) { return String(r.period) === pname; }), pick;
+      if (unit === "PO") pick = rows.filter(function (r) { return r.level === "PO" && normId(r.po_id) === normId(value); });
+      else {
+        var dk = {}; sc.districts.forEach(function (d) { dk[normDist(d)] = 1; });
+        pick = rows.filter(function (r) { return r.level === "District" && dk[normDist(r.district)]; });
+      }
+      var out = { cols: {}, unit: unit, rowsInMonth: rows.length, unitRows: pick.length, qy: true };
+      TGT_KEYS.forEach(function (k) {
+        var total = 0, any = false, parts = [];
+        pick.forEach(function (r) {
+          var v = qyTnum(r[k]);
+          parts.push({ district: r.district || "", po: r.po_name || r.po_id || r.district || "", value: v, status: v > 0 ? "counted" : "zero" });
+          if (v > 0) { any = true; total = k === "posts_per_teacher" ? Math.max(total, v) : total + v; }   // a ratio is not added up
+        });
+        out.cols[k] = { value: any ? total : null, parts: parts };
+      });
+      return out;
+    }
+    function payload(p) {
+      var code = qyCode(ay, p), mcodes = p === "FY" ? months : qyQMonths(ay, p);
+      var prevCode = p === "FY" ? qyCode(ay - 1, "FY") : (p === 1 ? qyCode(ay - 1, 4) : qyCode(ay, p - 1));
+      var carry = { B1: "", B2: "", B3: "", B4: "", B5: "" };
+      applyCarry(carry, (own[prevCode] || {}).G);
+      return { p: p, ay: ay, code: code, months: mcodes, g1: g1For(mcodes), prevSections: own[prevCode] || {},
+               future: mcodes[0] > qyNowCode(),                 // not started yet: shown as "—", never scored
+               view: { header: sc.header, unitEmpId: sc.empId, month: code, academic: null, targets: targetsFor(p),
+                       weeks: [{ week: 0, code: code, sections: own[code] || {}, readPoints: rpFor(p, mcodes), prefill: {}, carryForward: carry }] } };
+    }
+    return { unit: unit, value: value, ay: ay, scope: sc, missing: flag.missing, acadOk: !!acadRows,
+             periods: { 1: payload(1), 2: payload(2), 3: payload(3), 4: payload(4), FY: payload("FY") } };
+  }
+
+  // One month exactly as the Monthly tab sees it
+  async function qyMonthPayload(unit, value, month) {
+    var r = await Promise.all([
+      sbGetWeeklyView(unit, value, month),
+      sbGetAcademic(unit, value, month).catch(function (e) { console.warn("Academic plan not loaded:", e); return null; }),
+      sbGetTargets(unit, value, month).catch(function (e) { console.warn("Targets not loaded:", e); return null; })
+    ]);
+    var v = r[0]; v.academic = r[1]; v.targets = r[2];
+    return { month: month, view: v, future: month > qyNowCode() };
+  }
+
+  /* ---------- scoring: run the Monthly rules on any payload ---------- */
+  function qyWith(view, dirty, fn) {
+    var sv = MVIEW, sd = MDIRTY;
+    MVIEW = view; MDIRTY = dirty || {};
+    try { return fn(); } finally { MVIEW = sv; MDIRTY = sd; }
+  }
+  // -> { goals: { G1: score|null, ... }, rows: { "G2|Storytelling": { t, d, p, s } }, total, n }
+  function qyEval(per, dirty) {
+    if (per.future) {
+      var none = { goals: {}, rows: {}, total: 0, n: 0, future: true };
+      QY_GOALS.forEach(function (g) { none.goals[g.key] = null; });
+      return none;
+    }
+    return qyWith(per.view, dirty, function () {
+      var rp = moW0().readPoints || {}, out = { goals: {}, rows: {}, total: 0, n: 0 };
+      QY_GOALS.forEach(function (g) {
+        var score = null;
+        if (g.key === "G1") {
+          var r = g.rows[0], t, d;
+          if (per.g1) { t = per.g1.target; d = per.g1.done; }
+          else { t = per.view.academic ? acadTotal(per.view.academic) : null; d = moG1Done(); }
+          var cell = { t: t, d: d === "" ? null : d, p: null, s: null };
+          if (t === 0) { cell.p = 1; cell.s = r.w; }                       // nothing planned = full score
+          else if (t != null) { var ps = moPctScore(d, t, r.w); if (ps) { cell.p = ps.pct / 100; cell.s = ps.score; } }
+          out.rows["G1|" + r.label] = cell;
+          score = cell.s;
+        } else if (g.key === "G4") {
+          var e4 = moG4Eval();
+          out.rows["G4|Other activities"] = { t: null, d: null, p: null, s: e4.score, g4: e4 };
+          score = e4.score;
+        } else {
+          g.rows.forEach(function (r) {
+            if (r.head) return;
+            var ev = moEval(g, r, rp), weighted = (r.lvl === 0 && r.w > 0) || r.community;
+            var t2 = ev.tg.state === "ok" ? ev.tg.value : (ev.full ? 0 : null);
+            out.rows[g.key + "|" + r.label] = {
+              t: r.info ? null : t2, d: ev.st.kind === "num" ? ev.st.value : null,
+              p: r.info ? null : ev.pct, s: weighted ? ev.score : null };
+          });
+          score = moGoalScore(g, rp).score;
+        }
+        out.goals[g.key] = score;
+        if (score != null) { out.total += score; out.n++; }
+      });
+      return out;
+    });
+  }
+
+  /* ---------- the goal matrix (rows G1-G4, one column group per period) ----------
+     cols: [{ label, sub, ev, tot }] · opts: { id, open: {i: true}, fixed: true (always open, no toggle) } */
+  function qyFmt(v, pct) {
+    if (v === null || v === undefined || v === "") return '<span class="pr-mut">—</span>';
+    return pct ? fmtNum(Math.round(v * 1000) / 10) + "%" : fmtNum(r2(v));
+  }
+  function qyMatrix(cols, opts) {
+    var open = opts.open || {}, cls = "pr-tbl pr-mo-tbl qy-tbl";
+    cols.forEach(function (c, i) { if (open[i] || opts.fixed) cls += " qy-o" + i; });
+    var h1 = '<tr><th class="pr-item" rowspan="2">Item</th><th class="pr-num" rowspan="2">Weight</th>', h2 = "<tr>";
+    cols.forEach(function (c, i) {
+      var o = !!(open[i] || opts.fixed);
+      h1 += '<th class="qy-ph' + (c.tot ? " qy-tot" : "") + '" data-p="' + i + '" colspan="' + (o ? 4 : 1) + '"><div class="qy-phin">'
+        + (opts.fixed ? "" : '<button type="button" class="qy-tog" data-p="' + i + '" aria-expanded="' + o + '" title="Show / hide target, done and % done">' + (o ? "−" : "+") + "</button>")
+        + '<span class="qy-plbl">' + esc(c.label) + (c.sub ? '<small>' + esc(c.sub) + "</small>" : "") + "</span></div></th>";
+      h2 += '<th class="pr-num qy-det" data-p="' + i + '">Target</th><th class="pr-num qy-det" data-p="' + i + '">Done</th>'
+        + '<th class="pr-num qy-det" data-p="' + i + '">% done</th><th class="pr-num qy-sc' + (c.tot ? " qy-tot" : "") + '" data-p="' + i + '">Score</th>';
+    });
+    h1 += "</tr>"; h2 += "</tr>";
+    var cellsFor = function (get, scoreOnly) {
+      return cols.map(function (c, i) {
+        var x = get(c) || {};
+        var tc = c.tot ? " qy-tot" : "";
+        return '<td class="pr-num qy-det' + tc + '" data-p="' + i + '">' + (scoreOnly ? "" : qyFmt(x.t)) + "</td>"
+          + '<td class="pr-num qy-det' + tc + '" data-p="' + i + '">' + (scoreOnly ? "" : qyFmt(x.d)) + "</td>"
+          + '<td class="pr-num qy-det' + tc + '" data-p="' + i + '">' + (scoreOnly ? "" : qyFmt(x.p, true)) + "</td>"
+          + '<td class="pr-num qy-sc' + tc + '" data-p="' + i + '">' + (x.sHtml != null ? x.sHtml : (x.hideS ? "" : qyFmt(x.s))) + "</td>";
+      }).join("");
+    };
+    var body = '<tr class="qy-totrow"><td class="pr-item">Total score<div class="pr-mo-sub">G1–G4 · out of ' + QY_MAX + '</div></td><td class="pr-num">' + QY_MAX + "</td>"
+      + cellsFor(function (c) { return { sHtml: c.ev.n ? fmtNum(r2(c.ev.total)) + '<small> / ' + QY_MAX + "</small>" : '<span class="pr-mut">—</span>' }; }, true) + "</tr>";
+    QY_GOALS.forEach(function (g) {
+      var gid = opts.id + g.key;
+      body += '<tr class="pr-grp qy-goal" data-grp="' + gid + '" data-goal="' + g.key + '"><td class="pr-item"><span class="pr-caret">▸</span><span class="pr-grp-k">' + g.key + "</span>" + esc(g.title) + "</td>"
+        + '<td class="pr-num">' + g.weight + "</td>"
+        + cellsFor(function (c) { return { sHtml: c.ev.goals[g.key] != null ? "<b>" + fmtNum(r2(c.ev.goals[g.key])) + "</b>" : '<span class="pr-mut">—</span>' }; }, true) + "</tr>";
+      g.rows.forEach(function (r) {
+        if (r.head) return;
+        var key = g.key + "|" + (g.key === "G4" ? "Other activities" : r.label);
+        var weighted = (r.lvl === 0 && r.w > 0) || r.community;
+        var sub = g.key === "G4" ? "Month columns: the Monthly G4. Quarter / year: activities entered by the reviewer."
+                : r.academic ? "Target: exams in the Academic Plan for the period. Done: exams completed, from the Monthly reviews."
+                : (r.note || "");
+        var lbl = r.academic ? "Exams planned vs completed" : r.label;
+        body += '<tr class="pr-row pr-hidden pr-mo-l' + r.lvl + '" data-secrow="' + gid + '"><td class="pr-item">' + esc(lbl)
+          + (sub ? '<div class="pr-mo-sub">' + esc(sub) + "</div>" : "") + "</td>"
+          + '<td class="pr-num">' + (r.w != null ? r.w : "") + "</td>"
+          + cellsFor(function (c) { var x = c.ev.rows[key] || {}; return { t: x.t, d: x.d, p: x.p, s: x.s, hideS: !weighted }; }, false) + "</tr>";
+      });
+    });
+    return '<div class="qy-wrap"><table class="' + cls + '" data-qy="' + opts.id + '"><thead>' + h1 + h2 + "</thead><tbody>" + body + "</tbody></table></div>";
+  }
+  function qyBindMatrix(root) {
+    var tbl = document.querySelector(root + " table.qy-tbl"); if (!tbl) return;
+    tbl.querySelectorAll(".qy-tog").forEach(function (b) {
+      b.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var i = b.dataset.p, on = !tbl.classList.contains("qy-o" + i);
+        tbl.classList.toggle("qy-o" + i, on);
+        var th = tbl.querySelector('th.qy-ph[data-p="' + i + '"]'); if (th) th.colSpan = on ? 4 : 1;
+        b.textContent = on ? "−" : "+"; b.setAttribute("aria-expanded", on ? "true" : "false");
+        var st = QY_OPEN[tbl.dataset.qy] = QY_OPEN[tbl.dataset.qy] || {}; st[i] = on;
+      });
+    });
+    tbl.querySelectorAll("tr.qy-goal").forEach(function (g) {
+      g.addEventListener("click", function () {
+        var opened = g.classList.toggle("is-open");
+        tbl.querySelectorAll('tr.pr-row[data-secrow="' + g.dataset.grp + '"]').forEach(function (tr) { tr.classList.toggle("pr-hidden", !opened); });
+        var st = QY_GOPEN[tbl.dataset.qy] = QY_GOPEN[tbl.dataset.qy] || {}; st[g.dataset.grp] = opened;
+      });
+    });
+    // keep open goals open after a refresh
+    var go = QY_GOPEN[tbl.dataset.qy] || {};
+    Object.keys(go).forEach(function (k) { if (!go[k]) return; var g = tbl.querySelector('tr.qy-goal[data-grp="' + k + '"]'); if (g) g.click(); });
+  }
+  var QY_OPEN = {}, QY_GOPEN = {};
+
+  function qyCards(items) {
+    return '<div class="pr-cards pr-mo-cards qy-cards">' + items.map(function (it) {
+      return '<div class="pr-card" data-goal="' + (it.goal || "") + '"><div class="pr-card-k">' + esc(it.label) + '</div><div class="pr-card-v">'
+        + (it.v != null ? fmtNum(r2(it.v)) : "—") + "<small>/ " + it.max + '</small></div><div class="pr-wkcard-foot"><span>' + esc(it.foot || "") + "</span></div></div>";
+    }).join("") + "</div>";
+  }
+  function qyGoalCards(ev, totalLabel, foot) {
+    var items = [{ goal: "TOTAL", label: totalLabel, v: ev.n ? ev.total : null, max: QY_MAX,
+                   foot: foot || (ev.n === QY_GOALS.length ? "All goals scored" : ev.n ? "Partial — " + ev.n + " of " + QY_GOALS.length + " goals scored" : "Shown once targets and data are in") }];
+    QY_GOALS.forEach(function (g) { items.push({ goal: g.key, label: g.key + " · " + g.title, v: ev.goals[g.key], max: g.weight }); });
+    return qyCards(items);
+  }
+  // What the quarter / year column is missing, said plainly
+  function qyDataNotes(per, label, missing) {
+    var notes = [], rp = per.view.weeks[0].readPoints || {}, T = per.view.targets;
+    if (missing && missing.length) notes.push("The quarter / year tables are not set up yet (" + missing.join(", ") + "). Run sql/2026-11-25-field-review-quarterly-yearly.sql in Supabase.");
+    else {
+      if (!rp.vinoba) notes.push("No Vinoba file uploaded for " + label + " (Admin → Data → Quarter & Whole-Year data).");
+      if (!rp.staffConnect) notes.push("No Staff Connect file uploaded for " + label + ".");
+      if (!T || !T.rowsInMonth) notes.push("No G2 · G3 targets uploaded for " + label + " (Admin → Targets → Quarter & Whole-Year targets).");
+      else if (!T.unitRows) notes.push("The " + label + " targets file has no row for this " + (per.view.header.unit === "PO" ? "PO" : "district") + ".");
+    }
+    if (!notes.length) return "";
+    return '<div class="pr-panel qy-notes"><b>For the ' + esc(label) + " column:</b><ul>" + notes.map(function (n) { return "<li>" + esc(n) + "</li>"; }).join("") + "</ul></div>";
+  }
+
+  /* ---------- review sections for a quarter / year (A, B, G3 entry, G4, G, H) ---------- */
+  function qySec(word) {
+    return {
+      A: { k: "A", title: "Check-in", who: "PO", write: true, rows: [
+        { id: "A1", label: "How are you feeling this " + word + "?", type: "mood" },
+        { id: "A2", label: "Anything on your mind?", type: "text" } ] },
+      B: { k: "B", title: "Last " + word + "'s actions", who: "PO", write: true, rows: [1, 2, 3, 4, 5].map(function (n) {
+        return { id: "B" + n, label: "Action " + n + " from last " + word, type: "prog" }; }) },
+      G: { k: "G", title: "Next " + word, who: "PO", write: true, rows: [{ id: "G1", label: "Blocker or escalation", type: "text" }]
+        .concat([1, 2, 3, 4, 5].map(function (n) { return { id: "G" + (n + 1), label: "Action " + n + " for next " + word, type: "text" }; })) },
+      H: { k: "H", title: "Review record", who: "PM", write: true, rows: [
+        { id: "H1", label: "Review held", type: "yn" },
+        { id: "H2", label: "Manager status", type: "status" },
+        { id: "H3", label: "Manager's remark", type: "text" } ] }
+    };
+  }
+  function qyRevName(word) { return word === "year" ? "whole-year" : "quarterly"; }
+  function qyGroupHead(id, key, title, who, extra) {
+    return '<tr class="pr-grp" data-grp="' + id + key + '"><td colspan="6"><span class="pr-caret">▸</span><span class="pr-grp-k">' + esc(key) + "</span>"
+      + esc(title) + ' <span class="pr-who-tag pr-who-' + whoClassOf(who) + '">' + esc(who) + "</span>" + (extra || "") + "</td></tr>";
+  }
+  function qyWriteSection(id, S, per, editable) {
+    var h = per.view.header, who = sectionWho(S, h.unit, h), w0 = per.view.weeks[0];
+    var out = qyGroupHead(id, S.k, S.title, who);
+    S.rows.forEach(function (r) {
+      out += '<tr class="pr-row pr-hidden" data-secrow="' + id + S.k + '"><td class="pr-item">' + esc(r.label) + '</td><td colspan="5">'
+        + renderCell(S, r, w0, editable) + "</td></tr>";
+    });
+    return out;
+  }
+  function qyVal(per, fid) { return qyWith(per.view, QDIRTY, function () { return moValue(fid); }); }
+  function qyPomSection(id, per, editable, word) {
+    var h = per.view.header, who = sectionWho({ k: "A", write: true }, h.unit, h), code = per.code;
+    var v = qyVal(per, "M_G3_POMCLUSTERS");
+    var cell = editable
+      ? '<input type="number" min="0" step="any" inputmode="decimal" class="pr-mo-ent qy-ent" placeholder="0" data-wc="' + code + '" data-fid="M_G3_POMCLUSTERS" value="' + (v === "" || v == null ? "" : v) + '">'
+      : (v === "" || v == null ? moPill("Not entered", "pr-mo-entry", "Entered by the person under review") : fmtNum(v));
+    return qyGroupHead(id, "G3", "POM transformed clusters", who)
+      + '<tr class="pr-row pr-hidden" data-secrow="' + id + 'G3"><td class="pr-item">POM transformed clusters this ' + word
+      + '<div class="pr-mo-sub">Used for this line in G3 (the ' + word + ' column). Not in any upload, so it is typed here.</div></td><td colspan="5">' + cell + "</td></tr>";
+  }
+  function qyG4Section(id, per, editable, word) {
+    var h = per.view.header, code = per.code;
+    var who = sectionWho({ k: "H", write: true }, h.unit, h);
+    return qyWith(per.view, QDIRTY, function () {
+      var e = moG4Eval(), all = moG4Items();
+      var out = qyGroupHead(id, "G4", "Other Goals — this " + word, who, '<span class="pr-grpcount">Weight 10</span>');
+      out += '<tr class="pr-row pr-hidden pr-mo-l0" data-secrow="' + id + 'G4" data-qyg4sum="1"><td class="pr-item">Other activities'
+        + '<div class="pr-mo-sub">Up to 3 activities, filled in by the reviewer. Their weights must add up to 10.</div></td>'
+        + moCell(moG4WsumHtml(e)) + moCell("Target") + moCell("Done") + moCell("% done") + moCell(e.score != null ? fmtNum(r2(e.score)) : moDash()) + "</tr>";
+      if (!editable) {
+        if (!e.items.length) return out + '<tr class="pr-row pr-hidden pr-mo-l1" data-secrow="' + id + 'G4"><td class="pr-item">'
+          + moPill("No activities added", "pr-mo-na", "Added by the reviewer") + '</td><td colspan="5"></td></tr>';
+        e.items.forEach(function (x) {
+          out += '<tr class="pr-row pr-hidden pr-mo-l1" data-secrow="' + id + 'G4"><td class="pr-item">' + esc(x.name || "(unnamed)") + "</td>"
+            + moCell(x.w === "" ? "" : fmtNum(x.w)) + moCell(x.t === "" ? "" : fmtNum(x.t)) + moCell(x.d === "" ? "" : fmtNum(x.d))
+            + moCell(x.sc ? fmtNum(x.sc.pct) + "%" : moDash()) + moCell(x.sc ? fmtNum(x.sc.score) : moDash()) + "</tr>";
+        });
+        return out;
+      }
+      var shown = all.filter(function (x) { return x.used; }).map(function (x) { return x.i; });
+      if (!shown.length) shown = [1];
+      all.forEach(function (x) {
+        var off = shown.indexOf(x.i) < 0, sc = x.used ? moPctScore(x.d, x.t, x.w === "" ? 0 : x.w) : null;
+        var numIn = function (k, v, ph) {
+          return '<input type="number" min="0" step="any" inputmode="decimal" class="pr-mo-g4n qy-g4n" data-wc="' + code + '" data-fid="M_G4_' + x.i + "_" + k
+            + '" placeholder="' + ph + '" value="' + (v === "" ? "" : v) + '">';
+        };
+        out += '<tr class="pr-row pr-hidden pr-mo-l1' + (off ? " pr-mo-g4off" : "") + '" data-secrow="' + id + 'G4" data-g4="' + x.i + '">'
+          + '<td class="pr-item"><div class="pr-mo-g4name"><input type="text" class="pr-mo-txt qy-g4t" maxlength="80" data-wc="' + code + '" data-fid="M_G4_' + x.i
+          + '_NAME" placeholder="Activity ' + x.i + ' — name" value="' + esc(x.name) + '">'
+          + '<button type="button" class="pr-mo-x qy-g4x" title="Remove this activity">✕</button></div></td>'
+          + moCell(numIn("W", x.w, "Weight")) + moCell(numIn("T", x.t, "Target")) + moCell(numIn("D", x.d, "Done"))
+          + moCell(sc ? fmtNum(sc.pct) + "%" : moDash()) + moCell(sc ? fmtNum(sc.score) : moDash()) + "</tr>";
+      });
+      out += '<tr class="pr-row pr-hidden" data-secrow="' + id + 'G4" data-g4add="1"' + (shown.length >= 3 ? ' style="display:none"' : "")
+        + '><td colspan="6"><button type="button" class="pr-btn pr-mo-add qy-g4add">+ Add activity</button>'
+        + ' <span class="pr-mo-sub" style="display:inline">Up to 3 · weights must add up to 10</span></td></tr>';
+      return out;
+    });
+  }
+
+  /* ---------- review status (same rule as Monthly; built from what is SAVED) ---------- */
+  function qyReviewStatus(per, word) {
+    var sec = per.view.weeks[0].sections || {}, PG = (per.prevSections || {}).G || {};
+    var A = sec.A || {}, B = sec.B || {}, G = sec.G || {}, H = sec.H || {}, M = sec.M || {};
+    var self = [], mgr = [];
+    if (!msumHas(A.A1)) self.push("A1 Mood");
+    [1, 2, 3, 4, 5].forEach(function (n) {
+      var b = msumObj(B["B" + n]), carried = msumTxt(PG["G" + (n + 1)]) || msumTxt(b.text);
+      if (carried && !msumHas(b.status)) self.push("B" + n + " status");
+    });
+    if (!["G2", "G3", "G4", "G5", "G6"].some(function (k) { return msumHas(G[k]); })) self.push("At least one action for next " + word);
+    if (!msumHas(M.M_G3_POMCLUSTERS)) self.push("G3 POM transformed clusters");
+    var acts = G4_SLOTS.map(function (i) {
+      var x = { name: msumTxt(M["M_G4_" + i + "_NAME"]), w: M["M_G4_" + i + "_W"], t: M["M_G4_" + i + "_T"], d: M["M_G4_" + i + "_D"] };
+      x.used = !!x.name || msumHas(x.w) || msumHas(x.t) || msumHas(x.d);
+      return x;
+    }).filter(function (x) { return x.used; });
+    if (!acts.length) mgr.push("G4 activities (add at least one)");
+    else {
+      var wsum = Math.round(acts.reduce(function (a, x) { return a + (msumHas(x.w) ? num(x.w) : 0); }, 0) * 1000) / 1000;
+      if (wsum !== 10) mgr.push("G4 weights add up to " + wsum + " (must be 10)");
+      if (acts.some(function (x) { return !x.name || !msumHas(x.w) || !msumHas(x.t) || !msumHas(x.d); })) mgr.push("G4 activity name / weight / target / done");
+    }
+    if (!msumHas(H.H1)) mgr.push("H1 Review held");
+    if (!msumHas(H.H2)) mgr.push("H2 Manager status");
+    var started = ["A", "B", "G", "M", "H"].some(function (k) { return hasContent(sec[k]); });
+    return { st: !self.length ? (!mgr.length ? "done" : "partial") : "none", started: started, self: self, mgr: mgr };
+  }
+  function qyStatusBanner(per, word, label) {
+    var h = per.view.header || {};
+    if (!h.selfEmpId) return "";
+    var ev = qyReviewStatus(per, word);
+    var selfName = h.unit === "PO" ? ((h.po && h.po.name) || "the PO") : (h.manager || "the " + h.unit);
+    var rv = msumReviewerOf(person(h.selfEmpId)), rvName = rv ? rv.name + " (" + rv.designation + ")" : "the reviewer";
+    var cls, pill, text, list = [];
+    if (!ev.started) { cls = "is-new"; pill = "Not started"; text = "Nothing saved for " + label + " yet."; list = ev.self.concat(ev.mgr); }
+    else if (ev.st === "none") { cls = "is-none"; pill = "Not done"; text = ev.self.length + " item" + (ev.self.length === 1 ? "" : "s") + " still pending for " + selfName + "."; list = ev.self.concat(ev.mgr); }
+    else if (ev.st === "partial") { cls = "is-partial"; pill = "Partially done"; text = selfName + "'s points are complete — waiting for " + rvName + " (G4 and H)."; list = ev.mgr; }
+    else { cls = "is-done"; pill = "Review done"; text = selfName + "'s points and " + rvName + "'s points are saved."; }
+    return '<div class="pr-panel pr-mstat ' + cls + '"><div class="pr-mstat-line"><span class="pr-mstat-pill">' + pill + "</span>"
+      + '<span class="pr-mstat-text">' + esc(text) + "</span></div>"
+      + (list.length ? '<div class="qy-pending">Pending: ' + list.map(esc).join(" · ") + "</div>" : "") + "</div>";
+  }
+
+  function qyReviewTable(id, per, word) {
+    var h = per.view.header || {};
+    if (!h.selfEmpId) return '<div class="pr-panel"><div class="pr-empty">Reviews are written per PO, PM or DM — a district has no review of its own. Open a PO, PM or DM to write the ' + qyRevName(word) + " review.</div></div>";
+    var S = qySec(word), selfOk = canEditSelf(per.view), mgrOk = canEditManager(per.view);
+    var body = qyWriteSection(id, S.A, per, selfOk) + qyWriteSection(id, S.B, per, selfOk)
+      + qyPomSection(id, per, selfOk, word) + qyG4Section(id, per, mgrOk, word)
+      + qyWriteSection(id, S.G, per, selfOk) + qyWriteSection(id, S.H, per, mgrOk);
+    var head = '<tr><th class="pr-item">Review — this ' + word + '</th><th class="pr-num">Weight</th><th class="pr-num">Target</th><th class="pr-num">Done</th><th class="pr-num">% done</th><th class="pr-num">Score</th></tr>';
+    var html = '<div class="pr-tablewrap qy-revwrap"><table class="pr-tbl pr-mo-tbl qy-rev"><thead>' + head + "</thead><tbody>" + body + "</tbody></table></div>";
+    if (selfOk || mgrOk) html += '<div class="pr-savebar"><span class="pr-savehint">You can edit the sections your role owns.</span>'
+      + '<button class="pr-btn pr-btn-primary qy-save">Save ' + qyRevName(word) + " review</button></div>";
+    return html;
+  }
+  // Bind the editable review table under root; onChange re-scores the page
+  function qyBindReview(root, per, onChange) {
+    bindTable(root + " .qy-revwrap");
+    var sel = function (s) { return document.querySelectorAll(root + " " + s); };
+    sel(".qy-ent").forEach(function (inp) {
+      inp.addEventListener("input", function () {
+        var raw = inp.value.trim(), val = raw === "" ? "" : Number(raw), bad = val !== "" && (isNaN(val) || val < 0);
+        inp.classList.toggle("is-bad", bad); if (bad) return;
+        markDirty(inp.dataset.wc, inp.dataset.fid, val); onChange();
+      });
+    });
+    var g4Row = function (tr) {
+      var i = Number(tr.dataset.g4);
+      qyWith(per.view, QDIRTY, function () {
+        var get = function (k) { return moNumVal("M_G4_" + i + "_" + k); }, w = get("W"), sc = moPctScore(get("D"), get("T"), w === "" ? 0 : w);
+        tr.cells[4].innerHTML = sc ? fmtNum(sc.pct) + "%" : moDash(); tr.cells[5].innerHTML = sc ? fmtNum(sc.score) : moDash();
+      });
+    };
+    var g4Sum = function () {
+      var tr = document.querySelector(root + ' tr[data-qyg4sum="1"]'); if (!tr) return;
+      qyWith(per.view, QDIRTY, function () { var e = moG4Eval(); tr.cells[1].innerHTML = moG4WsumHtml(e); tr.cells[5].innerHTML = e.score != null ? fmtNum(r2(e.score)) : moDash(); });
+    };
+    sel(".qy-g4n").forEach(function (inp) {
+      inp.addEventListener("input", function () {
+        var raw = inp.value.trim(), val = raw === "" ? "" : Number(raw), bad = val !== "" && (isNaN(val) || val < 0);
+        inp.classList.toggle("is-bad", bad); if (bad) return;
+        markDirty(inp.dataset.wc, inp.dataset.fid, val); g4Row(inp.closest("tr")); g4Sum(); onChange();
+      });
+    });
+    sel(".qy-g4t").forEach(function (inp) { inp.addEventListener("input", function () { markDirty(inp.dataset.wc, inp.dataset.fid, inp.value); g4Sum(); onChange(); }); });
+    sel(".qy-g4x").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var tr = b.closest("tr");
+        tr.querySelectorAll("input[data-fid]").forEach(function (inp) { inp.value = ""; inp.classList.remove("is-bad"); markDirty(inp.dataset.wc, inp.dataset.fid, ""); });
+        if (document.querySelectorAll(root + " tr[data-g4]:not(.pr-mo-g4off)").length > 1) tr.classList.add("pr-mo-g4off");
+        g4Row(tr); g4Sum(); onChange();
+        var add = document.querySelector(root + ' tr[data-g4add="1"]'); if (add) add.style.display = "";
+      });
+    });
+    sel(".qy-g4add").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var next = document.querySelector(root + " tr[data-g4].pr-mo-g4off");
+        if (next) { next.classList.remove("pr-mo-g4off"); var n = next.querySelector(".pr-mo-txt"); if (n) n.focus(); }
+        if (!document.querySelector(root + " tr[data-g4].pr-mo-g4off")) b.closest("tr").style.display = "none";
+      });
+    });
+  }
+  function qySave(root, per, word, reload) {
+    if (document.querySelector(root + " .qy-revwrap .is-bad")) { toast("Fix the highlighted number first — it must be 0 or more."); return; }
+    var e4 = qyWith(per.view, QDIRTY, function () { return moG4Eval(); });
+    if (e4.items.length && e4.items.some(function (x) { return !x.name.trim(); })) { toast("G4: give every activity a name (or remove it)."); return; }
+    if (e4.items.length && !e4.valid) { toast("G4: the activity weights add up to " + fmtNum(e4.wsum) + " — they must total exactly 10."); return; }
+    var fields = QDIRTY[per.code] || {};
+    if (!Object.keys(fields).length) { toast("Nothing to save yet."); return; }
+    var btn = document.querySelector(root + " .qy-save"); if (btn) { btn.disabled = true; btn.innerHTML = '<span class="pr-spin"></span>Saving…'; }
+    sbSaveWeekly(per.view.header.selfEmpId, per.code, fields, currentEmail()).then(function () {
+      delete QDIRTY[per.code]; toast("Saved."); reload();
+    }).catch(function (e) {
+      console.error("Save failed", e);
+      if (btn) { btn.disabled = false; btn.textContent = "Save " + qyRevName(word) + " review"; }
+      var hint = document.querySelector(root + " .pr-savehint");
+      if (hint) { hint.textContent = "Save failed — click Save again to retry. Your changes are NOT lost."; hint.classList.add("is-fail"); }
+      toast("Save failed — please click Save again to retry.");
+    });
+  }
+
+  /* ---------- filters (one set per tab) ---------- */
+  var QY_TABS = {
+    quarterly: { unit: "prQUnit", value: "prQValue", vlabel: "prQValueLabel", year: "prQYear", q: "prQQuarter", load: "prQLoad", body: "prQBody" },
+    yearly:    { unit: "prYUnit", value: "prYValue", vlabel: "prYValueLabel", year: "prYYear", load: "prYLoad", body: "prYBody" },
+    wholeyear: { unit: "prFUnit", value: "prFValue", vlabel: "prFValueLabel", year: "prFYear", load: "prFLoad", body: "prFBody" }
+  };
+  function qyAyList() {
+    var s = {}; s[qyCurAy()] = 1;
+    ((state.base && state.base.months) || []).forEach(function (m) { s[qyAyOf(m.code)] = 1; });
+    return Object.keys(s).map(Number).sort(function (a, b) { return b - a; });
+  }
+  function qyFillFromBase() {
+    if (!state.base) return;
+    Object.keys(QY_TABS).forEach(function (k) {
+      var t = QY_TABS[k], ys = $(t.year); if (!ys) return;
+      var keep = ys.value; ys.innerHTML = "";
+      qyAyList().forEach(function (ay) { ys.appendChild(opt(String(ay), qyAyLabel(ay))); });
+      ys.value = keep && ys.querySelector('option[value="' + keep + '"]') ? keep : String(qyCurAy());
+      ys.disabled = false;
+      if (t.q && $(t.q) && !$(t.q).dataset.init) { $(t.q).value = String(qyCurQ()); $(t.q).dataset.init = "1"; }
+      qyPopulateValue(k);
+    });
+  }
+  function qyPopulateValue(k) {
+    var t = QY_TABS[k], unit = $(t.unit).value, sel = $(t.value);
+    $(t.vlabel).textContent = UNIT_LABEL[unit] || "PO";
+    if (!state.base) { sel.innerHTML = ""; sel.disabled = true; sel.appendChild(opt("", "—")); return; }
+    fillUnitSelect(sel, unit);
+  }
+  function qyReady(k) { var t = QY_TABS[k]; return !!($(t.unit).value && $(t.value).value && $(t.year).value && (!t.q || $(t.q).value)); }
+  function qyRefreshBtn(k) { $(QY_TABS[k].load).disabled = !qyReady(k); }
+  function qyHasDirty() { return Object.keys(QDIRTY).some(function (c) { return Object.keys(QDIRTY[c]).length; }); }
+  function qyWire() {
+    Object.keys(QY_TABS).forEach(function (k) {
+      var t = QY_TABS[k]; if (!$(t.unit)) return;
+      var auto = function () { qyRefreshBtn(k); if (qyReady(k) && !qyHasDirty()) qyLoad(k); };
+      $(t.unit).addEventListener("change", function () { qyPopulateValue(k); qyRefreshBtn(k); });
+      $(t.value).addEventListener("change", auto);
+      $(t.year).addEventListener("change", auto);
+      if (t.q) $(t.q).addEventListener("change", auto);
+      $(t.load).addEventListener("click", function () { qyLoad(k); });
+    });
+  }
+  // Opening a tab for the first time carries over the Monthly (or Weekly) selection.
+  function qySyncFrom(k) {
+    var t = QY_TABS[k]; if (!$(t.value) || $(t.value).value) return;
+    var su = $("prMoValue") && $("prMoValue").value ? "prMo" : ($("prValue") && $("prValue").value ? "pr" : "");
+    if (!su) return;
+    $(t.unit).value = $(su + "Unit").value; qyPopulateValue(k);
+    $(t.value).value = $(su + "Value").value;
+    var mo = $(su === "prMo" ? "prMoMonth" : "prMonth").value;
+    if (mo) {
+      var ay = qyAyOf(mo); if ($(t.year).querySelector('option[value="' + ay + '"]')) $(t.year).value = String(ay);
+      if (t.q) { var mm = Number(mo.substring(4, 6)); for (var q = 1; q <= 4; q++) if (QY_QM[q].indexOf(mm) >= 0) $(t.q).value = String(q); }
+    }
+    qyRefreshBtn(k);
+  }
+
+  /* ---------- load + render ---------- */
+  var QY_SEQ = { quarterly: 0, yearly: 0, wholeyear: 0 };
+  function qyLoad(k) {
+    var t = QY_TABS[k]; if (!qyReady(k)) return;
+    var unit = $(t.unit).value, value = $(t.value).value, ay = Number($(t.year).value), q = t.q ? Number($(t.q).value) : null;
+    var ticket = ++QY_SEQ[k], body = $(t.body);
+    var what = k === "quarterly" ? "quarterly review" : (k === "yearly" ? "yearly view" : "whole-year review");
+    body.innerHTML = '<div class="pr-empty pr-loading">Loading ' + what + "…</div>";
+    var jobs = [sbGetQyYear(unit, value, ay)];
+    if (k === "quarterly") qyQMonths(ay, q).forEach(function (m) { jobs.push(qyMonthPayload(unit, value, m)); });
+    Promise.all(jobs).then(function (res) {
+      if (ticket !== QY_SEQ[k]) return;
+      var data = { unit: unit, value: value, ay: ay, q: q, year: res[0], months: res.slice(1) };
+      var code = k === "quarterly" ? qyCode(ay, q) : (k === "wholeyear" ? qyCode(ay, "FY") : null);
+      if (code) delete QDIRTY[code];
+      QV[k] = data;
+      qyRender(k);
+    }).catch(function (e) {
+      if (ticket !== QY_SEQ[k]) return;
+      body.innerHTML = '<div class="pr-empty pr-error">Couldn\'t load: ' + esc(e.message || String(e)) + "</div>";
+    });
+  }
+  function qyRender(k) {
+    var d = QV[k]; if (!d) return;
+    var body = $(QY_TABS[k].body), y = d.year, h = y.scope.header;
+    var html = renderHeader(h) + renderBlocks(h, { roster: null });
+    if (k === "quarterly") {
+      var per = y.periods[d.q], qLabel = "Q" + d.q + " " + qyAyLabel(d.ay);
+      html += '<div id="prQCards"></div>' + qyDataNotes(per, qLabel, y.missing) + '<div id="prQMatrix"></div>';
+      html += qyStatusBanner(per, "quarter", qLabel) + qyReviewTable("q", per, "quarter");
+      body.innerHTML = html;
+      var paint = function () {
+        var cols = d.months.map(function (mp, i) { return { label: "Month " + (i + 1), sub: qyMonLabel(mp.month) + (mp.future ? " \u00B7 not yet" : ""), ev: qyEval({ view: mp.view, future: mp.future }, {}) }; });
+        var qev = qyEval(per, QDIRTY);
+        cols.push({ label: "Quarter total", sub: qLabel, ev: qev, tot: true });
+        $("prQCards").innerHTML = qyGoalCards(qev, "Quarter score · " + qLabel);
+        $("prQMatrix").innerHTML = '<p class="qy-hint">Click <b>+</b> on a column to see target, done and % done. Click a goal to see its lines. Month columns are the Monthly figures; the Quarter total uses this quarter\'s own uploads and entries.</p>'
+          + qyMatrix(cols, { id: "q", open: (QY_OPEN.q = QY_OPEN.q || { 3: true }) });
+        qyBindMatrix("#prQMatrix");
+      };
+      paint();
+      qyBindAfter("#prQBody", per, "quarter", paint, function () { qyLoad(k); });
+    } else if (k === "yearly") {
+      var cols = [1, 2, 3, 4].map(function (q) { return { label: "Q" + q, sub: qyQRange(q) + (y.periods[q].future ? " \u00B7 not yet" : ""), ev: qyEval(y.periods[q], {}) }; });
+      var cards = cols.map(function (c, i) { return { goal: "G" + (i + 1), label: "Q" + (i + 1) + " · " + qyQRange(i + 1), v: c.ev.n ? c.ev.total : null, max: QY_MAX,
+        foot: c.ev.future ? "Not started yet" : c.ev.n ? c.ev.n + " of " + QY_GOALS.length + " goals scored" : "No data yet" }; });
+      html += qyCards(cards);
+      if (y.missing.length) html += qyDataNotes(y.periods[1], "quarter", y.missing);
+      html += '<p class="qy-hint">Each quarter: G1 from the Academic Plan and the Monthly reviews, G2 · G3 from that quarter\'s uploads, G4 from that quarter\'s review. Click <b>+</b> on a quarter for target, done and % done.</p>';
+      html += '<div id="prYMatrix">' + qyMatrix(cols, { id: "y", open: (QY_OPEN.y = QY_OPEN.y || {}) }) + "</div>";
+      body.innerHTML = html;
+      qyBindMatrix("#prYMatrix");
+    } else {
+      var fy = y.periods.FY, open = qyYearOpen(d.ay), yLabel = qyAyLabel(d.ay);
+      var fyLabel = "Whole year " + yLabel + (open ? " (year to date)" : "");
+      html += '<div id="prFCards"></div>';
+      if (open) html += '<div class="pr-panel qy-notes"><b>Year to date.</b> ' + esc(yLabel) + " runs until May " + (d.ay + 1) + ". Achieved numbers so far are compared with the full-year target, so the score will rise as the year goes on.</div>";
+      html += qyDataNotes(fy, "whole-year", y.missing) + '<div id="prFMatrix"></div>';
+      html += qyStatusBanner(fy, "year", fyLabel) + qyReviewTable("f", fy, "year");
+      body.innerHTML = html;
+      var paintF = function () {
+        var ev = qyEval(fy, QDIRTY);
+        $("prFCards").innerHTML = qyGoalCards(ev, open ? "Year to date · " + yLabel : "Year score · " + yLabel);
+        $("prFMatrix").innerHTML = qyMatrix([{ label: open ? "Year to date" : "Whole year", sub: yLabel, ev: ev, tot: true }], { id: "f", fixed: true });
+        qyBindMatrix("#prFMatrix");
+      };
+      paintF();
+      qyBindAfter("#prFBody", fy, "year", paintF, function () { qyLoad(k); });
+    }
+  }
+  function qyBindAfter(root, per, word, paint, reload) {
+    var timer = null;
+    var onChange = function () { if (timer) clearTimeout(timer); timer = setTimeout(paint, 250); };
+    qyBindReview(root, per, onChange);
+    var sb = document.querySelector(root + " .qy-save");
+    if (sb) sb.addEventListener("click", function () { qySave(root, per, word, reload); });
+  }
+
 
   /* ---------- Goal Numbers Fetcher for Progress Tab ---------- */
   var _goalFetchChain = Promise.resolve();

@@ -705,6 +705,9 @@
             <button class="pr-navbtn" data-view="summary"><span class="fr-ico fr-i-sum" aria-hidden="true"></span>Summary</button>
             <button class="pr-navbtn" data-view="monthly"><span class="fr-ico fr-i-month" aria-hidden="true"></span>Monthly</button>
             <button class="pr-navbtn" data-view="mosum"><span class="fr-ico fr-i-sum" aria-hidden="true"></span>Monthly Summary</button>
+            <button class="pr-navbtn" data-view="quarterly"><span class="fr-ico fr-i-month" aria-hidden="true"></span>Quarterly</button>
+            <button class="pr-navbtn" data-view="yearly"><span class="fr-ico fr-i-sum" aria-hidden="true"></span>Yearly</button>
+            <button class="pr-navbtn" data-view="wholeyear"><span class="fr-ico fr-i-target" aria-hidden="true"></span>Whole Year</button>
           </nav>
         </div>
 
@@ -803,6 +806,76 @@
           </div>
           <div id="prMsBody">
             <div class="pr-empty">Pick a month to see who has written their monthly review.</div>
+          </div>
+        </section>
+
+
+        <!-- QUARTERLY · YEARLY · WHOLE YEAR (Nov 2026) — logic in pos-review.js (qy*).
+             Academic year Jun–May · Q1 Jun–Aug · Q2 Sep–Nov · Q3 Dec–Feb · Q4 Mar–May · G1–G4 only. -->
+        <section class="pr-view" id="prQuarterly" hidden>
+          <div class="pr-panel pr-filters">
+            <label class="pr-field"><span>Review unit</span>
+              <select id="prQUnit">
+                <option value="PO">PO</option>
+                <option value="PM">PM</option>
+                <option value="DM">DM</option>
+                <option value="District">District</option>
+              </select></label>
+            <label class="pr-field"><span id="prQValueLabel">PO</span>
+              <select id="prQValue" disabled><option value="">—</option></select></label>
+            <label class="pr-field"><span>Academic year</span>
+              <select id="prQYear" disabled><option value="">—</option></select></label>
+            <label class="pr-field"><span>Quarter</span>
+              <select id="prQQuarter">
+                <option value="1">Q1 · Jun–Aug</option>
+                <option value="2">Q2 · Sep–Nov</option>
+                <option value="3">Q3 · Dec–Feb</option>
+                <option value="4">Q4 · Mar–May</option>
+              </select></label>
+            <button class="pr-btn pr-btn-primary" id="prQLoad" disabled>Open review</button>
+          </div>
+          <div id="prQBody">
+            <div class="pr-empty">Choose a review unit, a value, the academic year and a quarter, then open the quarterly review.</div>
+          </div>
+        </section>
+
+        <section class="pr-view" id="prYearly" hidden>
+          <div class="pr-panel pr-filters">
+            <label class="pr-field"><span>Review unit</span>
+              <select id="prYUnit">
+                <option value="PO">PO</option>
+                <option value="PM">PM</option>
+                <option value="DM">DM</option>
+                <option value="District">District</option>
+              </select></label>
+            <label class="pr-field"><span id="prYValueLabel">PO</span>
+              <select id="prYValue" disabled><option value="">—</option></select></label>
+            <label class="pr-field"><span>Academic year</span>
+              <select id="prYYear" disabled><option value="">—</option></select></label>
+            <button class="pr-btn pr-btn-primary" id="prYLoad" disabled>Show</button>
+          </div>
+          <div id="prYBody">
+            <div class="pr-empty">Choose a review unit, a value and the academic year to see Q1–Q4 side by side.</div>
+          </div>
+        </section>
+
+        <section class="pr-view" id="prWholeyear" hidden>
+          <div class="pr-panel pr-filters">
+            <label class="pr-field"><span>Review unit</span>
+              <select id="prFUnit">
+                <option value="PO">PO</option>
+                <option value="PM">PM</option>
+                <option value="DM">DM</option>
+                <option value="District">District</option>
+              </select></label>
+            <label class="pr-field"><span id="prFValueLabel">PO</span>
+              <select id="prFValue" disabled><option value="">—</option></select></label>
+            <label class="pr-field"><span>Academic year</span>
+              <select id="prFYear" disabled><option value="">—</option></select></label>
+            <button class="pr-btn pr-btn-primary" id="prFLoad" disabled>Open review</button>
+          </div>
+          <div id="prFBody">
+            <div class="pr-empty">Choose a review unit, a value and the academic year, then open the whole-year review.</div>
           </div>
         </section>
 
@@ -1637,6 +1710,48 @@
         html[data-theme="dark"] .pr-wkbar,html[data-theme="dark"] .pr-savebar{background:rgba(29,36,48,.96);border-color:rgba(255,255,255,.08);}
         html[data-theme="dark"] .pr-wkpick{background:#232B38;border-color:rgba(255,255,255,.1);color:#E8ECF2;}
         html[data-theme="dark"] .pr-wkpick.is-on{background:linear-gradient(135deg,#2F6FE4,#0B8F7A);color:#fff;}
+
+        /* ── Quarterly · Yearly · Whole Year (pos-review.js qy*) ── */
+        .qy-wrap{max-height:72vh;overflow:auto;background:#fff;border:1px solid rgba(15,23,42,.07);border-radius:var(--r);box-shadow:var(--sh-sm);margin-bottom:16px;}
+        .qy-tbl th.qy-ph{text-align:center;border-left:1px solid var(--l);background:#F2F6FC;}
+        .qy-tbl thead tr:nth-child(2) th{top:41px;}
+        .qy-tbl th.qy-ph .qy-phin{display:flex;align-items:center;justify-content:center;gap:8px;}
+        .qy-tbl .qy-plbl{display:flex;flex-direction:column;line-height:1.25;text-transform:none;letter-spacing:0;font-size:12.5px;color:var(--ink);font-weight:700;}
+        .qy-tbl .qy-plbl small{font-size:10.5px;color:var(--mut);font-weight:600;}
+        .qy-tog{width:22px;height:22px;border-radius:7px;border:1px solid var(--acc-line);background:#fff;color:var(--acc-ink);font:inherit;font-size:14px;font-weight:700;
+                line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;}
+        .qy-tog:hover{background:var(--acc);border-color:var(--acc);color:#fff;}
+        .qy-tbl .qy-det{display:none;}
+        .qy-tbl.qy-o0 .qy-det[data-p="0"],.qy-tbl.qy-o1 .qy-det[data-p="1"],.qy-tbl.qy-o2 .qy-det[data-p="2"],
+        .qy-tbl.qy-o3 .qy-det[data-p="3"],.qy-tbl.qy-o4 .qy-det[data-p="4"]{display:table-cell;}
+        .qy-tbl td.qy-sc,.qy-tbl th.qy-sc{border-right:1px solid var(--l2);}
+        .qy-tbl .qy-tot{background:#F6FBF9;}
+        .qy-tbl th.qy-tot{background:#E8F6F1;}
+        .qy-tbl td.qy-sc{font-weight:650;color:var(--ink);}
+        .qy-tbl tr.qy-totrow td{background:#F8FAFF;font-weight:700;color:var(--ink);border-bottom:1px solid var(--acc-line);}
+        .qy-tbl tr.qy-totrow td small{color:var(--faint);font-weight:600;}
+        .qy-tbl tr.qy-goal td{cursor:pointer;}
+        .qy-tbl tr.qy-goal td:not(:first-child){box-shadow:none;}
+        .qy-tbl tr.qy-goal td.pr-num{text-align:right;}
+        .qy-hint{font-size:12px;color:var(--mut);margin:2px 2px 8px;}
+        .qy-notes{font-size:13px;color:#7a5b12;background:#fff8e6;border-color:#ecd9a8;}
+        .qy-notes ul{margin:6px 0 0 18px;padding:0;}
+        .qy-pending{margin-top:8px;font-size:12.5px;color:var(--ink2);}
+        .qy-revwrap{margin-top:4px;}
+        @media (max-width:640px){
+          .qy-wrap{max-height:none;overflow-x:auto;}
+          .pr-tbl.qy-tbl{display:table !important;width:auto;min-width:100%;}
+          .pr-tbl.qy-tbl thead{display:table-header-group !important;}
+          .pr-tbl.qy-tbl tbody{display:table-row-group !important;}
+          .pr-tbl.qy-tbl tr,.pr-tbl.qy-tbl tr.pr-grp,.pr-tbl.qy-tbl tr.pr-row:not(.pr-hidden){display:table-row !important;margin:0;padding:0;border:0;}
+          .pr-tbl.qy-tbl tr.pr-hidden{display:none !important;}
+          .pr-tbl.qy-tbl tr > td,.pr-tbl.qy-tbl tr.pr-grp > td,.pr-tbl.qy-tbl tr.pr-row > td{display:table-cell !important;padding:8px 10px !important;min-height:0;
+                     border-radius:0 !important;border:0 !important;border-bottom:1px solid var(--l2) !important;font-size:12.5px;}
+          .pr-tbl.qy-tbl td.pr-item{position:sticky !important;left:0;min-width:180px !important;background:#fff !important;}
+          .pr-tbl.qy-tbl .qy-det{display:none !important;}
+          .pr-tbl.qy-tbl.qy-o0 .qy-det[data-p="0"],.pr-tbl.qy-tbl.qy-o1 .qy-det[data-p="1"],.pr-tbl.qy-tbl.qy-o2 .qy-det[data-p="2"],
+          .pr-tbl.qy-tbl.qy-o3 .qy-det[data-p="3"],.pr-tbl.qy-tbl.qy-o4 .qy-det[data-p="4"]{display:table-cell !important;}
+        }
       </style>
     </div>
 
@@ -1772,6 +1887,38 @@
             </div>
             <div class="pos-scroll-wrap pos-tgt-wrap" style="max-height:560px;">
                 <table><thead id="posTgtThead"></thead><tbody id="posTgtTbody"></tbody></table>
+            </div>
+
+            <!-- QUARTER & WHOLE-YEAR TARGETS (Nov 2026) — pos.js uploadQyTargets, table qy_targets.
+                 PO file -> PO view · District file -> District view · PM / DM add up their districts' rows. -->
+            <div class="pos-src-card" style="margin-top:22px;">
+                <div class="pos-src-head">
+                    <div class="pos-src-tile" style="background:#e8f6f1;"><span class="fr-ico fr-i-month" aria-hidden="true"></span></div>
+                    <div class="pos-src-titles">
+                        <div class="pos-src-title">Quarter &amp; Whole-Year targets (G2 · G3)</div>
+                        <div class="pos-src-sub">One file per level and period. PO rows are used for a PO's review, District rows for a District's review; PM and DM add up the rows of their districts. Same column headers as the monthly targets file (PM, visits, case study and compliance columns are ignored).</div>
+                    </div>
+                    <button type="button" class="pos-btn pos-btn-ghost" onclick="window.POSAdmin.downloadQyTgtCurrent()"><span class="pos-ico pos-ico-dl" aria-hidden="true"></span><span>Download period</span></button>
+                    <button type="button" class="pos-btn pos-btn-ghost" onclick="window.POSAdmin.downloadQyTgtSample()"><span class="pos-ico pos-ico-dl" aria-hidden="true"></span><span>Sample</span></button>
+                </div>
+                <div class="pos-src-controls">
+                    <div class="pos-field"><label>Level</label><select id="posQyTLevel" class="pos-sel" onchange="window.POSAdmin.loadQyTargets()"><option value="PO">PO</option><option value="District">District</option></select></div>
+                    <div class="pos-field"><label>Academic year</label><select id="posQyTYear" class="pos-sel" onchange="window.POSAdmin.loadQyTargets()"></select></div>
+                    <div class="pos-field"><label>Period</label><select id="posQyTPeriod" class="pos-sel" onchange="window.POSAdmin.loadQyTargets()"></select></div>
+                    <div class="pos-field pos-field--grow">
+                        <label>Targets Excel for this period</label>
+                        <label class="pos-file">
+                            <input type="file" id="posQyTFile" accept=".xlsx,.xls,.csv" onchange="window.POSAdmin.onFilePicked(this)">
+                            <span class="pos-file-icon" aria-hidden="true"></span>
+                            <span class="pos-file-text">Choose an Excel file</span>
+                        </label>
+                    </div>
+                    <button type="button" class="pos-btn pos-btn-primary" id="posQyTUploadBtn" onclick="window.POSAdmin.uploadQyTargets()">Upload</button>
+                </div>
+                <div class="pos-tgt-status" id="posQyTStatus" aria-live="polite"><span class="pos-tgt-st-text">Loading…</span></div>
+            </div>
+            <div class="pos-scroll-wrap pos-tgt-wrap" style="max-height:420px;">
+                <table><thead id="posQyTThead"></thead><tbody id="posQyTTbody"></tbody></table>
             </div>
         </div>
 
@@ -2012,6 +2159,42 @@
                     <button type="button" class="pos-btn pos-btn-primary" id="posVaUploadBtn" onclick="window.POSAdmin.uploadVa()">Upload</button>
                 </div>
                 <div id="posVaLogTbody"><div class="pos-last pos-last--empty">Loading…</div></div>
+            </div>
+            <!-- QUARTER & WHOLE-YEAR DATA (Nov 2026) — pos.js uploadQyData. Feeds the Quarter total,
+                 Yearly and Whole Year columns of the review (G2 · G3). Tables: sql/2026-11-25-field-review-quarterly-yearly.sql -->
+            <div class="pos-src-card">
+                <div class="pos-src-head">
+                    <div class="pos-src-tile" style="background:#e8f6f1;"><span class="fr-ico fr-i-month" aria-hidden="true"></span></div>
+                    <div class="pos-src-titles">
+                        <div class="pos-src-title">Quarter &amp; Whole-Year data</div>
+                        <div class="pos-src-sub">The Vinoba Block Status Report or Staff Connect event report exported for a whole quarter or the whole academic year (same file formats as the monthly cards). Used for G2 · G3 in the Quarterly, Yearly and Whole Year tabs.</div>
+                    </div>
+                    <button type="button" class="pos-btn pos-btn-ghost" onclick="window.POSAdmin.downloadQyDataSample()"><span class="pos-ico pos-ico-dl" aria-hidden="true"></span><span>Sample</span></button>
+                </div>
+                <div class="pos-src-controls">
+                    <div class="pos-field">
+                        <label>Source</label>
+                        <select id="posQySrc" class="pos-sel"><option value="vinoba">Vinoba</option><option value="sc">Staff Connect (Events)</option></select>
+                    </div>
+                    <div class="pos-field">
+                        <label>Academic year</label>
+                        <select id="posQyYear" class="pos-sel"></select>
+                    </div>
+                    <div class="pos-field">
+                        <label>Period</label>
+                        <select id="posQyPeriod" class="pos-sel"></select>
+                    </div>
+                    <div class="pos-field pos-field--grow">
+                        <label>File</label>
+                        <label class="pos-file">
+                            <input type="file" id="posQyFile" accept=".xlsx,.xls,.csv" onchange="window.POSAdmin.onFilePicked(this)">
+                            <span class="pos-file-icon" aria-hidden="true"></span>
+                            <span class="pos-file-text">Choose an Excel file</span>
+                        </label>
+                    </div>
+                    <button type="button" class="pos-btn pos-btn-primary" id="posQyUploadBtn" onclick="window.POSAdmin.uploadQyData()">Upload</button>
+                </div>
+                <div id="posQyDataLog"><div class="pos-last pos-last--empty">Loading…</div></div>
             </div>
 
         </div>

@@ -17,7 +17,8 @@
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
 
   /* ------------------------------------------------ 1. pickers fold into a context line */
-  var VIEWS = [["prWeekly", "prBody"], ["prSummary", "prSumBody"], ["prMonthly", "prMoBody"], ["prMosum", "prMsBody"]];
+  var VIEWS = [["prWeekly", "prBody"], ["prSummary", "prSumBody"], ["prMonthly", "prMoBody"], ["prMosum", "prMsBody"],
+               ["prQuarterly", "prQBody"], ["prYearly", "prYBody"], ["prWholeyear", "prFBody"]];
 
   function hasResult(body) {
     var el = $(body);
@@ -113,7 +114,7 @@
   // whatever kind of control was used (buttons, boxes, lists, notes, the monthly figures).
   function showSave() {
     if (!phone()) return;
-    Array.prototype.forEach.call(document.querySelectorAll("#prBody .pr-savebar, #prMoBody .pr-savebar"), function (bar) {
+    Array.prototype.forEach.call(document.querySelectorAll("#prBody .pr-savebar, #prMoBody .pr-savebar, #prQBody .pr-savebar, #prFBody .pr-savebar"), function (bar) {
       if (bar.classList.contains("is-dirty")) return;
       bar.classList.add("is-dirty");
       var hint = bar.querySelector(".pr-savehint");

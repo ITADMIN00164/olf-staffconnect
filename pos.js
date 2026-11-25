@@ -149,9 +149,9 @@ function showTab(tab) {
     if (tgt) tgt.style.display = tab === "targets" ? "" : "none";
     if (als) als.style.display = tab === "aliases" ? "" : "none";
     if (tab === "academic") initAcademicTab();
-    if (tab === "targets") initTargetsTab();
+    if (tab === "targets") { initTargetsTab(); initQyTargets(); }
     if (tab === "aliases") initAliasTab();
-    if (tab === "data") { initDataTab(); initErTab(); initKekaTab(); initScTab(); initNimbleTab(); initVaTab(); }
+    if (tab === "data") { initDataTab(); initErTab(); initKekaTab(); initScTab(); initNimbleTab(); initVaTab(); initQyData(); }
 }
 
 /* ====================================
@@ -3332,6 +3332,407 @@ function refreshFileLabel(input) {
 }
 
 /* ====================================
+   QUARTER & WHOLE-YEAR UPLOADS (Nov 2026)
+   Feed the Quarterly (Quarter total), Yearly and Whole Year tabs of the review.
+   Academic year = June to May; "year" below = its start (2026 = 2026-27).
+     Q1 Jun-Aug · Q2 Sep-Nov · Q3 Dec-Feb · Q4 Mar-May · FY = whole year
+   1. Data  -> vinoba_qy_data / staffconnect_qy_data: the same Vinoba and Staff Connect files
+               as the monthly cards, exported for the whole quarter / year.
+               Stored with week = 1-4 (quarter) or 9 (year), month = first month of the period.
+   2. Targets -> qy_targets: G2 · G3 targets per period, one file per level:
+               PO rows (PO view) or District rows (District view; PM / DM add up their districts).
+               Same columns as the monthly targets file; G5 / PM columns are ignored.
+   Tables: sql/2026-11-25-field-review-quarterly-yearly.sql
+==================================== */
+
+const QY_PERIODS = [
+    { v: "Q1", label: "Q1 · Jun–Aug", week: 1, month: 6 },
+    { v: "Q2", label: "Q2 · Sep–Nov", week: 2, month: 9 },
+    { v: "Q3", label: "Q3 · Dec–Feb", week: 3, month: 12 },
+    { v: "Q4", label: "Q4 · Mar–May", week: 4, month: 3 },
+    { v: "FY", label: "Whole year",   week: 9, month: 6 },
+];
+const QY_SOURCES = {
+    vinoba: { label: "Vinoba", table: "vinoba_qy_data" },
+    sc:     { label: "Staff Connect", table: "staffconnect_qy_data" },
+};
+function qyPeriod(v) { return QY_PERIODS.find(p => p.v === v) || null; }
+function qyPeriodOfWeek(w) { return QY_PERIODS.find(p => p.week === Number(w)) || null; }
+function qyAyLabel(ay) { return ay + "-" + String(Number(ay) + 1).slice(2); }
+function qyCurAy() { const d = new Date(); return d.getMonth() + 1 >= 6 ? d.getFullYear() : d.getFullYear() - 1; }
+function qyCurPeriod() { const m = new Date().getMonth() + 1; return m >= 6 && m <= 8 ? "Q1" : m >= 9 && m <= 11 ? "Q2" : (m === 12 || m <= 2) ? "Q3" : "Q4"; }
+function qyFillAy(sel) {
+    if (!sel || sel.options.length) return;
+    const cur = qyCurAy();
+    for (let y = cur - 1; y <= cur + 1; y++) {
+        const o = document.createElement("option");
+        o.value = y; o.textContent = qyAyLabel(y);
+        if (y === cur) o.selected = true;
+        sel.appendChild(o);
+    }
+}
+function qyFillPeriods(sel) {
+    if (!sel || sel.options.length) return;
+    QY_PERIODS.forEach(p => { const o = document.createElement("option"); o.value = p.v; o.textContent = p.label; sel.appendChild(o); });
+    sel.value = qyCurPeriod();
+}
+function qyTableMissing(err) {
+    const m = String((err && (err.message || err.details || err.hint)) || "");
+    return (err && (err.code === "42P01" || err.code === "PGRST205")) || /does not exist|could not find the table|schema cache/i.test(m);
+}
+const QY_SETUP_MSG = "The quarter / year tables are not in Supabase yet. Run sql/2026-11-25-field-review-quarterly-yearly.sql in the Supabase SQL editor first.";
+
+/* ---------- 1. Data (Vinoba + Staff Connect for a quarter / year) ---------- */
+function initQyData() {
+    const ys = document.getElementById("posQyYear");
+    if (!ys || ys.options.length) return;          // same markup, already set up
+    qyFillAy(ys);
+    qyFillPeriods(document.getElementById("posQyPeriod"));
+    loadQyDataLog();
+}
+
+async function downloadQyDataSample() {
+    const src = document.getElementById("posQySrc")?.value || "vinoba";
+    if (src === "sc") return downloadScTempl();
+    return downloadVinobaTempl();
+}
+
+async function loadQyDataLog() {
+    const el = document.getElementById("posQyDataLog");
+    if (!el) return;
+    try {
+        const out = [];
+        for (const key of Object.keys(QY_SOURCES)) {
+            const { data, error } = await posSupabase.from(QY_SOURCES[key].table)
+                .select("year, month, week, uploaded_at").order("year", { ascending: false }).range(0, 9999);
+            if (error) throw error;
+            const map = new Map();
+            (data || []).forEach(r => {
+                const k = r.year + "-" + r.week;
+                const e = map.get(k) || { src: key, year: r.year, week: r.week, month: r.month, n: 0, last: r.uploaded_at };
+                e.n++; if (r.uploaded_at > e.last) e.last = r.uploaded_at;
+                map.set(k, e);
+            });
+            out.push(...map.values());
+        }
+        if (!out.length) { el.innerHTML = `<div class="pos-last pos-last--empty">No quarter or whole-year uploads yet</div>`; return; }
+        out.sort((a, b) => b.year - a.year || a.week - b.week || a.src.localeCompare(b.src));
+        el.innerHTML = out.map(e => {
+            const p = qyPeriodOfWeek(e.week);
+            const when = e.last ? new Date(e.last).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+            return `<div class="pos-last">
+                <span class="pos-last-label">${escHtml(QY_SOURCES[e.src].label)}</span>
+                <span class="pos-last-period">${qyAyLabel(e.year)} · ${escHtml(p ? p.label : "week " + e.week)}</span>
+                <span class="pos-last-dot"></span><span>${e.n} rows</span>
+                <span class="pos-last-dot"></span><span>${when}</span>
+                <button class="pos-icon-btn delete" title="Delete this upload"
+                    onclick="window.POSAdmin.deleteQyData('${e.src}',${e.year},${e.week})"></button>
+            </div>`;
+        }).join("");
+    } catch (err) {
+        console.error("Quarter / year data log failed:", err);
+        el.innerHTML = `<div class="pos-last pos-last--empty">${escHtml(qyTableMissing(err) ? QY_SETUP_MSG : "Failed to load the list.")}</div>`;
+    }
+}
+
+async function uploadQyData() {
+    const src = document.getElementById("posQySrc").value;
+    const ay = Number(document.getElementById("posQyYear").value);
+    const per = qyPeriod(document.getElementById("posQyPeriod").value);
+    const fileInput = document.getElementById("posQyFile");
+    const file = fileInput && fileInput.files[0];
+    if (!QY_SOURCES[src] || !ay || !per) { window.notify("Pick the source, academic year and period first.", "warning"); return; }
+    if (!file) { window.notify("Select a file first.", "warning"); return; }
+    const label = `${QY_SOURCES[src].label} · ${qyAyLabel(ay)} · ${per.label}`;
+    const btn = document.getElementById("posQyUploadBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "Uploading…"; }
+    try {
+        const XLSX = await loadXLSX();
+        const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const fileHeaders = (XLSX.utils.sheet_to_json(ws, { header: 1 })[0] || []).map(h => String(h || "").trim()).filter(h => h);
+
+        // same column checks as the monthly cards
+        let columns = null;
+        if (src === "vinoba") {
+            const sameSet = cols => cols.every(c => fileHeaders.includes(c.excel)) && fileHeaders.every(h => cols.some(c => c.excel === h));
+            columns = sameSet(VINOBA_COLUMNS) ? VINOBA_COLUMNS : sameSet(VINOBA_COLUMNS_OCT2026) ? VINOBA_COLUMNS_OCT2026 : null;
+            if (!columns) {
+                const exp = VINOBA_COLUMNS.map(c => c.excel);
+                const missing = exp.filter(h => !fileHeaders.includes(h)), extra = fileHeaders.filter(h => !exp.includes(h));
+                await window.showAppAlert({ title: "Column mismatch", type: "error", okText: "OK",
+                    message: "This file's columns don't match the Vinoba format.\n\n" + (missing.length ? "Missing: " + missing.join(", ") + "\n" : "")
+                        + (extra.length ? "Unexpected: " + extra.join(", ") + "\n" : "") + "\nDownload the sample to see the expected headers." });
+                return;
+            }
+        } else {
+            const exp = SC_COLUMNS.map(c => c.excel);
+            const missing = exp.filter(h => !fileHeaders.includes(h)), extra = fileHeaders.filter(h => !exp.includes(h));
+            if (missing.length || extra.length) {
+                await window.showAppAlert({ title: "Column mismatch", type: "error", okText: "OK",
+                    message: "This file's columns don't match the Staff Connect format.\n\n" + (missing.length ? "Missing: " + missing.join(", ") + "\n" : "")
+                        + (extra.length ? "Unexpected: " + extra.join(", ") + "\n" : "") + "\nDownload the sample to see the expected headers." });
+                return;
+            }
+            columns = SC_COLUMNS;
+        }
+
+        let json = XLSX.utils.sheet_to_json(ws);
+        if (src === "sc") json = json.filter(r => r["State"] || r["District"] || r["Block"]);
+        if (!json.length) { window.notify("File is empty — no data rows found.", "warning"); return; }
+
+        const table = QY_SOURCES[src].table;
+        const { count, error: cntErr } = await posSupabase.from(table).select("id", { count: "exact", head: true })
+            .eq("year", ay).eq("month", per.month).eq("week", per.week);
+        if (cntErr) throw cntErr;
+        const ok = await window.showAppConfirm({
+            title: count ? "Replace this upload?" : "Upload?",
+            message: count ? `${label} already has ${count} rows. Replace them with the ${json.length} rows in this file?`
+                           : `Save ${json.length} rows for ${label}?`,
+            type: "warning", confirmText: count ? "Replace" : "Upload", cancelText: "Cancel"
+        });
+        if (!ok) return;
+
+        const rows = json.map(row => {
+            const o = { year: ay, month: per.month, week: per.week, period: per.v };
+            for (const col of columns) {
+                let val = row[col.excel];
+                if (src === "sc") {
+                    if (typeof val === "string") val = val.trim();
+                    const isText = ["state", "district", "block", "event_month"].includes(col.db);
+                    o[col.db] = val !== undefined && val !== null && val !== "" ? val : (isText ? null : 0);
+                } else {
+                    o[col.db] = val !== undefined && val !== null && val !== "" ? val : null;
+                }
+            }
+            return o;
+        });
+        await replacePeriodRows(table, ay, per.month, per.week, rows);
+        window.notify(`${rows.length} rows saved for ${label}.`, "success");
+        fileInput.value = ""; refreshFileLabel(fileInput);
+        loadQyDataLog();
+    } catch (err) {
+        console.error("Quarter / year upload failed:", err);
+        window.notify(qyTableMissing(err) ? QY_SETUP_MSG : friendlyDbError(err), "error");
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "Upload"; }
+    }
+}
+
+async function deleteQyData(src, year, week) {
+    const per = qyPeriodOfWeek(week), s = QY_SOURCES[src];
+    if (!s || !per) return;
+    const ok = await window.showAppConfirm({
+        title: "Delete upload?",
+        message: `Delete all ${s.label} data for ${qyAyLabel(year)} · ${per.label}? This cannot be undone.`,
+        type: "error", confirmText: "Delete", cancelText: "Cancel"
+    });
+    if (!ok) return;
+    const { error } = await posSupabase.from(s.table).delete().eq("year", year).eq("week", week);
+    if (error) { window.notify(friendlyDbError(error), "error"); return; }
+    window.notify("Upload deleted.", "success");
+    loadQyDataLog();
+}
+
+/* ---------- 2. Targets (G2 · G3) for a quarter / year ---------- */
+const QY_TGT_TABLE = "qy_targets";
+// G2 · G3 columns of the monthly targets file (same headers)
+const QY_TGT_NUM = TGT_NUM.filter(c => [
+    "story_telling", "poetry_recitation", "creative_writing", "spoken_english", "spelling_bee", "morning_assembly",
+    "st_streak", "pr_streak", "cw_streak", "se_streak", "sb_streak",
+    "kathawli", "online_unique_teachers", "online_unique_schools", "posts_per_teacher", "star_teachers",
+    "teachers_using_expert_coupon", "pom_transformed_clusters", "blocks_with_recognition_events",
+    "district_recognition_event", "teachers_recognized", "cluster_heads_recognized"].includes(c.db));
+const QY_TGT_TEXT = {
+    PO:       [{ excel: "PO ID", db: "po_id" }, { excel: "PO Name", db: "po_name" }, { excel: "District", db: "district" }],
+    District: [{ excel: "District", db: "district" }],
+};
+let qyTgtRows = [], qyTgtSeq = 0;
+
+function qyTgtPicked() {
+    const level = document.getElementById("posQyTLevel")?.value || "PO";
+    const ay = Number(document.getElementById("posQyTYear")?.value);
+    const per = qyPeriod(document.getElementById("posQyTPeriod")?.value);
+    return { level, ay, per, label: ay && per ? `${level === "PO" ? "PO" : "District"} targets · ${qyAyLabel(ay)} · ${per.label}` : "" };
+}
+function initQyTargets() {
+    const ys = document.getElementById("posQyTYear");
+    if (!ys || ys.options.length) return;
+    qyFillAy(ys);
+    qyFillPeriods(document.getElementById("posQyTPeriod"));
+    loadQyTargets();
+}
+async function loadQyTargets() {
+    const { level, ay, per } = qyTgtPicked();
+    const st = document.getElementById("posQyTStatus");
+    if (!ay || !per) return;
+    const seq = ++qyTgtSeq;
+    if (st) st.innerHTML = `<span class="pos-tgt-st-text">Loading…</span>`;
+    try {
+        const { data, error } = await posSupabase.from(QY_TGT_TABLE).select("*")
+            .eq("year", ay).eq("period", per.v).eq("level", level).order("district").range(0, 4999);
+        if (error) throw error;
+        if (seq !== qyTgtSeq) return;
+        qyTgtRows = data || [];
+        renderQyTargets();
+    } catch (err) {
+        if (seq !== qyTgtSeq) return;
+        qyTgtRows = [];
+        renderQyTargets(qyTableMissing(err) ? QY_SETUP_MSG : "Couldn't load: " + friendlyDbError(err));
+    }
+}
+function renderQyTargets(errorText) {
+    const { level, label } = qyTgtPicked();
+    const st = document.getElementById("posQyTStatus"), th = document.getElementById("posQyTThead"), tb = document.getElementById("posQyTTbody");
+    if (!th || !tb) return;
+    const last = qyTgtRows.reduce((a, r) => (r.updated_at > a ? r.updated_at : a), "");
+    if (st) st.innerHTML = errorText ? `<span class="pos-tgt-st-text">${escHtml(errorText)}</span>`
+        : qyTgtRows.length
+            ? `<span class="pos-tgt-st-text"><b>${escHtml(label)}</b>: ${qyTgtRows.length} ${level === "PO" ? "PO" : "district"} rows saved${last ? " · last updated " + new Date(last).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : ""}. Uploading again replaces them.</span>
+               <button type="button" class="pos-btn pos-btn-ghost" onclick="window.POSAdmin.deleteQyTargets()">Delete these rows</button>`
+            : `<span class="pos-tgt-st-text"><b>${escHtml(label)}</b>: nothing saved yet.</span>`;
+    const text = QY_TGT_TEXT[level];
+    th.innerHTML = "<tr>" + text.map(c => `<th>${escHtml(c.excel)}</th>`).join("") + QY_TGT_NUM.map(c => `<th title="${escHtml(c.excel)}">${escHtml(c.short)}</th>`).join("") + "</tr>";
+    tb.innerHTML = qyTgtRows.length
+        ? qyTgtRows.map(r => "<tr>" + text.map(c => `<td>${escHtml(r[c.db] || "")}</td>`).join("")
+            + QY_TGT_NUM.map(c => `<td>${r[c.db] == null ? "" : escHtml(String(r[c.db]))}</td>`).join("") + "</tr>").join("")
+        : `<tr><td colspan="${text.length + QY_TGT_NUM.length}" class="empty-state">No rows for this period.</td></tr>`;
+}
+async function downloadQyTgtSample() {
+    const { level } = qyTgtPicked();
+    const XLSX = await loadXLSX();
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([QY_TGT_TEXT[level].concat(QY_TGT_NUM).map(c => c.excel)]), "Sheet1");
+    XLSX.writeFile(wb, `qy_targets_${level}_sample.xlsx`);
+}
+async function downloadQyTgtCurrent() {
+    const { level, label } = qyTgtPicked();
+    if (!qyTgtRows.length) { window.notify(`Nothing saved for ${label || "this period"}.`, "warning"); return; }
+    const cols = QY_TGT_TEXT[level].concat(QY_TGT_NUM);
+    const XLSX = await loadXLSX();
+    const aoa = [cols.map(c => c.excel)].concat(qyTgtRows.map(r => cols.map(c => r[c.db] == null ? "" : r[c.db])));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), "Sheet1");
+    XLSX.writeFile(wb, label.replace(/[^A-Za-z0-9-]+/g, "_") + ".xlsx");
+}
+async function uploadQyTargets() {
+    const { level, ay, per, label } = qyTgtPicked();
+    const fileInput = document.getElementById("posQyTFile");
+    const file = fileInput && fileInput.files[0];
+    if (!ay || !per) { window.notify("Pick the academic year and period first.", "warning"); return; }
+    if (!file) { window.notify("Select a file first.", "warning"); return; }
+    const btn = document.getElementById("posQyTUploadBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "Uploading…"; }
+    try {
+        const XLSX = await loadXLSX();
+        const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const fileHeaders = (XLSX.utils.sheet_to_json(ws, { header: 1 })[0] || []).map(h => String(h || "").trim()).filter(h => h);
+        const text = QY_TGT_TEXT[level];
+        // required: the level's key columns + the G2 · G3 columns (SB Streak optional, as monthly);
+        // any other column of the monthly targets file (PM, visits, case study, compliance, PO ID / Name) is ignored
+        const required = text.concat(QY_TGT_NUM.filter(c => !c.optional)).map(c => c.excel);
+        const known = new Set(TGT_ALL.map(c => c.excel).concat(text.map(c => c.excel)).concat(["State"]));
+        const missing = required.filter(h => !fileHeaders.includes(h)), extra = fileHeaders.filter(h => !known.has(h));
+        if (missing.length || extra.length) {
+            await window.showAppAlert({ title: "Column mismatch", type: "error", okText: "OK",
+                message: "This file's columns don't match the targets format.\n\n" + (missing.length ? "Missing: " + missing.join(", ") + "\n" : "")
+                    + (extra.length ? "Unexpected: " + extra.join(", ") + "\n" : "") + "\nDownload the sample to see the expected headers." });
+            return;
+        }
+        const json = XLSX.utils.sheet_to_json(ws, { raw: false, defval: "" });
+        const rows = [], bad = [], skipped = [];
+        const distNames = new Map(posData.districts.map(d => [String(d.name).replace(/\s+/g, " ").trim().toLowerCase(), d.name]));
+        json.forEach((r, i) => {
+            if (required.every(h => String(r[h] || "").trim() === "")) return;          // blank line
+            const o = { level, year: ay, period: per.v };
+            text.forEach(c => { o[c.db] = String(r[c.excel] || "").trim(); });
+            if (level === "PO") {
+                if (!o.po_id) { bad.push(`Row ${i + 2}: PO ID is empty`); return; }
+                const a = posData.assignments.find(x => x.emp_id === o.po_id);
+                if (a && a.designation !== "PO") { skipped.push(`${o.po_id} ${a.name} (${a.designation})`); return; }
+            } else {
+                const known = distNames.get(o.district.replace(/\s+/g, " ").toLowerCase());
+                if (!o.district) { bad.push(`Row ${i + 2}: District is empty`); return; }
+                if (!known) { bad.push(`Row ${i + 2}: "${o.district}" is not a district in Locations`); return; }
+                o.district = known;
+            }
+            QY_TGT_NUM.forEach(c => {
+                const n = tgtNum(r[c.excel]);
+                if (Number.isNaN(n)) bad.push(`${o.po_id || o.district}: "${c.excel}" is not a number ("${r[c.excel]}")`);
+                o[c.db] = Number.isNaN(n) ? null : n;
+            });
+            rows.push(o);
+        });
+        if (bad.length) {
+            await window.showAppAlert({ title: "File not accepted", type: "error", okText: "OK",
+                message: bad.slice(0, 12).join("\n") + (bad.length > 12 ? `\n…and ${bad.length - 12} more` : "") + "\n\nNothing was saved." });
+            return;
+        }
+        if (!rows.length) { window.notify("No rows found in the file.", "warning"); return; }
+        const keyOf = o => level === "PO" ? o.po_id : o.district;
+        const dups = rows.map(keyOf).filter((k, i, a) => a.indexOf(k) !== i);
+        if (dups.length) {
+            await window.showAppAlert({ title: "File not accepted", type: "error", okText: "OK",
+                message: `Each ${level === "PO" ? "PO" : "district"} must appear once. Repeated: ` + [...new Set(dups)].join(", ") + "\n\nNothing was saved." });
+            return;
+        }
+        const forPeriod = q => q.eq("year", ay).eq("period", per.v).eq("level", level);
+        const { count, error: cntErr } = await forPeriod(posSupabase.from(QY_TGT_TABLE).select("id", { count: "exact", head: true }));
+        if (cntErr) throw cntErr;
+        const ok = await window.showAppConfirm({
+            title: count ? "Replace these targets?" : "Upload targets?",
+            message: (count ? `${label} already has ${count} rows. All of them will be replaced by the ` : "This will save ") + `${rows.length} rows in this file.`
+                + (skipped.length ? ` ${skipped.length} non-PO row${skipped.length === 1 ? "" : "s"} skipped: ${skipped.join("; ")}.` : "") + " Continue?",
+            type: "warning", confirmText: count ? "Replace" : "Upload", cancelText: "Cancel"
+        });
+        if (!ok) return;
+        const by = currentAdminEmail(), now = new Date().toISOString();
+        rows.forEach(o => { o.updated_by = by; o.updated_at = now; });
+        // new rows in first; the period's old rows out only after every batch succeeded
+        const { data: last, error: lastErr } = await forPeriod(posSupabase.from(QY_TGT_TABLE).select("id")).order("id", { ascending: false }).limit(1);
+        if (lastErr) throw lastErr;
+        const maxOldId = last && last.length ? last[0].id : null;
+        try {
+            for (let i = 0; i < rows.length; i += 200) {
+                const { error } = await posSupabase.from(QY_TGT_TABLE).insert(rows.slice(i, i + 200));
+                if (error) throw error;
+            }
+        } catch (err) {
+            let undo = forPeriod(posSupabase.from(QY_TGT_TABLE).delete());
+            if (maxOldId != null) undo = undo.gt("id", maxOldId);
+            await undo;
+            throw err;
+        }
+        if (maxOldId != null) {
+            const { error } = await forPeriod(posSupabase.from(QY_TGT_TABLE).delete()).lte("id", maxOldId);
+            if (error) throw error;
+        }
+        window.notify(`${rows.length} rows saved for ${label}.`, "success");
+        fileInput.value = ""; refreshFileLabel(fileInput);
+        await loadQyTargets();
+    } catch (err) {
+        console.error("Quarter / year targets upload failed:", err);
+        window.notify(qyTableMissing(err) ? QY_SETUP_MSG : friendlyDbError(err), "error");
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "Upload"; }
+    }
+}
+async function deleteQyTargets() {
+    const { level, ay, per, label } = qyTgtPicked();
+    if (!ay || !per || !qyTgtRows.length) return;
+    const ok = await window.showAppConfirm({
+        title: "Delete targets?", message: `Delete all ${qyTgtRows.length} rows of ${label}? This cannot be undone.`,
+        type: "error", confirmText: "Delete", cancelText: "Cancel"
+    });
+    if (!ok) return;
+    const { error } = await posSupabase.from(QY_TGT_TABLE).delete().eq("year", ay).eq("period", per.v).eq("level", level);
+    if (error) { window.notify(friendlyDbError(error), "error"); return; }
+    window.notify("Targets deleted.", "success");
+    loadQyTargets();
+}
+
+/* ====================================
    EXPORT
 ==================================== */
 
@@ -3361,5 +3762,7 @@ window.POSAdmin = {
     openAcadModal, onAcadPoIdChange, closeAcadModal, saveAcadRow, deleteAcadRow,
     loadTargetRows, renderTargetsTable, downloadTgtSample, downloadTgtCurrent, uploadTargets,
     onTgtPeriodChange,
-    openTgtModal, onTgtPoIdChange, closeTgtModal, saveTgtRow, deleteTgtRow
+    openTgtModal, onTgtPoIdChange, closeTgtModal, saveTgtRow, deleteTgtRow,
+    downloadQyDataSample, uploadQyData, deleteQyData, loadQyDataLog,
+    loadQyTargets, downloadQyTgtSample, downloadQyTgtCurrent, uploadQyTargets, deleteQyTargets
 };
