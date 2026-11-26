@@ -3038,7 +3038,7 @@ function openReviewModal(id) {
   const lockMember = currentUser.role !== ROLES.ADMIN && memberEl.value === currentUser.name;
   memberEl.disabled = lockMember;
   deptEl.disabled = lockMember;
-  document.getElementById('rf-reviewer-row').style.display = lockMember ? 'none' : '';
+  document.getElementById('rf-reviewer-row').style.display = 'none';   // the reviewer and the date are recorded automatically
 
   openModal('review-modal');
   loadGoalsForReview();
@@ -3137,8 +3137,13 @@ function saveReview() {
   }
   const rec = {
     id: existingId||uid(), year, month, dept, member,
-    reviewer: document.getElementById('rf-reviewer').value,
-    date: document.getElementById('rf-date').value,
+    // The reviewer is whoever enters the manager scores; the date is the day it was saved.
+    reviewer: (function () {
+      var gave = [].some.call(document.querySelectorAll('.item-mgrscore'), function (i) { return i.value !== '' && !i.disabled; });
+      var was = (DB.reviews.find(function (x) { return x.id === existingId; }) || {}).reviewer;
+      return gave ? currentUser.name : (was || document.getElementById('rf-reviewer').value || '');
+    })(),
+    date: new Date().toISOString().split('T')[0],
     remarks: document.getElementById('rf-remarks').value,
     sheetBLink: (document.getElementById('rf-sheetb').value||'').trim(),
     helpNeeded: (document.getElementById('rf-helpneeded').value||'').trim(),
