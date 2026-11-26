@@ -1286,8 +1286,51 @@ function dbDelta(cur, prev, unit) {
   var d = cur - prev; if (d === 0) return '<span class="db-d">no change</span>';
   return '<span class="db-d ' + (d > 0 ? 'up' : 'down') + '">' + (d > 0 ? '\u25B2 +' : '\u25BC ') + d + (unit || '') + '</span>';
 }
+// ── "i" tips: a small button that explains, in plain words, how a number is worked out ──
+var HP_TIPS = {
+  weightage: 'Weightage is how much a goal counts in the final score. All the goals together must add up to 100%.',
+  maxMarks: 'The most marks the manager can give for this activity. The scores are out of this number.',
+  mpTasks: 'All the tasks planned for this month. Cancelled tasks are counted here, but nowhere else.',
+  mpDone: 'Completed tasks divided by all tasks this month. Cancelled tasks are left out.',
+  mpOpen: 'Tasks that are not completed yet and are not on hold.',
+  mpLate: 'Tasks whose target date has passed and that are not completed or cancelled.',
+  mpHours: 'Hours you really spent, divided by the hours you estimated, added up for this month.',
+  Completion: 'Completed tasks divided by all tasks. Cancelled tasks are left out.',
+  Overdue: 'Tasks whose target date has passed and that are not completed or cancelled.',
+  'On time': 'Of the tasks that are completed, how many were finished on or before their target date.',
+  'Hours vs plan': 'How far the hours are from the plan: (actual hours minus estimated hours) divided by estimated hours. 0% means exactly as planned. A plus sign means it took longer.',
+  'Items delivered': 'Items really delivered divided by items planned, added up across all the tasks.',
+  'Manager grade': 'How the manager graded the completed tasks. A counts as 100%, B as 67% and C as 33%, then they are averaged.',
+  'Average performance': 'The average Performance score of the reviews a manager has scored. Performance: for each goal, manager marks divided by max marks, times the weightage; then all goals are added up.',
+  'Reviews filed': 'Reviews where at least one score has been entered.',
+  'Awaiting manager': 'The person has scored themselves, but the manager has not scored yet.',
+  'Manager scored': 'Reviews where the manager has entered scores. Only these have a Performance score.',
+  '80% or more': 'Scored reviews with a Performance of 80% or more.',
+  'Below 50%': 'Scored reviews with a Performance below 50%.'
+};
+function hpTip(text) { return '<button type="button" class="hp-i" data-tip="' + esc(text) + '" aria-label="How this is worked out">i</button>'; }
+(function hpTipHandlers() {
+  var pop = null, cur = null;
+  function hide() { if (pop) { pop.remove(); pop = null; } cur = null; }
+  function show(el) {
+    hide(); cur = el;
+    pop = document.createElement('div'); pop.className = 'hp-pop'; pop.setAttribute('role', 'tooltip'); pop.textContent = el.getAttribute('data-tip') || '';
+    document.body.appendChild(pop);
+    var r = el.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight, x = r.left + r.width / 2 - w / 2, y = r.bottom + 8;
+    x = Math.max(8, Math.min(x, window.innerWidth - w - 8)); if (y + h > window.innerHeight - 8) y = r.top - h - 8;
+    pop.style.left = x + 'px'; pop.style.top = Math.max(8, y) + 'px';
+  }
+  document.addEventListener('mouseover', function (e) { var t = e.target.closest && e.target.closest('.hp-i'); if (t && t !== cur) show(t); });
+  document.addEventListener('mouseout', function (e) { var t = e.target.closest && e.target.closest('.hp-i'); if (t && !t.contains(e.relatedTarget)) hide(); });
+  document.addEventListener('focusin', function (e) { var t = e.target.closest && e.target.closest('.hp-i'); if (t) show(t); });
+  document.addEventListener('focusout', function (e) { if (e.target.closest && e.target.closest('.hp-i')) hide(); });
+  document.addEventListener('click', function (e) { var t = e.target.closest && e.target.closest('.hp-i'); if (t) { e.preventDefault(); e.stopPropagation(); if (cur === t) hide(); else show(t); } else hide(); }, true);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hide(); });
+  window.addEventListener('scroll', hide, true);
+})();
+function hpHowOpen() { openModal('hp-how-modal'); }
 function dbTile(label, value, sub, color, bar) {
-  return '<div class="db-tile" style="--tc:' + color + '"><span>' + label + '</span><b>' + value + '</b><em>' + sub + '</em>'
+  return '<div class="db-tile" style="--tc:' + color + '"><span>' + label + (HP_TIPS[label] ? hpTip(HP_TIPS[label]) : '') + '</span><b>' + value + '</b><em>' + sub + '</em>'
     + (bar == null ? '' : '<div class="db-prog"><i style="width:' + Math.min(bar, 100) + '%;background:' + color + '"></i></div>') + '</div>';
 }
 function dbCard(title, note, body) {
@@ -1378,7 +1421,7 @@ function dbRenderPlan() {
     + dbTile('Completion', (pct == null ? '\u2014' : pct + '%') + dbDelta(pct, prevPct, ' pts'), done + ' of ' + live.length + ' tasks', pct == null ? 'var(--text3)' : pctColor(pct), pct)
     + dbTile('Overdue', overdue.length, overdue.length ? 'past target, not done' : 'all on track', overdue.length ? '#DC2626' : '#16A34A')
     + dbTile('On time', ot.onTimePct == null ? '\u2014' : ot.onTimePct + '%', ot.completedCount + ' completed', ot.onTimePct == null ? 'var(--text3)' : pctColor(ot.onTimePct), ot.onTimePct)
-    + dbTile('Hours', hv.variancePct == null ? '\u2014' : (hv.variancePct > 0 ? '+' : '') + hv.variancePct + '%', Math.round(hv.estTotal * 10) / 10 + ' h est \u2192 ' + Math.round(hv.actualTotal * 10) / 10 + ' h actual', varColor(hv.variancePct) === 'var(--text3)' ? '#64748B' : varColor(hv.variancePct))
+    + dbTile('Hours vs plan', hv.variancePct == null ? '\u2014' : (hv.variancePct > 0 ? '+' : '') + hv.variancePct + '%', Math.round(hv.estTotal * 10) / 10 + ' h est \u2192 ' + Math.round(hv.actualTotal * 10) / 10 + ' h actual', varColor(hv.variancePct) === 'var(--text3)' ? '#64748B' : varColor(hv.variancePct))
     + dbTile('Items delivered', ic.ratioPct == null ? '\u2014' : ic.ratioPct + '%', ic.actualTotal + ' of ' + ic.plannedTotal + ' planned', ic.ratioPct == null ? 'var(--text3)' : pctColor(ic.ratioPct), ic.ratioPct)
     + dbTile('Manager grade', q.qualityPct == null ? '\u2014' : q.qualityPct + '%', q.gradedCount + ' graded of ' + q.completedCount + ' done', q.qualityPct == null ? 'var(--text3)' : pctColor(q.qualityPct), q.qualityPct)
     + '</div>';
@@ -1424,7 +1467,7 @@ function dbRenderPlan() {
     rows = deptsInScope('').map(function (d) { return rowFor(d, '<b>' + esc(d) + '</b>', tasks.filter(function (t) { return t.dept === d; })); });
   }
   rows.sort(function (a, b) { return (b.od - a.od) || ((a.pct == null ? 101 : a.pct) - (b.pct == null ? 101 : b.pct)); });
-  var table = rows.length ? '<div class="db-scroll"><table class="db-tbl"><thead><tr><th>' + headLabel + '</th><th class="c">Tasks</th><th>Completion</th><th class="c">On time</th><th class="c">Overdue</th><th class="c">Hours vs est.</th></tr></thead><tbody>'
+  var table = rows.length ? '<div class="db-scroll"><table class="db-tbl"><thead><tr><th>' + headLabel + '</th><th class="c">Tasks</th><th>Completion</th><th class="c">On time' + hpTip(HP_TIPS['On time']) + '</th><th class="c">Overdue</th><th class="c">Hours vs plan' + hpTip(HP_TIPS['Hours vs plan']) + '</th></tr></thead><tbody>'
     + rows.map(function (r) {
       return '<tr><td>' + r.link + '</td><td class="c">' + (r.n || '<span style="color:var(--text3)">0</span>') + '</td><td>' + (r.n ? dbMeter(r.pct) : '<span class="db-pill">No plan</span>') + '</td><td class="c">' + dbPctText(r.ot) + '</td>'
         + '<td class="c">' + (r.od ? '<span class="db-pill bad">' + r.od + '</span>' : '<span style="color:var(--text3)">0</span>') + '</td><td class="c">' + (r.hv == null ? '<span style="color:var(--text3)">\u2014</span>' : '<b style="color:' + varColor(r.hv) + '">' + (r.hv > 0 ? '+' : '') + r.hv + '%</b>') + '</td></tr>';
@@ -1733,7 +1776,7 @@ function renderSgDetail() {
     + (canEdit ? '<div class="sgp-ha"><button class="btn btn-secondary" onclick="openCopyGoals()">Copy goals</button><button class="btn btn-primary" onclick="openAddGoalModal()">+ Add SMART Goal</button></div>' : '')
     + '</div>';
 
-  html += '<div class="sgp-meter"><div class="sgp-mt"><b>Weightage ' + total + '% of 100%</b><span>' + groups.length + (groups.length === 1 ? ' goal' : ' goals') + (groups.length > 1 ? ' \u00B7 <button type="button" class="sgp-link" onclick="sgpToggleAll()">Expand / collapse all</button>' : '') + '</span></div>'
+  html += '<div class="sgp-meter"><div class="sgp-mt"><b>Weightage ' + total + '% of 100%' + hpTip(HP_TIPS.weightage) + '</b><span>' + groups.length + (groups.length === 1 ? ' goal' : ' goals') + (groups.length > 1 ? ' \u00B7 <button type="button" class="sgp-link" onclick="sgpToggleAll()">Expand / collapse all</button>' : '') + '</span></div>'
     + '<div class="sgp-bar-t">' + groups.map(function (g, i) { return '<i title="' + esc(g.goal) + ' ' + g.weightage + '%" style="width:' + Math.min(parseFloat(g.weightage) || 0, 100) + '%;background:' + SGP_COLORS[i % SGP_COLORS.length] + '"></i>'; }).join('') + '</div>'
     + '<div class="sgp-msg ' + st.cls + '">' + msg + '</div></div>';
 
@@ -1748,7 +1791,7 @@ function renderSgDetail() {
       + (canEdit ? '<button class="btn btn-secondary btn-sm" title="Edit goal" onclick="editGoalGroup(\'' + escJs(r0.year) + '\',\'' + escJs(r0.dept) + '\',\'' + escJs(r0.member) + '\',\'' + escJs(grp.goal) + '\')">' + sgIc('edit') + '</button>'
         + '<button class="btn btn-danger btn-sm" title="Delete goal" onclick="deleteGoalGroup(\'' + escJs(r0.year) + '\',\'' + escJs(r0.dept) + '\',\'' + escJs(r0.member) + '\',\'' + escJs(grp.goal) + '\')">' + sgIc('trash') + '</button>' : '')
       + '</span><span class="sgp-chev">\u203A</span></div>'
-      + '<div class="sgp-body"><div class="sgp-act is-h"><span>Activity</span><span>Particulars</span><span style="text-align:center">Max</span><span></span></div>'
+      + '<div class="sgp-body"><div class="sgp-act is-h"><span>Activity</span><span>Particulars</span><span style="text-align:center">Max' + hpTip(HP_TIPS.maxMarks) + '</span><span></span></div>'
       + grp.rows.map(function (r) {
           return '<div class="sgp-act"><b>' + esc(r.cat) + '</b><span class="sgp-pt">' + esc(r.particulars || '\u2014') + '</span><span class="sgp-mx">' + r.maxScore + '</span>'
             + '<span class="sgp-ac">' + (canEdit ? '<button class="btn btn-secondary btn-sm" title="Edit" onclick="openGoalModal(\'' + r.id + '\')">' + sgIc('edit') + '</button><button class="btn btn-danger btn-sm" title="Delete" onclick="deleteGoal(\'' + r.id + '\')">' + sgIc('trash') + '</button>' : '') + '</span></div>';
@@ -2340,11 +2383,11 @@ function renderMpMain(year, month, dept) {
     + '<div class="sgp-ha"><button class="btn btn-secondary" onclick="exportPlanExcel()" title="Download this view as Excel">Excel</button>'
     + (canAdd ? '<button class="btn btn-primary" onclick="openAddTask()">+ Add task</button>' : '') + '</div></div>'
     + '<div class="mp-tiles">'
-    + '<div class="mp-tile"><span>Tasks</span><b>' + all.length + '</b><em>' + (all.length - live.length ? (all.length - live.length) + ' cancelled' : 'this month') + '</em></div>'
-    + '<div class="mp-tile"><span>Completed</span><b>' + done + '</b><em>' + pct + '% of ' + live.length + '</em><div class="mp-prog"><i style="width:' + pct + '%"></i></div></div>'
-    + '<div class="mp-tile"><span>Open</span><b>' + open + '</b><em>to do or in progress</em></div>'
-    + '<div class="mp-tile' + (late ? ' is-late' : '') + '"><span>Overdue</span><b>' + late + '</b><em>past target, not done</em></div>'
-    + '<div class="mp-tile"><span>Hours</span><b>' + r2(act) + ' / ' + r2(est) + '</b><em>actual / estimated</em></div></div>';
+    + '<div class="mp-tile"><span>Tasks' + hpTip(HP_TIPS.mpTasks) + '</span><b>' + all.length + '</b><em>' + (all.length - live.length ? (all.length - live.length) + ' cancelled' : 'this month') + '</em></div>'
+    + '<div class="mp-tile"><span>Completed' + hpTip(HP_TIPS.mpDone) + '</span><b>' + done + '</b><em>' + pct + '% of ' + live.length + '</em><div class="mp-prog"><i style="width:' + pct + '%"></i></div></div>'
+    + '<div class="mp-tile"><span>Open' + hpTip(HP_TIPS.mpOpen) + '</span><b>' + open + '</b><em>to do or in progress</em></div>'
+    + '<div class="mp-tile' + (late ? ' is-late' : '') + '"><span>Overdue' + hpTip(HP_TIPS.mpLate) + '</span><b>' + late + '</b><em>past target, not done</em></div>'
+    + '<div class="mp-tile"><span>Hours' + hpTip(HP_TIPS.mpHours) + '</span><b>' + r2(act) + ' / ' + r2(est) + '</b><em>actual / estimated</em></div></div>';
 
   // weeks
   document.getElementById('mp-weeks').innerHTML = '<button type="button" class="mp-wk' + (!week ? ' is-sel' : '') + '" onclick="mpWeek(\'\')">All weeks<i>' + all.length + '</i></button>'
@@ -2365,7 +2408,7 @@ function renderMpMain(year, month, dept) {
     return ca === cb ? 0 : (ca < cb ? 1 : -1);
   });
   if (!tasks.length) {
-    listEl.innerHTML = '<div class="hp-empty" style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:40px 16px;margin-top:14px"><b>' + (all.length ? 'No tasks match' : 'No tasks planned') + '</b>' + (all.length ? 'Change the week, status or search.' : (canAdd ? 'Use \u201C+ Add task\u201D to plan ' + esc(month) + '.' : 'Nothing has been planned for ' + esc(month) + ' yet.')) + '</div>';
+    listEl.innerHTML = '<div class="hp-empty" style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:40px 16px;margin-top:14px"><b>' + (all.length ? 'No tasks match' : 'No tasks planned') + '</b>' + (all.length ? 'Change the week, status or search.' : (canAdd ? 'Use \u201C+ Add task\u201D to plan ' + esc(month) + '. Each task is linked to one of your SMART Goals, so add your goals first if you have not.' : 'Nothing has been planned for ' + esc(month) + ' yet.')) + '</div>';
     return;
   }
   var html = '', lastWeek = null;
@@ -2398,7 +2441,7 @@ function mpCard(t) {
     : '<div><label>Status</label><div class="mpt-ro">' + statusBadge(t.status) + '</div></div>';
   var body = '<h5 class="mpt-h">Status update</h5><div class="mpt-g">' + statusField
     + f('Completed on', 'compDate', 'date', t.compDate) + f('Actual hours', 'actualHrs', 'number', t.actualHrs || 0) + f('Actual items', 'actualItems', 'number', t.actualItems)
-    + f('Revised target', 'revisedTgtDate', 'date', t.revisedTgtDate) + f('Deviation', 'deviation', 'text', t.deviation, ' class="w2"') + f('Help needed', 'helpNeeded', 'text', t.helpNeeded) + '</div>'
+    + f('New target date', 'revisedTgtDate', 'date', t.revisedTgtDate) + f('Why it changed', 'deviation', 'text', t.deviation, ' class="w2"') + f('Help needed', 'helpNeeded', 'text', t.helpNeeded) + '</div>'
     + (ed ? '<div class="mpt-bar"><button class="btn btn-primary btn-sm" onclick="mpSave(\'' + id + '\')">Save update</button><span class="sp"></span>'
         + '<button class="btn btn-secondary btn-sm" onclick="openEditTask(\'' + id + '\')">' + sgIc('edit') + ' Edit task</button>'
         + '<button class="btn btn-danger btn-sm" onclick="deleteTask(\'' + id + '\')">' + sgIc('trash') + ' Delete</button></div>' : '');
@@ -2809,6 +2852,18 @@ function rvCalc(r) {
   return { rows: rows, total: total, wTotal: wTotal,
            mgrDone: items.some(function (i) { return sgScoreEntered(i.mgrScore); }), memDone: items.some(function (i) { return sgScoreEntered(i.memberScore); }) };
 }
+// How the Performance number is worked out, with the person's own figures.
+function rvHow(c) {
+  var r2 = function (v) { return Math.round(v * 100) / 100; };
+  if (!c.mgrDone) return '<div class="rv-how muted"><b>How the score is worked out.</b> For each goal: manager marks \u00F7 max marks \u00D7 weightage. Then the goals are added up. This panel shows the sums once the manager has scored.</div>';
+  var rows = c.rows.map(function (g) {
+    var share = g.gMax > 0 ? Math.round(g.gMgr / g.gMax * 100) : 0;
+    return '<tr><td>' + esc(g.grp.goal) + '</td><td class="c">' + r2(g.gMgr) + ' of ' + r2(g.gMax) + '</td><td class="c">' + share + '%</td><td class="c">' + g.w + '%</td><td class="c"><b>' + g.perf + '</b></td></tr>';
+  }).join('');
+  return '<details class="rv-how"><summary>How is this worked out?</summary><div class="rv-howb"><p>For each goal: <b>manager marks \u00F7 max marks \u00D7 weightage</b>. Then the goals are added up.</p>'
+    + '<div class="db-scroll"><table class="db-tbl"><thead><tr><th>Goal</th><th class="c">Manager marks</th><th class="c">Share</th><th class="c">Weightage</th><th class="c">Points</th></tr></thead><tbody>' + rows
+    + '<tr><td><b>Performance</b></td><td></td><td></td><td class="c">' + c.wTotal + '%</td><td class="c"><b>' + c.total + '%</b></td></tr></tbody></table></div></div></details>';
+}
 function rvStatus(r) {
   if (!r) return { cls: 'none', txt: 'Not started', pill: '' };
   var c = rvCalc(r);
@@ -2881,20 +2936,21 @@ function renderRvMain(year, month, p) {
       return '<div class="rv-bar-r"><span title="' + esc(g.grp.goal) + '">' + esc(g.grp.goal) + ' \u00B7 ' + g.w + '%</span><div class="rv-bar-t"><i style="width:' + Math.min(pc, 100) + '%;background:' + pctColor(pc) + '"></i></div><b style="color:' + (c.mgrDone ? pctColor(pc) : 'var(--text3)') + '">' + (c.mgrDone ? g.perf + '%' : '\u2014') + '</b></div>';
     }).join('') + '</div></div>';
 
+  html += rvHow(c);
   c.rows.forEach(function (g) {
     var grp = g.grp, first = grp.rows[0];
     html += '<article class="rv-gcard"><div class="rv-gh" onclick="rvToggle(this)"><h3>' + esc(grp.goal) + '</h3><span class="rv-wt">Weightage ' + g.w + '%</span>'
       + '<span class="score-badge" style="background:' + pctColor(g.gMax > 0 ? g.gMgr / g.gMax * 100 : 0) + '22;color:' + (c.mgrDone ? pctColor(g.gMax > 0 ? g.gMgr / g.gMax * 100 : 0) : 'var(--text3)') + '">' + (c.mgrDone ? g.perf + '% of ' + g.w + '%' : 'Not scored') + '</span>'
       + sgSuccessEyeBtn(r.year, r.dept, r.member, grp.goal, first.goalItemId) + '<span class="sgp-chev">\u203A</span></div>'
-      + '<div class="rv-gbody"><div class="rv-row rv-hd"><span>Activity</span><span class="c">Target</span><span class="c">Actual</span><span>Remark</span><span class="c">Max</span><span class="c">Member</span><span class="c">Manager</span></div>'
+      + '<div class="rv-gbody"><div class="rv-row rv-hd"><span>Activity</span><span class="c">Target</span><span class="c">Actual</span><span>Remark</span><span class="c">Max</span><span class="c">Self score</span><span class="c">Manager score</span></div>'
       + grp.rows.map(function (i) {
           var idx = items.indexOf(i), hasR = !!(i.remark && String(i.remark).trim());
           return '<div class="rv-row"><span class="rv-act"><b>' + esc(i.cat) + '</b><small>' + esc(i.particulars || '') + '</small></span>'
             + '<span class="c rv-t"><small class="rv-lb">Target</small>' + esc(i.target || '\u2014') + '</span><span class="c rv-a"><small class="rv-lb">Actual</small>' + esc(i.actual || '\u2014') + '</span>'
             + '<span class="rv-rm">' + (hasR ? esc(i.remark) : '<span style="color:var(--text3)">\u2014</span>') + (canRemark ? '<button type="button" title="' + (hasR ? 'Edit remark' : 'Add remark') + '" onclick="sgOpenItemRemarkModal(\'' + r.id + '\',' + idx + ')">' + sgIc('edit') + '</button>' : '') + '</span>'
             + '<span class="c" style="font-weight:700"><small class="rv-lb">Max</small>' + i.maxScore + '</span>'
-            + '<span class="c"><small class="rv-lb">Member</small><span class="score-badge ' + scoreClass(i.memberScore, i.maxScore) + '">' + (sgScoreEntered(i.memberScore) ? i.memberScore : '\u2014') + '</span></span>'
-            + '<span class="c"><small class="rv-lb">Manager</small>' + (sgScoreEntered(i.mgrScore) ? '<span class="score-badge ' + scoreClass(i.mgrScore, i.maxScore) + '">' + i.mgrScore + '</span>' : '<span style="color:var(--text3)">\u2014</span>') + '</span></div>';
+            + '<span class="c"><small class="rv-lb">Self score</small><span class="score-badge ' + scoreClass(i.memberScore, i.maxScore) + '">' + (sgScoreEntered(i.memberScore) ? i.memberScore : '\u2014') + '</span></span>'
+            + '<span class="c"><small class="rv-lb">Manager score</small>' + (sgScoreEntered(i.mgrScore) ? '<span class="score-badge ' + scoreClass(i.mgrScore, i.maxScore) + '">' + i.mgrScore + '</span>' : '<span style="color:var(--text3)">\u2014</span>') + '</span></div>';
         }).join('')
       + '<div class="rv-row" style="font-weight:700;background:var(--surface2);border-radius:8px;padding-left:8px;padding-right:8px"><span style="grid-column:1/5">Total</span><span class="c">' + g.gMax + '</span><span class="c">' + g.gMem + '</span><span class="c">' + (g.gMgr > 0 ? g.gMgr : '\u2014') + '</span></div>'
       + '</div></article>';
@@ -2989,7 +3045,7 @@ function loadGoalsForReview() {
 
   let goalRows = DB.goals.filter(g => g.year===year && g.dept===dept && g.member===member);
   if (!goalRows.length) {
-    host.innerHTML = `<div class="hp-empty" style="margin-top:14px;border:1px dashed var(--border2);border-radius:12px"><b>No SMART Goals yet</b>${esc(member)} has no goals for ${esc(academicYearShort(year))}. Add goals in the SMART Goals tab first.</div>`;
+    host.innerHTML = `<div class="hp-empty" style="margin-top:14px;border:1px dashed var(--border2);border-radius:12px"><b>No SMART Goals yet</b>${esc(member)} has no goals for ${esc(academicYearShort(year))}. Add goals in the SMART Goals tab first.<br><button type="button" class="btn btn-primary btn-sm" style="margin-top:12px" onclick="closeModal('review-modal');showPage('smart-goals')">Go to SMART Goals</button></div>`;
     document.getElementById('rv-live').innerHTML = '';
     return;
   }
@@ -3002,7 +3058,7 @@ function loadGoalsForReview() {
   let html = '';
   groupByGoal(goalRows).forEach(grp => {
     html += `<div class="rv-mg"><div class="rv-mgh">${esc(grp.goal)} <span>Weightage ${grp.weightage}%</span></div>
-      <div class="rv-row rv-hd" style="padding:8px 14px 0"><span>Activity</span><span class="c">Target</span><span class="c">Actual</span><span>Remark</span><span class="c">Max</span><span class="c">Member</span><span class="c">Manager</span></div>`;
+      <div class="rv-row rv-hd" style="padding:8px 14px 0"><span>Activity</span><span class="c">Target</span><span class="c">Actual</span><span>Remark</span><span class="c">Max</span><span class="c">Self score</span><span class="c">Manager score</span></div>`;
     grp.rows.forEach(g => {
       const ex = existing?.items?.find(i => i.goalItemId === g.id);
       const maxVal = (ex && typeof ex.maxScore !== 'undefined') ? ex.maxScore : g.maxScore;
@@ -3012,8 +3068,8 @@ function loadGoalsForReview() {
         <label class="rv-f"><small>Actual</small><input type="text" class="item-actual" placeholder="Actual" value="${esc(ex?.actual||'')}"></label>
         <label class="rv-f"><small>Remark</small><input type="text" class="item-remark" placeholder="Remark" value="${esc(ex?.remark||'')}"></label>
         <label class="rv-f"><small>Max</small><input type="number" min="0" class="item-maxscore" value="${maxVal}" title="Max score comes from SMART Goals and can be adjusted here" oninput="rvPreview()"></label>
-        <label class="rv-f"><small>Member</small><input type="number" min="0" class="item-memberscore" value="${(ex && sgScoreEntered(ex.memberScore))?ex.memberScore:''}" ${memberDisabled} oninput="rvPreview()"></label>
-        <label class="rv-f"><small>Manager</small><input type="number" min="0" class="item-mgrscore" value="${(ex && sgScoreEntered(ex.mgrScore))?ex.mgrScore:''}" ${mgrDisabled} oninput="rvPreview()"></label>
+        <label class="rv-f"><small>Self score</small><input type="number" min="0" class="item-memberscore" value="${(ex && sgScoreEntered(ex.memberScore))?ex.memberScore:''}" ${memberDisabled} oninput="rvPreview()"></label>
+        <label class="rv-f"><small>Manager score</small><input type="number" min="0" class="item-mgrscore" value="${(ex && sgScoreEntered(ex.mgrScore))?ex.mgrScore:''}" ${mgrDisabled} oninput="rvPreview()"></label>
       </div>`;
     });
     html += `</div>`;
@@ -4649,6 +4705,7 @@ try { window.selectDept = selectDept; } catch(e){}
 try { window.selectSettingsDept = selectSettingsDept; } catch(e){}
 try { window.selectDeptAndMember = selectDeptAndMember; } catch(e){}
 try { window.showPage = showPage; } catch(e){}
+try { window.hpHowOpen = hpHowOpen; } catch(e){}
 try { window.switchRole = switchRole; } catch(e){}
 try { window.toggleColsPanel = toggleColsPanel; } catch(e){}
 try { window.toggleColumn = toggleColumn; } catch(e){}
