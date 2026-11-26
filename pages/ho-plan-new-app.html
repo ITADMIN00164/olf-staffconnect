@@ -1716,6 +1716,43 @@
   #sg-app.hp-enter .sgp-person:nth-child(n+5) { animation-delay: .26s; }
   @media (max-width: 640px) { #sg-app .modal-backdrop.open .modal { animation: hpSheet .32s cubic-bezier(.22,1,.36,1); } }
 }
+
+/* ── clarity: "i" tips, a short line at the top of each page, the How it works panel ── */
+#sg-app #hp-how-btn { gap: 6px; }
+#sg-app #hp-how-btn .sg-refresh-ico { display: inline-block; }
+#sg-app .hp-i { display: inline-grid; place-items: center; width: 16px; height: 16px; padding: 0; margin-left: 6px; border-radius: 50%; border: 1px solid var(--border2); background: var(--surface); color: var(--text3); font: 700 10px/1 inherit; cursor: help; vertical-align: middle; text-transform: none; letter-spacing: 0; }
+#sg-app .hp-i:hover, #sg-app .hp-i:focus-visible { color: var(--brand); border-color: var(--brand); outline: 0; }
+.hp-pop { position: fixed; z-index: 99999; max-width: 270px; padding: 10px 12px; border-radius: 12px; background: #0F172A; color: #fff; font: 500 12.5px/1.45 inherit; box-shadow: 0 14px 30px -10px rgba(0,0,0,.55); pointer-events: none; }
+#sg-app .hp-lead { display: flex; align-items: flex-start; gap: 12px; margin: 0 0 12px; padding: 11px 14px; border-radius: 14px; background: var(--brand-lt, #EEF2FF); border: 1px solid var(--border); }
+#sg-app .hp-step { flex: none; padding: 3px 10px; border-radius: 99px; background: var(--brand, #2F6FE4); color: #fff; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+#sg-app .hp-lead p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text2); }
+#sg-app .hp-lead b { color: var(--text); }
+#sg-app .hp-lk { border: 0; background: none; padding: 0; font: inherit; font-weight: 700; color: var(--brand, #2F6FE4); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
+#sg-app .sgp-ag-hd { margin-bottom: 4px; font-size: 11.5px; font-weight: 700; color: var(--text3); }
+#sg-app .hp-how-modal { max-width: 640px; }
+#sg-app .hp-how { max-height: 70vh; overflow-y: auto; font-size: 13.5px; line-height: 1.55; color: var(--text2); }
+#sg-app .hp-steps { margin: 0 0 14px; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 10px; }
+#sg-app .hp-steps li { counter-increment: s; position: relative; padding-left: 38px; }
+#sg-app .hp-steps li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: var(--brand, #2F6FE4); color: #fff; font-weight: 800; font-size: 13px; }
+#sg-app .hp-steps li b { color: var(--text); font-size: 14.5px; }
+#sg-app .hp-steps li em { margin-left: 6px; font-style: normal; font-size: 11.5px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .04em; }
+#sg-app .hp-steps li span { display: block; }
+#sg-app .hp-calc { padding: 12px 14px; border-radius: 14px; background: var(--surface-alt, #F8FAFC); border: 1px solid var(--border); margin-bottom: 14px; }
+#sg-app .hp-formula { margin: 0 0 10px; color: var(--text); }
+#sg-app .hp-note { margin: 10px 0 0; font-size: 12.5px; color: var(--text3); }
+#sg-app .hp-h4 { margin: 4px 0 8px; font-size: 14px; color: var(--text); }
+#sg-app .hp-dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 0; }
+#sg-app .hp-dl dt { font-weight: 800; color: var(--text); }
+#sg-app .hp-dl dd { margin: 0; }
+#sg-app .rv-how { margin: 12px 0; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); font-size: 13px; color: var(--text2); }
+#sg-app .rv-how summary { cursor: pointer; font-weight: 800; color: var(--brand, #2F6FE4); }
+#sg-app .rv-how.muted { background: var(--surface-alt, #F8FAFC); }
+#sg-app .rv-howb p { margin: 10px 0; }
+@media (max-width: 640px) {
+  #sg-app .hp-lead { flex-direction: column; gap: 8px; }
+  #sg-app .hp-dl { grid-template-columns: 1fr; gap: 0; }
+  #sg-app .hp-dl dd { margin-bottom: 8px; }
+}
 </style>
 <nav class="app-nav" id="sgHero">
   <span class="pg-blob pg-blob--a" aria-hidden="true"></span>
@@ -1728,6 +1765,7 @@
     </div>
   </div>
   <div class="nav-right" style="display:flex;align-items:center;gap:8px">
+    <button class="btn btn-secondary btn-sm" id="hp-how-btn" type="button" onclick="hpHowOpen()" title="How goals, plans, reviews and scores work"><span class="sg-refresh-ico"><svg class="sg-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.500 2.300c-.7.4-1 .9-1 1.700M12 17h.01"/></svg></span> How it works</button>
     <button class="btn btn-secondary btn-sm" id="sg-refresh-btn" onclick="sgRefresh()" title="Reload the latest data from the server (no page reload needed)">
       <span class="sg-refresh-ico"><svg class="sg-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.300 5.700M20 4v7h-7"/></svg></span> Refresh
     </button>
@@ -1745,8 +1783,8 @@
     </div>
     <div class="dash-subtabs">
       <button class="dash-subtab-btn" data-subtab="flow" id="dash-subtab-btn-flow" onclick="switchDashSubtab('flow')" style="display:none">Ticket Flow</button>
-      <button class="dash-subtab-btn active" data-subtab="plan" onclick="switchDashSubtab('plan')">Monthly Plan Progress</button>
-      <button class="dash-subtab-btn" data-subtab="review" onclick="switchDashSubtab('review')">Monthly Review</button>
+      <button class="dash-subtab-btn active" data-subtab="plan" onclick="switchDashSubtab('plan')">Task progress</button>
+      <button class="dash-subtab-btn" data-subtab="review" onclick="switchDashSubtab('review')">Review scores</button>
     </div>
   </div>
 </nav>
@@ -1762,6 +1800,7 @@
   <!-- The banner tab already names this page: title kept for screen readers only -->
   <h1 class="sg-vh">Dashboard</h1>
   <p class="sg-vh" id="dash-dept-label">Overview of all SMART Goals and task progress</p>
+  <div class="hp-lead"><span class="hp-step">Overview</span><p>See how the month is going: how many tasks are done, what is late, and how the reviews are scored. Tap the <b>i</b> on any number to see how it is worked out. <button type="button" class="hp-lk" onclick="hpHowOpen()">How is this worked out?</button></p></div>
   <div class="sgp-bar" id="dash-filter-bar">
     <div class="sgp-f"><span>Academic year</span><select class="sgp-sel" id="dash-year-filter" onchange="renderDashboard()"><option value="">All Academic Years</option></select></div>
     <div class="sgp-f"><span>Month</span><select class="sgp-sel" id="dash-month-filter" onchange="renderDashboard()"><option value="">All Months</option></select></div>
@@ -1879,6 +1918,7 @@
 <div id="page-smart-goals" class="page">
   <h1 class="sg-vh">SMART Goals</h1>
   <p class="sg-vh" id="sg-dept-label">Define goals and activities for each person</p>
+  <div class="hp-lead"><span class="hp-step">Step 1 of 3</span><p>Set the goals for the year. Each <b>goal</b> has a <b>weightage</b> (how much it counts) and <b>activities</b> (what will be done), each with a <b>max score</b>. The weightages must add up to 100%. <button type="button" class="hp-lk" onclick="hpHowOpen()">How it all works</button></p></div>
   <div class="sgp-bar sgp-bar-2">
     <div class="sgp-f"><span>Academic year</span><select class="sgp-sel" id="sg-year-filter" onchange="renderSmartGoals()"></select></div>
     <div class="sgp-f"><span>Department</span><select class="sgp-sel sgp-sel-w" id="sg-dept-filter" onchange="onSgDeptChange()"><option value="">Select department…</option></select></div>
@@ -1897,6 +1937,7 @@
 <div id="page-monthly-plan" class="page">
   <h1 class="sg-vh">Monthly Plan</h1>
   <p class="sg-vh" id="mp-dept-label">Week-wise tasks linked to SMART Goals</p>
+  <div class="hp-lead"><span class="hp-step">Step 2 of 3</span><p>Plan the month. Add <b>tasks</b> week by week, each linked to one of the goals. Then update each task as you work: status, hours and items. <button type="button" class="hp-lk" onclick="hpHowOpen()">How it all works</button></p></div>
   <div class="sgp-bar">
     <div class="sgp-f"><span>Academic year</span><select class="sgp-sel" id="mp-year" onchange="renderPlan()"></select></div>
     <div class="sgp-f"><span>Month</span><select class="sgp-sel" id="mp-month" onchange="renderPlan()"></select></div>
@@ -1929,6 +1970,7 @@
 <div id="page-reviews" class="page">
   <h1 class="sg-vh">Monthly Reviews</h1>
   <p class="sg-vh" id="rv-dept-label">Self-review by member. Manager score by the department head, an admin, or the reporting manager.</p>
+  <div class="hp-lead"><span class="hp-step">Step 3 of 3</span><p>Review the month. You give yourself a <b>self score</b> for every activity, up to its max. Then your manager gives a <b>manager score</b>. The <b>Performance</b> number is worked out from the manager scores. <button type="button" class="hp-lk" onclick="hpHowOpen()">How is this worked out?</button></p></div>
   <div class="sgp-bar">
     <div class="sgp-f"><span>Academic year</span><select class="sgp-sel" id="rv-year" onchange="renderReviews()"></select></div>
     <div class="sgp-f"><span>Month</span><select class="sgp-sel" id="rv-month" onchange="renderReviews()"></select></div>
@@ -1947,6 +1989,7 @@
 <!-- ══════════ SETTINGS ══════════ -->
 <div id="page-settings" class="page">
   <h1 class="sg-vh">Settings</h1>
+  <div class="hp-lead"><span class="hp-step">Admin</span><p>Choose which <b>departments</b> use this tool, and who the <b>admins</b> are. Everyone in a department comes from the Employees list, with their reporting manager.</p></div>
   <div class="hp-set">
     <section class="hp-card">
       <header class="hp-card-h">
@@ -1969,6 +2012,39 @@
 </div><!-- /app-body -->
 
 <!-- ══════════ MODALS ══════════ -->
+<div class="modal-backdrop" id="hp-how-modal" onclick="if(event.target===this)closeModal('hp-how-modal')">
+  <div class="modal hp-how-modal">
+    <div class="modal-head"><div><span class="modal-title">How this works</span><span class="modal-sub">Goals, monthly plans, reviews and the Performance score</span></div><button class="modal-close" onclick="closeModal('hp-how-modal')">&times;</button></div>
+    <div class="modal-body hp-how">
+      <ol class="hp-steps">
+        <li><b>Goals</b> <em>once a year</em><span>Agree what you will work on. Each goal has a <b>weightage</b> (how much it counts) and the weightages add up to <b>100%</b>. Under each goal are <b>activities</b>, and each activity has a <b>max score</b>.</span></li>
+        <li><b>Monthly plan</b> <em>every month</em><span>Add tasks week by week, each linked to a goal. Update the status, hours and items as you work.</span></li>
+        <li><b>Review</b> <em>end of month</em><span>You give yourself a <b>self score</b> for each activity, up to its max. Your manager then gives a <b>manager score</b>.</span></li>
+        <li><b>Performance</b> <em>the result</em><span>Worked out from the manager scores only, like this:</span></li>
+      </ol>
+      <div class="hp-calc">
+        <p class="hp-formula">For each goal: <b>manager marks &divide; max marks &times; weightage</b>. Then add the goals up.</p>
+        <table class="db-tbl"><thead><tr><th>Example</th><th class="c">Manager marks</th><th class="c">Share</th><th class="c">Weightage</th><th class="c">Points</th></tr></thead><tbody>
+          <tr><td>Goal A (two activities, max 10 each)</td><td class="c">8 + 6 = 14 of 20</td><td class="c">70%</td><td class="c">60%</td><td class="c"><b>42</b></td></tr>
+          <tr><td>Goal B (two activities, max 10 each)</td><td class="c">9 + 7 = 16 of 20</td><td class="c">80%</td><td class="c">40%</td><td class="c"><b>32</b></td></tr>
+          <tr><td><b>Performance</b></td><td></td><td></td><td class="c">100%</td><td class="c"><b>74%</b></td></tr>
+        </tbody></table>
+        <p class="hp-note">80% or more is strong, 50 to 79% is fair, below 50% needs support.</p>
+      </div>
+      <h4 class="hp-h4">What the dashboard numbers mean</h4>
+      <dl class="hp-dl">
+        <dt>Completion</dt><dd>Completed tasks &divide; all tasks (cancelled tasks are left out).</dd>
+        <dt>Overdue</dt><dd>The target date has passed and the task is not completed or cancelled.</dd>
+        <dt>On time</dt><dd>Of the completed tasks, how many were finished by their target date.</dd>
+        <dt>Hours</dt><dd>(Actual hours &minus; estimated hours) &divide; estimated hours. A plus sign means it took longer than planned.</dd>
+        <dt>Items delivered</dt><dd>Items really delivered &divide; items planned.</dd>
+        <dt>Manager grade</dt><dd>Grades A, B and C on completed tasks count as 100%, 67% and 33%, then are averaged.</dd>
+      </dl>
+    </div>
+    <div class="modal-foot"><button class="btn btn-primary" onclick="closeModal('hp-how-modal')">Got it</button></div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="task-modal" onclick="if(event.target===this)closeModal('task-modal')">
   <div class="modal hp-task-modal">
     <div class="modal-head">
@@ -1987,9 +2063,9 @@
       <div class="field" style="margin-bottom:14px"><label>Action point <span class="req">*</span></label><textarea id="tf-action" placeholder="What will be done?"></textarea></div>
       <div class="form-grid" style="grid-template-columns:2fr 1fr 1fr 1.4fr;margin-bottom:14px">
         <div class="field"><label>Sub-activity</label><input id="tf-subcat" placeholder="Optional" autocomplete="off"></div>
-        <div class="field"><label>Planned</label><select id="tf-planned"><option value="Yes">Yes</option><option value="No">No</option></select></div>
-        <div class="field"><label>Items</label><input id="tf-planneditems" type="number" min="0" placeholder="Optional"></div>
-        <div class="field"><label>Est. hours <span class="req">*</span></label><input id="tf-est" type="number" step="0.5" min="0" placeholder="0"></div>
+        <div class="field"><label>Planned</label><select id="tf-planned"><option value="Yes">Yes</option><option value="No">No</option></select><span class="sgp-hint">No = it came up during the month</span></div>
+        <div class="field"><label>Items</label><input id="tf-planneditems" type="number" min="0" placeholder="Optional"><span class="sgp-hint">How many you plan to deliver</span></div>
+        <div class="field"><label>Est. hours <span class="req">*</span></label><input id="tf-est" type="number" step="0.5" min="0" placeholder="0"><span class="sgp-hint">Your estimate of the time</span></div>
       </div>
       <div class="field" style="max-width:240px"><label>Target date <span class="req">*</span></label><input id="tf-tgtdate" type="date"></div>
     </div>
@@ -2232,6 +2308,7 @@
       </div>
       <div class="field" style="margin-bottom:16px"><label>Description</label><textarea id="ag-description" placeholder="Optional. What this goal is about."></textarea></div>
       <div class="sgp-ag-h"><span>Activities <span class="req">*</span></span><button type="button" class="btn btn-secondary btn-sm" onclick="sgAgRow()">+ Add activity</button></div>
+      <div class="sgp-ag-r sgp-ag-hd" aria-hidden="true"><span>Activity (what will be done)</span><span>Max score</span><span>Particulars (optional)</span><span></span></div>
       <div id="ag-acts"></div>
     </div>
     <div class="modal-foot">
