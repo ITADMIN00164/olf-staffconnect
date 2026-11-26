@@ -2852,6 +2852,14 @@ function rvCalc(r) {
   return { rows: rows, total: total, wTotal: wTotal,
            mgrDone: items.some(function (i) { return sgScoreEntered(i.mgrScore); }), memDone: items.some(function (i) { return sgScoreEntered(i.memberScore); }) };
 }
+// Target and Actual for one activity, filled in from the Monthly Plan: the tasks planned, and the tasks completed,
+// for that goal and activity in that month. Cancelled tasks are left out.
+function rvAuto(year, month, dept, member, goal, cat) {
+  var ts = DB.tasks.filter(function (t) { return t.year === year && t.month === month && t.dept === dept && t.member === member && t.goal === goal && t.cat === cat && t.status !== 'Cancelled'; });
+  if (!ts.length) return { target: '', actual: '' };
+  var done = ts.filter(function (t) { return t.status === 'Completed'; }).length;
+  return { target: ts.length + (ts.length === 1 ? ' task' : ' tasks'), actual: done + (done === 1 ? ' task' : ' tasks') };
+}
 // How the Performance number is worked out, with the person's own figures.
 function rvHow(c) {
   var r2 = function (v) { return Math.round(v * 100) / 100; };
@@ -2944,9 +2952,9 @@ function renderRvMain(year, month, p) {
       + sgSuccessEyeBtn(r.year, r.dept, r.member, grp.goal, first.goalItemId) + '<span class="sgp-chev">\u203A</span></div>'
       + '<div class="rv-gbody"><div class="rv-row rv-hd"><span>Activity</span><span class="c">Target</span><span class="c">Actual</span><span>Remark</span><span class="c">Max</span><span class="c">Self score</span><span class="c">Manager score</span></div>'
       + grp.rows.map(function (i) {
-          var idx = items.indexOf(i), hasR = !!(i.remark && String(i.remark).trim());
+          var idx = items.indexOf(i), hasR = !!(i.remark && String(i.remark).trim()), au = rvAuto(r.year, r.month, r.dept, r.member, i.goal, i.cat);
           return '<div class="rv-row"><span class="rv-act"><b>' + esc(i.cat) + '</b><small>' + esc(i.particulars || '') + '</small></span>'
-            + '<span class="c rv-t"><small class="rv-lb">Target</small>' + esc(i.target || '\u2014') + '</span><span class="c rv-a"><small class="rv-lb">Actual</small>' + esc(i.actual || '\u2014') + '</span>'
+            + '<span class="c rv-t"><small class="rv-lb">Target</small>' + esc(i.target || au.target || '\u2014') + '</span><span class="c rv-a"><small class="rv-lb">Actual</small>' + esc(i.actual || au.actual || '\u2014') + '</span>'
             + '<span class="rv-rm">' + (hasR ? esc(i.remark) : '<span style="color:var(--text3)">\u2014</span>') + (canRemark ? '<button type="button" title="' + (hasR ? 'Edit remark' : 'Add remark') + '" onclick="sgOpenItemRemarkModal(\'' + r.id + '\',' + idx + ')">' + sgIc('edit') + '</button>' : '') + '</span>'
             + '<span class="c" style="font-weight:700"><small class="rv-lb">Max</small>' + i.maxScore + '</span>'
             + '<span class="c"><small class="rv-lb">Self score</small><span class="score-badge ' + scoreClass(i.memberScore, i.maxScore) + '">' + (sgScoreEntered(i.memberScore) ? i.memberScore : '\u2014') + '</span></span>'
@@ -3062,10 +3070,11 @@ function loadGoalsForReview() {
     grp.rows.forEach(g => {
       const ex = existing?.items?.find(i => i.goalItemId === g.id);
       const maxVal = (ex && typeof ex.maxScore !== 'undefined') ? ex.maxScore : g.maxScore;
+      const _au = rvAuto(year, document.getElementById('rf-month').value, dept, member, g.goal, g.cat);
       html += `<div class="rv-row review-score-row" data-goal-id="${g.id}" data-goal-name="${esc(g.goal)}" data-weightage="${g.weightage}" data-default-max="${g.maxScore}">
         <span class="rv-act"><b>${esc(g.cat)}</b><small>${esc(g.particulars||'')}</small></span>
-        <label class="rv-f"><small>Target</small><input type="text" class="item-target" placeholder="Target" value="${esc(ex?.target||'')}"></label>
-        <label class="rv-f"><small>Actual</small><input type="text" class="item-actual" placeholder="Actual" value="${esc(ex?.actual||'')}"></label>
+        <label class="rv-f"><small>Target</small><input type="text" class="item-target" placeholder="Target" value="${esc((ex && ex.target) || _au.target)}"></label>
+        <label class="rv-f"><small>Actual</small><input type="text" class="item-actual" placeholder="Actual" value="${esc((ex && ex.actual) || _au.actual)}"></label>
         <label class="rv-f"><small>Remark</small><input type="text" class="item-remark" placeholder="Remark" value="${esc(ex?.remark||'')}"></label>
         <label class="rv-f"><small>Max</small><input type="number" min="0" class="item-maxscore" value="${maxVal}" title="Max score comes from SMART Goals and can be adjusted here" oninput="rvPreview()"></label>
         <label class="rv-f"><small>Self score</small><input type="number" min="0" class="item-memberscore" value="${(ex && sgScoreEntered(ex.memberScore))?ex.memberScore:''}" ${memberDisabled} oninput="rvPreview()"></label>
