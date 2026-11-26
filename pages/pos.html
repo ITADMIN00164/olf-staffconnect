@@ -657,6 +657,11 @@
     #posPage .pg-hero .pos-top-tabs--header .pos-top-tab.active { background: #fff; color: #2457C5; box-shadow: 0 6px 14px rgba(15,23,42,.18); }
     #posPage .pg-hero .pos-top-tabs--header .pos-top-tab.active .fr-ico { color: #2F6FE4; }
     #posPage .pg-hero .pg-hero-ico .fr-ico { background-color: #fff; }
+    /* The hero (Dashboard / Admin switch) is only for itadmin - hidden for everyone else - and kept slim */
+    #posPage .pg-hero:not(:has(#posAdminTabBtn:not([hidden]))) { display: none !important; }
+    #posPage .pg-hero { min-height: 0 !important; padding-top: 12px !important; padding-bottom: 12px !important; margin-bottom: 14px; }
+    #posPage .pg-hero .pg-hero-sub { display: none; }
+    #posPage .pg-hero .pg-hero-title { font-size: 20px !important; line-height: 1.2; margin: 0; }
 
     /* second level: one soft card per row of tabs */
     #posPage .pr-head, #posPage .pos-subtabs {
@@ -700,15 +705,22 @@
             <h1 class="pr-title">Reviews</h1>
             <p class="pr-sub">Weekly review across POs, PMs and DMs.</p>
           </div>
+          <!-- Reviews (one coloured group) + Analytics (Weekly Summary / Monthly Summary) -->
           <nav class="pr-nav" id="prNav">
-            <button class="pr-navbtn is-active" data-view="weekly"><span class="fr-ico fr-i-week" aria-hidden="true"></span>Weekly</button>
-            <button class="pr-navbtn" data-view="summary"><span class="fr-ico fr-i-sum" aria-hidden="true"></span>Summary</button>
-            <button class="pr-navbtn" data-view="monthly"><span class="fr-ico fr-i-month" aria-hidden="true"></span>Monthly</button>
-            <button class="pr-navbtn" data-view="mosum"><span class="fr-ico fr-i-sum" aria-hidden="true"></span>Monthly Summary</button>
-            <button class="pr-navbtn" data-view="quarterly"><span class="fr-ico fr-i-month" aria-hidden="true"></span>Quarterly</button>
-            <button class="pr-navbtn" data-view="yearly"><span class="fr-ico fr-i-sum" aria-hidden="true"></span>Yearly</button>
-            <button class="pr-navbtn" data-view="wholeyear"><span class="fr-ico fr-i-target" aria-hidden="true"></span>Whole Year</button>
+            <div class="pr-navgrp" role="group" aria-label="Reviews">
+              <button class="pr-navbtn is-active" data-view="weekly"><span class="fr-ico fr-i-week" aria-hidden="true"></span>Weekly</button>
+              <button class="pr-navbtn" data-view="monthly"><span class="fr-ico fr-i-month" aria-hidden="true"></span>Monthly</button>
+              <button class="pr-navbtn" data-view="quarterly"><span class="fr-ico fr-i-month" aria-hidden="true"></span>Quarterly</button>
+              <button class="pr-navbtn" data-view="yearly"><span class="fr-ico fr-i-sum" aria-hidden="true"></span>Yearly</button>
+              <button class="pr-navbtn" data-view="wholeyear"><span class="fr-ico fr-i-target" aria-hidden="true"></span>Whole Year</button>
+            </div>
+            <button class="pr-navbtn pr-navbtn-ana" data-view="analytics"><span class="fr-ico fr-i-sum" aria-hidden="true"></span>Analytics</button>
           </nav>
+        </div>
+
+        <div class="pr-anaswitch" id="prAnaSwitch" role="tablist" aria-label="Analytics" hidden>
+          <button type="button" class="pr-anabtn is-on" data-ana="summary">Weekly Summary</button>
+          <button type="button" class="pr-anabtn" data-ana="mosum">Monthly Summary</button>
         </div>
 
         <section class="pr-view" id="prWeekly">
@@ -811,7 +823,7 @@
 
 
         <!-- QUARTERLY · YEARLY · WHOLE YEAR (Nov 2026) — logic in pos-review.js (qy*).
-             Academic year Jun–May · Q1 Jun–Aug · Q2 Sep–Nov · Q3 Dec–Feb · Q4 Mar–May · G1–G4 only. -->
+             Academic year Jun–May · Q1 Jun–Aug · Q2 Sep–Nov · Q3 Dec–Feb · Q4 Mar–May · G1–G5 (G5 for PO / PM / DM only). -->
         <section class="pr-view" id="prQuarterly" hidden>
           <div class="pr-panel pr-filters">
             <label class="pr-field"><span>Review unit</span>
@@ -966,6 +978,23 @@
         .pr-navbtn.is-active::after{content:"";position:absolute;left:10px;right:10px;bottom:-1px;height:2.5px;border-radius:3px 3px 0 0;
                                     background:linear-gradient(90deg,var(--acc),var(--teal));}
         .pr-navbtn:focus-visible{outline:2px solid var(--acc);outline-offset:-2px;}
+        /* Reviews group (Weekly … Whole Year) in one colour; Analytics on its own in another */
+        .pr-nav{align-items:center;gap:10px;}
+        .pr-navgrp{display:flex;align-items:center;gap:2px;padding:4px;margin:6px 0;border-radius:13px;
+                   background:linear-gradient(135deg,rgba(79,142,247,.12),rgba(16,177,151,.09));border:1px solid var(--acc-line);}
+        .pr-navgrp .pr-navbtn{height:36px;border-radius:9px;}
+        #posPage .pr-navgrp .pr-navbtn.is-active{background:#fff;color:#2457C5;box-shadow:0 1px 2px rgba(15,23,42,.06),0 2px 8px rgba(47,111,228,.16);}
+        #posPage .pr-navgrp .pr-navbtn.is-active::after{display:none;}
+        #posPage .pr-navbtn-ana{height:44px;border-radius:13px;background:#F4EFFE;border:1px solid #DCCDFB;color:#6B46C1;}
+        #posPage .pr-navbtn-ana:hover{background:#ECE2FE;color:#5B34B0;}
+        #posPage .pr-navbtn-ana .fr-ico{color:inherit;}
+        #posPage .pr-navbtn-ana.is-active{background:linear-gradient(135deg,#7C5CE6,#5B34B0);border-color:transparent;color:#fff;box-shadow:0 8px 16px -8px rgba(91,52,176,.55);}
+        #posPage .pr-navbtn-ana.is-active::after{display:none;}
+        .pr-anaswitch{display:flex;width:max-content;gap:4px;padding:4px;margin:0 0 14px;border-radius:12px;background:#F4EFFE;border:1px solid #DCCDFB;}
+        .pr-anaswitch[hidden]{display:none;}
+        .pr-anabtn{height:34px;padding:0 16px;border:0;border-radius:9px;background:transparent;font:inherit;font-size:13px;font-weight:650;color:#6B46C1;cursor:pointer;}
+        .pr-anabtn:hover{background:rgba(255,255,255,.6);}
+        .pr-anabtn.is-on{background:#fff;color:#4C2A99;box-shadow:0 1px 2px rgba(15,23,42,.06),0 2px 8px rgba(91,52,176,.14);}
 
         /* ── Panels ── */
         .pr-panel{background:var(--glass);-webkit-backdrop-filter:blur(18px) saturate(150%);backdrop-filter:blur(18px) saturate(150%);
@@ -1044,6 +1073,23 @@
         .pr-blocks-h b{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:20px;padding:0 7px;margin-left:8px;
                        border-radius:999px;background:var(--acc-soft);color:var(--acc-ink);font-size:11.5px;letter-spacing:0;}
         .pr-chips{display:flex;gap:6px;flex-wrap:wrap;}
+        .pr-team .pr-chips + .pr-blocks-h{margin-top:14px;}
+        /* compact person card; blocks / districts / team folded by default (click a heading to open) */
+        .pr-po{padding:10px 14px;gap:12px;}
+        .pr-avatar{width:38px;height:38px;border-radius:11px;font-size:13.5px;}
+        .pr-po-main{gap:3px;}
+        .pr-po-name{font-size:16px;}
+        .pr-po-name small{height:20px;font-size:11px;}
+        .pr-po-line{font-size:12.5px;}
+        .pr-po + .pr-blocks{padding-top:8px;}
+        .pr-blocks{padding-top:8px;padding-bottom:8px;}
+        .pr-blocks .pr-blocks-h{cursor:pointer;user-select:none;width:max-content;}
+        .pr-blocks .pr-blocks-h::before{content:"\25B8";display:inline-block;width:12px;margin-right:4px;color:var(--acc-ink);font-size:10px;transition:transform .15s ease;}
+        .pr-blocks.is-open .pr-blocks-h::before{transform:rotate(90deg);}
+        .pr-blocks .pr-blocks-h:hover{color:var(--acc-ink);}
+        .pr-blocks:not(.is-open){display:flex;flex-wrap:wrap;gap:4px 22px;}
+        .pr-blocks:not(.is-open) .pr-chips{display:none;}
+        .pr-blocks:not(.is-open) .pr-blocks-h{margin:0 !important;}
         .pr-chip{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 11px;border:1px solid var(--l);border-radius:9px;
                  font-size:12.5px;font-weight:500;color:var(--ink2);background:#fff;box-shadow:0 1px 1px rgba(15,23,42,.03);}
         .pr-chip code{order:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:10.5px;font-weight:600;color:var(--mut);
@@ -1310,6 +1356,8 @@
         .pr-acad-tick.is-ro{cursor:default;opacity:.85;}
         .pr-acad-tick.is-ro input{cursor:default;}
         .pr-mo-g1done{min-width:28px;}
+        .pr-acad-type{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:999px;font-size:12px;font-weight:650;color:var(--mut);background:#F1F5F9;border:1px solid var(--l);}
+        .pr-acad-type.is-core{color:var(--acc-ink);background:var(--acc-soft);border-color:var(--acc-line);}
         #prSumModalDl::before,.pr-sum-dl::before{content:"";width:15px;height:15px;background:currentColor;-webkit-mask:var(--fr-dl) center/contain no-repeat;mask:var(--fr-dl) center/contain no-repeat;}
         .pr-addbox{width:min(640px,94vw);}
         .pr-addform{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-height:60vh;overflow:auto;padding:2px;}
@@ -1430,6 +1478,22 @@
         .pr-mstat.is-none{--mst:var(--bad);--mst-ink:var(--bad-ink);--mst-soft:var(--bad-soft);--mst-line:var(--bad-line);}
         .pr-mstat.is-new{--mst:#94A3B8;--mst-ink:var(--ink2);--mst-soft:#F1F5F9;--mst-line:#E2E8F0;}
         .pr-mstat-line{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;}
+        /* review status as a small button after "Open review"; details open in a pop-over */
+        .pr-statslot{position:relative;display:inline-flex;align-self:flex-end;}
+        .pr-statslot:empty{display:none;}
+        .pr-statbtn{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 14px;border-radius:12px;border:1px solid var(--l);
+                    background:#F1F5F9;color:var(--ink2);font:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;}
+        .pr-statdot{width:8px;height:8px;border-radius:50%;background:currentColor;}
+        .pr-statcar{font-size:10px;opacity:.7;}
+        .pr-statbtn.is-done{color:var(--good-ink);background:var(--good-soft);border-color:var(--good-line);}
+        .pr-statbtn.is-partial{color:var(--warn-ink);background:var(--warn-soft);border-color:var(--warn-line);}
+        .pr-statbtn.is-none{color:var(--bad-ink);background:var(--bad-soft);border-color:var(--bad-line);}
+        .pr-statbtn.is-new{color:var(--ink2);background:#F1F5F9;border-color:#E2E8F0;}
+        .pr-statbtn:hover{filter:brightness(.97);}
+        .pr-statpop{position:absolute;top:calc(100% + 8px);right:0;z-index:40;width:min(540px,92vw);max-height:60vh;overflow:auto;
+                    background:#fff;border:1px solid var(--l);border-radius:14px;box-shadow:var(--sh-md);padding:12px 14px;}
+        .pr-statpop .pr-mstat{margin:0;padding:0 0 0 12px;box-shadow:none;background:none;border-top:0;border-right:0;border-bottom:0;}
+        @media (max-width:640px){ .pr-statslot{width:100%;} .pr-statbtn{width:100%;justify-content:center;height:44px;} .pr-statpop{left:0;right:0;width:auto;} }
         .pr-mstat-pill{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 11px 0 9px;border-radius:999px;font-size:12.5px;font-weight:700;
           color:var(--mst-ink);background:var(--mst-soft);border:1px solid var(--mst-line);white-space:nowrap;}
         .pr-mstat-pill::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--mst);}
@@ -1511,6 +1575,11 @@
           #posPage .pr-navbtn.is-active::after{display:none;}
           #ftrRoot .pr-navbtn.is-active{background:linear-gradient(135deg,#2F6FE4,#0B8F7A) !important;color:#fff !important;box-shadow:0 8px 16px -8px rgba(47,111,228,.6);}
           #ftrRoot .pr-navbtn.is-active .fr-ico{color:#fff !important;}
+          #ftrRoot .pr-navgrp{display:contents;}
+          #ftrRoot .pr-nav{grid-template-columns:repeat(3,minmax(0,1fr)) !important;}
+          #ftrRoot .pr-navbtn-ana.is-active{background:linear-gradient(135deg,#7C5CE6,#5B34B0) !important;}
+          .pr-anaswitch{width:100%;}
+          .pr-anabtn{flex:1;}
 
           /* who / month pickers: comfortable to tap */
           .pr-filters{gap:10px;padding:14px;}
@@ -1781,6 +1850,15 @@
         /* no small text inside the table */
         .qy-tbl tr.pr-mo-l2 td.pr-item{font-size:13px;}
         .qy-tbl td.pr-item[title]{cursor:help;}
+        /* narrower Item column in the quarter / year tables, so the period columns get the room */
+        .qy-tbl th.pr-item,.qy-tbl td.pr-item{width:250px;min-width:230px;max-width:260px;white-space:normal;}
+        .qy-tbl tr.qy-goal td.pr-item,.qy-tbl tr.qy-totrow td.pr-item{white-space:nowrap;}
+        .qy-tbl thead tr:first-child th:nth-child(2),.qy-tbl tbody td:nth-child(2){width:64px;min-width:56px;padding-left:8px;padding-right:10px;}
+        /* folded lines (Monthly: Total streaks and its clubs) */
+        .pr-tbl tr.pr-row.pr-folded,.pr-tbl.qy-tbl tbody tr.pr-row.pr-folded{display:none !important;}
+        .pr-tbl tr.pr-foldhead{cursor:pointer;}
+        .pr-tbl tr.pr-foldhead:hover td{background:#F4F7FC;}
+        .pr-fold-caret{display:inline-block;width:14px;margin-right:4px;color:var(--acc-ink);font-size:11px;}
         .qy-tbl tr.qy-goal td.pr-item[title]{cursor:pointer;}
         @media (max-width:640px){
           .qy-wrap{max-height:none;overflow-x:auto;}

@@ -1,0 +1,4412 @@
+/*******************************************************************************
+ * FIELD TEAM REVIEW — DASHBOARD (pos-review.js)
+ * Renders the Weekly review inside Org Admin -> Dashboard, reading from Supabase.
+ *
+ * The renderer (header, week cards, A–H table, edit cells, text modal) is
+ * carried over unchanged from po.js. Only the data layer is new: the Apps
+ * Script calls (getBaseData / getWeeklyView / saveWeekly) are replaced by the
+ * Supabase functions below, which reproduce JsonCreator.gs + ui.gs rules.
+ * window.FTRDashboard.mount() is called by pos.js when the Dashboard tab opens.
+ ******************************************************************************/
+(function () {
+  "use strict";
+
+  var ADMIN_EMAIL = "itadmin@openlinksfoundation.org";
+  var state = { base: null };
+  var VIEW = null;                 // last weekly-view payload
+  var DIRTY = {};                  // { periodCode: { fieldId: value } }
+
+  /* ---------- helpers ---------- */
+  function currentEmail() { return (window.__olfUser && window.__olfUser.email ? window.__olfUser.email : "").toLowerCase(); }
+  function $(id) { return document.getElementById(id); }
+  function opt(v, t) { var o = document.createElement("option"); o.value = v; o.textContent = t; return o; }
+  function num(v) { var n = Number(v); return isNaN(n) ? 0 : n; }
+  // Display only: Indian digit grouping (1,353 · 24,188 · 1,00,000), up to 2 decimals.
+  function fmtNum(v) { if (v === "" || v == null) return "—"; var n = Number(v); if (isNaN(n)) return esc(String(v)); return n.toLocaleString("en-IN", { maximumFractionDigits: 2 }); }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]; }); }
+  var toastTimer = null;
+  function toast(msg) { var el = $("poToast"); if (!el) return; el.textContent = msg; el.hidden = false; if (toastTimer) clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.hidden = true; }, 3200); }
+
+  /* ---------- section config ---------- */
+  var SEC = [
+    { k: "A", title: "Check-in", who: "PO", write: true, rows: [
+      { id: "A1", label: "How are you feeling this week?", type: "mood" },
+      { id: "A2", label: "Anything on your mind?", type: "text" } ] },
+    { k: "B", title: "Last week's actions", who: "PO", write: true, rows: [
+      { id: "B1", label: "Action 1 from last week", type: "prog" },
+      { id: "B2", label: "Action 2 from last week", type: "prog" },
+      { id: "B3", label: "Action 3 from last week", type: "prog" },
+      { id: "B4", label: "Action 4 from last week", type: "prog" },
+      { id: "B5", label: "Action 5 from last week", type: "prog" } ] },
+    { k: "C", title: "Vinoba", who: "Auto", src: ["vinoba"] },
+    { k: "D", title: "Staff Connect (Events)", who: "Auto", src: ["staffConnect"] },
+    { k: "E", title: "Nimble (Tickets)", who: "Auto", src: ["nimble"] },
+    { k: "F", title: "Keka & Visit / ER", who: "Auto", src: ["keka", "visit"] },
+    { k: "G", title: "Next week", who: "PO", write: true, rows: [
+      { id: "G1", label: "Blocker or escalation", type: "text" },
+      { id: "G2", label: "Action 1 for next week", type: "text" },
+      { id: "G3", label: "Action 2 for next week", type: "text" },
+      { id: "G4", label: "Action 3 for next week", type: "text" },
+      { id: "G5", label: "Action 4 for next week", type: "text" },
+      { id: "G6", label: "Action 5 for next week", type: "text" } ] },
+    { k: "H", title: "Review record", who: "PM", write: true, rows: [
+      { id: "H1", label: "Review held", type: "yn" },
+      { id: "H2", label: "Manager status", type: "status" },
+      { id: "H3", label: "Manager's remark", type: "text" } ] }
+  ];
+  var MOODS = [["G", '<i class="pr-mood-dot g"></i>Good'], ["Y", '<i class="pr-mood-dot y"></i>Mixed'], ["R", '<i class="pr-mood-dot r"></i>Struggling']];
+  var PM_STATUS = ["On track", "Needs support", "Off track"];
+  var B_STATUS = ["Done", "Partial", "Not"];
+
+  /* ---------- mount ---------- */
+
+  /* ======================================================================
+     SUPABASE DATA LAYER
+     Replaces the Apps Script backend (ui.gs + JsonCreator.gs). It builds
+     exactly the payloads the renderer below already expects:
+       getBaseData()            -> { pos, pms, dms, districts, months }
+       getWeeklyView(u, v, m)   -> { header, unitEmpId, month, weeks, roster }
+       saveWeekly(emp, code, f) -> upserts review_responses
+     Metric names, order and rules mirror JsonCreator.gs buildPoJson().
+     ====================================================================== */
+  function db() { return window.posSupabase; }
+
+  var ROLE_TITLE = { PO: "Project Officer", PM: "Program Manager", DM: "Division Manager", COO: "COO" };
+  var MON_LONG  = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  var MON_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  // Vinoba rows shown in the review (order = row order on the Weekly tab).
+  // Each label is worked out per block row by vinobaRowVals() and then summed over the unit's blocks.
+  // Core life-skill clubs (Nov 2026): Creative Writing, Storytelling, Poetry Recitation, Spoken English
+  // and Spelling Bee. Morning Assembly stays outside the core.
+  var LS_CLUBS = [
+    ["Creative Writing", "creative_writing"], ["Storytelling", "storytelling"],
+    ["Poetry Recitation", "poetry_recitation"], ["Spoken English", "spoken_english"],
+    ["Spelling Bee", "spelling_bee"]
+  ];
+  // Streak columns per club: Nov 2026 report (total + improved) and the older report.
+  // The older report had one streak number per club for the first four clubs only; it counted
+  // IMPROVED streaks, so old uploads show it under "Improved" (the stored data is not changed).
+  var STREAK_COLS = {
+    creative_writing:  { total: "total_streak_creative_writing",  improved: "improved_streak_creative_writing",  old: "streak_creative_writing" },
+    storytelling:      { total: "total_streak_storytelling",      improved: "improved_streak_storytelling",      old: "streak_storytelling" },
+    poetry_recitation: { total: "total_streak_poetry_recitation", improved: "improved_streak_poetry_recitation", old: "streak_poetry_recitation" },
+    spoken_english:    { total: "total_streak_spoken_english",    improved: "improved_streak_spoken_english",    old: "streak_spoken_english" },
+    spelling_bee:      { total: "total_streak_spelling_bee",      improved: "improved_streak_spelling_bee",      old: null }
+  };
+  var VINOBA_COLS = [
+    ["Total Schools", "total_schools"], ["Total Teachers", "total_teachers"],
+    ["Unique Schools Posting", "unique_schools_posting"], ["Unique Teachers Posting", "unique_teachers_posting"],
+    ["Total Posts", "total_posts"]]
+    .concat(LS_CLUBS)
+    .concat([["Total Lifeskills", "total_lifeskills"], ["Morning Assembly", "morning_assembly"],
+    ["Other Activities Total", "total_other_posts"],
+    ["Total Streaks", null], ["Improved Streaks", null]])
+    .concat([].concat.apply([], LS_CLUBS.map(function (c) {
+      return [["Total Streak \u00B7 " + c[0], null], ["Improved Streak \u00B7 " + c[0], null]]; })))
+    .concat([
+    ["Expert Coupons Given", "coupons_given"], ["Expert Coupons Available", "coupons_available"],
+    ["Expert Coupons Outstanding", "coupons_outstanding"], ["Expert Coupons Expired", "coupons_expired"],
+    ["Star Teachers", "star_teachers"], ["Post Per Month Per Teacher", "post_per_month_per_teacher"]
+    // POM Transformed Clusters / Block & District POM Winners are not shown (the winner columns are still
+    // uploaded and stored in vinoba_data; POM transformed clusters is entered by the PO on the Monthly tab).
+  ]);
+
+  // One vinoba_data row -> { label: number | null }  (null = not in that upload).
+  // Works the same for uploads in the older format and the Nov 2026 format, without changing stored data:
+  //  - Total Lifeskills = the 5 core clubs added up (older uploads did not count Spelling Bee in it).
+  //  - Other Activities Total moves by the same amount, so Total Posts = Lifeskills + Other still holds.
+  //  - Total / Improved Streaks = the 5 clubs' streaks added up.
+  function vinobaRowVals(r) {
+    var has = function (k) { return k && r[k] !== null && r[k] !== undefined && r[k] !== ""; };
+    var val = function (k) { return has(k) ? num(r[k]) : null; };
+    var add = function (vals) {
+      return vals.every(function (v) { return v === null; }) ? null : vals.reduce(function (a, v) { return a + (v || 0); }, 0);
+    };
+    var o = {};
+    VINOBA_COLS.forEach(function (c) { if (c[1]) o[c[0]] = val(c[1]); });
+
+    var ls = add(LS_CLUBS.map(function (c) { return val(c[1]); }));
+    var storedLs = val("total_lifeskills");
+    if (ls !== null) {
+      o["Total Lifeskills"] = ls;
+      if (o["Other Activities Total"] !== null && storedLs !== null) o["Other Activities Total"] -= (ls - storedLs);
+      else if (o["Other Activities Total"] === null && o["Total Posts"] !== null) o["Other Activities Total"] = o["Total Posts"] - ls;
+    }
+
+    var tot = [], imp = [];
+    LS_CLUBS.forEach(function (c) {
+      var sc = STREAK_COLS[c[1]];
+      var t = val(sc.total);
+      var i = has(sc.improved) ? val(sc.improved) : val(sc.old);
+      o["Total Streak \u00B7 " + c[0]] = t;
+      o["Improved Streak \u00B7 " + c[0]] = i;
+      tot.push(t); imp.push(i);
+    });
+    o["Total Streaks"] = add(tot);
+    o["Improved Streaks"] = add(imp);
+    return o;
+  }
+  // Staff Connect event report. Only these two columns belong to the block on the row:
+  // summed over the blocks in scope (a PO sees just their own blocks).
+  var SC_BLOCK_COLS = [
+    ["Total Block Events", "total_block_events"],
+    ["Teachers Felicitated at Block Level", "teachers_felicitated_block_level"]
+  ];
+  // Every other column is the DISTRICT's figure, repeated on each block row of that district
+  // (e.g. "2 District Events" on Ahilyanagar's block A = the district held 2). Counted once per
+  // district (highest value among its rows), then added across the districts in scope.
+  var SC_DISTRICT_COLS = [
+    ["Total District Events", "total_district_events"],
+    ["Teachers Felicitated at District Level", "teachers_felicitated_district_level"],
+    ["SU/NS Events", "su_ns_events"],
+    ["Teachers Felicitated in SU/NS Events", "teachers_felicitated_su_ns_events"],
+    ["Other Events", "other_events"],
+    ["Teachers Felicitated in Other Events", "teachers_felicitated_other_events"],
+    ["Cluster Heads Recognised", "cluster_heads_recognised"]          // added to the report Oct 2026
+  ];
+  var KEKA_COLS = [
+    ["Working Days", "total_working_days"], ["Present Days", "present_days"], ["Absent Days", "absent_days"],
+    ["Leaves", "leaves"], ["Regularized", "regularized"], ["Late Arrival", "late_arrival_days"],
+    ["Missing Swipe Days", "missing_swipe_days"]
+  ];
+  var NIMBLE_KEYS  = ["Tickets Raised", "Tickets In Validation", "Tickets Closed"];
+  var VISIT_KEYS   = ["Daily Forms Filed", "Visit Forms Filed", "School Visits", "Block Visits", "Cluster Visits",
+                      "District Visits", "Program Dashboard Updated Yes", "Kathawli Yes", "ER Submitted", "ER Amount"];
+  var DERIVED_KEYS = ["Form Completion %", "PO Form Filling Status", "Keka Punctual"];
+
+  function pad2(n) { return (n < 10 ? "0" : "") + n; }
+  function normBlock(v) { return String(v == null ? "" : v).toUpperCase().replace(/\s+/g, ""); }
+  function normDist(v) { return String(v == null ? "" : v).replace(/\s+/g, " ").trim().toLowerCase(); }
+  function normId(v) { return String(v == null ? "" : v).trim().toUpperCase(); }
+  function zeroOf(cols) { var o = {}; cols.forEach(function (c) { o[c[0]] = 0; }); return o; }
+  function blankOf(keys) { var o = {}; keys.forEach(function (k) { o[k] = ""; }); return o; }
+  function byNameSort(a, b) { return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0); }
+  function prevMonthCode(ym) {
+    var y = Number(ym.substring(0, 4)), m = Number(ym.substring(4, 6)) - 1;
+    if (m < 1) { m = 12; y -= 1; }
+    return "" + y + pad2(m);
+  }
+
+  // PostgREST returns at most 1000 rows per request — page through bigger results.
+  async function fetchAll(build) {
+    var out = [], from = 0, size = 1000;
+    for (;;) {
+      var res = await build().range(from, from + size - 1);
+      if (res.error) throw res.error;
+      out = out.concat(res.data || []);
+      if (!res.data || res.data.length < size) return out;
+      from += size;
+    }
+  }
+
+  /* ---------- org structure (assignments + locations), cached per page load ---------- */
+  var ORG = null;
+  async function loadOrg(force) {
+    if (ORG && !force) return ORG;
+    var r = await Promise.all([
+      fetchAll(function () { return db().from("states").select("id,name"); }),
+      fetchAll(function () { return db().from("districts").select("id,name,state_id,division"); }),
+      fetchAll(function () { return db().from("blocks").select("id,name,district_id"); }),
+      fetchAll(function () { return db().from("assignments").select("*").eq("status", "active"); })
+    ]);
+    var stateById = {}; r[0].forEach(function (s) { stateById[s.id] = s.name; });
+    var distById = {}, distByKey = {};
+    r[1].forEach(function (d) {
+      var rec = { id: d.id, name: d.name, state: stateById[d.state_id] || "", division: d.division || "", blocks: [] };
+      distById[d.id] = rec; distByKey[normDist(d.name)] = rec;
+    });
+    r[2].forEach(function (b) { var d = distById[b.district_id]; if (d) d.blocks.push(b.name); });
+    ORG = { districts: r[1].map(function (d) { return distById[d.id]; }), distByKey: distByKey, people: r[3] };
+    return ORG;
+  }
+  function person(empId) {
+    var id = normId(empId);
+    return ORG.people.filter(function (p) { return normId(p.emp_id) === id; })[0] || null;
+  }
+  function overlaps(a, b) {
+    var s = {}; (a || []).forEach(function (x) { s[normDist(x)] = 1; });
+    return (b || []).some(function (x) { return s[normDist(x)]; });
+  }
+  // Reporting line is decided by district overlap (Org Admin design).
+  function peopleOver(role, districts) {
+    return ORG.people.filter(function (p) { return p.designation === role && overlaps(p.assigned_districts, districts); })
+                     .sort(byNameSort);
+  }
+  function blocksOfDistricts(districts) {
+    var out = [], seen = {};
+    (districts || []).forEach(function (dn) {
+      var d = ORG.distByKey[normDist(dn)]; if (!d) return;
+      d.blocks.forEach(function (b) { var k = normBlock(b); if (!seen[k]) { seen[k] = 1; out.push(b); } });
+    });
+    return out;
+  }
+  function distInfo(districts) {
+    var d = ORG.distByKey[normDist((districts || [])[0])];
+    return { state: d ? d.state : "", division: d ? d.division : "" };
+  }
+
+  /* ---------- dropdowns ---------- */
+  async function sbGetBaseData() {
+    await loadOrg(true);
+    var periods = await fetchAll(function () { return db().from("data_periods").select("year,month"); });
+    var seen = {}, months = [];
+    periods.forEach(function (p) {
+      var code = "" + p.year + pad2(p.month);
+      if (!seen[code]) { seen[code] = 1; months.push({ code: code, label: MON_LONG[p.month - 1] + " " + p.year }); }
+    });
+    months.sort(function (a, b) { return a.code < b.code ? -1 : 1; });
+    // The month after the latest uploaded month opens too (no data yet), so POs can write
+    // its action points ahead; it becomes a normal month once its data is uploaded.
+    if (months.length) {
+      var last = months[months.length - 1].code, ly = Number(last.substring(0, 4)), lm = Number(last.substring(4, 6));
+      var ny = lm === 12 ? ly + 1 : ly, nm = lm === 12 ? 1 : lm + 1;
+      months.push({ code: "" + ny + pad2(nm), label: MON_LONG[nm - 1] + " " + ny + " (no data yet)" });
+    }
+    function list(role) {
+      return ORG.people.filter(function (p) { return p.designation === role; })
+                       .map(function (p) { return { empId: p.emp_id, name: p.name }; }).sort(byNameSort);
+    }
+    return {
+      pos: list("PO"), pms: list("PM"), dms: list("DM"),
+      districts: ORG.districts.map(function (d) { return d.name; }).sort(),
+      months: months
+    };
+  }
+
+  /* ---------- the weekly view ---------- */
+  async function sbGetWeeklyView(unit, value, month) {
+    await loadOrg();
+    var y = Number(month.substring(0, 4)), m = Number(month.substring(4, 6));
+    var self = null, districts, blockNames, team = [];
+
+    if (unit === "PO") {
+      self = person(value);
+      if (!self) throw new Error("No active assignment found for " + value + ".");
+      districts = self.assigned_districts || [];
+      blockNames = self.assigned_blocks || [];
+    } else if (unit === "PM" || unit === "DM") {
+      self = person(value);
+      if (!self) throw new Error("No active assignment found for " + value + ".");
+      districts = self.assigned_districts || [];
+      blockNames = blocksOfDistricts(districts);
+      team = peopleOver("PO", districts);
+    } else {                                   // District
+      districts = [value];
+      blockNames = blocksOfDistricts(districts);
+      team = peopleOver("PO", districts);
+    }
+    var unitEmpId = self ? self.emp_id : "";
+    var header = buildHeader(unit, value, self, districts, blockNames, team);
+
+    var blockKeys = blockNames.map(normBlock), distKeys = districts.map(normDist);
+    var codes = [], prevCodes = [], pm = prevMonthCode(month);
+    for (var w = 0; w <= 5; w++) codes.push(month + pad2(w));
+    for (var w2 = 0; w2 <= 5; w2++) prevCodes.push(pm + pad2(w2));   // 00 = previous monthly review
+
+    var NONE = Promise.resolve([]);
+    var q = await Promise.all([
+      fetchAll(function () { return db().from("data_periods").select("week").eq("year", y).eq("month", m); }),
+      blockKeys.length ? fetchAll(function () { return db().from("vinoba_v").select("*").eq("year", y).eq("month", m).in("block_key", blockKeys); }) : NONE,
+      distKeys.length  ? fetchAll(function () { return db().from("staffconnect_v").select("*").eq("year", y).eq("month", m).in("district_key", distKeys); }) : NONE,
+      unitEmpId ? fetchAll(function () { return db().from("keka_data").select("*").eq("year", y).eq("month", m).eq("employee_id", unitEmpId); }) : NONE,
+      unitEmpId ? fetchAll(function () { return db().from("er_data").select("*").eq("year", y).eq("month", m).eq("employee_id", unitEmpId); }) : NONE,
+      unitEmpId ? fetchAll(function () { return db().from("nimble_data").select("*").eq("year", y).eq("month", m).eq("emp_id", unitEmpId); }) : NONE,
+      unitEmpId ? fetchAll(function () { return db().from("visitandactivity_data").select("*").eq("year", y).eq("month", m).eq("emp_id", unitEmpId); }) : NONE,
+      unitEmpId ? fetchAll(function () { return db().from("review_responses").select("*").eq("emp_id", unitEmpId).in("period_code", codes.concat(prevCodes)); }) : NONE,
+      sbGetWeekDates(y, m),
+      sbGetRemovedWeeks(y, m),
+      sbGetRemovedWeeks(Number(pm.substring(0, 4)), Number(pm.substring(4, 6)))
+    ]);
+    var weekDates = q[8], removed = q[9], prevRemoved = q[10];
+    var weeksWithData = {}; q[0].forEach(function (r) { weeksWithData[r.week] = 1; });
+    var own = sectionsByCode(q[7]);
+    var evMonth = MON_SHORT[m - 1] + "-" + y;   // Staff Connect "Month" column, e.g. "Sep-2026"
+
+    // Week 1 takes its actions from the last week of the previous month that has G filled.
+    // When that month's Week 5 was removed, whatever was already written in Week 5's G is
+    // not lost: it comes forward too, after Week 4's actions (same text listed once).
+    // B has 5 rows; if the two weeks hold more than 5 actions, the extras share row 5.
+    function carryFromPrevMonth(carry) {
+      var base = 0;
+      for (var pw = 5; pw >= 1; pw--) {
+        if (prevRemoved[pw]) continue;
+        var prev = own[pm + pad2(pw)];
+        if (prev && prev.G) { base = pw; break; }
+      }
+      var srcs = [];
+      if (base) srcs.push(own[pm + pad2(base)].G);
+      for (var rw = base + 1; rw <= 5; rw++) {
+        var gone = own[pm + pad2(rw)];
+        if (prevRemoved[rw] && gone && gone.G) srcs.push(gone.G);
+      }
+      if (srcs.length <= 1) { if (srcs.length) applyCarry(carry, srcs[0]); return; }
+      var list = [];
+      srcs.forEach(function (g) {
+        ["G2", "G3", "G4", "G5", "G6"].forEach(function (k) {
+          var t = String(g[k] == null ? "" : g[k]).trim();
+          if (t && list.indexOf(t) < 0) list.push(t);
+        });
+      });
+      if (list.length > 5) list = list.slice(0, 4).concat([list.slice(4).join(" | ")]);
+      ["B1", "B2", "B3", "B4", "B5"].forEach(function (b, i) { carry[b] = list[i] || ""; });
+    }
+
+    var weeks = [];
+    for (var wk = 0; wk <= 5; wk++) {
+      var code = month + pad2(wk);
+      var rp = weeksWithData[wk] ? buildReadPoints(wk, !!unitEmpId, blockKeys, distKeys, evMonth,
+                 q[1], q[2], q[3], q[4], q[5], q[6]) : {};
+      var carry = { B1: "", B2: "", B3: "", B4: "", B5: "" };
+      if (wk === 0) applyCarry(carry, (own[pm + "00"] || {}).G);      // Monthly tab: last month's plan
+      else if (wk >= 2) {
+        // The week before, skipping weeks removed for this month (normally that is just wk - 1).
+        var pk = wk - 1; while (pk > 1 && removed[pk]) pk--;
+        if (!removed[pk]) applyCarry(carry, (own[month + pad2(pk)] || {}).G);
+        else carryFromPrevMonth(carry);
+      }
+      else if (wk === 1) carryFromPrevMonth(carry);
+      weeks.push({ week: wk, code: code, sections: own[code] || {}, readPoints: rp,
+                   prefill: {}, carryForward: carry, verified: null });
+    }
+
+    var roster = null;
+    if (unit === "PM" || unit === "DM") {
+      var members = unit === "PM"
+        ? team.map(function (p) { return { id: p.emp_id, name: p.name }; })
+        : peopleOver("PM", districts).map(function (p) { return { id: p.emp_id, name: p.name }; });
+      var ids = members.map(function (x) { return x.id; });
+      var rr = ids.length ? await fetchAll(function () { return db().from("review_responses").select("emp_id,period_code,section,field,value").in("emp_id", ids).in("period_code", codes); }) : [];
+      var byEmp = {};
+      rr.forEach(function (r) { (byEmp[r.emp_id] = byEmp[r.emp_id] || []).push(r); });
+      var byWeek = {};
+      codes.forEach(function (c) {
+        byWeek[c] = {};
+        members.forEach(function (mb) { byWeek[c][mb.id] = reviewStatusOf((sectionsByCode(byEmp[mb.id] || [])[c])); });
+      });
+      roster = { kind: unit === "PM" ? "PO" : "PM", members: members, byWeek: byWeek };
+    }
+    return { header: header, unitEmpId: unitEmpId, month: month, weeks: weeks, roster: roster, weekDates: weekDates, removedWeeks: removed };
+  }
+
+  /* ---------- removed weeks (itadmin) ----------
+     Table week_removed: one row per year/month/week that does not apply to that month
+     (usually Week 5). A removed week is hidden for everyone and skipped when actions
+     carry forward. Nothing in review_responses is deleted, so Restore brings it back.
+     Never fails the review: if the table is missing, every week shows as before. */
+  async function sbGetRemovedWeeks(y, m) {
+    try {
+      var res = await db().from("week_removed").select("week").eq("year", y).eq("month", m);
+      if (res.error) { console.warn("week_removed:", res.error.message || res.error); return {}; }
+      var out = {};
+      (res.data || []).forEach(function (r) { out[r.week] = true; });
+      return out;
+    } catch (e) { console.warn("week_removed:", e); return {}; }
+  }
+  async function sbSetWeekRemoved(y, m, wk, on) {
+    var res = on
+      ? await db().from("week_removed").upsert({ year: y, month: m, week: wk, removed_by: currentEmail() || "unknown",
+          removed_at: new Date().toISOString() }, { onConflict: "year,month,week" })
+      : await db().from("week_removed").delete().eq("year", y).eq("month", m).eq("week", wk);
+    if (res.error) {
+      if (/week_removed/.test(res.error.message || "") && /exist|schema cache|not find/i.test(res.error.message || ""))
+        throw new Error("The week_removed table isn't set up yet. Run sql/field-review-removed-weeks.sql in Supabase first.");
+      throw res.error;
+    }
+  }
+
+  /* ---------- week dates (set by itadmin, shown to everyone) ----------
+     Table week_dates: one row per year/month/week with from_date and to_date.
+     Never fails the review: if the table is missing or unreadable, no dates are shown. */
+  async function sbGetWeekDates(y, m) {
+    try {
+      var res = await db().from("week_dates").select("week,from_date,to_date").eq("year", y).eq("month", m);
+      if (res.error) { console.warn("week_dates:", res.error.message || res.error); return {}; }
+      var out = {};
+      (res.data || []).forEach(function (r) { if (r.from_date && r.to_date) out[r.week] = { from: r.from_date, to: r.to_date }; });
+      return out;
+    } catch (e) { console.warn("week_dates:", e); return {}; }
+  }
+  async function sbSaveWeekDates(y, m, wk, from, to) {
+    var res = await db().from("week_dates").upsert({
+      year: y, month: m, week: wk, from_date: from, to_date: to,
+      updated_by: currentEmail() || "unknown", updated_at: new Date().toISOString()
+    }, { onConflict: "year,month,week" });
+    if (res.error) throw res.error;
+  }
+  async function sbClearWeekDates(y, m, wk) {
+    var res = await db().from("week_dates").delete().eq("year", y).eq("month", m).eq("week", wk);
+    if (res.error) throw res.error;
+  }
+
+  function buildHeader(unit, value, self, districts, blockNames, team) {
+    var di = distInfo(districts);
+    var pmP = peopleOver("PM", districts)[0] || null, dmP = peopleOver("DM", districts)[0] || null;
+    var cooP = peopleOver("COO", districts)[0] || ORG.people.filter(function (p) { return p.designation === "COO"; })[0] || null;
+    var lc = function (s) { return String(s || "").toLowerCase(); };
+    var blocks = blockNames.map(function (b) { return { key: normBlock(b), name: b }; });
+    // Who fills H (Review record): the next person up the line. If that seat is vacant
+    // (e.g. the PM resigned and is no longer an active assignment), it moves one level up:
+    // PO -> PM -> DM -> COO, PM -> DM -> COO, DM -> COO.
+    var chain = unit === "PO" ? [["PM", pmP], ["DM", dmP], ["COO", cooP]]
+              : unit === "PM" ? [["DM", dmP], ["COO", cooP]]
+              : unit === "DM" ? [["COO", cooP]] : [];
+    var mgr = chain.filter(function (c) { return c[1]; })[0] || null;
+    var managerRole = mgr ? mgr[0] : (chain[0] ? chain[0][0] : "");
+    var managerEmailOf = lc(mgr && mgr[1].email);
+    var managerCovering = !!(mgr && chain[0] && mgr[0] !== chain[0][0]);   // true when standing in for a vacant seat
+    if (unit === "PO") {
+      return {
+        unit: unit,
+        po: { name: self.name, empId: self.emp_id, designation: ROLE_TITLE.PO, email: self.email || "" },
+        state: di.state, division: di.division, district: districts.join(", "),
+        pm: pmP ? { name: pmP.name, id: pmP.emp_id, email: pmP.email || "", designation: ROLE_TITLE.PM } : { name: "" },
+        dm: dmP ? { name: dmP.name, id: dmP.emp_id, email: dmP.email || "", designation: ROLE_TITLE.DM } : { name: "" },
+        coo: cooP ? { name: cooP.name, id: cooP.emp_id, email: cooP.email || "" } : { name: "" },
+        blocks: blocks, poCount: 1,
+        selfEmpId: self.emp_id,
+        selfEmail: lc(self.email),                      // the PO fills A/B/G
+        managerEmail: managerEmailOf,                   // the PM fills H (DM if the PM seat is vacant)
+        managerRole: managerRole, managerCovering: managerCovering
+      };
+    }
+    var selfEmail = (unit === "PM" || unit === "DM") ? lc(self.email) : "";
+    var managerEmail = (unit === "PM" || unit === "DM") ? managerEmailOf : "";
+    return {
+      unit: unit,
+      manager: self ? self.name : "", managerId: self ? self.emp_id : "",
+      selfEmpId: self ? self.emp_id : "", selfEmail: selfEmail, managerEmail: managerEmail,
+      managerRole: managerRole, managerCovering: managerCovering,
+      district: unit === "District" ? value : "",
+      division: di.division, state: di.state,
+      dm: unit === "PM" && dmP ? dmP.name : "",
+      coo: cooP ? cooP.name : "",
+      pos: team.map(function (p) { return { name: p.name, empId: p.emp_id }; }),
+      blocks: blocks, districts: districts,
+      poCount: team.length, pmCount: peopleOver("PM", districts).length
+    };
+  }
+
+  /* One week's readPoints — same groups, keys and rules as JsonCreator buildPoJson(). */
+  function buildReadPoints(wk, hasSelf, blockKeys, distKeys, evMonth, vin, sc, keka, er, nim, va) {
+    var inWeek = function (r) { return r.week === wk; };
+    var bset = {}; blockKeys.forEach(function (k) { bset[k] = 1; });
+
+    // Vinoba: block metrics summed over the unit's blocks
+    var vinoba = zeroOf(VINOBA_COLS), seen = {}, anyRow = false;
+    vin.filter(inWeek).forEach(function (r) {
+      if (!bset[r.block_key]) return;
+      anyRow = true;
+      var rv = vinobaRowVals(r);
+      VINOBA_COLS.forEach(function (c) {
+        var x = rv[c[0]];
+        if (x === null || x === undefined) return;
+        seen[c[0]] = 1;
+        vinoba[c[0]] += x;
+      });
+    });
+    // Columns added to the report later (e.g. Morning Assembly, Total Streaks) are empty in uploads made
+    // with an older format: show them as blank ("—"), not as a misleading 0.
+    if (anyRow) VINOBA_COLS.forEach(function (c) { if (!seen[c[0]]) vinoba[c[0]] = ""; });
+
+    // Staff Connect: block metrics summed; district metrics once per district.
+    // Only events for the month under review (the report can mix months).
+    var scRows = sc.filter(function (r) { return inWeek(r) && (!r.event_month || String(r.event_month).trim() === evMonth); });
+    // Columns added to the report later: uploads made before they existed hold null there
+    // (newer uploads store blanks as 0), so all-null means "not in that upload" -> show "—".
+    var SC_LATE = { "Cluster Heads Recognised": 1 };
+    // Block level: summed over the unit's own blocks.
+    var staff = zeroOf(SC_BLOCK_COLS);
+    scRows.forEach(function (r) {
+      if (!bset[r.block_key]) return;
+      SC_BLOCK_COLS.forEach(function (c) { staff[c[0]] += num(r[c[1]]); });
+    });
+    // District level: once per district (any block row of the district carries it), summed across districts.
+    var distTotals = zeroOf(SC_DISTRICT_COLS), dSeen = {}, dAny = false;
+    distKeys.forEach(function (dk) {
+      var drows = scRows.filter(function (r) { return r.district_key === dk; });
+      if (!drows.length) return;
+      dAny = true;
+      SC_DISTRICT_COLS.forEach(function (c) {
+        var best = 0;
+        drows.forEach(function (r) {
+          var v = r[c[1]];
+          if (v !== null && v !== undefined && v !== "") { dSeen[c[0]] = 1; best = Math.max(best, num(v)); }
+        });
+        distTotals[c[0]] += best;
+      });
+    });
+    if (dAny) Object.keys(SC_LATE).forEach(function (k) { if (!dSeen[k]) distTotals[k] = ""; });
+    for (var k in distTotals) staff[k] = distTotals[k];
+
+    var evBlocks = {};
+    scRows.forEach(function (r) { if (bset[r.block_key] && num(r.total_block_events) > 0) evBlocks[r.block_key] = 1; });
+    var out = { vinoba: vinoba, staffConnect: staff, extra: { "Blocks With Events": Object.keys(evBlocks).length } };
+    if (!hasSelf) {   // District view: individual sources are not summable (old aggregateReadPoints)
+      out.keka = blankOf(KEKA_COLS.map(function (c) { return c[0]; }));
+      out.nimble = blankOf(NIMBLE_KEYS); out.visit = blankOf(VISIT_KEYS); out.derived = blankOf(DERIVED_KEYS);
+      return out;
+    }
+
+    // Keka (by Employee ID)
+    var kRows = keka.filter(inWeek), kk = zeroOf(KEKA_COLS);
+    kRows.forEach(function (r) { KEKA_COLS.forEach(function (c) { kk[c[0]] += num(r[c[1]]); }); });
+
+    // Nimble (alias-matched emp_id). Closed = has a close date; otherwise "in Validate" when the
+    // board column mentions validate (Validate, Resolution#Validate, Notification Validated…); the rest are open.
+    var tickets = nim.filter(inWeek), raised = tickets.length, closed = 0, inVal = 0;
+    tickets.forEach(function (t) {
+      if (t.date_closed != null && String(t.date_closed).trim() !== "") closed++;
+      else if (/validat/i.test(String(t.board_column || ""))) inVal++;
+    });
+
+    // Visit & Activity (alias-matched emp_id), summed across the person's rows
+    var v = { daily: 0, visit: 0, school: 0, block: 0, cluster: 0, district: 0, dash: 0, kath: 0 };
+    va.filter(inWeek).forEach(function (r) {
+      v.daily += num(r.form_filled_activity); v.visit += num(r.form_filled_visit);
+      v.school += num(r.school_visits); v.block += num(r.block_visits); v.cluster += num(r.cluster_visits);
+      v.district += num(r.district_visit); v.dash += num(r.program_dashboard_updated_yes); v.kath += num(r.kathavli_yes);
+    });
+
+    // ER (by Employee ID): Status "Submitted" or "Locked" -> submitted
+    var erRow = er.filter(inWeek)[0] || null;
+    var erStatus = erRow ? String(erRow.status || "").trim() : "";
+    var erSubmitted = /^(submitted|locked)$/i.test(erStatus);
+    out.extra["ER Status"] = erStatus;                       // Monthly "why" text only (not a weekly row)
+    out.extra["Tickets Open"] = raised - closed - inVal;
+
+    out.keka = kk;
+    out.nimble = { "Tickets Raised": raised, "Tickets In Validation": inVal, "Tickets Closed": closed };
+    out.visit = {
+      "Daily Forms Filed": v.daily, "Visit Forms Filed": v.visit, "School Visits": v.school,
+      "Block Visits": v.block, "Cluster Visits": v.cluster, "District Visits": v.district,
+      "Program Dashboard Updated Yes": v.dash, "Kathawli Yes": v.kath,
+      "ER Submitted": erSubmitted ? "Yes" : (erStatus ? "No" : ""),
+      "ER Amount": erRow ? num(erRow.amount) : 0
+    };
+    var wd = num(kk["Working Days"]);
+    out.derived = {
+      "Form Completion %": wd > 0 ? Math.round((v.daily / wd) * 1000) / 10 : 0,
+      "PO Form Filling Status": v.daily,
+      "Keka Punctual": kRows.length ? ((num(kk["Late Arrival"]) + num(kk["Missing Swipe Days"])) === 0 ? "Y" : "N") : ""
+    };
+    return out;
+  }
+
+  /* review_responses rows -> { periodCode: { A: {A1:..., _by, _at}, B: {...} } } */
+  function sectionsByCode(rows) {
+    var out = {};
+    (rows || []).forEach(function (r) {
+      var c = out[r.period_code] = out[r.period_code] || {};
+      var s = c[r.section] = c[r.section] || {};
+      s[r.field] = r.value;
+      if (!s._at || r.updated_at > s._at) { s._at = r.updated_at; s._by = r.updated_by; }
+    });
+    return out;
+  }
+  function applyCarry(carry, g) {
+    if (!g) return;
+    carry.B1 = g.G2 || ""; carry.B2 = g.G3 || ""; carry.B3 = g.G4 || ""; carry.B4 = g.G5 || ""; carry.B5 = g.G6 || "";
+  }
+  function reviewStatusOf(s) {
+    if (!s) return "none";
+    var n = [secFilled({ sections: s }, "A"), secFilled({ sections: s }, "B"),
+             secFilled({ sections: s }, "G"), secFilled({ sections: s }, "H")].filter(Boolean).length;
+    return n === 4 ? "done" : (n > 0 ? "partial" : "none");
+  }
+
+  /* ---------- save (field-level upsert; PO and PM saves never clobber each other) ---------- */
+  async function sbSaveWeekly(empId, code, fields, by) {
+    if (!empId) throw new Error("This view has no single owner \u2014 open a PO, PM or DM review to edit.");
+    var now = new Date().toISOString(), rows = [];
+    Object.keys(fields).forEach(function (key) {
+      if (!/^[A-H][0-9]/.test(key) && !/^M_[A-Z0-9_]+$/.test(key)) return;   // A1..H3 review answers, M_* monthly goal entries
+      rows.push({ emp_id: empId, period_code: code, section: key.charAt(0), field: key,
+                  value: fields[key], updated_by: by, updated_at: now });
+    });
+    if (!rows.length) return;
+    var res = await db().from("review_responses").upsert(rows, { onConflict: "emp_id,period_code,field" });
+    if (res.error) throw res.error;
+  }
+
+
+  // Called by pos.js after an assignment is added, edited or marked resigned, so the
+  // Dashboard stops using the org structure it cached when it first opened.
+  var ORG_STALE = false;
+  function orgChanged() { ORG = null; ORG_STALE = true; MSUM.cache = {}; MSUM.data = null; QV = { quarterly: null, yearly: null, wholeyear: null }; }
+
+  function mount() {
+    var root = $("ftrRoot"); if (!root) return;
+    if (root.dataset.mounted === "1") {
+      if (ORG_STALE) { ORG_STALE = false; VIEW = null; DIRTY = {}; loadBaseData(); }
+      return;
+    }
+    ORG_STALE = false;
+    root.dataset.mounted = "1";
+    if (!window.posSupabase) { prBody('<div class="pr-empty pr-error">Supabase client not loaded — check that pos-supabase.js is included.</div>'); return; }
+    wireNav(); wireFilters(); wireMonthly(); sumWire(); msumWire(); qyWire();
+    if ($("prModalSave")) $("prModalSave").addEventListener("click", saveTextModal);
+    wireWeekDates();
+    if ($("prModalClose")) $("prModalClose").addEventListener("click", closeTextModal);
+    // Tapping outside the note box, or pressing Escape, closes it - unless there is text typed that would be lost.
+    if ($("prModal")) $("prModal").addEventListener("click", function (e) { if (e.target === $("prModal")) leaveTextModal(); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && $("prModal") && !$("prModal").hidden) leaveTextModal(); });
+    if ($("prModalText")) $("prModalText").addEventListener("input", updateModalMsg);
+    if ($("prListClose")) $("prListClose").addEventListener("click", closeAcadList);
+    if ($("prListModal")) $("prListModal").addEventListener("click", function (e) { if (e.target === $("prListModal")) closeAcadList(); });
+    loadBaseData();
+  }
+  function prBody(html) { var b = $("prBody"); if (b) b.innerHTML = html; }
+
+  /* ---------- nav ---------- */
+  function wireNav() {
+    var btns = document.querySelectorAll("#prNav .pr-navbtn");
+    btns.forEach(function (b) {
+      b.addEventListener("click", function () {
+        btns.forEach(function (x) { x.classList.remove("is-active"); });
+        b.classList.add("is-active");
+        var v = b.dataset.view;
+        ["weekly", "summary", "monthly", "mosum", "quarterly", "yearly", "wholeyear"].forEach(function (name) {
+          var el = $("pr" + name.charAt(0).toUpperCase() + name.slice(1)); if (el) el.hidden = (name !== v);
+        });
+        if (v === "monthly") moSyncFromWeekly();
+        if (QY_TABS[v]) qySyncFrom(v);
+        if (v === "mosum") msumOnOpen();
+      });
+    });
+  }
+
+  /* ---------- filters / dropdowns ---------- */
+  function wireFilters() {
+    $("prUnit").addEventListener("change", function () { populateValue($("prUnit").value); refreshLoad(); });
+    $("prValue").addEventListener("change", refreshLoad);
+    $("prMonth").addEventListener("change", refreshLoad);
+    $("prLoad").addEventListener("click", loadWeeklyView);
+  }
+  function refreshLoad() { $("prLoad").disabled = !($("prUnit").value && $("prValue").value && $("prMonth").value); }
+
+  function setLoadingDropdowns() {
+    var v = $("prValue"), m = $("prMonth");
+    v.innerHTML = '<option value="">Loading…</option>'; v.disabled = true;
+    m.innerHTML = '<option value="">Loading…</option>'; m.disabled = true;
+  }
+  function loadBaseData() {
+    setLoadingDropdowns();
+    prBody('<div class="pr-empty pr-loading">Loading base data\u2026</div>');
+    sbGetBaseData().then(function (data) {
+      state.base = data;
+      var mo = $("prMonth"); mo.innerHTML = "";
+      if (!data.months.length) { mo.innerHTML = '<option value="">No months</option>'; }
+      else { mo.appendChild(opt("", "Select…")); data.months.forEach(function (m) { mo.appendChild(opt(m.code, m.label)); }); }
+      mo.disabled = false;
+      populateValue($("prUnit").value);
+      moFillFromBase();
+      sumFillFromBase();
+      msumFillFromBase();
+      qyFillFromBase();
+      prBody('<div class="pr-empty">Choose a review unit, a value and a month, then open the review.</div>');
+    }).catch(function (e) {
+      prBody('<div class="pr-empty pr-error">Couldn\'t load base data: ' + esc(e.message || String(e)) + '</div>');
+      resetDropdowns();
+    });
+  }
+  function resetDropdowns() {
+    var v = $("prValue"), m = $("prMonth");
+    if (!v || !m) return;                                    // Field Review is not the page on screen
+    v.innerHTML = '<option value="">—</option>'; v.disabled = true;
+    m.innerHTML = '<option value="">—</option>'; m.disabled = true;
+  }
+  var UNIT_LABEL = { PO:"PO", PM:"PM", DM:"DM", District:"District" };
+  function fillUnitSelect(sel, unit) {
+    sel.innerHTML = ""; sel.appendChild(opt("", "Select…"));
+    var b = state.base;
+    if (unit === "District") b.districts.forEach(function (d) { sel.appendChild(opt(d, d)); });
+    else if (unit === "PM") b.pms.forEach(function (p) { sel.appendChild(opt(p.empId, p.name)); });
+    else if (unit === "DM") b.dms.forEach(function (p) { sel.appendChild(opt(p.empId, p.name)); });
+    else b.pos.forEach(function (p) { sel.appendChild(opt(p.empId, p.name)); });
+    sel.disabled = false;
+  }
+  function populateValue(unit) {
+    var sel = $("prValue"); $("prValueLabel").textContent = UNIT_LABEL[unit] || "PO";
+    if (!state.base) { sel.innerHTML = ""; sel.disabled = true; sel.appendChild(opt("", "—")); return; }
+    fillUnitSelect(sel, unit);
+  }
+
+  /* ---------- load + render the weekly view ---------- */
+  function loadWeeklyView() {
+    var unit = $("prUnit").value, value = $("prValue").value, month = $("prMonth").value;
+    if (!unit || !value || !month) return;
+    DIRTY = {};
+    SELWK = { 1: true, 2: true, 3: true, 4: true, 5: true };
+    prBody('<div class="pr-empty pr-loading">Loading review…</div>');
+    sbGetWeeklyView(unit, value, month).then(function (data) {
+      VIEW = data; renderWeeklyView();
+    }).catch(function (e) { prBody('<div class="pr-empty pr-error">Couldn\'t load: ' + esc(e.message || String(e)) + "</div>"); });
+  }
+
+  function hasData(wk) {
+    if (!wk || !wk.readPoints) return false;
+    return ["vinoba", "keka", "nimble", "staffConnect", "visit"].some(function (g) { return Object.keys(wk.readPoints[g] || {}).length; });
+  }
+  function presentWeeks() { return (VIEW.weeks || []).filter(function (w) { return w.week >= 1 && w.week <= 5 && hasData(w); }); }
+  function weekByNum(n) {
+    var list = VIEW.weeks || [];
+    for (var i = 0; i < list.length; i++) if (list[i].week === n) return list[i];
+    return { week: n, code: VIEW.month + (n < 10 ? "0" + n : "" + n), sections: {}, readPoints: {} };
+  }
+  function isRemovedWeek(n) { return !!(VIEW && VIEW.removedWeeks && VIEW.removedWeeks[n]); }
+  function liveWeekNums() { return [1, 2, 3, 4, 5].filter(function (n) { return !isRemovedWeek(n); }); }
+  function calWeeks() { return liveWeekNums().map(weekByNum); }   // Week 1-5, with or without data, minus weeks removed for this month
+  function mtdWeek() { var w0 = (VIEW.weeks || []).filter(function (w) { return w.week === 0; })[0]; return hasData(w0) ? w0 : null; }
+  function repWeek() { var pw = presentWeeks(); return pw.length ? pw[0] : (mtdWeek() || (VIEW.weeks || [])[1] || { readPoints: {} }); }
+
+  /* ---------- OLF calendar (ported from v26 prototype) ----------
+     Weeks run Monday->Sunday. The weekly review is the last working day of the
+     week: the Saturday, or the Friday when it's the 1st/3rd Saturday (off). A
+     week locks the Monday after its review. Admin can still edit locked weeks. */
+  var SAT_OFF = [1, 3];   // which Saturdays of a month are off (admin-configurable later)
+  var CAL = {};           // weekNo -> { label, reviewLabel, locked, moved, adminUnlock }
+  function calAdd(d, n) { var x = new Date(d); x.setDate(x.getDate() + n); return x; }
+  function calPad(n) { return (n < 10 ? "0" : "") + n; }
+  function calIso(d) { return d.getFullYear() + "-" + calPad(d.getMonth() + 1) + "-" + calPad(d.getDate()); }
+  function calNthSat(d) { return Math.floor((d.getDate() - 1) / 7) + 1; }
+  function calSatOff(d) { return SAT_OFF.indexOf(calNthSat(d)) >= 0; }
+  function calNonWorking(d) { if (d.getDay() === 0) return true; if (d.getDay() === 6 && calSatOff(d)) return true; return false; }
+  function calPrevWorking(d) { var x = new Date(d); while (calNonWorking(x)) x = calAdd(x, -1); return x; }
+  function calNextMonday(d) { var x = calAdd(d, 1); while (x.getDay() !== 1) x = calAdd(x, 1); return x; }
+  function calReviewDay(monday) {
+    var sat = calAdd(monday, 5);
+    var scheduled = calSatOff(sat) ? calAdd(sat, -1) : sat;   // Friday when the Saturday is off
+    var actual = calPrevWorking(scheduled);
+    return { actual: actual, moved: calIso(actual) !== calIso(scheduled) };
+  }
+  var CAL_MO = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  var CAL_WD = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  function calDM(d) { return d.getDate() + " " + CAL_MO[d.getMonth()]; }
+  function calWD(d) { return CAL_WD[d.getDay()] + " " + calDM(d); }
+  function computeCalendar() {
+    CAL = {};
+    var month = VIEW && VIEW.month;
+    if (!month || month.length < 6) return;
+    var y = Number(month.substring(0, 4)), m = Number(month.substring(4, 6)) - 1;
+    var isAdmin = (currentEmail() === ADMIN_EMAIL), today = new Date();
+    var first = new Date(y, m, 1);
+    var mon = calAdd(calAdd(first, -(((first.getDay() + 6) % 7))), -14);   // 2 weeks before the 1st
+    var no = 0;
+    for (var k = 0; k < 12; k++, mon = calAdd(mon, 7)) {
+      var r = calReviewDay(mon);
+      if (r.actual.getFullYear() === y && r.actual.getMonth() === m) {
+        no++;
+        var end = calAdd(mon, 6), lockDate = calNextMonday(r.actual), past = today >= lockDate;
+        CAL[no] = { from: new Date(mon), to: new Date(end), label: calDM(mon) + " \u2013 " + calDM(end), reviewLabel: calWD(r.actual),
+                    moved: r.moved, locked: false, adminUnlock: false };
+      }
+    }
+  }
+  /* Editing is decided by WHO you are, never by which week it is.
+     Owners (PO: A/B/G, PM: H) can always edit any week; everyone else views. */
+  function weekLocked() { return false; }
+
+  function prIsAdmin() { return currentEmail() === ADMIN_EMAIL; }
+  function canEditSelf(v) { v = v || VIEW; var h = (v && v.header) || {}; if (!h.selfEmpId) return false; var e = h.selfEmail || ""; return prIsAdmin() || (!!currentEmail() && currentEmail() === e); }
+  function canEditManager(v) { v = v || VIEW; var h = (v && v.header) || {}; if (!h.selfEmpId) return false; var e = h.managerEmail || ""; return prIsAdmin() || (!!currentEmail() && currentEmail() === e); }
+  function renderWeeklyView() {
+    computeCalendar();
+    Object.keys(CELL_VALS).forEach(function (k) { if (!/00\|/.test(k)) delete CELL_VALS[k]; });   // keep Monthly's
+    var h = VIEW.header || {};
+    var html = renderHeader(h) + renderBlocks(h) + phoneWeekBarHtml() + renderCards() + renderTable();
+    var canEdit = canEditSelf() || canEditManager();
+    if (canEdit) html += '<div class="pr-savebar"><span class="pr-savehint">You can edit the sections your role owns.</span>'
+      + '<button class="pr-btn pr-btn-primary" id="prSave">Save review</button></div>';
+    prBody(html);
+    bindTable();
+    bindWeekSel();
+    if (canEdit && $("prSave")) $("prSave").addEventListener("click", saveAll);
+  }
+
+  // Display only: up to two initials for the avatar in the header card.
+  function initials(s) {
+    var p = String(s || "").replace(/[^A-Za-zऀ-ॿ\s]+/g, " ").trim().split(/\s+/).filter(Boolean);
+    if (!p.length) return "?";
+    return (p[0].charAt(0) + (p.length > 1 ? p[p.length - 1].charAt(0) : "")).toUpperCase();
+  }
+  function headCard(name, inner, role) {
+    return '<div class="pr-panel pr-po"><span class="pr-avatar" aria-hidden="true">' + esc(initials(name)) + '</span>'
+      + '<div class="pr-po-main">' + inner + '</div>'
+      + '<span class="pr-role pr-role-' + esc(String(role || "PO").toLowerCase()) + '">' + esc(role || "PO") + '</span></div>';
+  }
+  function renderHeader(h) {
+    if (h.po) {
+      var line = [];
+      if (h.district) line.push("<b>" + esc(h.district) + "</b>");
+      if (h.division) line.push(esc(h.division) + " division");
+      if (h.state) line.push(esc(h.state));
+      if (h.pm && h.pm.name) line.push("PM " + esc(h.pm.name) + (h.pm.designation ? " · " + esc(h.pm.designation) : ""));
+      else line.push("PM vacant" + (h.managerCovering && h.managerRole ? " · " + esc(h.managerRole) + " fills the review record" : ""));
+      if (h.dm && h.dm.name) line.push("DM " + esc(h.dm.name));
+      if (h.coo && h.coo.name) line.push("COO " + esc(h.coo.name));
+      return headCard(h.po.name, '<div class="pr-po-name">' + esc(h.po.name)
+        + '<small>' + esc(h.po.empId) + (h.po.designation ? " · " + esc(h.po.designation) : "") + '</small></div>'
+        + '<div class="pr-po-line">' + line.join('<span class="sep">·</span>') + '</div>', "PO");
+    }
+    // aggregate (PM / DM / District)
+    var line = [], title, sub;
+    if (h.unit === "PM") {
+      title = h.manager || "PM"; sub = "Program Manager · manages " + (h.poCount || 0) + " POs";
+      if (h.division) line.push(esc(h.division) + " division");
+      if (h.dm) line.push("DM " + esc(h.dm));
+      if (h.coo) line.push("COO " + esc(h.coo));
+    } else if (h.unit === "DM") {
+      title = h.manager || "DM"; sub = "Division Manager · manages " + (h.pmCount || 0) + " PMs · " + (h.poCount || 0) + " POs";
+      if (h.division) line.push(esc(h.division) + " division");
+      if (h.coo) line.push("COO " + esc(h.coo));
+    } else {
+      title = h.district || "District"; sub = (h.poCount || 0) + " POs" + (h.division ? " · " + esc(h.division) + " division" : "");
+    }
+    return headCard(title, '<div class="pr-po-name">' + esc(title) + '<small>' + esc(sub) + '</small></div>'
+      + '<div class="pr-po-line">' + (line.length ? line.join('<span class="sep">·</span>') + '<span class="sep">·</span>' : "")
+      + '<span class="pr-mut">view only</span></div>', h.unit || "District");
+  }
+
+  function renderBlocks(h, v) {
+    v = v || VIEW;
+    if (v.roster && v.roster.members) {
+      var kind = v.roster.kind === "PM" ? "PMs" : "POs";
+      var mc = v.roster.members.map(function (m) {
+        return '<span class="pr-chip">' + esc(m.name) + (m.total ? ' <code>' + m.total + ' PO' + (m.total > 1 ? "s" : "") + '</code>' : "") + '</span>';
+      }).join("");
+      return '<div class="pr-panel pr-blocks"><div class="pr-blocks-h">Team — ' + kind + '<b>' + v.roster.members.length + '</b></div><div class="pr-chips">' + mc + '</div></div>';
+    }
+    var blocks = h.blocks || []; if (!blocks.length) return "";
+    var chips = blocks.map(function (b) {
+      var code = "", name = b.name || "";
+      var m = /^([\d\s-]+)\s*[-]\s*(.+)$/.exec(name);
+      if (m) { code = m[1].replace(/\s/g, ""); name = m[2]; }
+      return '<span class="pr-chip">' + (code ? '<code>' + esc(code) + '</code>' : "") + esc(name) + '</span>';
+    }).join("");
+    return '<div class="pr-panel pr-blocks"><div class="pr-blocks-h">Blocks reviewed<b>' + blocks.length + '</b></div>'
+      + '<div class="pr-chips">' + chips + '</div></div>';
+  }
+
+  function rosterWeekCount(code) {
+    var r = VIEW.roster, bw = (r.byWeek || {})[code] || {}, done = 0, total = 0;
+    if (r.kind === "PM") { r.members.forEach(function (m) { var x = bw[m.id] || { done:0, total:0 }; done += x.done; total += x.total; }); }
+    else { r.members.forEach(function (m) { total++; if (bw[m.id]) done++; }); }
+    return { done: done, total: total };
+  }
+  function hasContent(sec) {
+    if (!sec) return false;
+    return Object.keys(sec).some(function (k) {
+      if (k === "_by" || k === "_at") return false;
+      var v = sec[k];
+      if (v == null || v === "") return false;
+      if (typeof v === "object") return Object.keys(v).some(function (kk) { return v[kk] !== "" && v[kk] != null; });
+      return true;
+    });
+  }
+  function secFilled(w, k) {
+    var s2 = (w.sections || {})[k]; if (!s2) return false;
+    if (k === "A") return !!s2.A1;
+    if (k === "B") return ["B1", "B2", "B3"].some(function (id) { return s2[id] && s2[id].status; });
+    if (k === "G") return ["G1", "G2", "G3", "G4"].some(function (id) { return s2[id]; });
+    if (k === "H") return !!s2.H1;
+    return hasContent(s2);
+  }
+  function isWeekComplete(w) { return secFilled(w, "A") && secFilled(w, "B") && secFilled(w, "G") && secFilled(w, "H"); }
+
+  // Week columns shown in the table (all by default; at least one stays).
+  var SELWK = { 1: true, 2: true, 3: true, 4: true, 5: true };
+  function applyWeekSel() {
+    var vis = liveWeekNums().filter(function (n) { return SELWK[n]; });
+    document.querySelectorAll("#prBody [data-wk]").forEach(function (el) {
+      var n = Number(el.dataset.wk), on = !!SELWK[n];
+      if (el.classList.contains("pr-wkcard")) {
+        el.classList.toggle("is-sel", on); el.classList.toggle("is-off", !on);
+        var t = el.querySelector(".pr-wk-vis"); if (t) t.textContent = on ? "Shown" : "Hidden";
+        return;
+      }
+      el.classList.toggle("pr-wkhide", !on);
+      el.classList.toggle("pr-wkalt", on && vis.indexOf(n) % 2 === 1);   // alternate tint between neighbouring weeks
+    });
+  }
+  /* ---------- week dates: display + itadmin editor ---------- */
+  function fmtDMY(iso) {               // "2026-10-01" -> "01/10/2026"
+    var p = String(iso || "").substring(0, 10).split("-");
+    return p.length === 3 ? p[2] + "/" + p[1] + "/" + p[0] : "";
+  }
+  function weekDateText(n) {
+    var d = VIEW && VIEW.weekDates && VIEW.weekDates[n];
+    return d ? fmtDMY(d.from) + " – " + fmtDMY(d.to) : "";
+  }
+  // Refresh the date text on the card and the column header without re-rendering the table
+  // (re-rendering would drop unsaved edits in the review cells).
+  function paintWeekDate(n) {
+    var t = weekDateText(n);
+    document.querySelectorAll('#prBody [data-wkdate="' + n + '"]').forEach(function (el) { el.textContent = t; });
+    var b = document.querySelector('#prBody [data-wkdatebtn="' + n + '"]');
+    if (b) b.textContent = t ? "Edit dates" : "Set dates";
+    if (typeof paintPhoneWeekBar === "function") paintPhoneWeekBar();
+  }
+  var WD_WEEK = 0;
+  function wdMsg(s, bad) { var el = $("prWdMsg"); if (el) { el.textContent = s || ""; el.classList.toggle("is-over", !!bad); } }
+  function openWeekDates(n) {
+    if (!prIsAdmin() || !VIEW || !VIEW.month || !$("prWdModal")) return;
+    WD_WEEK = n;
+    var d = (VIEW.weekDates || {})[n] || {};
+    $("prWdTitle").textContent = "Week " + n + " dates · " + monthLabel(VIEW.month);
+    $("prWdFrom").value = d.from ? String(d.from).substring(0, 10) : "";
+    $("prWdTo").value = d.to ? String(d.to).substring(0, 10) : "";
+    $("prWdClear").hidden = !d.from;
+    wdMsg("Everyone sees these dates on the week card and the Week " + n + " column.");
+    $("prWdModal").hidden = false;
+    $("prWdFrom").focus();
+  }
+  function closeWeekDates() { if ($("prWdModal")) $("prWdModal").hidden = true; WD_WEEK = 0; }
+  function wdBusy(on) { ["prWdSave", "prWdClear", "prWdClose"].forEach(function (id) { if ($(id)) $(id).disabled = on; }); }
+  function saveWeekDates() {
+    if (!prIsAdmin() || !WD_WEEK || !VIEW) return;
+    var from = $("prWdFrom").value, to = $("prWdTo").value;
+    if (!from || !to) { wdMsg("Pick both a From and a To date.", true); return; }
+    if (from > to) { wdMsg("From date must be on or before the To date.", true); return; }
+    var y = Number(VIEW.month.substring(0, 4)), m = Number(VIEW.month.substring(4, 6)), n = WD_WEEK, month = VIEW.month;
+    wdBusy(true); wdMsg("Saving…");
+    sbSaveWeekDates(y, m, n, from, to).then(function () {
+      if (VIEW && VIEW.month === month) { VIEW.weekDates = VIEW.weekDates || {}; VIEW.weekDates[n] = { from: from, to: to }; paintWeekDate(n); }
+      closeWeekDates(); toast("Week " + n + " dates saved.");
+    }).catch(function (e) {
+      wdMsg("Couldn't save: " + (e.message || String(e)), true);
+    }).then(function () { wdBusy(false); });
+  }
+  function clearWeekDates() {
+    if (!prIsAdmin() || !WD_WEEK || !VIEW) return;
+    var y = Number(VIEW.month.substring(0, 4)), m = Number(VIEW.month.substring(4, 6)), n = WD_WEEK, month = VIEW.month;
+    wdBusy(true); wdMsg("Removing…");
+    sbClearWeekDates(y, m, n).then(function () {
+      if (VIEW && VIEW.month === month && VIEW.weekDates) { delete VIEW.weekDates[n]; paintWeekDate(n); }
+      closeWeekDates(); toast("Week " + n + " dates removed.");
+    }).catch(function (e) {
+      wdMsg("Couldn't remove: " + (e.message || String(e)), true);
+    }).then(function () { wdBusy(false); });
+  }
+  function wireWeekDates() {
+    if (!$("prWdModal")) return;
+    $("prWdSave").addEventListener("click", saveWeekDates);
+    $("prWdClear").addEventListener("click", clearWeekDates);
+    $("prWdClose").addEventListener("click", closeWeekDates);
+    $("prWdModal").addEventListener("click", function (e) { if (e.target === $("prWdModal")) closeWeekDates(); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("prWdModal").hidden) closeWeekDates(); });
+    ["prWdFrom", "prWdTo"].forEach(function (id) {
+      $(id).addEventListener("change", function () {
+        // Picking a From date first fills a sensible To (a week later) so admin needs fewer clicks.
+        if (id === "prWdFrom" && $("prWdFrom").value && !$("prWdTo").value) {
+          var d = new Date($("prWdFrom").value + "T00:00:00"); d.setDate(d.getDate() + 6);
+          $("prWdTo").value = d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+        }
+        wdMsg("");
+      });
+    });
+  }
+
+  function bindWeekSel() {
+    document.querySelectorAll("#prBody .pr-wkcard[data-wk]").forEach(function (c) {
+      c.addEventListener("click", function (e) {
+        var n = Number(c.dataset.wk);
+        if (e.target.closest && e.target.closest("[data-wkdatebtn]")) { e.stopPropagation(); openWeekDates(n); return; }
+        if (e.target.closest && e.target.closest("[data-wkdelbtn]")) { e.stopPropagation(); setWeekRemoved(n, true); return; }
+        if (SELWK[n] && liveWeekNums().filter(function (k) { return SELWK[k]; }).length === 1) { toast("At least one week stays visible."); return; }
+        SELWK[n] = !SELWK[n]; applyWeekSel();
+      });
+    });
+    document.querySelectorAll("#prBody [data-wkrestore]").forEach(function (b) {
+      b.addEventListener("click", function () { setWeekRemoved(Number(b.dataset.wkrestore), false); });
+    });
+    var all = $("prWkAll");
+    if (all) all.addEventListener("click", function () { SELWK = { 1: true, 2: true, 3: true, 4: true, 5: true }; applyWeekSel(); });
+    bindPhoneWeekBar();
+    applyPhoneWeeks();
+  }
+
+  /* ---------- phone: one week at a time ----------
+     A phone has no room for five week columns side by side, and sliding sideways
+     to find one is awkward. So on a phone a week bar picks ONE week (today's week
+     to begin with) and the table shows just that week - the same single-column
+     view the "show or hide a week" cards give on a laptop. */
+  var MQ_PHONE = window.matchMedia ? window.matchMedia("(max-width: 640px)") : null;
+  var PHONE_WK = 0, PHONE_FORCED = false;
+  function onPhone() { return !!(MQ_PHONE && MQ_PHONE.matches); }
+  function weekState(w) {
+    var n = ["A", "B", "G", "H"].filter(function (k) { return secFilled(w, k); }).length;
+    return n === 4 ? "complete" : n > 0 ? "partial" : "";
+  }
+  function defaultPhoneWeek() {
+    var live = liveWeekNums(), today = new Date();
+    for (var i = 0; i < live.length; i++) {
+      var c = CAL[live[i]];
+      if (c && c.from && c.to && today >= c.from && today < calAdd(c.to, 1)) return live[i];   // this week
+    }
+    var started = live.filter(function (n) { return weekState(weekByNum(n)) !== ""; });
+    return started.length ? started[started.length - 1] : (live[0] || 1);                          // else the latest one with entries
+  }
+  function phoneWeekBarHtml() {
+    var weeks = calWeeks();
+    if (!weeks.length) return "";
+    var btns = weeks.map(function (w) {
+      return '<button type="button" role="tab" class="pr-wkpick ' + weekState(w) + '" data-pw="' + w.week + '" aria-label="Week ' + w.week + '">'
+        + '<span class="pr-wkpick-w">Week</span><b>' + w.week + '</b><i></i></button>';
+    }).join("");
+    return '<div class="pr-wkbar" id="prWkBar"><div class="pr-wkseg" role="tablist" aria-label="Week">' + btns + '</div>'
+      + '<div class="pr-wkinfo" id="prWkInfo"></div></div>';
+  }
+  function paintPhoneWeekBar() {
+    var bar = $("prWkBar");
+    if (!bar) return;
+    var n = PHONE_WK, w = weekByNum(n);
+    if (!w) return;
+    Array.prototype.forEach.call(bar.querySelectorAll(".pr-wkpick"), function (b) {
+      var on = Number(b.dataset.pw) === n;
+      b.classList.toggle("is-on", on);
+      b.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    var dt = weekDateText(n) || (CAL[n] && CAL[n].label) || "";
+    var st = weekState(w), remark = st === "complete" ? "Completed" : st === "partial" ? "Partially completed" : "Not started yet";
+    var flags = ["A", "B", "G", "H"].map(function (k) {
+      return '<span class="pr-bar ' + (secFilled(w, k) ? "on" : "off") + '" title="' + k + '"></span>';
+    }).join("");
+    $("prWkInfo").innerHTML = '<div class="pr-wkinfo-top"><b>Week ' + n + '</b><span>' + esc(dt) + '</span></div>'
+      + '<div class="pr-wkinfo-foot"><span class="pr-wkstate ' + st + '">' + remark + '</span><span class="pr-bars">' + flags + '</span>'
+      + (prIsAdmin() ? '<button type="button" class="pr-wkdate-btn" data-pwdates="' + n + '">' + (weekDateText(n) ? "Edit dates" : "Set dates") + '</button>' : "")
+      + '</div>';
+  }
+  function applyPhoneWeeks() {
+    if (onPhone()) {
+      if (liveWeekNums().indexOf(PHONE_WK) < 0) PHONE_WK = defaultPhoneWeek();
+      SELWK = { 1: false, 2: false, 3: false, 4: false, 5: false };
+      SELWK[PHONE_WK] = true;
+      PHONE_FORCED = true;
+    } else if (PHONE_FORCED) {
+      SELWK = { 1: true, 2: true, 3: true, 4: true, 5: true };
+      PHONE_FORCED = false;
+    }
+    applyWeekSel();
+    paintPhoneWeekBar();
+  }
+  function bindPhoneWeekBar() {
+    var bar = $("prWkBar");
+    if (!bar) return;
+    bar.addEventListener("click", function (e) {
+      var pick = e.target.closest && e.target.closest(".pr-wkpick");
+      if (pick) { PHONE_WK = Number(pick.dataset.pw); applyPhoneWeeks(); return; }
+      var d = e.target.closest && e.target.closest("[data-pwdates]");
+      if (d) openWeekDates(Number(d.dataset.pwdates));
+    });
+  }
+  if (MQ_PHONE && MQ_PHONE.addEventListener) MQ_PHONE.addEventListener("change", function () { if (VIEW && $("prWkBar")) applyPhoneWeeks(); });
+
+  /* Remove / restore a week for the whole month (itadmin only). It applies to every PO, PM
+     and DM, because weeks are the month's calendar slots, not one person's. Saved entries
+     are kept; the view reloads so the column, the cards and the carry-forward update. */
+  var WK_REMOVABLE = [5];   // only Week 5 can be missing from a month
+  async function setWeekRemoved(n, on) {
+    if (!prIsAdmin() || !VIEW || !VIEW.month) return;
+    var month = VIEW.month, y = Number(month.substring(0, 4)), m = Number(month.substring(4, 6));
+    var unsaved = Object.keys(DIRTY).some(function (c) { return Object.keys(DIRTY[c]).length; });
+    var w = weekByNum(n), filled = ["A", "B", "G", "H"].some(function (k) { return secFilled(w, k); });
+    var lines = on
+      ? ["Week " + n + " disappears for everyone in " + monthLabel(month) + " (all POs, PMs and DMs).",
+         "Next month's Week 1 shows Week " + (n - 1) + "'s “Next week” actions, plus any already written in Week " + n + "."]
+          .concat(filled ? ["Everything saved in Week " + n + " is kept in the database, just hidden. Restore brings it back."] : [])
+      : ["Week " + n + " comes back for everyone in " + monthLabel(month) + ", with anything saved in it.",
+         "Next month's Week 1 goes back to showing Week " + n + "'s actions (or Week " + (n - 1) + "'s if Week " + n + " has none)."];
+    if (unsaved) lines.push("You have unsaved changes on this page — save them first, or they will be lost.");
+    var ok = window.showAppConfirm
+      ? await window.showAppConfirm({ title: (on ? "Remove Week " : "Restore Week ") + n + "?", message: lines.join("\n"),
+          type: "warning", confirmText: on ? "Remove week" : "Restore week" })
+      : window.confirm(lines.join("\n"));
+    if (!ok) return;
+    try {
+      await sbSetWeekRemoved(y, m, n, on);
+      toast(on ? "Week " + n + " removed for " + monthLabel(month) + "." : "Week " + n + " restored.");
+      if (VIEW && VIEW.month === month) loadWeeklyView();
+    } catch (e) {
+      toast((on ? "Couldn't remove the week: " : "Couldn't restore the week: ") + (e.message || String(e)));
+    }
+  }
+  // What itadmin sees in place of a removed week: a slim card with Restore. Everyone else sees nothing.
+  function removedCardHtml(n) {
+    return '<div class="pr-card pr-wkcard pr-wkcard--removed">'
+      + '<div class="pr-card-k"><span>Week ' + n + '</span><span class="pr-wk-gone">Removed</span></div>'
+      + '<div class="pr-wkgone-txt">Not part of ' + esc(monthLabel(VIEW.month)) + '. Hidden for everyone; next month’s Week 1 shows Week ' + (n - 1) + '’s and Week ' + n + '’s actions.</div>'
+      + '<button type="button" class="pr-wkdate-btn" data-wkrestore="' + n + '">Restore week</button></div>';
+  }
+
+  function weekCardHtml(w) {
+    var c = CAL[w.week] || {};
+    var flags = ["A", "B", "G", "H"].map(function (k) { return secFilled(w, k); });   // bar 1=A, 2=B, 3=G, 4=H
+    var filled = flags.filter(Boolean).length;
+    var BAR_K = ["A", "B", "G", "H"], BAR_T = ["Check-in", "Last week's actions", "Next week", "Review record"];
+    var bars = flags.map(function (f, i) { return '<span class="pr-bar ' + (f ? "on" : "off") + '" data-k="' + BAR_K[i] + '" title="' + BAR_K[i] + ". " + BAR_T[i] + (f ? " — filled" : " — not filled") + '"></span>'; }).join("");
+    var state = filled === 4 ? " complete" : filled > 0 ? " partial" : "";
+    var remark = filled === 4 ? "Completed" : filled > 0 ? "Partially completed" : "Not started yet";
+    var lock = "";   // no time-based locking — owners can edit any week
+    // Dates: everyone sees them once set; only itadmin gets the button to set or change them.
+    var dt = weekDateText(w.week);
+    var dateLine = !(dt || prIsAdmin()) ? "" : '<div class="pr-wkcard-date"><span data-wkdate="' + w.week + '">' + esc(dt) + '</span>'
+      + (prIsAdmin() ? '<button type="button" class="pr-wkdate-btn" data-wkdatebtn="' + w.week + '" title="Set the dates for Week ' + w.week + '">'
+          + (dt ? "Edit dates" : "Set dates") + '</button>' : "")
+      + (prIsAdmin() && WK_REMOVABLE.indexOf(w.week) >= 0 ? '<button type="button" class="pr-wkdel-btn" data-wkdelbtn="' + w.week
+          + '" title="This month has no Week ' + w.week + ' — remove it for everyone" aria-label="Remove Week ' + w.week + '"></button>' : "") + '</div>';
+    return '<div class="pr-card pr-wkcard' + state + '" data-wk="' + w.week + '" role="button" tabindex="0" title="Click to show or hide Week ' + w.week + '">'
+      + '<div class="pr-card-k"><span>Week ' + w.week + '</span>' + lock + '<span class="pr-wk-vis">Shown</span></div>'
+      + dateLine
+      + '<div class="pr-bars">' + bars + '</div>'
+      + '<div class="pr-wkcard-foot"><span>' + remark + '</span><span></span></div></div>';
+  }
+  function renderCards() {
+    var cards = "";
+    calWeeks().forEach(function (w) { cards += weekCardHtml(w); });
+    if (prIsAdmin()) [1, 2, 3, 4, 5].filter(isRemovedWeek).forEach(function (n) { cards += removedCardHtml(n); });
+    return '<div class="pr-cards-hint">Click a week to show or hide its column \u00B7 <button type="button" class="pr-linkbtn" id="prWkAll">Show all weeks</button></div>'
+      + '<div class="pr-cards pr-wkcards">' + cards + '</div>';
+  }
+  function statCard(k, v, sub) {
+    return '<div class="pr-card"><div class="pr-card-k">' + esc(k) + '</div><div class="pr-card-v">' + esc(v)
+      + (sub ? '<small>' + esc(sub) + '</small>' : "") + '</div></div>';
+  }
+  function computeStats(pw, mtd) {
+    var repTotal = pw.length, repDone = 0, actDone = 0, actTotal = 0, compDone = 0, compTotal = 0;
+    pw.forEach(function (w) {
+      if (w.sections && Object.keys(w.sections).length) repDone++;
+      var B = (w.sections || {}).B || {};
+      ["B1", "B2", "B3"].forEach(function (id) { if (B[id] && (B[id].text || B[id].status)) { actTotal++; if (B[id].status === "Done") actDone++; } });
+      var v = (w.readPoints || {}).visit || {};
+      if (Object.keys(v).length) {
+        [["ER Submitted", function (x) { return /^y/i.test(String(x)); }], ["Program Dashboard Updated Yes", function (x) { return num(x) > 0; }], ["Kathawli Yes", function (x) { return num(x) > 0; }]]
+          .forEach(function (c) { compTotal++; if (c[1](v[c[0]])) compDone++; });
+      }
+      var d = (w.readPoints || {}).derived || {};
+      if (d["Keka Punctual"] !== undefined && d["Keka Punctual"] !== "") { compTotal++; if (d["Keka Punctual"] === "Y") compDone++; }
+    });
+    var srcT = mtd || repWeek();
+    var tickets = num(((srcT.readPoints || {}).nimble || {})["Tickets Raised"]);
+    return {
+      repTotal: repTotal, repDone: repDone,
+      actDone: actDone, actTotal: actTotal, actPct: actTotal ? Math.round(actDone / actTotal * 100) : 0,
+      compDone: compDone, compTotal: compTotal, compPct: compTotal ? Math.round(compDone / compTotal * 100) : 0,
+      tickets: tickets
+    };
+  }
+
+  /* ---------- columnar A–H table ---------- */
+  function sectionRows(S) {
+    if (S.write) return S.rows.map(function (r) { return { id: r.id, label: r.label, type: r.type }; });
+    // data rows: union of keys across the sources, from a representative week
+    var rep = repWeek(), out = [];
+    S.src.forEach(function (src) {
+      var grp = (rep.readPoints || {})[src] || {};
+      Object.keys(grp).forEach(function (key) { out.push({ label: key, key: key, src: src, data: true }); });
+    });
+    return out;
+  }
+  function dataVal(r, w) {
+    var g = (w.readPoints || {})[r.src] || {};
+    if (r.src === "vinoba" && r.key === "Post Per Month Per Teacher") {   // UI formula, not summed
+      var ut = num(g["Unique Teachers Posting"]), tp = num(g["Total Posts"]);
+      return tp ? String(Math.round(ut / tp * 100) / 100) : "\u2014";
+    }
+    return fmtNum(g[r.key]);
+  }
+  function sectionWho(S, unit, h) {
+    if (S.k === "TEAM") return unit === "DM" ? "PM" : "PO";
+    if (!S.write) return "Auto";
+    if (S.k === "H") {
+      if (h && h.managerRole) return h.managerRole;   // moves up when the PM/DM seat is vacant
+      return unit === "DM" ? "COO" : (unit === "PM" ? "DM" : "PM");
+    }
+    return unit === "DM" ? "DM" : (unit === "PM" ? "PM" : "PO");
+  }
+  function whoClassOf(who) { return who === "Auto" ? "auto" : (who === "PO" ? "po" : "pm"); }
+
+  function renderTable() {
+    var present = calWeeks(), mtd = null;   // All Month (week 0) data is shown in the Monthly tab, not here
+    if (!present.length) return '<div class="pr-panel"><div class="pr-empty">No weekly data uploaded for this month yet — upload it under Admin \u2192 Data (All Month uploads appear in the Monthly tab).</div></div>';
+    var totalCols = 1 + present.length + (mtd ? 1 : 0);
+
+    var head = '<tr><th class="pr-item">Item</th>';
+    present.forEach(function (w) {
+      var c = CAL[w.week] || {};
+      head += '<th class="pr-num pr-wkh" data-wk="' + w.week + '">Week ' + w.week
+        + '<span class="pr-wkh-date" data-wkdate="' + w.week + '">' + esc(weekDateText(w.week)) + '</span></th>';   // dates only when itadmin has set them
+    });
+    if (mtd) head += '<th class="pr-num pr-mtd">MTD</th>';
+    head += '</tr>';
+
+    var body = "";
+    if (VIEW.roster && VIEW.roster.members) body += renderRosterSection(present, mtd, totalCols);
+    var uUnit = (VIEW.header && VIEW.header.unit) || "PO";
+    SEC.forEach(function (S) {
+      var rows = sectionRows(S);
+      var editable = S.write ? ((S.k === "H") ? canEditManager() : canEditSelf()) : false;
+      var who = sectionWho(S, uUnit, VIEW.header);
+      body += '<tr class="pr-grp" data-grp="' + S.k + '"><td colspan="' + totalCols + '"><span class="pr-caret">\u25B8</span><span class="pr-grp-k">' + S.k + '</span>' + esc(S.title) + ' <span class="pr-who-tag pr-who-' + whoClassOf(who) + '">' + who + '</span></td></tr>';
+      if (!S.write && !rows.length) {
+        body += '<tr class="pr-row pr-hidden" data-secrow="' + S.k + '"><td class="pr-item pr-mut">No data uploaded for this month yet</td>';
+        present.forEach(function (w) { body += '<td class="pr-num pr-wkc" data-wk="' + w.week + '"><span class="pr-mut">\u2014</span></td>'; });
+        body += "</tr>";
+      }
+      rows.forEach(function (r) {
+        body += '<tr class="pr-row pr-hidden" data-secrow="' + S.k + '">';
+        body += '<td class="pr-item">' + esc(r.label) + '</td>';
+        present.forEach(function (w) {
+          body += '<td class="' + (r.data ? "pr-num " : "") + 'pr-wkc" data-wk="' + w.week + '">' + (r.data ? dataVal(r, w) : renderCell(S, r, w, editable)) + '</td>';
+        });
+        if (mtd) body += '<td class="pr-num pr-mtd">' + (r.data ? dataVal(r, mtd) : '<span class="pr-mut">\u2014</span>') + '</td>';
+        body += '</tr>';
+      });
+    });
+    return '<div class="pr-tablewrap"><table class="pr-tbl"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>';
+  }
+  function renderRosterSection(present, mtd, totalCols) {
+    var r = VIEW.roster, who = r.kind === "PM" ? "PM" : "PO";
+    var html = '<tr class="pr-grp" data-grp="TEAM"><td colspan="' + totalCols + '"><span class="pr-caret">\u25B8</span>Team <span class="pr-who-tag pr-who-' + whoClassOf(who) + '">' + who + '</span></td></tr>';
+    r.members.forEach(function (m) {
+      html += '<tr class="pr-row pr-hidden pr-teamrow" data-secrow="TEAM">';
+      html += '<td class="pr-item">' + esc(m.name) + '</td>';
+      present.forEach(function (w) {
+        var st = ((r.byWeek || {})[w.code] || {})[m.id] || "none";
+        var text = st === "done" ? "Completed" : (st === "partial" ? "Partially done" : "Not started");
+        var cls = st === "done" ? "pr-rev-yes" : (st === "partial" ? "pr-rev-part" : "pr-rev-no");
+        html += '<td class="pr-num pr-wkc" data-wk="' + w.week + '"><span class="' + cls + '">' + text + '</span></td>';
+      });
+      if (mtd) html += '<td class="pr-num pr-mtd"><span class="pr-mut">\u2014</span></td>';
+      html += '</tr>';
+    });
+    return html;
+  }
+
+
+  var CELL_VALS = {};
+  var TEXT_MAX = 150;
+  function openTextModal(btn) {
+    var wc = btn.dataset.wc, fid = btn.dataset.fid, ed = btn.dataset.ed === "1", label = btn.dataset.label || "";
+    $("prModalTitle").textContent = (ed ? "Edit" : "View") + " \u2014 " + label;
+    var ta = $("prModalText");
+    ta.value = CELL_VALS[wc + "|" + fid] || ""; ta.readOnly = !ed; ta.maxLength = TEXT_MAX;
+    var sb = $("prModalSave"); sb.hidden = !ed; sb.dataset.wc = wc; sb.dataset.fid = fid; sb.dataset.key = wc + "|" + fid;
+    updateModalMsg();
+    if (!ed) $("prModalMsg").textContent = "";       // no character counter when only viewing
+    $("prModal").hidden = false;
+    if (ed) ta.focus();
+  }
+  function updateModalMsg() {
+    var ta = $("prModalText"), m = $("prModalMsg"), len = ta.value.length;
+    if (len >= TEXT_MAX) { m.textContent = "Content limit exceeded (max " + TEXT_MAX + " characters)."; m.className = "pr-modal-msg is-over"; }
+    else { m.textContent = len + " / " + TEXT_MAX; m.className = "pr-modal-msg"; }
+  }
+  function saveTextModal() {
+    var sb = $("prModalSave"), wc = sb.dataset.wc, fid = sb.dataset.fid, val = $("prModalText").value;
+    CELL_VALS[sb.dataset.key] = val;
+    markDirty(wc, fid, val);
+    var cell = document.querySelector('.pr .pr-iconbtn[data-wc="' + wc + '"][data-fid="' + fid + '"]');
+    if (cell) cell.classList.toggle("has-val", !!(val && val.trim()));
+    closeTextModal();
+  }
+  function closeTextModal() { $("prModal").hidden = true; }
+  function leaveTextModal() {
+    var sb = $("prModalSave"), changed = sb && !sb.hidden && $("prModalText").value !== (CELL_VALS[sb.dataset.key] || "");
+    if (!changed) { closeTextModal(); return; }
+    var m = $("prModalMsg");
+    m.textContent = "You have text that is not saved. Tap Save, or Close to discard it.";
+    m.className = "pr-modal-msg is-over";
+  }
+  function renderCell(S, r, w, editable) {
+    var sec = (w.sections || {})[S.k] || {};
+    var stored = sec[r.id];
+    var ro = !editable;                 // identity only — past weeks stay editable
+    var wc = w.code, fid = r.id;
+    if (r.type === "mood") {
+      var mv = stored !== undefined ? stored : "";
+      if (ro) return moodLabel(mv);
+      return seg(wc, fid, MOODS.map(function (m) { return [m[0], m[1]]; }), mv);
+    }
+    if (r.type === "yn") {
+      var yv = stored !== undefined ? stored : "";
+      if (ro) return yv ? (yv === "Y" ? "Yes" : "No") : '<span class="pr-mut">—</span>';
+      return seg(wc, fid, [["Y", "Yes"], ["N", "No"]], yv);
+    }
+    if (r.type === "status") {
+      var sv = stored !== undefined ? stored : "";
+      if (ro) return sv ? esc(sv) : '<span class="pr-mut">—</span>';
+      return '<select class="pr-sel" data-wc="' + wc + '" data-fid="' + fid + '"><option value="">—</option>'
+        + PM_STATUS.map(function (o) { return '<option' + (sv === o ? " selected" : "") + '>' + esc(o) + '</option>'; }).join("") + '</select>';
+    }
+    if (r.type === "prog") {
+      var carry = (w.carryForward || {})["B" + fid.slice(1)] || (stored && stored.text) || "";
+      var st = (stored && stored.status) || "";
+      var none = w.week === 1 ? "— from last month —" : "— none —";
+      var carryHtml;
+      if (carry) {
+        CELL_VALS[wc + "|V" + fid] = carry;   // read-only copy for the View popup
+        carryHtml = '<button type="button" class="pr-viewbtn" data-wc="' + wc + '" data-fid="V' + fid + '" data-ed="0" data-label="' + esc(r.label)
+          + '" title="' + esc(carry) + '">View action</button>';
+      } else carryHtml = '<span class="pr-carry-none">' + none + "</span>";
+      if (ro) return '<div class="pr-bcell">' + carryHtml + (st ? '<span class="pr-bstat">' + esc(st) + "</span>" : '<span class="pr-mut">—</span>') + "</div>";
+      return '<div class="pr-bcell">' + carryHtml + seg(wc, fid, B_STATUS.map(function (o) { return [o, o]; }), st, esc(carry)) + "</div>";
+    }
+    // text -> compact edit / view icon (opens a popup)
+    var tv = stored !== undefined ? stored : "";
+    CELL_VALS[wc + "|" + fid] = tv;
+    var hasVal = !!(tv && String(tv).trim());
+    var canEdit = !ro;
+    return '<button type="button" class="pr-iconbtn' + (hasVal ? " has-val" : "") + (canEdit ? " editable" : "") + '" data-wc="' + wc + '" data-fid="' + fid + '" data-ed="' + (canEdit ? "1" : "0") + '" data-label="' + esc(r.label) + '" title="' + (canEdit ? "Edit" : "View") + '">' + '' + '</button>';
+  }
+  function seg(wc, fid, opts, val, carryText) {
+    return '<div class="pr-seg" data-wc="' + wc + '" data-fid="' + fid + '"' + (carryText != null ? ' data-carry="' + carryText + '"' : "") + '">'
+      + opts.map(function (o) { return '<button type="button" class="pr-segbtn' + (val === o[0] ? " is-on" : "") + '" data-v="' + o[0] + '">' + o[1] + '</button>'; }).join("") + '</div>';
+  }
+  function moodLabel(v) { for (var i = 0; i < MOODS.length; i++) if (MOODS[i][0] === v) return MOODS[i][1]; return '<span class="pr-mut">—</span>'; }
+
+  function bindTable(root) {
+    root = root || "#prBody";
+    // accordions (collapsed by default)
+    document.querySelectorAll(root + " .pr-grp").forEach(function (g) {
+      g.addEventListener("click", function () {
+        var open = g.classList.toggle("is-open");
+        g.querySelector(".pr-caret").textContent = open ? "▾" : "▸";
+        document.querySelectorAll(root + ' .pr-row[data-secrow="' + g.dataset.grp + '"]').forEach(function (tr) { tr.classList.toggle("pr-hidden", !open); });
+      });
+    });
+    document.querySelectorAll(root + " .pr-iconbtn").forEach(function (b) { b.addEventListener("click", function () { openTextModal(b); }); });
+    document.querySelectorAll(root + " .pr-viewbtn").forEach(function (b) { b.addEventListener("click", function () { openTextModal(b); }); });
+    // segmented
+    document.querySelectorAll(root + " .pr-seg").forEach(function (s) {
+      s.querySelectorAll(".pr-segbtn").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          s.querySelectorAll(".pr-segbtn").forEach(function (b) { b.classList.remove("is-on"); });
+          btn.classList.add("is-on");
+          var fid = s.dataset.fid, wc = s.dataset.wc, v = btn.dataset.v;
+          if (fid.charAt(0) === "B") markDirty(wc, fid, { text: s.dataset.carry || "", status: v });
+          else markDirty(wc, fid, v);
+        });
+      });
+    });
+    // text + select
+    document.querySelectorAll(root + " textarea[data-fid], " + root + " select[data-fid]").forEach(function (el) {
+      var h = function () { markDirty(el.dataset.wc, el.dataset.fid, el.value); };
+      el.addEventListener("input", h); el.addEventListener("change", h);
+    });
+  }
+  function markDirty(wc, fid, val) {
+    // <AY>9q00 / <AY>9900 = Quarterly / Whole Year, YYYYMM00 = Monthly tab, weeks 01-05 = Weekly
+    var map = qyIsCode(wc) ? QDIRTY : (/00$/.test(wc) ? MDIRTY : DIRTY);
+    (map[wc] = map[wc] || {})[fid] = val;
+    try { window.dispatchEvent(new Event("pr-dirty")); } catch (e) { /* older browsers: the phone layer simply keeps Save visible */ }
+  }
+
+  function saveAll() {
+    var codes = Object.keys(DIRTY).filter(function (c) { return Object.keys(DIRTY[c]).length; });
+    if (!codes.length) { toast("Nothing to save yet."); return; }
+    var btn = $("prSave"); btn.disabled = true; btn.innerHTML = '<span class="pr-spin"></span>Saving…';
+    var empId = VIEW.header.selfEmpId, failed = 0;
+    Promise.all(codes.map(function (code) {
+      return sbSaveWeekly(empId, code, DIRTY[code], currentEmail()).catch(function (e) { failed++; console.error("Save failed for " + code, e); });
+    })).then(function () {
+      btn.disabled = false; btn.textContent = "Save review";
+      if (failed) {
+        var hint = document.querySelector("#prBody .pr-savehint");
+        if (hint) { hint.textContent = "Save failed for " + failed + " week(s) \u2014 click Save again to retry. Your changes are NOT lost."; hint.classList.add("is-fail"); }
+        toast("Save failed \u2014 please click Save again to retry.");
+      } else {
+        toast("Saved."); DIRTY = {}; loadWeeklyView();
+      }
+    });
+  }
+
+
+  /* ======================================================================
+     MONTHLY TAB — Sheet B monthly scorecard
+     Same design language as Weekly. A / B / G / H are the same review blocks
+     as Weekly, saved for period YYYYMM00 (one per month). In between sit the
+     five goals G1–G5, each line scored as  Target -> Done -> % -> Score.
+     "Done" is filled from the All-Month (week 0) uploads wherever a file
+     carries it. Targets, and goal items people will type in, are not stored
+     yet: those cells show "Not set" / "To be entered" until that is built.
+     Weights follow the Monthly-tab architecture deck (Sheet B).
+     ====================================================================== */
+  var MVIEW = null;                // last monthly payload (same shape as VIEW)
+  var MDIRTY = {};                 // { "YYYYMM00": { fieldId: value } }
+
+  var MO_SEC = {
+    A: { k: "A", title: "Check-in", who: "PO", write: true, rows: [
+      { id: "A1", label: "How are you feeling this month?", type: "mood" },
+      { id: "A2", label: "Anything on your mind?", type: "text" } ] },
+    B: { k: "B", title: "Last month's actions", who: "PO", write: true, rows: [1, 2, 3, 4, 5].map(function (n) {
+      return { id: "B" + n, label: "Action " + n + " from last month", type: "prog" }; }) },
+    G: { k: "G", title: "Next month", who: "PO", write: true, rows: [{ id: "G1", label: "Blocker or escalation", type: "text" }]
+      .concat([1, 2, 3, 4, 5].map(function (n) { return { id: "G" + (n + 1), label: "Action " + n + " for next month", type: "text" }; })) },
+    H: { k: "H", title: "Review record", who: "PM", write: true, rows: [
+      { id: "H1", label: "Review held", type: "yn" },
+      { id: "H2", label: "Manager status", type: "status" },
+      { id: "H3", label: "Manager's remark", type: "text" } ] }
+  };
+
+  // value helpers over one month's readPoints (rp = week 0 of the view)
+  function mv(rp, g, k) { var grp = rp && rp[g]; if (!grp || grp[k] === undefined || grp[k] === "") return null; return num(grp[k]); }
+  function msum(rp, g, keys) {
+    var vals = keys.map(function (k) { return mv(rp, g, k); });
+    return vals.every(function (v) { return v === null; }) ? null : vals.reduce(function (a, v) { return a + (v || 0); }, 0);
+  }
+  function A(fn, src) { return { auto: fn, src: src }; }           // filled from an upload
+  var NA = { na: true };                                              // no file carries it yet
+  var UE = { entry: true };                                           // will be typed in the UI
+  var NE = { numentry: true };                                        // a number typed by the PO (saved as M_ field)
+
+  // [label on this page, Vinoba column suffix] for the 5 core clubs' streak lines
+  var MO_STREAK_CLUBS = [["Storytelling", "Storytelling"], ["Creative Writing", "Creative Writing"], ["Spoken English", "Spoken English"],
+                         ["Poetry", "Poetry Recitation"], ["Spelling Bee", "Spelling Bee"]];
+
+  // lvl: 0 = component (carries weight), 1 = item / sub-component, 2 = sub-item
+  var MO_GOALS = [
+    { key: "G1", title: "Academic Programs", weight: 40, rows: [
+      { lvl: 0, label: "Exams planned this month", w: 40, academic: true,
+        note: "Planned: the district's exams from Admin \u2192 Academic Plan. Done: click a number and tick each exam when it is completed \u2014 a tick counts for every PO, PM and DM of that district." } ] },
+
+    { key: "G2", title: "Life Skills Programs", weight: 20, rows: [
+      // Core = the 5 core clubs (Spelling Bee joined the core in Nov 2026), compared with the sum of their 5 targets.
+      { lvl: 0, label: "LS Program Cycle (Core)", w: 10, v: A(function (rp) { return msum(rp, "vinoba", ["Storytelling", "Creative Writing", "Poetry Recitation", "Spoken English", "Spelling Bee"]); }, "Vinoba \u00B7 sum of the five core clubs") },
+      { lvl: 1, label: "Storytelling",     v: A(function (rp) { return mv(rp, "vinoba", "Storytelling"); }, "Vinoba") },
+      { lvl: 1, label: "Creative Writing", v: A(function (rp) { return mv(rp, "vinoba", "Creative Writing"); }, "Vinoba") },
+      { lvl: 1, label: "Poetry",           v: A(function (rp) { return mv(rp, "vinoba", "Poetry Recitation"); }, "Vinoba") },
+      { lvl: 1, label: "Spoken English",   v: A(function (rp) { return mv(rp, "vinoba", "Spoken English"); }, "Vinoba") },
+      { lvl: 1, label: "Spelling Bee",     v: A(function (rp) { return mv(rp, "vinoba", "Spelling Bee"); }, "Vinoba \u00B7 spelling_bee") },
+      { lvl: 0, label: "LS Program Cycle (Non-core)", w: 0, v: A(function (rp) { return mv(rp, "vinoba", "Morning Assembly"); }, "Vinoba \u00B7 Morning Assembly") },
+      { lvl: 1, label: "Morning Assembly", v: A(function (rp) { return mv(rp, "vinoba", "Morning Assembly"); }, "Vinoba \u00B7 morning_assembly") },
+      // Streak is scored on IMPROVED streaks of the 5 core clubs, compared with the sum of their 5 streak targets.
+      // Shown as: Streaks improved (target + achieved) with the 5 clubs, then Total streaks (achieved only,
+      // no target, no score) folded by default - click it to show its 5 clubs (Monthly and Quarterly / Yearly).
+      { lvl: 0, label: "Streak", w: 10, note: "Scored on improved streaks of the 5 core clubs",
+        v: A(function (rp) { return mv(rp, "vinoba", "Improved Streaks"); }, "Vinoba \u00B7 improved streaks, sum of the 5 core clubs") },
+      { lvl: 1, label: "Streaks improved", v: A(function (rp) { return mv(rp, "vinoba", "Improved Streaks"); }, "Vinoba \u00B7 improved streaks, sum of the 5 core clubs") }
+    ].concat(MO_STREAK_CLUBS.map(function (c) {
+      return { lvl: 2, label: "Improved \u00B7 " + c[0], v: A(function (rp) { return mv(rp, "vinoba", "Improved Streak \u00B7 " + c[1]); }, "Vinoba \u00B7 improved streaks \u00B7 " + c[1]) };
+    })).concat([
+      { lvl: 1, label: "Total streaks", info: true, fold: "streakTotal", note: "Achieved only \u2014 no target. Click to show the clubs.",
+        v: A(function (rp) { return mv(rp, "vinoba", "Total Streaks"); }, "Vinoba \u00B7 total streaks, sum of the 5 core clubs (information only)") }
+    ]).concat(MO_STREAK_CLUBS.map(function (c) {
+      return { lvl: 2, label: "Total \u00B7 " + c[0], info: true, foldOf: "streakTotal", v: A(function (rp) { return mv(rp, "vinoba", "Total Streak \u00B7 " + c[1]); }, "Vinoba \u00B7 total streaks \u00B7 " + c[1] + " (information only)") };
+    })) },
+
+    { key: "G3", title: "Vibrant Teacher Community", weight: 20, rows: [
+      { lvl: 0, label: "Vinoba Kathavli Stories", w: 5, v: A(function (rp) { return mv(rp, "visit", "Kathawli Yes"); }, "Visit & Activity \u00B7 Kathavli \u201CYes\u201D count") },
+      { lvl: 0, label: "Online + Offline community", w: 15, note: "Scored together: items achieved out of 10, \u00D7 15" },
+      { lvl: 1, label: "Online teachers community", w: 6 },
+      { lvl: 2, label: "Unique teachers posting", w: 1, v: A(function (rp) { return mv(rp, "vinoba", "Unique Teachers Posting"); }, "Vinoba") },
+      { lvl: 2, label: "Unique schools posting", w: 1, v: A(function (rp) { return mv(rp, "vinoba", "Unique Schools Posting"); }, "Vinoba") },
+      { lvl: 2, label: "Posts per month per teacher", w: 1, v: A(function (rp) {
+          // Ratio agreed with the programme team: unique teachers posting / total posts (target 1).
+          // Same formula as the Weekly tab. Kept unrounded so % done is exact; shown to 2 decimals.
+          var t = mv(rp, "vinoba", "Unique Teachers Posting"), p = mv(rp, "vinoba", "Total Posts");
+          return (t === null || !p) ? null : Math.round((t / p) * 10000) / 10000; }, "Vinoba \u00B7 unique teachers posting \u00F7 total posts") },
+      { lvl: 2, label: "Star teachers (3-month consistency)", w: 1, v: A(function (rp) { return mv(rp, "vinoba", "Star Teachers"); }, "Vinoba") },
+      { lvl: 2, label: "Teachers using expert coupons", w: 1, v: A(function (rp) { return mv(rp, "vinoba", "Expert Coupons Given"); }, "Vinoba \u00B7 expert coupons given") },
+      { lvl: 2, label: "POM transformed clusters", w: 1, v: NE, fid: "M_G3_POMCLUSTERS" },
+      { lvl: 1, label: "Offline teachers community", w: 4 },
+      { lvl: 2, label: "Blocks with recognition events", w: 1, v: A(function (rp) { return mv(rp, "extra", "Blocks With Events"); }, "Staff Connect \u00B7 your blocks with at least one block event (block level)") },
+      { lvl: 2, label: "District recognition events held", w: 1, v: A(function (rp) { return mv(rp, "staffConnect", "Total District Events"); }, "Staff Connect \u00B7 Total District Events \u2014 district figure, counted once per district") },
+      { lvl: 2, label: "Teachers recognised", w: 1, v: A(function (rp) { return msum(rp, "staffConnect", ["Teachers Felicitated at Block Level", "Teachers Felicitated at District Level", "Teachers Felicitated in SU/NS Events", "Teachers Felicitated in Other Events"]); }, "Staff Connect \u00B7 block-level felicitations of these blocks + district, SU/NS and other felicitations counted once per district") },
+      { lvl: 2, label: "Cluster heads recognised", w: 1, v: A(function (rp) { return mv(rp, "staffConnect", "Cluster Heads Recognised"); }, "Staff Connect \u00B7 Total Cluster Heads Recognised \u2014 district figure, counted once per district") } ] },
+
+    { key: "G4", title: "Other Goals", weight: 10, rows: [
+      { lvl: 0, label: "Other activities", w: 10, g4: true } ] },
+
+    { key: "G5", title: "Self-Development", weight: 10, rows: [
+      { lvl: 0, label: "Compliance", w: 4, target: 12, compliance: true },
+      { lvl: 1, label: "No ball drop", head: true },
+      { lvl: 2, label: "Keka \u2014 daily reporting done on time", yn: A(function (rp) {
+          var p = rp && rp.derived && rp.derived["Keka Punctual"]; if (!p) return null;
+          var late = mv(rp, "keka", "Late Arrival") || 0, miss = mv(rp, "keka", "Missing Swipe Days") || 0;
+          return { yes: p === "Y", tip: "Late Arrival Days " + fmtNum(late) + " + Missing Swipe Days " + fmtNum(miss) + " = " + fmtNum(late + miss) + (p === "Y" ? " \u2192 Yes" : " \u2192 No (must be 0)"),
+                   why: [["Late Arrival Days", fmtNum(late)], ["Missing Swipe Days", fmtNum(miss)], ["Total", fmtNum(late + miss)]],
+                   rule: "Yes when Late Arrival Days + Missing Swipe Days = 0, from this month's Keka (All Month) upload." };
+        }, "No Keka row for this person in this month's All Month upload") },
+      { lvl: 2, label: "ER submitted by 26th, error-free", yn: A(function (rp) {
+          var s = rp && rp.visit && rp.visit["ER Submitted"]; if (!s) return null;
+          var st = (rp.extra && rp.extra["ER Status"]) || "", amt = mv(rp, "visit", "ER Amount");
+          return { yes: s === "Yes", tip: "ER status: " + (st || "blank") + (amt != null ? " \u00B7 Amount " + fmtNum(amt) : "") + (s === "Yes" ? " \u2192 Yes" : " \u2192 No (needs Submitted or Locked)"),
+                   why: [["Status in the ER file", st || "(blank)"], ["Amount", amt != null ? fmtNum(amt) : "\u2014"]],
+                   rule: "Yes when the ER status is Submitted or Locked, from this month's ER (All Month) upload. The file has no submission date, so \u201Cby 26th\u201D isn't checked." };
+        }, "No ER row for this person in this month's All Month upload") },
+      { lvl: 2, label: "All requests raised via Nimble (not email)", yn: UE, fid: "M_G5_NIMBLE", hint: function (rp) {
+          var n = rp && rp.nimble; if (!n || n["Tickets Raised"] === "" || n["Tickets Raised"] == null) return null;
+          var open = (rp.extra && rp.extra["Tickets Open"]) || 0;
+          return { short: n["Tickets Raised"] + " raised \u00B7 " + n["Tickets In Validation"] + " in Validate \u00B7 " + n["Tickets Closed"] + " closed \u00B7 " + open + " open",
+                   tip: "Nimble this month: " + n["Tickets Raised"] + " tickets raised \u2014 " + n["Tickets Closed"] + " closed (have a close date), " + n["Tickets In Validation"] + " in the Validate column, " + open + " still open." };
+        } },
+      { lvl: 2, label: "Program Dashboard updated after each stage", yn: A(function (rp) {
+          var n = mv(rp, "visit", "Program Dashboard Updated Yes"); if (n === null) return null;
+          return { yes: n > 0, detail: n + "\u00D7", tip: "Program Dashboard updated \u201CYes\u201D " + n + " time" + (n === 1 ? "" : "s") + " this month" + (n > 0 ? " \u2192 Yes" : " \u2192 No"),
+                   why: [["Program Dashboard updated \u201CYes\u201D count", fmtNum(n)]],
+                   rule: "Yes when the Visit & Activity file shows at least one \u201CYes\u201D for Program Dashboard updated this month." };
+        }, "No Visit & Activity row for this person this month") },
+      { lvl: 1, label: "Planning and tracking", head: true },
+      { lvl: 2, label: "WhatsApp daily update sent", yn: UE, fid: "M_G5_WHATSAPP" },
+      { lvl: 2, label: "PO Form filled daily", yn: A(function (rp) {
+          var p = mv(rp, "derived", "Form Completion %"); if (p === null) return null;
+          var f = mv(rp, "visit", "Daily Forms Filed") || 0, wd = mv(rp, "keka", "Working Days") || 0;
+          return { yes: p >= 100, detail: fmtNum(p) + "%", tip: f + " daily forms filed \u00F7 " + wd + " Keka working days = " + fmtNum(p) + "%" + (p >= 100 ? " \u2192 Yes" : " \u2192 No (needs 100%)"),
+                   why: [["Daily forms filed (Visit & Activity)", fmtNum(f)], ["Working days (Keka)", fmtNum(wd)], ["Completion", fmtNum(p) + "%"]],
+                   rule: "Yes when daily forms filed \u2265 Keka working days (100%)." };
+        }, "No Visit & Activity or Keka data for this person this month") },
+      { lvl: 2, label: "PO Field Visit Report filed same day as visit", yn: UE, fid: "M_G5_FVR", hint: function (rp) {
+          var vf = mv(rp, "visit", "Visit Forms Filed"); if (vf === null) return null;
+          var vis = msum(rp, "visit", ["School Visits", "Cluster Visits", "Block Visits", "District Visits"]) || 0;
+          return { short: vf + " visit forms filed \u00B7 " + vis + " visits recorded", tip: "Visit & Activity this month: " + vf + " visit forms filed for " + vis + " visits recorded." };
+        } },
+      { lvl: 2, label: "POM Reporting done every Friday after POM", yn: UE, fid: "M_G5_POM" },
+      { lvl: 2, label: "District CEO PPT submitted by 28th, error-free", yn: UE, fid: "M_G5_CEOPPT" },
+      { lvl: 1, label: "No obvious mistakes", head: true },
+      { lvl: 2, label: "All District Action Tracker follow-ups completed", yn: UE, fid: "M_G5_ACTTRACKER" },
+      { lvl: 2, label: "Action points completed from CEO Tracker", yn: UE, fid: "M_G5_CEOTRACKER" },
+      { lvl: 2, label: "No commitments missed", yn: UE, fid: "M_G5_COMMIT", hint: function (rp, w0) {
+          var B = (w0 && w0.sections && w0.sections.B) || {}, c = { Done: 0, Partial: 0, Not: 0 }, n = 0;
+          ["B1", "B2", "B3", "B4", "B5"].forEach(function (k) { var s = B[k] && B[k].status; if (s && c[s] != null) { c[s]++; n++; } });
+          if (!n) return null;
+          return { short: "Last month's actions: " + c.Done + " Done \u00B7 " + c.Partial + " Partial \u00B7 " + c.Not + " Not", tip: "From B. Last month's actions (saved): " + c.Done + " Done, " + c.Partial + " Partial, " + c.Not + " Not." };
+        } },
+      { lvl: 0, label: "Visits", w: 4, v: A(function (rp) { return msum(rp, "visit", ["School Visits", "Cluster Visits", "Block Visits", "District Visits"]); }, "Visit & Activity \u00B7 all visits") },
+      { lvl: 1, label: "School", v: A(function (rp) { return mv(rp, "visit", "School Visits"); }, "Visit & Activity") },
+      { lvl: 1, label: "Cluster", v: A(function (rp) { return mv(rp, "visit", "Cluster Visits"); }, "Visit & Activity") },
+      { lvl: 1, label: "Block / District", v: A(function (rp) { return msum(rp, "visit", ["Block Visits", "District Visits"]); }, "Visit & Activity \u00B7 block + district visits") },
+      { lvl: 0, label: "Case Study", w: 2, v: NE, fid: "M_G5_CASESTUDY" } ] }
+  ];
+
+  /* ---------- monthly filters ---------- */
+  function wireMonthly() {
+    if (!$("prMoUnit")) return;
+    $("prMoUnit").addEventListener("change", function () { moPopulateValue(); moRefresh(); });
+    // Picking a person (or month) opens their monthly review straight away, so the status
+    // line shows at once. Not when there are unsaved edits — those would be lost.
+    var autoOpen = function () {
+      moRefresh();
+      var dirty = Object.keys(MDIRTY).some(function (c) { return Object.keys(MDIRTY[c]).length; });
+      if (!$("prMoLoad").disabled && !dirty) loadMonthlyView();
+    };
+    $("prMoValue").addEventListener("change", autoOpen);
+    $("prMoMonth").addEventListener("change", autoOpen);
+    $("prMoLoad").addEventListener("click", loadMonthlyView);
+  }
+  function moRefresh() { $("prMoLoad").disabled = !($("prMoUnit").value && $("prMoValue").value && $("prMoMonth").value); }
+  function moPopulateValue() {
+    var unit = $("prMoUnit").value, sel = $("prMoValue");
+    $("prMoValueLabel").textContent = UNIT_LABEL[unit] || "PO";
+    if (!state.base) { sel.innerHTML = ""; sel.disabled = true; sel.appendChild(opt("", "\u2014")); return; }
+    fillUnitSelect(sel, unit);
+  }
+  function moFillFromBase() {
+    if (!$("prMoMonth") || !state.base) return;
+    var mo = $("prMoMonth"); mo.innerHTML = "";
+    if (!state.base.months.length) mo.innerHTML = '<option value="">No months</option>';
+    else { mo.appendChild(opt("", "Select\u2026")); state.base.months.forEach(function (m) { mo.appendChild(opt(m.code, m.label)); }); }
+    mo.disabled = false;
+    moPopulateValue();
+  }
+  // Opening Monthly for the first time carries over the Weekly selection.
+  function moSyncFromWeekly() {
+    if (!$("prMoValue") || $("prMoValue").value || !$("prValue").value) return;
+    $("prMoUnit").value = $("prUnit").value; moPopulateValue();
+    $("prMoValue").value = $("prValue").value; $("prMoMonth").value = $("prMonth").value;
+    moRefresh();
+  }
+
+  var MO_LOAD_SEQ = 0;
+  function loadMonthlyView() {
+    var unit = $("prMoUnit").value, value = $("prMoValue").value, month = $("prMoMonth").value;
+    if (!unit || !value || !month) return;
+    MDIRTY = {};
+    var ticket = ++MO_LOAD_SEQ;                     // only the latest pick may render
+    $("prMoBody").innerHTML = '<div class="pr-empty pr-loading">Loading monthly review\u2026</div>';
+    Promise.all([
+      sbGetWeeklyView(unit, value, month),
+      sbGetAcademic(unit, value, month).catch(function (e) { console.warn("Academic plan not loaded:", e); return null; }),
+      sbGetTargets(unit, value, month).catch(function (e) { console.warn("Targets not loaded:", e); return null; })
+    ]).then(function (res) { if (ticket !== MO_LOAD_SEQ) return; MVIEW = res[0]; MVIEW.academic = res[1]; MVIEW.targets = res[2]; renderMonthlyView(); })
+      .catch(function (e) { if (ticket !== MO_LOAD_SEQ) return; $("prMoBody").innerHTML = '<div class="pr-empty pr-error">Couldn\'t load: ' + esc(e.message || String(e)) + "</div>"; });
+  }
+
+  /* ---------- scoring ---------- */
+  function moRowState(r, rp) {
+    // -> { kind: "num"|"yn"|"na"|"entry"|"none", value, yes, detail, src }
+    var spec = r.v || r.yn;
+    if (!spec) return { kind: "none" };
+    if (spec.numentry) {
+      var ev0 = moNumVal(r.fid);
+      return ev0 === "" ? { kind: "numempty" } : { kind: "num", value: ev0, src: "Entered by the PO on this page", entered: true };
+    }
+    if (spec.na) return { kind: "na" };
+    if (spec.entry) return r.fid ? { kind: "ynentry", value: moValue(r.fid) } : { kind: "entry" };
+    var got = spec.auto(rp);
+    if (r.yn) return got ? { kind: "yn", yes: got.yes, detail: got.detail || "", src: spec.src, tip: got.tip || spec.src, why: got.why || [], rule: got.rule || "" }
+                         : { kind: "nodata", src: spec.src, tip: spec.src };
+    return got === null ? { kind: "nodata", src: spec.src } : { kind: "num", value: got, src: spec.src };
+  }
+  function moScore(r, st) {
+    // % and score need a target; only Compliance has a fixed one (12) today.
+    if (r.compliance) return null;
+    if (r.target == null || !st || st.kind !== "num") return null;
+    var pct = r.target > 0 ? Math.min(st.value / r.target, 1) : 0;
+    return { pct: pct, score: (r.w || 0) * pct };
+  }
+  function moCompliance(goal, rp) {
+    var items = goal.rows.filter(function (r) { return r.yn; }), yes = 0, answered = 0;
+    items.forEach(function (r) {
+      var st = moRowState(r, rp);
+      if (st.kind === "yn") { answered++; if (st.yes) yes++; }
+      else if (st.kind === "ynentry" && (st.value === "Y" || st.value === "N")) { answered++; if (st.value === "Y") yes++; }
+    });
+    return { yes: yes, answered: answered, total: items.length };
+  }
+
+  /* ---------- render ---------- */
+  function moCell(html, cls) { return '<td class="pr-num' + (cls ? " " + cls : "") + '">' + html + "</td>"; }
+  function moDash() { return '<span class="pr-mut">\u2014</span>'; }
+  function moPill(text, cls, title) { return '<span class="pr-mo-pill ' + cls + '"' + (title ? ' title="' + esc(title) + '"' : "") + ">" + esc(text) + "</span>"; }
+
+  function moComplianceCells(g, r, rp) {
+    var c = moCompliance(g, rp), cs = moComplianceScore(g, r, rp);
+    return { done: c.yes + " Yes" + '<div class="pr-mo-sub">' + c.answered + " of " + c.total + " answered</div>",
+             pct: cs ? fmtNum(Math.round(cs.pct * 1000) / 10) + "%" : moDash(), score: cs ? fmtNum(r2(cs.score)) : moDash() };
+  }
+  // Recompute the Compliance row and every score card from saved + unsaved values (no full re-draw,
+  // so unsaved A / B / G / H edits stay exactly as typed).
+  var MO_ENT = [];
+  function moRefreshScores() {
+    var rp = moW0().readPoints || {};
+    document.querySelectorAll("#prMoBody tr[data-ent]").forEach(function (tr) {
+      var it = MO_ENT[Number(tr.dataset.ent)]; if (!it) return;
+      var ev = moEval(it.g, it.r, rp), weighted = (it.r.lvl === 0 && it.r.w > 0) || it.r.community;
+      if (moTgtUsesEntry(it.r)) {
+        tr.cells[2].innerHTML = moTargetHtml(it.g, it.r, ev.tg);
+        var tb = tr.cells[2].querySelector(".pr-mo-tlink");
+        if (tb) tb.addEventListener("click", function () { openTargetPopup(Number(tb.dataset.ti)); });
+      }
+      tr.cells[4].innerHTML = ev.pct != null ? fmtNum(Math.round(ev.pct * 1000) / 10) + "%" : moDash();
+      tr.cells[5].innerHTML = weighted ? (ev.score != null ? fmtNum(r2(ev.score)) : moDash()) : "";
+      if (it.r.community) { var sub = tr.cells[0].querySelector(".pr-mo-sub");
+        if (sub) sub.textContent = "Average of the 10 metrics below (a metric with no target counts as 100%) \u2014 " + ev.used + " of " + ev.of + " scored now, \u00D7 15."; }
+    });
+    moG4SummaryRefresh();
+    MO_GOALS.forEach(function (g) {
+      var gs = moGoalScore(g, rp);
+      var card = document.querySelector('#prMoBody .pr-card[data-goal="' + g.key + '"]');
+      if (card) {
+        card.querySelector(".pr-card-v").innerHTML = (gs.score != null ? fmtNum(r2(gs.score)) : "\u2014") + "<small>/ " + g.weight + "</small>";
+        if (g.key === "G4") card.querySelector(".pr-wkcard-foot span").textContent = moG4Foot();
+        else if (g.key === "G1") card.querySelector(".pr-wkcard-foot span").textContent = moG1Foot();
+        else if (g.key !== "G1" && gs.scored) card.querySelector(".pr-wkcard-foot span").textContent = gs.scored + " of " + gs.total + " parts scored";
+      }
+      if (g.key === "G5") {
+        var tr = document.querySelector('#prMoBody tr[data-comp="1"]'), cr = g.rows.filter(function (x) { return x.compliance; })[0];
+        if (tr && cr) { var cc = moComplianceCells(g, cr, rp); tr.cells[3].innerHTML = cc.done; tr.cells[4].innerHTML = cc.pct; tr.cells[5].innerHTML = cc.score; }
+      }
+    });
+    var tc = document.querySelector('#prMoBody .pr-card[data-goal="TOTAL"]');
+    if (tc) {
+      var T = moTotals(rp);
+      tc.querySelector(".pr-card-v").innerHTML = (T.total != null ? fmtNum(r2(T.total)) : "\u2014") + "<small>/ 100</small>";
+      tc.querySelector(".pr-wkcard-foot span").textContent = moTotalFoot(T);
+    }
+  }
+  var MO_WHY = [];
+  function openWhy(i) {
+    var it = MO_WHY[i]; if (!it) return;
+    var h = (MVIEW && MVIEW.header) || {}, who = h.unit === "PO" ? (h.po && h.po.name) : (h.manager || h.district || "");
+    $("prListTitle").textContent = "Why " + (it.st.yes ? "Yes" : "No") + " \u2014 " + it.r.label + " \u00B7 " + monthLabel(MVIEW.month) + (who ? " \u00B7 " + who : "");
+    $("prListBody").innerHTML = '<table class="pr-tbl"><tbody>' + it.st.why.map(function (w) {
+        return '<tr class="pr-row"><td>' + esc(w[0]) + '</td><td class="pr-num">' + esc(w[1]) + "</td></tr>"; }).join("")
+      + '<tr class="pr-row pr-tgt-total"><td>Result</td><td class="pr-num ' + (it.st.yes ? "pr-rev-yes" : "pr-rev-part") + '">' + (it.st.yes ? "Yes" : "No") + "</td></tr></tbody></table>";
+    $("prListNote").textContent = it.st.rule;
+    $("prListModal").hidden = false;
+  }
+
+
+  /* ---------- G4 · Other Goals: up to 3 activities chosen by the PO ----------
+     Each activity: name, weight, target, done (saved as M_G4_<n>_NAME / _W / _T / _D).
+     Weights of the activities in use must add up to exactly 10.
+     % done = done / target (capped at 100%); score = weight x % done; G4 = sum. */
+  var G4_SLOTS = [1, 2, 3];
+  function moNumVal(fid) { var v = moValue(fid); return (v === "" || v == null) ? "" : num(v); }
+  function moG4Items() {
+    return G4_SLOTS.map(function (i) {
+      var o = { i: i, name: String(moValue("M_G4_" + i + "_NAME") || ""), w: moNumVal("M_G4_" + i + "_W"),
+                t: moNumVal("M_G4_" + i + "_T"), d: moNumVal("M_G4_" + i + "_D") };
+      o.used = o.name.trim() !== "" || o.w !== "" || o.t !== "" || o.d !== "";
+      return o;
+    });
+  }
+  function moG4Eval() {
+    var items = moG4Items().filter(function (x) { return x.used; });
+    var wsum = Math.round(items.reduce(function (a, x) { return a + (x.w === "" ? 0 : x.w); }, 0) * 1000) / 1000;
+    items.forEach(function (x) { x.sc = moPctScore(x.d, x.t, x.w === "" ? 0 : x.w); });
+    var valid = items.length > 0 && wsum === 10, scored = items.filter(function (x) { return x.sc; });
+    return { items: items, wsum: wsum, valid: valid, scored: scored.length,
+             score: valid && scored.length ? scored.reduce(function (a, x) { return a + x.sc.score; }, 0) : null };
+  }
+  function moG4Foot() {
+    var e = moG4Eval();
+    if (!e.items.length) return "Add up to 3 activities";
+    if (!e.valid) return "Weights add up to " + fmtNum(e.wsum) + " \u2014 must be 10";
+    return e.scored + " of " + e.items.length + " activities scored";
+  }
+  function moG4WsumHtml(e) {
+    return '<span class="pr-mo-wsum ' + (e.items.length && !e.valid ? "bad" : (e.valid ? "ok" : "")) + '" title="The weights of the activities must add up to 10">'
+      + fmtNum(e.wsum) + " / 10</span>";
+  }
+
+  function moG4Section(g) {
+    var e = moG4Eval(), all = moG4Items(), editable = canEditSelf(MVIEW), code = moW0().code;
+    var out = moGroupHead(g.key, '<span class="pr-grp-k">' + g.key + "</span>" + esc(g.title), "Goal", "auto", '<span class="pr-grpcount">Weight ' + g.weight + "</span>");
+    out += '<tr class="pr-row pr-hidden pr-mo-l0" data-secrow="mG4" data-g4sum="1"><td class="pr-item">Other activities'
+      + '<div class="pr-mo-sub">Up to 3 activities chosen by the PO. Their weights must add up to 10.</div></td>'
+      + moCell(moG4WsumHtml(e)) + moCell("") + moCell("") + moCell("") + moCell(e.score != null ? fmtNum(r2(e.score)) : moDash()) + "</tr>";
+    if (!editable) {
+      if (!e.items.length) return out + '<tr class="pr-row pr-hidden pr-mo-l1" data-secrow="mG4"><td class="pr-item">'
+        + moPill("No activities added", "pr-mo-na", "Added by the person under review") + '</td><td colspan="5"></td></tr>';
+      e.items.forEach(function (x) {
+        out += '<tr class="pr-row pr-hidden pr-mo-l1" data-secrow="mG4"><td class="pr-item">' + esc(x.name || "(unnamed)") + "</td>"
+          + moCell(x.w === "" ? "" : fmtNum(x.w)) + moCell(x.t === "" ? "" : fmtNum(x.t)) + moCell(x.d === "" ? "" : fmtNum(x.d))
+          + moCell(x.sc ? fmtNum(x.sc.pct) + "%" : moDash()) + moCell(x.sc ? fmtNum(x.sc.score) : moDash()) + "</tr>";
+      });
+      return out;
+    }
+    var shown = all.filter(function (x) { return x.used; }).map(function (x) { return x.i; });
+    if (!shown.length) shown = [1];
+    all.forEach(function (x) {
+      var off = shown.indexOf(x.i) < 0, sc = x.used ? moPctScore(x.d, x.t, x.w === "" ? 0 : x.w) : null;
+      var numIn = function (k, v, ph) {
+        return '<input type="number" min="0" step="any" inputmode="decimal" class="pr-mo-g4n" data-wc="' + code + '" data-fid="M_G4_' + x.i + "_" + k
+          + '" placeholder="' + ph + '" value="' + (v === "" ? "" : v) + '">';
+      };
+      out += '<tr class="pr-row pr-hidden pr-mo-l1' + (off ? " pr-mo-g4off" : "") + '" data-secrow="mG4" data-g4="' + x.i + '">'
+        + '<td class="pr-item"><div class="pr-mo-g4name"><input type="text" class="pr-mo-txt" maxlength="80" data-wc="' + code + '" data-fid="M_G4_' + x.i
+        + '_NAME" placeholder="Activity ' + x.i + ' \u2014 name" value="' + esc(x.name) + '">'
+        + '<button type="button" class="pr-mo-x" title="Remove this activity">\u2715</button></div></td>'
+        + moCell(numIn("W", x.w, "Weight")) + moCell(numIn("T", x.t, "Target")) + moCell(numIn("D", x.d, "Done"))
+        + moCell(sc ? fmtNum(sc.pct) + "%" : moDash()) + moCell(sc ? fmtNum(sc.score) : moDash()) + "</tr>";
+    });
+    out += '<tr class="pr-row pr-hidden" data-secrow="mG4" data-g4add="1"' + (shown.length >= 3 ? ' style="display:none"' : "")
+      + '><td colspan="6"><button type="button" class="pr-btn pr-mo-add">+ Add activity</button>'
+      + ' <span class="pr-mo-sub" style="display:inline">Up to 3 \u00B7 weights must add up to 10</span></td></tr>';
+    return out;
+  }
+
+  function moG4RowRefresh(tr) {
+    var i = Number(tr.dataset.g4), get = function (k) { return moNumVal("M_G4_" + i + "_" + k); };
+    var w = get("W"), sc = moPctScore(get("D"), get("T"), w === "" ? 0 : w);
+    tr.cells[4].innerHTML = sc ? fmtNum(sc.pct) + "%" : moDash();
+    tr.cells[5].innerHTML = sc ? fmtNum(sc.score) : moDash();
+  }
+  function moG4SummaryRefresh() {
+    var tr = document.querySelector('#prMoBody tr[data-g4sum="1"]'); if (!tr) return;
+    var e = moG4Eval();
+    tr.cells[1].innerHTML = moG4WsumHtml(e);
+    tr.cells[5].innerHTML = e.score != null ? fmtNum(r2(e.score)) : moDash();
+  }
+  function bindG4() {
+    document.querySelectorAll("#prMoBody .pr-mo-g4n").forEach(function (inp) {
+      inp.addEventListener("input", function () {
+        var raw = inp.value.trim(), val = raw === "" ? "" : Number(raw), bad = val !== "" && (isNaN(val) || val < 0);
+        inp.classList.toggle("is-bad", bad);
+        if (bad) return;
+        markDirty(inp.dataset.wc, inp.dataset.fid, val);
+        moG4RowRefresh(inp.closest("tr")); moRefreshScores();
+      });
+    });
+    document.querySelectorAll("#prMoBody .pr-mo-txt").forEach(function (inp) {
+      inp.addEventListener("input", function () { markDirty(inp.dataset.wc, inp.dataset.fid, inp.value); moRefreshScores(); });
+    });
+    document.querySelectorAll("#prMoBody .pr-mo-x").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var tr = b.closest("tr");
+        tr.querySelectorAll("input[data-fid]").forEach(function (inp) { inp.value = ""; inp.classList.remove("is-bad"); markDirty(inp.dataset.wc, inp.dataset.fid, ""); });
+        var visible = document.querySelectorAll("#prMoBody tr[data-g4]:not(.pr-mo-g4off)").length;
+        if (visible > 1) tr.classList.add("pr-mo-g4off");
+        moG4RowRefresh(tr); moRefreshScores();
+        var add = document.querySelector('#prMoBody tr[data-g4add="1"]'); if (add) add.style.display = "";
+      });
+    });
+    document.querySelectorAll("#prMoBody .pr-mo-add").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var next = document.querySelector("#prMoBody tr[data-g4].pr-mo-g4off");
+        if (next) { next.classList.remove("pr-mo-g4off"); var n = next.querySelector(".pr-mo-txt"); if (n) n.focus(); }
+        if (!document.querySelector("#prMoBody tr[data-g4].pr-mo-g4off")) b.closest("tr").style.display = "none";
+      });
+    });
+  }
+
+  function moW0() {
+    var month = MVIEW.month;
+    return (MVIEW.weeks || []).filter(function (w) { return w.week === 0; })[0] || { week: 0, code: month + "00", sections: {}, readPoints: {} };
+  }
+  // Saved "exams completed" for this month ("" = not entered yet)
+  function moValue(fid) {
+    var code = moW0().code, d = MDIRTY[code];
+    if (d && Object.prototype.hasOwnProperty.call(d, fid)) return d[fid];
+    var v = ((moW0().sections || {}).M || {})[fid];
+    return v == null ? "" : v;
+  }
+  // G1 done comes from the exams ticked Completed for the unit's districts (shared, see acadFromRows).
+  // Months from before the ticks: nothing ticked + a number typed in the old box -> that number.
+  function moG1Legacy() {
+    var v = moValue("M_G1_DONE");
+    return (v === undefined || v === null || v === "") ? "" : num(v);
+  }
+  // This month's G1 programs (core share the 40, non-core listed only); null when the plan didn't load
+  function moG1P() { var ac = MVIEW && MVIEW.academic; return ac ? acadPrograms(ac, moG1Legacy()) : null; }
+  function moG1Foot() {
+    var P = moG1P();
+    if (!P) return "Academic Plan unavailable";
+    if (P.na) return "No core exams this month — not scored";
+    return P.n + " core exam" + (P.n === 1 ? "" : "s") + " · " + fmtNum(P.coreD) + " of " + fmtNum(P.coreT) + " done";
+  }
+  // The G1 rows of the Monthly table: Core exams (weight 40, split equally per program) + each
+  // core program, then Non-core exams + each non-core program (listed, no weight).
+  function moG1Rows() {
+    var P = moG1P(), out = "";
+    var tr = function (lvl, label, tip, w, t, d, pct, s, link) {
+      var lk = function (v) { return link && v !== "" && v != null ? '<button type="button" class="pr-mo-link" title="See and tick the exams">' + fmtNum(v) + "</button>" : (v === "" || v == null ? moDash() : fmtNum(v)); };
+      return '<tr class="pr-row pr-hidden pr-mo-l' + lvl + '" data-secrow="mG1" data-g1row="1"><td class="pr-item"' + (tip ? ' title="' + esc(tip) + '"' : "") + ">" + esc(label) + "</td>"
+        + '<td class="pr-num">' + (w == null ? "" : fmtNum(r2(w))) + "</td>"
+        + '<td class="pr-num">' + lk(t) + "</td>" + '<td class="pr-num">' + lk(d) + "</td>"
+        + '<td class="pr-num">' + (pct == null ? moDash() : fmtNum(Math.round(pct * 1000) / 10) + "%") + "</td>"
+        + '<td class="pr-num">' + (s === "" ? "" : s == null ? moDash() : fmtNum(r2(s))) + "</td></tr>";
+    };
+    if (!P) return tr(0, "Core exams", "The Academic Plan could not be loaded", 40, "", "", null, null, false);
+    var legacyTip = P.legacy ? " Done here is the number typed earlier in the old “exams completed” box — tick the exams to replace it." : "";
+    if (P.na) {
+      out += '<tr class="pr-row pr-hidden pr-mo-l0" data-secrow="mG1" data-g1row="1"><td class="pr-item" title="No core exam in the Academic Plan this month, so G1 is left out and the monthly score is worked out from the other goals.">Core exams</td>'
+        + '<td class="pr-num">40</td><td class="pr-num">0</td><td class="pr-num">' + moDash() + '</td><td class="pr-num">' + moDash() + "</td>"
+        + '<td class="pr-num">' + moPill("Not scored", "pr-mo-na", "No core exam this month") + "</td></tr>";
+    } else {
+      out += tr(0, "Core exams", "40 points shared equally by this month's " + P.n + " core exam program" + (P.n === 1 ? "" : "s") + "." + legacyTip,
+                40, P.coreT, P.coreD, P.score / 40, P.score, true);
+      P.core.forEach(function (p) { out += tr(1, p.label, legacyTip.trim(), p.w, p.t, p.d, p.pct, p.w == null ? "" : p.s, true); });
+    }
+    if (P.noncore.length) {
+      out += tr(0, "Non-core exams", "Listed for follow-up; not part of the G1 score.", null, P.ncT, P.ncD, P.ncT > 0 ? Math.min(P.ncD / P.ncT, 1) : null, "", true);
+      P.noncore.forEach(function (p) { out += tr(1, p.label, "", null, p.t, p.d, p.pct, "", true); });
+    }
+    return out;
+  }
+  function moG1Section(g) {
+    return moGroupHead(g.key, '<span class="pr-grp-k">' + g.key + "</span>" + esc(g.title), "Goal", "auto", '<span class="pr-grpcount">Weight ' + g.weight + "</span>") + moG1Rows();
+  }
+  // After a tick: redraw the G1 rows (keeping the section open or closed) and the score cards
+  function moRefreshG1() {
+    var head = document.querySelector('#prMoBody tr.pr-grp[data-grp="mG1"]');
+    if (head) {
+      document.querySelectorAll('#prMoBody tr[data-g1row]').forEach(function (tr) { tr.remove(); });
+      head.insertAdjacentHTML("afterend", moG1Rows());
+      var open = head.classList.contains("is-open");
+      document.querySelectorAll('#prMoBody tr[data-g1row]').forEach(function (tr) {
+        tr.classList.toggle("pr-hidden", !open);
+        tr.querySelectorAll(".pr-mo-link").forEach(function (b) { b.addEventListener("click", openAcadList); });
+      });
+    }
+    var foot = document.querySelector('#prMoBody .pr-card[data-goal="G1"] .pr-wkcard-foot span');
+    if (foot) foot.textContent = moG1Foot();
+    moRefreshScores();
+  }
+  // Monthly total: goals scored, out of 100. When G1 has no core exam it is left out and the
+  // other goals are scaled up to 100 (their weights add up to 60).
+  function moTotals(rp) {
+    var total = 0, n = 0, g1na = false;
+    MO_GOALS.forEach(function (g) {
+      var gs = moGoalScore(g, rp);
+      if (gs.na) { g1na = true; return; }
+      if (gs.score != null) { total += gs.score; n++; }
+    });
+    var of = g1na ? 100 - MO_GOALS[0].weight : 100;
+    return { total: n ? total * 100 / of : null, n: n, of: g1na ? 4 : 5, g1na: g1na };
+  }
+  function moTotalFoot(T) {
+    var s = T.n === T.of ? "All goals scored" : T.n ? "Partial — " + T.n + " of " + T.of + " goals scored" : "Shown once targets and data are in";
+    return T.g1na ? s + " · no core exams, G1 left out" : s;
+  }
+  // Sheet B rule: % done = done / target, capped at 100%; score = weight x % done
+  function moPctScore(done, target, weight) {
+    if (done === "" || done == null || isNaN(done) || !(target > 0)) return null;
+    var p = Math.min(done / target, 1);
+    return { pct: Math.round(p * 1000) / 10, score: Math.round(weight * p * 100) / 100 };
+  }
+  function moOnNumInput(e) {
+    var el = e.target, raw = el.value.trim(), tr = el.closest("tr");
+    var val = raw === "" ? "" : Number(raw);
+    var bad = val !== "" && (isNaN(val) || val < 0);
+    el.classList.toggle("is-bad", bad);
+    if (bad) return;                                   // never save a negative / non-number
+    markDirty(el.dataset.wc, el.dataset.fid, val);
+    var target = Number(el.dataset.target), sc = moPctScore(val, target, Number(el.dataset.weight));
+    tr.cells[4].innerHTML = sc ? fmtNum(sc.pct) + "%" : moDash();
+    tr.cells[5].innerHTML = sc ? fmtNum(sc.score) : moDash();
+    var over = tr.querySelector(".pr-mo-over");
+    if (val !== "" && val > target) { if (!over) el.insertAdjacentHTML("afterend", '<div class="pr-mo-over">More than planned</div>'); }
+    else if (over) over.remove();
+    var card = document.querySelector('#prMoBody .pr-card[data-goal="G1"] .pr-card-v');
+    if (card) card.innerHTML = (sc ? fmtNum(sc.score) : "\u2014") + "<small>/ " + el.dataset.weight + "</small>";
+    moRefreshScores();
+  }
+
+  function renderMonthlyView() {
+    MO_TLINES = []; MO_WHY = []; MO_ENT = [];
+    var v = MVIEW, h = v.header || {}, month = v.month;
+    var w0 = (v.weeks || []).filter(function (w) { return w.week === 0; })[0] || { week: 0, code: month + "00", sections: {}, readPoints: {} };
+    var rp = w0.readPoints || {}, haveData = hasData(w0);
+    var label = monthLabel(month);
+    var selfOk = canEditSelf(v), mgrOk = canEditManager(v);
+
+    var html = renderHeader(h) + renderBlocks(h, v);
+    html += moStatusBanner(v, w0);
+    html += moCards(rp);
+
+    var head = '<tr><th class="pr-item">Item</th><th class="pr-num">Weight</th><th class="pr-num">Target</th><th class="pr-num">Done</th><th class="pr-num">% done</th><th class="pr-num">Score</th></tr>';
+    var body = moWriteSection(MO_SEC.A, w0, selfOk, h.unit) + moWriteSection(MO_SEC.B, w0, selfOk, h.unit);
+    MO_GOALS.forEach(function (g) { body += moGoalSection(g, rp); });
+    body += moWriteSection(MO_SEC.G, w0, selfOk, h.unit) + moWriteSection(MO_SEC.H, w0, mgrOk, h.unit);
+    html += '<div class="pr-tablewrap"><table class="pr-tbl pr-mo-tbl"><thead>' + head + "</thead><tbody>" + body + "</tbody></table></div>";
+
+    if (selfOk || mgrOk) html += '<div class="pr-savebar"><span class="pr-savehint">You can edit the sections your role owns.</span>'
+      + '<button class="pr-btn pr-btn-primary" id="prMoSave">Save monthly review</button></div>';
+    $("prMoBody").innerHTML = html;
+    bindTable("#prMoBody");
+    // folded lines (Total streaks): click the line to show / hide its clubs
+    document.querySelectorAll("#prMoBody tr.pr-foldhead").forEach(function (h) {
+      h.addEventListener("click", function () {
+        var open = h.classList.toggle("is-unfolded");
+        h.querySelector(".pr-fold-caret").textContent = open ? "\u25BE" : "\u25B8";
+        document.querySelectorAll('#prMoBody tr[data-foldof="' + h.dataset.fold + '"]').forEach(function (tr) { tr.classList.toggle("pr-folded", !open); });
+      });
+    });
+    document.querySelectorAll("#prMoBody .pr-mo-link").forEach(function (b) { b.addEventListener("click", openAcadList); });
+    document.querySelectorAll("#prMoBody .pr-mo-num").forEach(function (i) { i.addEventListener("input", moOnNumInput); });
+    document.querySelectorAll("#prMoBody .pr-mo-tlink").forEach(function (b) { b.addEventListener("click", function () { openTargetPopup(Number(b.dataset.ti)); }); });
+    bindG4();
+    document.querySelectorAll("#prMoBody .pr-mo-ent").forEach(function (inp) {
+      inp.addEventListener("input", function () {
+        var raw = inp.value.trim(), val = raw === "" ? "" : Number(raw), bad = val !== "" && (isNaN(val) || val < 0);
+        inp.classList.toggle("is-bad", bad);
+        if (bad) return;
+        markDirty(inp.dataset.wc, inp.dataset.fid, val); moRefreshScores();
+      });
+    });
+    document.querySelectorAll("#prMoBody .pr-mo-why").forEach(function (b) { b.addEventListener("click", function () { openWhy(Number(b.dataset.wi)); }); });
+    document.querySelectorAll("#prMoBody .pr-mo-yn").forEach(function (s) {
+      s.addEventListener("change", function () { markDirty(s.dataset.wc, s.dataset.fid, s.value); moRefreshScores(); });
+    });
+    if ($("prMoSave")) $("prMoSave").addEventListener("click", saveMonthly);
+    document.querySelectorAll("#prMoBody .pr-mstat-toggle").forEach(function (t) {
+      t.addEventListener("click", function () {
+        var more = t.closest(".pr-mstat").querySelector(".pr-mstat-more"), open = more.hidden;
+        more.hidden = !open; t.setAttribute("aria-expanded", open ? "true" : "false");
+        t.textContent = open ? "Hide pending items" : "Click here to see what\u2019s pending";
+      });
+    });
+    document.querySelectorAll("#prMoBody [data-jgrp]").forEach(function (b) {
+      b.addEventListener("click", function () { moJump(b.dataset.jgrp, b.dataset.jfid); });
+    });
+  }
+
+  /* ---------- review status banner (same rule as the Monthly Summary tab) ----------
+     Built from what is SAVED for this month, so it changes after Save. Each gap is a
+     button that opens its section and scrolls to the field. */
+  var MO_GRP_NAME = { mA: "A \u00B7 Check-in", mB: "B \u00B7 Last month's actions", mG1: "G1 \u00B7 Academic Programs",
+    mG2: "G2 \u00B7 Life Skills", mG3: "G3 \u00B7 Vibrant Teacher Community", mG4: "G4 \u00B7 Other Goals",
+    mG5: "G5 \u00B7 Self-Development", mG: "G \u00B7 Next month", mH: "H \u00B7 Review record" };
+  var MO_GRP_ORDER = ["mA", "mB", "mG1", "mG2", "mG3", "mG4", "mG5", "mG", "mH"];
+  function moStatusBanner(v, w0) {
+    var h = v.header || {};
+    if (!h.selfEmpId) return "";                                   // District view: nobody's own review
+    var cf = w0.carryForward || {};
+    var prev = { G: { G2: cf.B1, G3: cf.B2, G4: cf.B3, G5: cf.B4, G6: cf.B5 } };
+    var ev = msumEvaluate(w0.sections, prev, v.academic ? acadTotal(v.academic) : 0);
+    var selfName = h.unit === "PO" ? ((h.po && h.po.name) || "the PO") : (h.manager || "the " + h.unit);
+    var rv = msumReviewerOf(person(h.selfEmpId));
+    var rvName = rv ? rv.name + " (" + rv.designation + ")" : "the manager";
+    var chips = function (list) {
+      var by = {};
+      list.forEach(function (x) { (by[x.grp] = by[x.grp] || []).push(x); });
+      return MO_GRP_ORDER.filter(function (g) { return by[g]; }).map(function (g) {
+        return '<div class="pr-mstat-grp"><span class="pr-mstat-sec">' + esc(MO_GRP_NAME[g] || g) + "</span>"
+          + by[g].map(function (x) {
+              return '<button type="button" class="pr-mstat-chip" data-jgrp="' + esc(x.grp) + '" data-jfid="' + esc(x.fid) + '" title="Go to this field">'
+                + esc(x.label) + "</button>";
+            }).join("") + "</div>";
+      }).join("");
+    };
+    var last = [ev.selfAt, ev.mgrAt].sort().pop();
+    var saved = last ? " · last saved " + fmtDMY(last) : "";
+    var n = ev.missingAt.length, items = function (k) { return k + " item" + (k === 1 ? "" : "s"); };
+    var cls, pill, text, list = [];
+    if (!ev.started) {
+      cls = "is-new"; pill = "Not started";
+      text = "Nothing saved for " + monthLabel(v.month).replace(/\s*\(no data yet\)/, "") + " yet — " + items(n) + " for " + selfName + " to fill, then " + rvName + " fills H.";
+      list = ev.missingAt.concat(ev.mgrMissingAt);
+    } else if (ev.st === "none") {
+      cls = "is-none"; pill = "Not done";
+      text = items(n) + " still pending for " + selfName + saved + ".";
+      list = ev.missingAt.concat(ev.mgrMissingAt);
+    } else if (ev.st === "partial") {
+      cls = "is-partial"; pill = "Partially done";
+      text = selfName + "'s points are complete — waiting for " + rvName + " to fill H" + saved + ".";
+      list = ev.mgrMissingAt;
+    } else {
+      cls = "is-done"; pill = "Review done";
+      text = selfName + "'s points and " + rvName + "'s review record (H) are saved" + saved + ".";
+    }
+    return '<div class="pr-panel pr-mstat ' + cls + '">'
+      + '<div class="pr-mstat-line"><span class="pr-mstat-pill">' + pill + "</span>"
+      + '<span class="pr-mstat-text">' + esc(text) + "</span>"
+      + (list.length ? '<button type="button" class="pr-mstat-toggle" aria-expanded="false">Click here to see what’s pending</button>' : "")
+      + "</div>"
+      + (list.length ? '<div class="pr-mstat-more" hidden><div class="pr-mstat-hint">Click an item to go to it. Save monthly review after filling.</div>' + chips(list) + "</div>" : "")
+      + "</div>";
+  }
+  // Open a section of the Monthly table and bring one field into view.
+  function moJump(grp, fid) {
+    var head = document.querySelector('#prMoBody tr.pr-grp[data-grp="' + grp + '"]');
+    if (!head) return;
+    if (!head.classList.contains("is-open")) head.click();
+    var row = null;
+    if (fid) { var el = document.querySelector('#prMoBody tr[data-secrow="' + grp + '"] [data-fid="' + fid + '"]'); row = el && el.closest("tr"); }
+    if (!row && grp === "mG4") row = document.querySelector('#prMoBody tr[data-g4add="1"]:not([style*="none"])') || document.querySelector('#prMoBody tr[data-g4sum="1"]');
+    if (!row && fid) {   // read-only cells have no data-fid: find the row by its label
+      var want = { A1: 0, A2: 1, H1: 0, H2: 1, H3: 2 }[fid];
+      if (want != null) row = document.querySelectorAll('#prMoBody tr[data-secrow="' + grp + '"]')[want] || null;
+    }
+    row = row || head;
+    row.scrollIntoView({ behavior: "smooth", block: "center" });
+    row.classList.remove("pr-flash"); void row.offsetWidth; row.classList.add("pr-flash");
+    var focus = fid && row.querySelector('[data-fid="' + fid + '"]');
+    if (focus && /^(INPUT|SELECT)$/.test(focus.tagName)) setTimeout(function () { try { focus.focus({ preventScroll: true }); } catch (e) {} }, 350);
+  }
+  function monthLabel(ym) {
+    var m = (state.base && state.base.months || []).filter(function (x) { return x.code === ym; })[0];
+    return m ? m.label : ym;
+  }
+
+  function moCards(rp) {
+    var cards = "", T = moTotals(rp);
+    MO_GOALS.forEach(function (g) {
+      var gs = moGoalScore(g, rp);
+      var foot = g.key === "G1" ? moG1Foot()
+               : g.key === "G4" ? moG4Foot()
+               : (gs.scored ? gs.scored + " of " + gs.total + " parts scored" : (MVIEW.targets && MVIEW.targets.rowsInMonth ? "Needs data or targets" : "No targets for this month"));
+      cards += '<div class="pr-card" data-goal="' + g.key + '"><div class="pr-card-k">' + g.key + " \u00B7 " + esc(g.title) + '</div><div class="pr-card-v">'
+        + (gs.score != null ? fmtNum(r2(gs.score)) : "\u2014") + "<small>/ " + g.weight + "</small></div>"
+        + '<div class="pr-wkcard-foot"><span>' + esc(foot) + "</span></div></div>";
+    });
+    var head = '<div class="pr-card" data-goal="TOTAL">'
+      + '<div class="pr-card-k">Monthly score</div><div class="pr-card-v">' + (T.total != null ? fmtNum(r2(T.total)) : "\u2014") + "<small>/ 100</small></div>"
+      + '<div class="pr-wkcard-foot"><span>' + esc(moTotalFoot(T)) + "</span></div></div>";
+    return '<div class="pr-cards pr-mo-cards">' + head + cards + "</div>";
+  }
+
+  function moGroupHead(key, title, tagText, tagCls, extra) {
+    return '<tr class="pr-grp" data-grp="m' + key + '"><td colspan="6"><span class="pr-caret">\u25B8</span>' + title
+      + ' <span class="pr-who-tag pr-who-' + tagCls + '">' + tagText + "</span>" + (extra || "") + "</td></tr>";
+  }
+  function moWriteSection(S, w0, editable, unit) {
+    var who = sectionWho(S, unit || "PO", MVIEW && MVIEW.header);
+    var out = moGroupHead(S.k, '<span class="pr-grp-k">' + S.k + "</span>" + esc(S.title), who, whoClassOf(who));
+    S.rows.forEach(function (r) {
+      out += '<tr class="pr-row pr-hidden" data-secrow="m' + S.k + '"><td class="pr-item">' + esc(r.label) + '</td><td colspan="5">'
+        + renderCell(S, r, w0, editable) + "</td></tr>";
+    });
+    return out;
+  }
+  function moGoalSection(g, rp) {
+    if (g.key === "G4") return moG4Section(g);
+    if (g.key === "G1") return moG1Section(g);
+    var out = moGroupHead(g.key, '<span class="pr-grp-k">' + g.key + "</span>" + esc(g.title), "Goal", "auto", '<span class="pr-grpcount">Weight ' + g.weight + "</span>");
+    g.rows.forEach(function (r) {
+      var cls = "pr-row pr-hidden pr-mo-l" + r.lvl + (r.head ? " pr-mo-head" : "") + (r.foldOf ? " pr-folded" : "") + (r.fold ? " pr-foldhead" : "");
+      var ev = (r.head || r.academic || r.compliance) ? null : moEval(g, r, rp);
+      var sub = r.fold ? "" : (r.note || "");
+      if (r.community && ev) sub = "Average of the 10 metrics below (a metric with no target counts as 100%) \u2014 " + ev.used + " of " + ev.of + " scored now, \u00D7 15.";
+      var item = esc(r.label) + (sub ? '<div class="pr-mo-sub">' + esc(sub) + "</div>" : "");
+      var entIdx = null;
+      if (r.community) { MO_ENT.push({ g: g, r: r }); entIdx = MO_ENT.length - 1; }
+      var rowOpen = '<tr class="' + cls + '" data-secrow="m' + g.key + '"' + (r.compliance ? ' data-comp="1"' : "");
+      if (r.fold) item = '<span class="pr-fold-caret">\u25B8</span>' + item;
+      if (r.fold) rowOpen += ' data-fold="' + r.fold + '" title="' + esc(r.note || "") + '"';
+      if (r.foldOf) rowOpen += ' data-foldof="' + r.foldOf + '"';
+      var row = '<td class="pr-item">' + item + "</td>";
+      if (r.head) return (out += rowOpen + ">" + row + '<td colspan="5"></td></tr>');
+      var done, target = "", pct = moDash(), score = moDash();
+
+      if (r.compliance) {
+        var cc = moComplianceCells(g, r, rp);
+        done = cc.done; target = String(r.target); pct = cc.pct; score = cc.score;
+      } else {
+        var st = ev.st;
+        // target: clickable number, a box to type it (targets the file doesn't carry yet), or why there is none
+        target = moTargetHtml(g, r, ev.tg);
+        if (moTgtIsEntry(r) || moTgtUsesEntry(r)) { MO_ENT.push({ g: g, r: r }); entIdx = MO_ENT.length - 1; }
+        if (r.v && r.v.numentry) {
+          var curv = st.kind === "num" ? st.value : "";
+          MO_ENT.push({ g: g, r: r }); entIdx = MO_ENT.length - 1;
+          done = canEditSelf(MVIEW)
+            ? '<input type="number" min="0" step="any" inputmode="decimal" class="pr-mo-ent" placeholder="0" data-wc="' + moW0().code
+              + '" data-fid="' + r.fid + '" value="' + curv + '">'
+            : (curv === "" ? moPill("Not entered", "pr-mo-entry", "Entered by the person under review") : fmtNum(curv));
+        }
+        else if (st.kind === "num") done = '<span title="' + esc(st.src) + '">' + fmtNum(st.value) + "</span>";
+        else if (st.kind === "yn") {
+          MO_WHY.push({ r: r, st: st });
+          done = '<button type="button" class="pr-mo-why ' + (st.yes ? "pr-rev-yes" : "pr-rev-part") + '" data-wi="' + (MO_WHY.length - 1) + '" title="' + esc(st.tip) + '">'
+            + (st.yes ? "Yes" : "No") + (st.detail ? " \u00B7 " + esc(st.detail) : "") + "</button>";
+        }
+        else if (st.kind === "nodata") done = '<span title="' + esc(st.tip || st.src) + '">' + moDash() + "</span>";
+        else if (st.kind === "ynentry") {
+          var hint = r.hint ? r.hint(rp, moW0()) : null;
+          done = canEditSelf(MVIEW)
+            ? '<select class="pr-mo-yn" data-wc="' + moW0().code + '" data-fid="' + r.fid + '"><option value="">\u2014</option>'
+              + '<option value="Y"' + (st.value === "Y" ? " selected" : "") + ">Yes</option><option value=\"N\"" + (st.value === "N" ? " selected" : "") + ">No</option></select>"
+            : (st.value === "Y" ? '<span class="pr-rev-yes">Yes</span>' : st.value === "N" ? '<span class="pr-rev-part">No</span>'
+               : moPill("Not entered", "pr-mo-entry", "Entered by the person under review"));
+          if (hint) done = '<span title="' + esc(hint.tip) + '">' + done + '</span><div class="pr-mo-sub pr-mo-hint" title="' + esc(hint.tip) + '">' + esc(hint.short) + "</div>";
+        }
+        else if (st.kind === "na") done = moPill("Not in data yet", "pr-mo-na", "No uploaded file carries this yet");
+        else if (st.kind === "entry") done = moPill("To be entered", "pr-mo-entry", "Will be filled in on this page");
+        else done = "";
+        if (ev.pct != null) pct = fmtNum(Math.round(ev.pct * 1000) / 10) + "%";
+        if (ev.score != null) score = fmtNum(r2(ev.score));
+        var weighted = (r.lvl === 0 && r.w > 0) || r.community;
+        if (!weighted) score = "";
+        if (r.yn) { target = ""; pct = ""; score = ""; }
+        if (!r.t && !r.tsum && !r.community && !r.v) pct = "";      // plain containers
+        if (r.info) { target = ""; pct = ""; score = ""; }            // information-only lines (e.g. total streaks)
+      }
+      row += moCell(r.w != null ? String(r.w) : "") + moCell(target) + moCell(done) + moCell(pct) + moCell(score) + "</tr>";
+      out += rowOpen + (entIdx != null ? ' data-ent="' + entIdx + '"' : "") + ">" + row;
+    });
+    return out;
+  }
+
+  /* ---------- monthly save (A / B / G / H for period YYYYMM00) ---------- */
+  function saveMonthly() {
+    if (document.querySelector("#prMoBody .is-bad")) { toast("Fix the highlighted number first \u2014 it must be 0 or more."); return; }
+    var e4 = moG4Eval();
+    if (e4.items.length && e4.items.some(function (x) { return !x.name.trim(); })) { toast("G4: give every activity a name (or remove it)."); return; }
+    if (e4.items.length && !e4.valid) { toast("G4: the activity weights add up to " + fmtNum(e4.wsum) + " \u2014 they must total exactly 10."); return; }
+    var codes = Object.keys(MDIRTY).filter(function (c) { return Object.keys(MDIRTY[c]).length; });
+    if (!codes.length) { toast("Nothing to save yet."); return; }
+    var btn = $("prMoSave"); btn.disabled = true; btn.innerHTML = '<span class="pr-spin"></span>Saving\u2026';
+    var empId = MVIEW.header.selfEmpId, failed = 0;
+    Promise.all(codes.map(function (code) {
+      return sbSaveWeekly(empId, code, MDIRTY[code], currentEmail()).catch(function (e) { failed++; console.error("Monthly save failed", e); });
+    })).then(function () {
+      btn.disabled = false; btn.textContent = "Save monthly review";
+      if (failed) {
+        var hint = document.querySelector("#prMoBody .pr-savehint");
+        if (hint) { hint.textContent = "Save failed — click Save again to retry. Your changes are NOT lost."; hint.classList.add("is-fail"); }
+        toast("Save failed \u2014 please click Save again to retry.");
+      } else { toast("Saved."); MDIRTY = {}; MSUM.cache = {}; MSUM.data = null; loadMonthlyView(); }
+    });
+  }
+
+
+  /* ---------- Academic Plan (G1): the DISTRICT's exams, completed once per district (Nov 2026) ----------
+     Target  The Academic Plan (academic_targets) is uploaded PO-wise, but the exams belong to the
+             district: a PO sees every exam of the districts they are assigned to (Assignments), and
+             PM / DM / District count each district's exam once. Same exam = same district + program +
+             test cycle (the exam key), whichever PO row it came from.
+     Done    academic_exam_done: one row per completed exam, written when any PO of the district ticks
+             it in the exam list (any PO of that district, or itadmin, can untick). Shared: every PO,
+             PM and DM of the district sees the tick. The row keeps the month it counts in (counts_in,
+             frozen when ticked) and no plan upload / edit ever touches it, so re-uploading the plan
+             can't change what POs already marked.
+             A month's Done = ticks of the unit's districts with counts_in = that month.
+     Older months: when nothing is ticked for a month but a number was typed in the old
+             "exams completed" box (M_G1_DONE), that number is still used. */
+  function acadNorm(s) { return String(s == null ? "" : s).replace(/\s+/g, " ").trim().toLowerCase(); }
+  function acadKey(district, program, test) { return normDist(district) + "|" + acadNorm(program) + "|" + acadNorm(test); }
+  function acadYm(ym) { ym = String(ym || ""); return ym.length === 6 ? MON_SHORT[Number(ym.slice(4)) - 1] + " " + ym.slice(0, 4) : ym; }
+  function acadToday() { var d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+
+  // All completed exams (small table: one row per exam done in a year). ok = false when the table is missing.
+  async function sbGetAcadDone() {
+    try { return { ok: true, rows: await fetchAll(function () { return db().from("academic_exam_done").select("*"); }) }; }
+    catch (e) { console.warn("academic_exam_done not loaded (run sql/2026-11-25-academic-exam-done.sql):", e); return { ok: false, rows: [] }; }
+  }
+  async function sbGetAcademic(unit, value, month) {
+    await loadOrg();
+    var r = await Promise.all([
+      fetchAll(function () { return db().from("academic_targets").select("*").eq("plan_month", month); }),
+      sbGetAcadDone()
+    ]);
+    var list = acadFromRows(r[0], unit, value, r[1], month);
+    list.args = [unit, value, month];
+    return list;
+  }
+  // Districts whose exams a unit carries: Assignments first; a PO missing there falls back to their own plan rows.
+  function acadDistrictsOf(unit, value, rows) {
+    if (unit === "District") return [value];
+    var p = person(value), d = ((p && p.assigned_districts) || []).slice();
+    if (!d.length && unit === "PO") {
+      var id = normId(value), seen = {};
+      (rows || []).forEach(function (r) {
+        if (normId(r.po_id) === id && !seen[normDist(r.district)]) { seen[normDist(r.district)] = 1; d.push(r.district); }
+      });
+    }
+    return d;
+  }
+  // One month's academic_targets rows -> the unit's exam list, one item per district exam.
+  // done = { ok, rows } from academic_exam_done; leave it out when only the planned count is needed.
+  function acadFromRows(rows, unit, value, done, month) {
+    var districts = acadDistrictsOf(unit, value, rows), dk = {};
+    districts.forEach(function (d) { dk[normDist(d)] = 1; });
+    var doneRows = (done && done.rows) || [], doneByKey = {};
+    doneRows.forEach(function (d) { doneByKey[d.exam_key] = d; });
+    var out = [], seen = {};
+    (rows || []).forEach(function (r) {
+      if (!dk[normDist(r.district)]) return;
+      var key = acadKey(r.district, r.program_name, r.test_cycle), who = r.po_name || r.po_id || "";
+      if (seen[key]) { if (who && seen[key].pos.indexOf(who) < 0) seen[key].pos.push(who); return; }
+      out.push(seen[key] = { key: key, program: r.program_name || "", test: r.test_cycle || "", date: r.fixed_date || "",
+                             pref: r.preferred_month || "", district: r.district || "", month: String(r.plan_month || month || ""),
+                             count: 1, pos: who ? [who] : [], done: doneByKey[key] || null });
+    });
+    out.sort(function (a, b) {
+      return (a.date || "9").localeCompare(b.date || "9") || a.district.localeCompare(b.district)
+          || a.program.localeCompare(b.program) || a.test.localeCompare(b.test);
+    });
+    // Done this month = the districts' ticks counted in this month (also ones the plan has since moved or dropped)
+    var counted = doneRows.filter(function (d) { return dk[normDist(d.district)] && String(d.counts_in) === String(month); });
+    out.districts = districts;
+    out.month = String(month || "");
+    out.doneOk = !!(done && done.ok);
+    out.doneCount = done && done.ok ? counted.length : null;
+    out.extraDone = counted.filter(function (d) { return !seen[d.exam_key]; });
+    return out;
+  }
+
+  // Exams planned: one per district exam.
+  function acadTotal(list) { return (list || []).reduce(function (a, it) { return a + (it.count || 1); }, 0); }
+
+  /* ---------- G1 exam programs: core / non-core (VP target sheet, Nov 2026) ----------
+     Core (Annex A) share G1's 40 points equally among the core programs that have exams in the
+     period (per program, not per test). Non-core (Annex B, and exams not in the VP sheet) are
+     listed with target / done but carry no weight. No core exam in the period = G1 is not scored
+     and the total is scaled to 100 from the other goals.
+     Plan names vary by district, so each is matched to one program label below (first match wins). */
+  var ACAD_PROGRAMS = [
+    // [label, core?, test on the program name: lower-case, punctuation turned into spaces].
+    // Listed in the VP sheet's order (rows are shown in this order); FLN ++ must stay above FLN.
+    ["FLN ++ (Class 6-8)", false, /^fln\s*(\+|plus)/],
+    ["FLN Program", true, /^fln\b/],
+    ["Class 10 Exam", true, /^class 10\b/],
+    ["Class 12 Exam", true, /^class 12\b/],
+    ["JNV", true, /^jnv\b/],
+    ["SE 04", true, /^s[ec] .*\b0?4( ?th)?\b/],
+    ["SE 07", true, /^s[ec] .*\b0?7( ?th)?\b/],
+    ["Scholarship (SE)", true, /^scholarship\b/],
+    ["NMMSE", true, /^nmms/],
+    ["JEE / NEET (Polestar)", true, /\bjee\b|\bneet\b/],
+    ["ISRO / NASA visit", false, /isro|nasa|iucaa|research station/],
+    ["K. Ajitdada Pawar SE", false, /ajitdada|अजितदादा/],
+    ["Balwadi", false, /balwadi/],
+    ["Utkrisht Class 5 Exam", false, /^class 0?5( ?th)?\b/],
+    ["Utkrisht Class 8 Exam", false, /^class 0?8( ?th)?\b/],
+    ["Utkrisht Class 9 Exam", false, /^class 0?9( ?th)?\b/],
+    ["Utkrisht Class 11 Exam", false, /^class 11( ?th)?\b/],
+    ["Pradhnyashodh", false, /pradhnyashodh|pradnyashodh/]
+  ];
+  // program name in the plan -> { label, core, rank }
+  function acadClass(name) {
+    var s = String(name || "").toLowerCase().replace(/[^a-z0-9ऀ-ॿ+]+/g, " ").trim();
+    for (var i = 0; i < ACAD_PROGRAMS.length; i++) {
+      var p = ACAD_PROGRAMS[i];
+      if (p[2].test(s)) return { label: p[0], core: p[1], rank: i };
+    }
+    return { label: String(name || "").replace(/\s+/g, " ").trim() || "Other exam", core: false, rank: 999 };
+  }
+  // Weights and score for a set of programs [{ label, core, rank, t, d }]
+  function acadScore(progs, weight) {
+    weight = weight || 40;
+    progs.sort(function (a, b) { return (a.core === b.core ? 0 : a.core ? -1 : 1) || a.rank - b.rank || a.label.localeCompare(b.label); });
+    var core = progs.filter(function (p) { return p.core; }), nc = progs.filter(function (p) { return !p.core; });
+    var scored = core.filter(function (p) { return p.t > 0; }), w = scored.length ? weight / scored.length : 0, score = 0;
+    progs.forEach(function (p) {
+      p.pct = p.t > 0 ? Math.min(p.d / p.t, 1) : null;
+      p.w = p.core && p.t > 0 ? w : null;
+      p.s = p.w != null ? p.w * p.pct : null;
+      if (p.s != null) score += p.s;
+    });
+    var sum = function (list, k) { return list.reduce(function (a, p) { return a + (p[k] || 0); }, 0); };
+    return { progs: progs, core: core, noncore: nc, n: scored.length, na: !scored.length, score: scored.length ? score : null,
+             coreT: sum(core, "t"), coreD: sum(core, "d"), ncT: sum(nc, "t"), ncD: sum(nc, "d"), weight: weight };
+  }
+  // A month's exam list (acadFromRows) -> programs with target / done.
+  // legacy: the old typed "exams completed" number, used only when nothing is ticked for the month;
+  // it is spread over the programs in order (core first), filling each one's target.
+  function acadPrograms(list, legacy) {
+    var month = String(list.month || ""), map = {};
+    var get = function (name) {
+      var c = acadClass(name);
+      return map[c.label] = map[c.label] || { label: c.label, core: c.core, rank: c.rank, t: 0, d: 0 };
+    };
+    list.forEach(function (it) {
+      var p = get(it.program); p.t += it.count || 1;
+      if (it.done && String(it.done.counts_in) === month) p.d++;
+    });
+    (list.extraDone || []).forEach(function (d) { get(d.program_name).d++; });
+    var progs = Object.keys(map).map(function (k) { return map[k]; });
+    var useLegacy = list.doneCount === 0 && legacy !== "" && legacy != null && Number(legacy) > 0;
+    if (useLegacy) acadSpread(progs, Number(legacy));
+    var out = acadScore(progs);
+    out.legacy = useLegacy;
+    return out;
+  }
+  function acadSpread(progs, n) {
+    progs.sort(function (a, b) { return (a.core === b.core ? 0 : a.core ? -1 : 1) || a.rank - b.rank; });
+    progs.forEach(function (p) { var take = Math.min(n, Math.max(p.t - p.d, 0)); p.d += take; n -= take; });
+    if (n > 0 && progs.length) progs[0].d += n;            // more than planned: keep it on the first program
+  }
+
+  function fmtDay(iso) {
+    if (!iso) return "";
+    var p = iso.split("-"); return Number(p[2]) + " " + MON_SHORT[Number(p[1]) - 1] + " " + p[0];
+  }
+
+  /* ---------- who may tick ---------- */
+  function acadViewer() {
+    var e = currentEmail(); if (!e || !ORG) return null;
+    return ORG.people.filter(function (p) { return String(p.email || "").trim().toLowerCase() === e; })[0] || null;
+  }
+  // Any PO of that district (Assignments), or itadmin.
+  function acadCanTick(district) {
+    if (prIsAdmin()) return true;
+    var me = acadViewer();
+    return !!me && me.designation === "PO" && overlaps(me.assigned_districts, [district]);
+  }
+
+  /* ---------- the exam list (click the planned / done number) ---------- */
+  function openAcadList() {
+    var list = (MVIEW && MVIEW.academic) || [], h = (MVIEW && MVIEW.header) || {}, month = String(MVIEW.month);
+    var who = h.unit === "PO" ? (h.po && h.po.name) : (h.manager || h.district || "");
+    var showDist = h.unit !== "PO" || (list.districts || []).length > 1;
+    var monIdx = function (s) { return MON_SHORT.map(function (m) { return m.toLowerCase(); }).indexOf(String(s || "").trim().slice(0, 3).toLowerCase()) + 1; };
+    var dateHtml = function (t) {
+      var off = t.date && t.pref && monIdx(t.pref) !== Number(t.date.slice(5, 7));
+      return t.date ? esc(fmtDay(t.date)) + (off ? '<div class="pr-list-warn" title="The plan\'s Preferred Month differs from the Fixed Date">Preferred month: ' + esc(t.pref) + "</div>" : "")
+                    : '<span class="pr-mut">No date</span>' + (t.pref ? '<div class="pr-list-warn">Preferred month: ' + esc(t.pref) + "</div>" : "");
+    };
+    var anyCan = false;
+    var tick = function (key, district, rec) {
+      var can = list.doneOk && acadCanTick(district), on = !!rec;
+      if (can) anyCan = true;
+      var meta = rec ? '<div class="pr-mo-sub">by ' + esc(rec.marked_by_name || rec.marked_by_email || "—")
+        + (rec.marked_at ? " · " + esc(fmtDay(String(rec.marked_at).slice(0, 10))) : "")
+        + (String(rec.counts_in) !== month ? ' · <span class="pr-list-warn">counted in ' + esc(acadYm(rec.counts_in)) + "</span>" : "") + "</div>" : "";
+      return '<label class="pr-acad-tick' + (on ? " is-on" : "") + (can ? "" : " is-ro") + '"><input type="checkbox" data-akey="' + esc(key) + '"'
+        + (on ? " checked" : "") + (can ? "" : " disabled") + "><span>" + (on ? "Completed" : "Not done") + "</span></label>" + meta;
+    };
+    var head = "<tr><th>#</th><th>Program</th><th>Type</th><th>Test cycle</th>" + (showDist ? "<th>District</th>" : "") + "<th>Date</th><th>Status</th></tr>";
+    var typ = function (name) { var c = acadClass(name); return '<span class="pr-acad-type' + (c.core ? " is-core" : "") + '" title="' + esc(c.label) + '">' + (c.core ? "Core" : "Non-core") + "</span>"; };
+    var body = list.map(function (e, i) {
+      return '<tr class="pr-row"><td>' + (i + 1) + "</td><td>" + esc(e.program) + "</td><td>" + typ(e.program) + "</td><td>" + esc(e.test || "—") + "</td>"
+        + (showDist ? "<td>" + esc(e.district) + "</td>" : "") + "<td>" + dateHtml(e) + "</td><td>" + tick(e.key, e.district, e.done) + "</td></tr>";
+    }).join("");
+    (list.extraDone || []).forEach(function (d) {
+      body += '<tr class="pr-row"><td>+</td><td>' + esc(d.program_name) + '<div class="pr-list-warn">Completed this month, no longer in this month’s plan</div></td><td>' + typ(d.program_name) + "</td><td>"
+        + esc(d.test_cycle || "—") + "</td>" + (showDist ? "<td>" + esc(d.district) + "</td>" : "")
+        + "<td>" + (d.exam_date ? esc(fmtDay(String(d.exam_date))) : '<span class="pr-mut">No date</span>') + "</td><td>" + tick(d.exam_key, d.district, d) + "</td></tr>";
+    });
+    var doneTxt = list.doneCount != null ? list.doneCount + " of " + acadTotal(list) + " completed" : acadTotal(list) + " planned";
+    $("prListTitle").textContent = "Exams — " + monthLabel(month) + (who ? " · " + who : "") + " (" + doneTxt + ")";
+    $("prListBody").innerHTML = '<table class="pr-tbl"><thead>' + head + "</thead><tbody>" + body + "</tbody></table>";
+    var dn = (list.districts || []).join(", ");
+    $("prListNote").textContent = !list.doneOk
+      ? "Completed ticks are not available yet (the academic_exam_done table is missing — run sql/2026-11-25-academic-exam-done.sql)."
+      : "These are the district's exams. A tick counts for the whole district" + (dn ? " (" + dn + ")" : "")
+        + ": every PO, PM and DM there sees it. Re-uploading the Academic Plan never changes a tick."
+        + (anyCan ? "" : " Only POs of the district can tick.");
+    $("prListBody").querySelectorAll("input[data-akey]").forEach(function (cb) {
+      cb.addEventListener("change", function () { acadToggle(cb.dataset.akey, cb.checked, cb); });
+    });
+    $("prListModal").hidden = false;
+  }
+  function closeAcadList() { $("prListModal").hidden = true; }
+
+  var ACAD_BUSY = false;
+  async function acadToggle(key, on, cb) {
+    var list = (MVIEW && MVIEW.academic) || [];
+    if (ACAD_BUSY) { cb.checked = !on; return; }
+    var it = list.filter(function (x) { return x.key === key; })[0] || null;
+    var rec = it ? it.done : (list.extraDone || []).filter(function (d) { return d.exam_key === key; })[0];
+    var district = it ? it.district : rec && rec.district;
+    if (!acadCanTick(district)) { cb.checked = !on; toast("Only POs of " + district + " can change this."); return; }
+    var ask = function (title, message) {
+      return window.showAppConfirm ? window.showAppConfirm({ title: title, message: message, type: "warning", confirmText: "Yes", cancelText: "Cancel" })
+                                   : Promise.resolve(window.confirm(title + "\n\n" + message));
+    };
+    var name = it ? it.program + (it.test ? " · " + it.test : "") : rec ? rec.program_name + (rec.test_cycle ? " · " + rec.test_cycle : "") : "";
+    if (on && it && it.date && it.date > acadToday()
+        && !(await ask("Mark as completed?", name + " is planned for " + fmtDay(it.date) + ", which is still ahead. Mark it completed anyway?"))) { cb.checked = false; return; }
+    if (!on && !(await ask("Untick this exam?", name + " will show as not done for every PO, PM and DM of " + district + "."))) { cb.checked = true; return; }
+    ACAD_BUSY = true;
+    $("prListBody").querySelectorAll("input[data-akey]").forEach(function (x) { x.disabled = true; });
+    try {
+      if (on) {
+        var me = acadViewer();
+        var row = { exam_key: key, district: it.district, program_name: it.program, test_cycle: it.test || "",
+                    counts_in: it.month || String(MVIEW.month), exam_date: it.date || null,
+                    marked_by_id: me ? me.emp_id : "", marked_by_name: me ? me.name : (prIsAdmin() ? "IT Admin" : ""), marked_by_email: currentEmail() };
+        var ins = await db().from("academic_exam_done").insert(row);
+        if (ins.error && ins.error.code !== "23505") throw ins.error;          // 23505: another PO ticked it first
+      } else {
+        var del = await db().from("academic_exam_done").delete().eq("exam_key", key);
+        if (del.error) throw del.error;
+      }
+      toast(on ? "Marked completed for " + district + "." : "Unticked.");
+    } catch (e) {
+      console.error("Exam tick failed:", e);
+      toast("Couldn’t save the tick — please try again.");
+    } finally {
+      ACAD_BUSY = false;
+    }
+    await acadReload();
+  }
+  // Re-read the list after a tick and refresh G1 in place (unsaved edits elsewhere on the page stay).
+  async function acadReload() {
+    var a = MVIEW && MVIEW.academic && MVIEW.academic.args;
+    if (!a) { loadMonthlyView(); return; }
+    try { MVIEW.academic = await sbGetAcademic(a[0], a[1], a[2]); }
+    catch (e) { toast("Couldn’t reload the exams."); return; }
+    MSUM.cache = {}; MSUM.data = null;
+    moRefreshG1();
+    if (!$("prListModal").hidden) openAcadList();
+  }
+
+
+  /* ---------- G2 / G3 / G5 targets (g1_g2_g3_target_sheet) ----------
+     PO      -> that PO's row for the month.
+     PM / DM -> the PO rows of their assigned districts; District -> that district.
+     Block check per district: POs sorted by how many of the district's blocks
+     they cover; a PO whose blocks are all already covered by a counted PO is
+     not counted (senior / junior). A PO whose blocks can't be placed in the
+     district is counted unless the district is already fully covered.
+     Posts per teacher is a ratio: fixed at 1 for PM / DM / District.
+     District recognition event: once per district (highest PO value).
+     A target of 0 means "not set".
+     Nov 2026: a district with its own row in district_targets for the month (Admin > Targets,
+     Level: District) uses that row instead of its PO rows. Per column: a blank cell in the district
+     row falls back to that district's PO rows (ops plans carry no Kathawli / visits / case study). A district without one falls back
+     to the PO rows as above, so months uploaded before keep their numbers. */
+  var TGT_LABEL = {
+    story_telling: "Story Telling", poetry_recitation: "Poetry Recitation", creative_writing: "Creative Writing",
+    spoken_english: "Spoken English", spelling_bee: "Spelling Bee", morning_assembly: "Morning Assembly",
+    st_streak: "ST Streak", pr_streak: "PR Streak", cw_streak: "CW Streak", se_streak: "SE Streak", sb_streak: "SB Streak",
+    kathawli: "Kathawli", online_unique_teachers: "Online Unique Teachers", online_unique_schools: "Online Unique Schools",
+    posts_per_teacher: "Posts per month / per teacher", star_teachers: "Star Teachers", teachers_using_expert_coupon: "Teachers using expert coupon",
+    pom_transformed_clusters: "POM Transformed clusters", blocks_with_recognition_events: "Blocks with recognition events",
+    district_recognition_event: "District recognition event held", teachers_recognized: "Teachers Recognized",
+    cluster_heads_recognized: "Cluster Heads recognized", school_visits: "School Visits", cluster_visits: "Cluster Visits",
+    officials_visits: "Officials Visits", case_study: "Case Study"
+  };
+  var TGT_KEYS = Object.keys(TGT_LABEL);
+
+  async function sbGetTargets(unit, value, month) {
+    await loadOrg();
+    var y = Number(month.substring(0, 4)), m = Number(month.substring(4, 6));
+    var rows = await fetchAll(function () { return db().from("g1_g2_g3_target_sheet").select("*").eq("year", y).eq("month", m); });
+    var tnum = function (v) { var n = Number(v); return (v === null || v === undefined || v === "" || isNaN(n)) ? null : n; };
+    var out = { cols: {}, unit: unit, rowsInMonth: rows.length };
+
+    if (unit === "PO") {
+      var r = rows.filter(function (x) { return normId(x.po_id) === normId(value); })[0] || null;
+      out.unitRows = r ? 1 : 0;
+      TGT_KEYS.forEach(function (k) {
+        var v = r ? tnum(r[k]) : null;
+        out.cols[k] = { value: v > 0 ? v : null, parts: r ? [{ district: r.district, po: r.po_name || r.po_id, value: v, status: v > 0 ? "counted" : "zero" }] : [] };
+      });
+      return out;
+    }
+
+    var districts = unit === "District" ? [value] : ((person(value) || {}).assigned_districts || []);
+    var groups = [];                    // per district: its own target row (if any) + its PO rows after the block check
+    var drows = await fetchAll(function () { return db().from("district_targets").select("*").eq("year", y).eq("month", m); })
+      .catch(function (e) { console.warn("district_targets not loaded (PO rows are used):", e); return []; });
+    out.rowsInMonth += drows.length;
+    districts.forEach(function (dn) {
+      var dk = normDist(dn), dist = ORG.distByKey[dk];
+      var dBlocks = dist ? dist.blocks.map(normBlock) : [];
+      var drow = drows.filter(function (x) { return normDist(x.district) === dk; })[0];
+      var dc = drow ? { r: drow, name: "District target", blocks: dBlocks, district: dist ? dist.name : dn, dTotal: dBlocks.length,
+                        status: "counted", note: "District row (Admin \u2192 Targets, Level: District)" } : null;
+      var cand = rows.filter(function (x) { return normDist(x.district) === dk; }).map(function (x) {
+        var p = person(x.po_id);
+        var bl = p ? (p.assigned_blocks || []).map(normBlock).filter(function (b) { return dBlocks.indexOf(b) >= 0; }) : [];
+        return { r: x, name: x.po_name || x.po_id, blocks: bl, district: dist ? dist.name : dn, dTotal: dBlocks.length };
+      }).sort(function (a, b) { return b.blocks.length - a.blocks.length; });
+      var covered = {};
+      var who = function (keys) { return keys.map(function (b) { return covered[b]; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).join(", "); };
+      cand.forEach(function (c) {
+        if (!c.blocks.length) {
+          var full = dBlocks.length && dBlocks.every(function (b) { return covered[b]; });
+          c.status = full ? "skipped" : "counted";
+          c.note = full ? "District already fully covered by " + who(dBlocks) : "Blocks not found in Assignments for this district";
+        } else {
+          var already = c.blocks.filter(function (b) { return covered[b]; });
+          if (already.length === c.blocks.length) { c.status = "skipped"; c.note = "All " + c.blocks.length + " blocks already covered by " + who(already); }
+          else {
+            c.status = "counted";
+            if (already.length) c.note = already.length + " of " + c.blocks.length + " blocks overlap " + who(already);
+            c.blocks.forEach(function (b) { if (!covered[b]) covered[b] = c.name; });
+          }
+        }
+      });
+      groups.push({ dc: dc, pos: cand });
+    });
+
+    out.unitRows = groups.reduce(function (a, g) { return a + (g.dc ? 1 : 0) + g.pos.length; }, 0);
+    TGT_KEYS.forEach(function (k) {
+      if (k === "posts_per_teacher") { out.cols[k] = { value: 1, fixed: true, parts: [] }; return; }
+      // A district row's value wins for this column; a blank cell in it (e.g. Kathawli, visits, case
+      // study - not in the ops plan) falls back to that district's PO rows, as if it had no district row.
+      var contributors = [];
+      groups.forEach(function (g) {
+        if (g.dc && tnum(g.dc.r[k]) != null) contributors.push(g.dc);
+        else g.pos.forEach(function (c) {
+          contributors.push(g.dc ? Object.assign({}, c, { note: (c.note ? c.note + " \u00B7 " : "") + "district row blank here, PO rows used" }) : c);
+        });
+      });
+      var perDistrict = k === "district_recognition_event", parts = [], total = 0, best = {};
+      contributors.forEach(function (c) {
+        var v = tnum(c.r[k]);
+        var part = { district: c.district, po: c.name, blocks: c.blocks.length, dTotal: c.dTotal, value: v, status: c.status, note: c.note };
+        if (c.status === "counted" && !(v > 0)) part.status = "zero";
+        parts.push(part);
+        if (part.status !== "counted") return;
+        if (perDistrict) { if (!best[c.district] || v > best[c.district].value) best[c.district] = part; }
+        else total += v;
+      });
+      if (perDistrict) {
+        parts.forEach(function (p) { if (p.status === "counted" && best[p.district] !== p) { p.status = "once"; p.note = "District counted once (highest value)"; } });
+        Object.keys(best).forEach(function (d) { total += best[d].value; });
+      }
+      out.cols[k] = { value: total > 0 ? total : null, parts: parts, perDistrict: perDistrict };
+    });
+    return out;
+  }
+
+  // Which target each Monthly line uses: one column, or the sum of several.
+  var MO_TMAP = {
+    "G2|LS Program Cycle (Core)": { tsum: ["story_telling", "creative_writing", "poetry_recitation", "spoken_english", "spelling_bee"] },
+    "G2|Storytelling": { t: "story_telling" }, "G2|Creative Writing": { t: "creative_writing" },
+    "G2|Poetry": { t: "poetry_recitation" }, "G2|Spoken English": { t: "spoken_english" }, "G2|Spelling Bee": { t: "spelling_bee" },
+    "G2|LS Program Cycle (Non-core)": { t: "morning_assembly" },
+    "G2|Morning Assembly": { t: "morning_assembly" },
+    "G2|Streak": { tsum: ["st_streak", "cw_streak", "se_streak", "pr_streak", "sb_streak"] },
+    "G2|Streaks improved": { tsum: ["st_streak", "cw_streak", "se_streak", "pr_streak", "sb_streak"] },
+    "G2|Improved \u00B7 Storytelling": { t: "st_streak" }, "G2|Improved \u00B7 Creative Writing": { t: "cw_streak" },
+    "G2|Improved \u00B7 Spoken English": { t: "se_streak" }, "G2|Improved \u00B7 Poetry": { t: "pr_streak" },
+    "G2|Improved \u00B7 Spelling Bee": { t: "sb_streak" },
+    "G3|Vinoba Kathavli Stories": { t: "kathawli" },
+    "G3|Online + Offline community": { community: true },
+    "G3|Unique teachers posting": { t: "online_unique_teachers" }, "G3|Unique schools posting": { t: "online_unique_schools" },
+    "G3|Posts per month per teacher": { t: "posts_per_teacher" }, "G3|Star teachers (3-month consistency)": { t: "star_teachers" },
+    "G3|Teachers using expert coupons": { t: "teachers_using_expert_coupon" }, "G3|POM transformed clusters": { t: "pom_transformed_clusters" },
+    "G3|Blocks with recognition events": { t: "blocks_with_recognition_events" },
+    "G3|District recognition events held": { t: "district_recognition_event" },
+    "G3|Teachers recognised": { t: "teachers_recognized" }, "G3|Cluster heads recognised": { t: "cluster_heads_recognized" },
+    "G5|Visits": { tsum: ["school_visits", "cluster_visits", "officials_visits"] },
+    "G5|School": { t: "school_visits" }, "G5|Cluster": { t: "cluster_visits" }, "G5|Block / District": { t: "officials_visits" },
+    "G5|Case Study": { t: "case_study" }
+  };
+  MO_GOALS.forEach(function (g) { g.rows.forEach(function (r) { var x = MO_TMAP[g.key + "|" + r.label]; if (x) { for (var k in x) r[k] = x[k]; } }); });
+
+  // Targets that the targets file does not carry yet can be typed on the Monthly page by the person
+  // under review (saved as an M_ field of that month). Today: the SB improved-streak target.
+  // A value in the targets file always wins; the typed value is used only while the file has none.
+  var MO_TGT_ENTRY = { sb_streak: "M_G2_SBSTREAK_TGT" };
+  function moTgtFile(k) { var T = MVIEW && MVIEW.targets, c = T && T.cols[k]; return c && c.value != null ? c.value : null; }
+  function moTgtEntered(k) { var f = MO_TGT_ENTRY[k]; if (!f) return null; var v = moNumVal(f); return (v === "" || !(v > 0)) ? null : v; }
+  function moTgtVal(k) { var v = moTgtFile(k); return v != null ? v : moTgtEntered(k); }
+  // true when this line's target is typed on the page (its key has an entry field and the file has no value)
+  function moTgtIsEntry(r) { return !!(r.t && MO_TGT_ENTRY[r.t] && MVIEW && MVIEW.targets && moTgtFile(r.t) == null); }
+  function moTgtUsesEntry(r) { return !!(r.tsum && r.tsum.some(function (k) { return MO_TGT_ENTRY[k]; })); }
+  function moTarget(r) {
+    var T = MVIEW && MVIEW.targets;
+    if (!r.t && !r.tsum) return { state: "none" };
+    if (!T) return { state: "unavailable" };
+    if (r.t) {
+      var c = T.cols[r.t];
+      if (c && c.value != null) return { state: "ok", value: c.value, fixed: !!c.fixed };
+      var e = moTgtEntered(r.t);
+      return e != null ? { state: "ok", value: e, entered: true } : { state: "notset" };
+    }
+    var vs = r.tsum.map(moTgtVal).filter(function (v) { return v != null; });
+    return vs.length ? { state: "ok", value: vs.reduce(function (a, b) { return a + b; }, 0) } : { state: "notset" };
+  }
+  // Target cell HTML (shared by the first draw and moRefreshScores)
+  function moTargetHtml(g, r, tg) {
+    if (moTgtIsEntry(r)) {
+      var cur = moValue(MO_TGT_ENTRY[r.t]);
+      return canEditSelf(MVIEW)
+        ? '<input type="number" min="0" step="any" inputmode="decimal" class="pr-mo-ent pr-mo-tent" placeholder="Enter" data-wc="' + moW0().code
+          + '" data-fid="' + MO_TGT_ENTRY[r.t] + '" value="' + (cur === "" || cur == null ? "" : cur) + '" title="Not in the targets file yet \u2014 type this month\'s target">'
+          + '<div class="pr-mo-sub">Enter target</div>'
+        : (tg.state === "ok" ? '<span title="Typed on this page (not in the targets file)">' + fmtNum(r2(tg.value)) + "</span>"
+                             : moPill("Not set", "pr-mo-na", "Not in the targets file; typed on this page by the person under review"));
+    }
+    if (tg.state === "ok") { MO_TLINES.push({ r: r, g: g }); return '<button type="button" class="pr-mo-tlink" data-ti="' + (MO_TLINES.length - 1) + '" title="See where this target comes from">' + fmtNum(r2(tg.value)) + "</button>"; }
+    if (tg.state === "notset") return moNoTargetFull()
+      ? '<span class="pr-mut" title="No target for this line this month (blank or 0) \u2014 counted as fully achieved">0</span>'
+      : moPill("Not set", "pr-mo-na", "No target for this line this month (blank or 0)");
+    if (tg.state === "unavailable") return moPill("Unavailable", "pr-mo-na", "The targets table could not be loaded");
+    return "";
+  }
+  // No target for a line this month (blank or 0 in the targets file) = nothing was asked, so the line
+  // counts as fully achieved (100%, full weight). Applies only once this person / unit has a row in
+  // the month's targets file — a month with no targets uploaded yet still shows "—".
+  function moNoTargetFull() { var T = MVIEW && MVIEW.targets; return !!(T && T.unitRows > 0); }
+  // One evaluation per line, shared by the table and the cards.
+  function moEval(g, r, rp) {
+    var res = { st: moRowState(r, rp), tg: moTarget(r), pct: null, score: null };
+    if (r.community) {           // equal weights: average of capped % over metrics with a target and data, x 15
+      var mets = g.rows.filter(function (x) { return x.lvl === 2 && x.t; }), ach = [];
+      mets.forEach(function (x) {
+        var t = moTarget(x), s = moRowState(x, rp);
+        if (t.state === "ok" && s.kind === "num") ach.push(Math.min(s.value / t.value, 1));
+        else if (t.state === "notset" && moNoTargetFull()) ach.push(1);          // no target = fully achieved
+      });
+      res.used = ach.length; res.of = mets.length;
+      if (ach.length) { res.pct = ach.reduce(function (a, b) { return a + b; }, 0) / ach.length; res.score = r.w * res.pct; }
+      return res;
+    }
+    if (res.tg.state === "ok" && res.st.kind === "num" && res.tg.value > 0) {
+      res.pct = Math.min(res.st.value / res.tg.value, 1);
+      if (r.lvl === 0 && r.w > 0) res.score = r.w * res.pct;
+    } else if (res.tg.state === "notset" && moNoTargetFull() && !r.info) {
+      res.pct = 1; res.full = true;                                            // no target = fully achieved
+      if (r.lvl === 0 && r.w > 0) res.score = r.w;
+    }
+    return res;
+  }
+  function moComplianceScore(g, r, rp) {
+    var c = moCompliance(g, rp);
+    if (c.answered !== c.total) return null;
+    var p = Math.min(c.yes / r.target, 1); return { pct: p, score: r.w * p };
+  }
+  function moGoalScore(g, rp) {
+    if (g.key === "G4") { var e4 = moG4Eval(); return { score: e4.score, scored: e4.scored, total: e4.items.length }; }
+    if (g.key === "G1") {
+      var P = moG1P();
+      if (!P) return { score: null, scored: 0, total: 1 };
+      if (P.na) return { score: null, scored: 0, total: 0, na: true };   // no core exam: G1 left out of the total
+      return { score: P.score, scored: P.n, total: P.n };
+    }
+    var comps = g.rows.filter(function (r) { return r.lvl === 0 && r.w > 0; }), got = 0, n = 0;
+    comps.forEach(function (r) {
+      var sc = r.compliance ? moComplianceScore(g, r, rp) : moEval(g, r, rp);
+      if (sc && sc.score != null) { got += sc.score; n++; }
+    });
+    return { score: n ? got : null, scored: n, total: comps.length };
+  }
+  function r2(x) { return Math.round(x * 100) / 100; }
+
+  /* ---------- target reconciliation popup ---------- */
+  var MO_TLINES = [];
+  function openTargetPopup(i) {
+    var item = MO_TLINES[i]; if (!item) return;
+    var r = item.r, T = MVIEW.targets, h = MVIEW.header || {};
+    var who = h.unit === "PO" ? (h.po && h.po.name) : (h.manager || h.district || "");
+    $("prListTitle").textContent = "Target \u2014 " + r.label + " \u00B7 " + monthLabel(MVIEW.month) + (who ? " \u00B7 " + who : "");
+    var body = "", note = "";
+    if (r.tsum) {
+      var tot = 0;
+      body = '<table class="pr-tbl"><thead><tr><th>Part</th><th class="pr-num">Target</th></tr></thead><tbody>'
+        + r.tsum.map(function (k) { var v = moTgtVal(k), typed = v != null && moTgtFile(k) == null; if (v != null) tot += v;
+            return '<tr class="pr-row"><td>' + esc(TGT_LABEL[k]) + (typed ? ' <span class="pr-mut">(typed on this page)</span>' : "") + '</td><td class="pr-num">'
+              + (v != null ? fmtNum(v) : '<span class="pr-mut">Not set</span>') + "</td></tr>"; }).join("")
+        + '<tr class="pr-row pr-tgt-total"><td>Total</td><td class="pr-num">' + fmtNum(tot) + "</td></tr></tbody></table>";
+      note = "Open each line's own target to see which POs and districts it comes from.";
+    } else {
+      var c = T.cols[r.t];
+      if (c.fixed) {
+        body = '<div class="pr-empty" style="padding:22px">Posts per teacher is a ratio, so it is not added up. The target is <b>1</b> for PM, DM and District \u2014 the same as every PO\'s target.</div>';
+      } else if (T.unit === "PO") {
+        var p0 = c.parts[0];
+        body = '<table class="pr-tbl"><thead><tr><th>From</th><th>District</th><th class="pr-num">Target</th></tr></thead><tbody><tr class="pr-row"><td>'
+          + esc(p0 ? p0.po : "") + "'s row</td><td>" + esc(p0 ? p0.district : "") + '</td><td class="pr-num">' + fmtNum(p0 ? p0.value : null) + "</td></tr></tbody></table>";
+        note = "From Admin \u2192 G2 \u00B7 G3 \u00B7 G5 Targets, " + monthLabel(MVIEW.month) + ".";
+      } else {
+        var ST = { counted: ["Counted", "pr-rev-yes"], skipped: ["Not counted", "pr-mut"], zero: ["No target (0)", "pr-mut"], once: ["Not counted", "pr-mut"] };
+        body = '<table class="pr-tbl"><thead><tr><th>District</th><th>PO</th><th class="pr-num">Blocks</th><th class="pr-num">Target</th><th>In total?</th></tr></thead><tbody>'
+          + c.parts.map(function (p) { var s = ST[p.status] || [p.status, ""];
+              return '<tr class="pr-row"><td>' + esc(p.district) + "</td><td>" + esc(p.po) + '</td><td class="pr-num">' + p.blocks + "/" + p.dTotal
+                + '</td><td class="pr-num">' + (p.value == null ? "" : fmtNum(p.value)) + '</td><td><span class="' + s[1] + '">' + s[0] + "</span>"
+                + (p.note ? '<div class="pr-list-warn">' + esc(p.note) + "</div>" : "") + "</td></tr>"; }).join("")
+          + '<tr class="pr-row pr-tgt-total"><td colspan="3">Total</td><td class="pr-num">' + fmtNum(c.value) + "</td><td></td></tr></tbody></table>";
+        note = (c.perDistrict ? "Counted once per district (the highest PO value)." : "PO rows of the districts, added up. A PO whose blocks are all covered by another PO is not counted.")
+          + " A district with its own row (Admin \u2192 Targets, Level: District) uses that row instead of its POs.";
+        if (!c.parts.length) note = "No PO rows for these districts in this month's targets.";
+      }
+    }
+    $("prListBody").innerHTML = body; $("prListNote").textContent = note; $("prListModal").hidden = false;
+  }
+
+  /* =====================================================================
+     SUMMARY VIEW
+     "Did the weekly review happen?" across people, instead of one person
+     at a time. Two multi-select filters (review unit, then member), a
+     month and a week, and a search box.
+
+     Shape of the answer changes with the filters:
+       no members ticked  -> one row per review unit, three COUNTS
+       members ticked     -> one row per member, three YES/NO columns
+
+     District is deliberately not a review unit here: a district has no
+     review_responses rows of its own, only the people in it do.
+     ===================================================================== */
+
+  var SUM_UNITS = [
+    { code: "PO", label: "PO" },
+    { code: "PM", label: "PM" },
+    { code: "DM", label: "DM" }
+  ];
+
+  var SUM = {
+    units: [],        // ticked unit codes; [] means all of SUM_UNITS
+    members: [],      // ticked emp_ids
+    q: "",            // search box, filters table rows only
+    data: null,       // last loaded payload
+    open: null,       // id of the open dropdown panel, so only one is open
+    drill: null       // { unit, st, people } behind the open drill-down modal
+  };
+
+  /* ---------- tiny multi-select dropdown ----------
+     Shared by both filters. Draft ticks live on the panel until Apply, so
+     half-made selections never reload the table. */
+  function sumMsRender(panelId, items, selected, allLabel) {
+    var p = $(panelId); if (!p) return;
+    var all = items.length && selected.length === 0;
+    p.innerHTML =
+      '<label class="pr-ms-row pr-ms-all"><input type="checkbox" class="pr-ms-selall"' + (all ? " checked" : "") + ">"
+      + "<b>Select All</b></label>"
+      + '<div class="pr-ms-list">'
+      + (items.length
+          ? items.map(function (it) {
+              return '<label class="pr-ms-row"><input type="checkbox" class="pr-ms-cb" value="' + esc(it.value) + '"'
+                + (selected.indexOf(it.value) >= 0 ? " checked" : "") + ">"
+                + "<span>" + esc(it.label) + "</span>"
+                + (it.hint ? '<span class="pr-ms-hint">' + esc(it.hint) + "</span>" : "")
+                + "</label>";
+            }).join("")
+          : '<div class="pr-ms-empty">Nothing to choose.</div>')
+      + "</div>"
+      + '<div class="pr-ms-foot"><span class="pr-ms-note">Nothing ticked = ' + esc(allLabel) + "</span>"
+      + '<button type="button" class="pr-btn pr-ms-clear">Clear</button>'
+      + '<button type="button" class="pr-btn pr-btn-primary pr-ms-apply">Apply</button></div>';
+  }
+
+  function sumMsTicked(panelId) {
+    return Array.prototype.slice.call(document.querySelectorAll("#" + panelId + " .pr-ms-cb:checked"))
+      .map(function (c) { return c.value; });
+  }
+
+  function sumMsOpen(panelId) {
+    if (SUM.open && SUM.open !== panelId) { var o = $(SUM.open); if (o) o.hidden = true; }
+    var p = $(panelId); if (!p) return;
+    p.hidden = !p.hidden;
+    SUM.open = p.hidden ? null : panelId;
+  }
+
+  function sumCloseAll() {
+    ["prSumUnitPanel", "prSumMemberPanel"].forEach(function (id) { var p = $(id); if (p) p.hidden = true; });
+    SUM.open = null;
+  }
+
+  /* ---------- filter labels ---------- */
+  function sumUnitBtnLabel() {
+    if (!SUM.units.length) return "All review units";
+    if (SUM.units.length === 1) return SUM.units[0];
+    return SUM.units.join(" · ");
+  }
+  function sumMemberBtnLabel() {
+    if (!SUM.units.length) return "Select a review unit first";
+    if (!SUM.members.length) return "All members";
+    if (SUM.members.length === 1) {
+      var m = sumAllMembers().filter(function (x) { return x.id === SUM.members[0]; })[0];
+      return m ? m.name : "1 selected";
+    }
+    return SUM.members.length + " selected";
+  }
+
+  // Everyone belonging to the ticked units (or to every unit when none are ticked).
+  function sumAllMembers() {
+    if (!ORG) return [];
+    var units = SUM.units.length ? SUM.units : SUM_UNITS.map(function (u) { return u.code; });
+    var out = [];
+    units.forEach(function (u) {
+      ORG.people.filter(function (p) { return p.designation === u; })
+        .sort(byNameSort)
+        .forEach(function (p) { out.push({ id: p.emp_id, name: p.name, unit: u }); });
+    });
+    return out;
+  }
+
+  function sumSyncFilterUI() {
+    var ub = $("prSumUnitBtn"), mb = $("prSumMemberBtn");
+    if (ub) ub.textContent = sumUnitBtnLabel();
+    if (mb) {
+      mb.textContent = sumMemberBtnLabel();
+      // Member list is meaningless until you've said which kind of person.
+      mb.disabled = !SUM.units.length;
+      mb.classList.toggle("is-muted", !SUM.units.length);
+    }
+  }
+
+  function sumFillFromBase() {
+    var mo = $("prSumMonth");
+    if (mo && state.base) {
+      mo.innerHTML = "";
+      if (!state.base.months.length) { mo.innerHTML = '<option value="">No months</option>'; }
+      else {
+        state.base.months.forEach(function (m) { mo.appendChild(opt(m.code, m.label)); });
+        // Default to the newest month that actually has data.
+        var pick = state.base.months[Math.max(0, state.base.months.length - 2)];
+        if (pick) mo.value = pick.code;
+      }
+      mo.disabled = false;
+    }
+    sumMsRender("prSumUnitPanel", SUM_UNITS.map(function (u) { return { value: u.code, label: u.label }; }),
+                SUM.units, "all review units");
+    sumSyncFilterUI();
+  }
+
+  function sumWire() {
+    var ub = $("prSumUnitBtn"), mb = $("prSumMemberBtn");
+    if (ub) ub.addEventListener("click", function (e) { e.stopPropagation(); sumMsOpen("prSumUnitPanel"); });
+    if (mb) mb.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (!SUM.units.length) return;
+      sumMsRender("prSumMemberPanel",
+        sumAllMembers().map(function (m) { return { value: m.id, label: m.name, hint: m.unit }; }),
+        SUM.members, "all members of the ticked units");
+      sumMsOpen("prSumMemberPanel");
+    });
+
+    // One delegated handler for both panels - they share the same markup.
+    ["prSumUnitPanel", "prSumMemberPanel"].forEach(function (id) {
+      var p = $(id); if (!p) return;
+      p.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var t = e.target;
+        if (t.classList.contains("pr-ms-selall")) {
+          p.querySelectorAll(".pr-ms-cb").forEach(function (c) { c.checked = t.checked; });
+          return;
+        }
+        if (t.classList.contains("pr-ms-cb")) {
+          var sa = p.querySelector(".pr-ms-selall");
+          if (sa) sa.checked = p.querySelectorAll(".pr-ms-cb:not(:checked)").length === 0;
+          return;
+        }
+        if (t.classList.contains("pr-ms-clear")) {
+          p.querySelectorAll(".pr-ms-cb, .pr-ms-selall").forEach(function (c) { c.checked = false; });
+          return;
+        }
+        if (t.classList.contains("pr-ms-apply")) {
+          var ticked = sumMsTicked(id);
+          // "Everything ticked" and "nothing ticked" both mean all, so store
+          // the empty form - it keeps the button label honest.
+          var total = p.querySelectorAll(".pr-ms-cb").length;
+          if (ticked.length === total) ticked = [];
+          if (id === "prSumUnitPanel") {
+            SUM.units = ticked;
+            SUM.members = [];                 // unit change invalidates the member picks
+          } else {
+            SUM.members = ticked;
+          }
+          sumCloseAll();
+          sumSyncFilterUI();
+          sumLoad();
+        }
+      });
+    });
+
+    document.addEventListener("click", function () { sumCloseAll(); });
+
+    // Delegated: the table is re-rendered on every change, so binding to the
+    // container survives re-renders where binding to the buttons would not.
+    var body = $("prSumBody");
+    if (body) body.addEventListener("click", function (e) {
+      var dl = e.target.closest ? e.target.closest("#prSumDl") : null;
+      if (dl) { sumDownload(); return; }
+      var btn = e.target.closest ? e.target.closest("[data-sumdrill]") : null;
+      if (btn) {
+        var parts = String(btn.dataset.sumdrill).split("|");
+        sumDrill(parts[0], parts[1]);
+      }
+    });
+
+    var mClose = $("prSumModalClose"), mDl = $("prSumModalDl"), mBack = $("prSumModal");
+    if (mClose) mClose.addEventListener("click", function () { $("prSumModal").hidden = true; });
+    if (mDl) mDl.addEventListener("click", sumDrillDownload);
+    if (mBack) mBack.addEventListener("click", function (e) { if (e.target === mBack) mBack.hidden = true; });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && $("prSumModal") && !$("prSumModal").hidden) $("prSumModal").hidden = true;
+    });
+
+    var s = $("prSumSearch");
+    if (s) s.addEventListener("input", function () { SUM.q = s.value || ""; sumRender(); });
+    ["prSumMonth", "prSumWeek"].forEach(function (id) {
+      var el = $(id); if (el) el.addEventListener("change", sumLoad);
+    });
+    var b = $("prSumLoad"); if (b) b.addEventListener("click", sumLoad);
+  }
+
+  /* ---------- data ----------
+     One query for the whole table: every selected person's responses for
+     the chosen month+week, keyed by emp_id. Same pattern the weekly
+     roster already uses, so no new load on the database. */
+  async function sbGetSummary(units, code) {
+    await loadOrg();
+    var byUnit = {}, all = [];
+    units.forEach(function (u) {
+      byUnit[u] = ORG.people.filter(function (p) { return p.designation === u; })
+        .sort(byNameSort)
+        .map(function (p) {
+          return { id: p.emp_id, name: p.name, unit: u, email: p.email || "",
+                   districts: (p.assigned_districts || []).join(", ") };
+        });
+      all = all.concat(byUnit[u]);
+    });
+
+    var ids = all.map(function (x) { return x.id; });
+    var rows = ids.length
+      ? await fetchAll(function () {
+          return db().from("review_responses")
+            .select("emp_id,period_code,section,field,value,updated_at,updated_by")
+            .in("emp_id", ids).eq("period_code", code);
+        })
+      : [];
+
+    var byEmp = {};
+    rows.forEach(function (r) { (byEmp[r.emp_id] = byEmp[r.emp_id] || []).push(r); });
+
+    var status = {};
+    all.forEach(function (m) {
+      status[m.id] = reviewStatusOf(sectionsByCode(byEmp[m.id] || [])[code]);
+    });
+    return { units: units, byUnit: byUnit, members: all, status: status, code: code };
+  }
+
+  function sumBody(html) { var b = $("prSumBody"); if (b) b.innerHTML = html; }
+
+  function sumLoad() {
+    var month = ($("prSumMonth") || {}).value, week = ($("prSumWeek") || {}).value;
+    if (!month) { sumBody('<div class="pr-empty">Pick a month.</div>'); return; }
+    var units = SUM.units.length ? SUM.units : SUM_UNITS.map(function (u) { return u.code; });
+    var code = month + pad2(Number(week || 1));
+
+    sumBody('<div class="pr-empty pr-loading">Loading…</div>');
+    var y = Number(month.substring(0, 4)), mo = Number(month.substring(4, 6)), wn = Number(week || 1);
+    sbGetRemovedWeeks(y, mo).then(function (rm) {
+      // Mark removed weeks in the Week dropdown for this month.
+      Array.prototype.forEach.call(($("prSumWeek") || {}).options || [], function (o) {
+        o.textContent = "Week " + o.value + (rm[o.value] ? " (removed)" : "");
+      });
+      if (rm[wn]) { SUM.data = null; sumBody('<div class="pr-empty">Week ' + wn + ' was removed for this month, so there is no review to report. Pick another week.</div>'); return; }
+      return sbGetSummary(units, code).then(function (d) { SUM.data = d; sumRender(); });
+    }).catch(function (e) {
+      sumBody('<div class="pr-empty pr-error">Couldn\'t load: ' + esc(e.message || String(e)) + "</div>");
+    });
+  }
+
+  /* ---------- render ---------- */
+  var SUM_ST = {
+    done:    { label: "Review Done",   cls: "pr-rev-yes" },
+    partial: { label: "Partially Done", cls: "pr-rev-part" },
+    none:    { label: "Not Done",      cls: "pr-rev-no" }
+  };
+
+  function sumPeriodLabel() {
+    var mo = $("prSumMonth"), wk = $("prSumWeek");
+    var ml = mo && mo.selectedOptions[0] ? mo.selectedOptions[0].textContent : "";
+    var wl = wk && wk.selectedOptions[0] ? wk.selectedOptions[0].textContent : "";
+    return (ml ? ml : "") + (wl ? " · " + wl : "");
+  }
+
+  function sumRender() {
+    var d = SUM.data;
+    if (!d) { sumBody('<div class="pr-empty">Pick a review unit and a month, then Show.</div>'); return; }
+
+    var q = SUM.q.trim().toLowerCase();
+    var html = '<div class="pr-panel"><div class="pr-sum-head">'
+      + '<div class="pr-blocks-h">Weekly review status '
+      + '<span class="pr-sum-period">' + esc(sumPeriodLabel()) + "</span></div>"
+      + '<button type="button" class="pr-btn pr-sum-dl" id="prSumDl">Download Excel</button>'
+      + "</div>";
+
+    if (!SUM.members.length) {
+      // ---- counts, one row per review unit ----
+      // Every count is a button into the list behind it. A zero is not -
+      // there is nothing to show, and a clickable 0 just wastes a click.
+      var cell = function (unit, st, n, cls) {
+        if (!n) return '<td class="pr-num"><span class="pr-sum-zero">0</span></td>';
+        return '<td class="pr-num"><button type="button" class="pr-sum-drill ' + cls
+          + '" data-sumdrill="' + esc(unit) + "|" + st + '">' + n + "</button></td>";
+      };
+
+      var tot = { done: 0, partial: 0, none: 0 };
+      var rows = d.units.map(function (u) {
+        var c = { done: 0, partial: 0, none: 0 };
+        (d.byUnit[u] || []).forEach(function (m) { c[d.status[m.id] || "none"]++; });
+        tot.done += c.done; tot.partial += c.partial; tot.none += c.none;
+        var n = (d.byUnit[u] || []).length;
+        return '<tr class="pr-row"><td class="pr-item"><b>' + esc(u) + "</b>"
+          + '<span class="pr-sum-sub">' + n + " " + (n === 1 ? "person" : "people") + "</span></td>"
+          + cell(u, "done", c.done, "pr-rev-yes")
+          + cell(u, "partial", c.partial, "pr-rev-part")
+          + cell(u, "none", c.none, "pr-rev-no")
+          + "</tr>";
+      }).join("");
+
+      html += '<div class="pr-tablewrap"><table class="pr-tbl pr-sum-tbl"><thead><tr>'
+        + "<th>Review unit</th><th class=\"pr-num\">Review Done</th>"
+        + '<th class="pr-num">Partially Done</th><th class="pr-num">Not Done</th></tr></thead><tbody>'
+        + rows
+        + (d.units.length > 1
+            ? '<tr class="pr-row pr-sum-total"><td class="pr-item"><b>Total</b></td>'
+              + cell("*", "done", tot.done, "")
+              + cell("*", "partial", tot.partial, "")
+              + cell("*", "none", tot.none, "")
+              + "</tr>"
+            : "")
+        + "</tbody></table></div>"
+        + '<p class="pr-sum-hint">Click any number to see and download that list. '
+        + "Tick one or more members above to see them listed individually.</p>";
+
+    } else {
+      // ---- yes / no, one row per ticked member ----
+      var picked = d.members.filter(function (m) { return SUM.members.indexOf(m.id) >= 0; });
+      var shown = picked.filter(function (m) {
+        return !q || m.name.toLowerCase().indexOf(q) >= 0 || String(m.id).toLowerCase().indexOf(q) >= 0;
+      });
+
+      if (!shown.length) {
+        html += '<div class="pr-empty">'
+          + (picked.length ? "No selected member matches that search." : "No members selected.")
+          + "</div>";
+      } else {
+        var yn = function (on, cls) {
+          return '<td class="pr-num"><span class="' + (on ? cls : "pr-sum-no") + '">' + (on ? "Yes" : "No") + "</span></td>";
+        };
+        html += '<div class="pr-tablewrap"><table class="pr-tbl pr-sum-tbl"><thead><tr>'
+          + "<th>Member</th><th class=\"pr-num\">Review Done</th>"
+          + '<th class="pr-num">Partially Done</th><th class="pr-num">Not Done</th></tr></thead><tbody>'
+          + shown.map(function (m) {
+              var st = d.status[m.id] || "none";
+              return '<tr class="pr-row"><td class="pr-item">' + esc(m.name)
+                + '<span class="pr-sum-sub">' + esc(m.id) + " · " + esc(m.unit) + "</span></td>"
+                + yn(st === "done", "pr-rev-yes")
+                + yn(st === "partial", "pr-rev-part")
+                + yn(st === "none", "pr-rev-no")
+                + "</tr>";
+            }).join("")
+          + "</tbody></table></div>";
+        if (q && shown.length < picked.length) {
+          html += '<p class="pr-sum-hint">' + shown.length + " of " + picked.length + " selected members shown.</p>";
+        }
+      }
+    }
+
+    sumBody(html + "</div>");
+  }
+
+  /* ---------- drill-down + Excel ----------
+     SheetJS is loaded on first use. app.js and pos.js each keep their own
+     copy of this loader; a third here keeps pos-review.js self-contained,
+     and the browser caches the script so only one fetch ever happens. */
+  var _sumXlsx = null;
+  function sumLoadXLSX() {
+    if (_sumXlsx) return _sumXlsx;
+    _sumXlsx = new Promise(function (resolve, reject) {
+      if (window.XLSX) { resolve(window.XLSX); return; }
+      var s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+      s.onload = function () { resolve(window.XLSX); };
+      s.onerror = function () { reject(new Error("Couldn't load the Excel library. Check your connection.")); };
+      document.head.appendChild(s);
+    });
+    return _sumXlsx;
+  }
+
+  function sumFileStem() {
+    var mo = $("prSumMonth"), wk = $("prSumWeek");
+    return "Weekly_Review_Status_" + ((mo && mo.value) || "") + "_W" + ((wk && wk.value) || "");
+  }
+
+  // aoa -> sheet, with column widths from the longest cell in each column.
+  function sumSheet(XLSX, aoa) {
+    var ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = (aoa[0] || []).map(function (_, i) {
+      var w = 10;
+      aoa.forEach(function (r) { w = Math.max(w, String(r[i] == null ? "" : r[i]).length + 2); });
+      return { wch: Math.min(w, 46) };
+    });
+    return ws;
+  }
+
+  function sumSave(XLSX, sheets, filename) {
+    var wb = XLSX.utils.book_new();
+    sheets.forEach(function (s) { XLSX.utils.book_append_sheet(wb, sumSheet(XLSX, s.rows), s.name); });
+    XLSX.writeFile(wb, filename + ".xlsx");
+  }
+
+  var SUM_LBL = { done: "Review Done", partial: "Partially Done", none: "Not Done" };
+
+  // Everyone matching a unit ("*" = all ticked units) and a status.
+  function sumPeopleFor(unit, st) {
+    var d = SUM.data; if (!d) return [];
+    var pool = unit === "*" ? d.members : (d.byUnit[unit] || []);
+    return pool.filter(function (m) { return (d.status[m.id] || "none") === st; });
+  }
+
+  function sumDrill(unit, st) {
+    var people = sumPeopleFor(unit, st);
+    SUM.drill = { unit: unit, st: st, people: people };
+
+    $("prSumModalTitle").textContent =
+      SUM_LBL[st] + " — " + (unit === "*" ? "all review units" : unit)
+      + " · " + sumPeriodLabel();
+
+    $("prSumModalBody").innerHTML = people.length
+      ? '<table class="pr-tbl pr-sum-tbl"><thead><tr><th>#</th><th>Name</th><th>Employee ID</th>'
+        + "<th>Unit</th><th>Districts</th></tr></thead><tbody>"
+        + people.map(function (m, i) {
+            return '<tr class="pr-row"><td class="pr-sum-ix">' + (i + 1) + "</td>"
+              + '<td class="pr-item">' + esc(m.name) + "</td>"
+              + "<td>" + esc(m.id) + "</td><td>" + esc(m.unit) + "</td>"
+              + "<td>" + esc(m.districts || "—") + "</td></tr>";
+          }).join("")
+        + "</tbody></table>"
+      : '<div class="pr-empty">Nobody in this group.</div>';
+
+    $("prSumModalNote").textContent = people.length
+      ? people.length + (people.length === 1 ? " person" : " people")
+      : "";
+    $("prSumModal").hidden = false;
+  }
+
+  function sumDrillDownload() {
+    var dr = SUM.drill; if (!dr) return;
+    sumLoadXLSX().then(function (XLSX) {
+      var rows = [["Name", "Employee ID", "Unit", "Districts", "Status", "Period"]];
+      dr.people.forEach(function (m) {
+        rows.push([m.name, m.id, m.unit, m.districts || "", SUM_LBL[dr.st], sumPeriodLabel()]);
+      });
+      sumSave(XLSX, [{ name: SUM_LBL[dr.st].slice(0, 28), rows: rows }],
+        sumFileStem() + "_" + (dr.unit === "*" ? "All" : dr.unit) + "_" + SUM_LBL[dr.st].replace(/\s+/g, ""));
+    }).catch(function (e) { toast(e.message || String(e)); });
+  }
+
+  // The whole table as it stands. The counts view also gets a People sheet,
+  // because a sheet of three numbers on its own is rarely what you wanted.
+  function sumDownload() {
+    var d = SUM.data; if (!d) return;
+    sumLoadXLSX().then(function (XLSX) {
+      var period = sumPeriodLabel();
+      var sheets = [];
+
+      if (!SUM.members.length) {
+        var head = [["Review unit", "People", "Review Done", "Partially Done", "Not Done", "Period"]];
+        var tot = { done: 0, partial: 0, none: 0 };
+        d.units.forEach(function (u) {
+          var c = { done: 0, partial: 0, none: 0 };
+          (d.byUnit[u] || []).forEach(function (m) { c[d.status[m.id] || "none"]++; });
+          tot.done += c.done; tot.partial += c.partial; tot.none += c.none;
+          head.push([u, (d.byUnit[u] || []).length, c.done, c.partial, c.none, period]);
+        });
+        if (d.units.length > 1) head.push(["Total", d.members.length, tot.done, tot.partial, tot.none, period]);
+        sheets.push({ name: "Summary", rows: head });
+
+        var detail = [["Name", "Employee ID", "Unit", "Districts", "Status", "Period"]];
+        d.members.forEach(function (m) {
+          detail.push([m.name, m.id, m.unit, m.districts || "", SUM_LBL[d.status[m.id] || "none"], period]);
+        });
+        sheets.push({ name: "People", rows: detail });
+
+      } else {
+        var q = SUM.q.trim().toLowerCase();
+        var picked = d.members.filter(function (m) { return SUM.members.indexOf(m.id) >= 0; })
+          .filter(function (m) {
+            return !q || m.name.toLowerCase().indexOf(q) >= 0 || String(m.id).toLowerCase().indexOf(q) >= 0;
+          });
+        var mr = [["Member", "Employee ID", "Unit", "Districts", "Review Done", "Partially Done", "Not Done", "Period"]];
+        picked.forEach(function (m) {
+          var st = d.status[m.id] || "none";
+          mr.push([m.name, m.id, m.unit, m.districts || "",
+                   st === "done" ? "Yes" : "No", st === "partial" ? "Yes" : "No", st === "none" ? "Yes" : "No", period]);
+        });
+        sheets.push({ name: "Members", rows: mr });
+      }
+
+      sumSave(XLSX, sheets, sumFileStem());
+    }).catch(function (e) { toast(e.message || String(e)); });
+  }
+
+  /* =====================================================================
+     MONTHLY SUMMARY VIEW
+     "Is this month's review written?" for every PO, PM and DM in a state /
+     district. Reads only review_responses for period YYYYMM00 (plus last
+     month's YYYYMM00 for the carried B actions) and the month's Academic
+     Plan, so it is two light queries per month, cached while the tab is open.
+
+     Manual points in the Monthly review:
+       Self (the person under review)
+         A1  mood
+         B1-B5  a status for every action carried from last month's G
+         G2-G6  at least one action for next month
+         (G1 exams completed is not a write point any more: POs tick the district's exams, Nov 2026)
+         every typed goal entry in MO_GOALS (POM clusters, the 8 G5 Yes/No, Case Study)
+         G4  at least one activity, each with name / weight / target / done, weights = 10
+         (A2 "anything on your mind" and G1 "blocker" are optional text)
+       Manager (PM; DM / COO when the seat above is vacant)
+         H1 Review held + H2 Manager status   (H3 remark optional)
+
+     Status:  Done    = self complete AND manager complete
+              Partial = self complete, manager not yet
+              Not done = self not complete (whatever the manager has written)
+     ===================================================================== */
+  var MSUM = { cache: {}, data: null, filled: false };
+  var MSUM_UNITS = ["PO", "PM", "DM"];
+  var MSUM_LBL = { done: "Review Done", partial: "Partially Done", none: "Not Done" };
+
+  function msumTxt(v) { return String(v == null ? "" : v).trim(); }
+  // B values are saved as { text, status }; older rows may hold the JSON as a string.
+  function msumObj(v) {
+    if (v && typeof v === "object") return v;
+    if (typeof v === "string" && v.charAt(0) === "{") { try { return JSON.parse(v); } catch (e) { return {}; } }
+    return {};
+  }
+  function msumHas(v) { return v !== null && v !== undefined && msumTxt(v) !== ""; }
+
+  // Every typed goal entry (fid) in the Monthly table, in table order — so a field
+  // added to MO_GOALS later is required here automatically.
+  function msumGoalFields() {
+    var out = [];
+    MO_GOALS.forEach(function (g) {
+      g.rows.forEach(function (r) {
+        if (r.fid && ((r.v && r.v.numentry) || (r.yn && r.yn.entry))) out.push({ fid: r.fid, label: r.label, grp: "m" + g.key });
+      });
+    });
+    return out;
+  }
+
+  /* One person's monthly review -> { st, self, mgr, missing[] } */
+  function msumEvaluate(sec, prevSec, examsPlanned) {
+    sec = sec || {}; prevSec = prevSec || {};
+    var A = sec.A || {}, B = sec.B || {}, G = sec.G || {}, H = sec.H || {}, M = sec.M || {}, PG = prevSec.G || {};
+    // Each gap carries where it lives in the Monthly table (grp = accordion, fid = field)
+    // so the review page can jump straight to it.
+    var missAt = [], mgrAt = [];
+    var miss = { push: function (label, grp, fid) { missAt.push({ label: label, grp: grp, fid: fid || "" }); } };
+    var mgrMiss = { push: function (label, grp, fid) { mgrAt.push({ label: label, grp: grp, fid: fid || "" }); } };
+
+    if (!msumHas(A.A1)) miss.push("A1 Mood", "mA", "A1");
+
+    // B: every action carried from last month's plan (G2..G6 -> B1..B5) needs a status.
+    [1, 2, 3, 4, 5].forEach(function (n) {
+      var b = msumObj(B["B" + n]);
+      var carried = msumTxt(PG["G" + (n + 1)]) || msumTxt(b.text);
+      if (carried && !msumHas(b.status)) miss.push("B" + n + " status \u2014 \u201C" + (carried.length > 40 ? carried.slice(0, 38) + "\u2026" : carried) + "\u201D", "mB", "B" + n);
+    });
+
+    if (!["G2", "G3", "G4", "G5", "G6"].some(function (k) { return msumHas(G[k]); })) miss.push("At least one action for next month", "mG", "G2");
+
+    // G1 exams completed is no longer typed: it comes from the district's ticks, so it is not a write point.
+
+    msumGoalFields().forEach(function (f) { if (!msumHas(M[f.fid])) miss.push(f.label, f.grp, f.fid); });
+
+    // G4: same rules the Save button enforces, plus a target and done for each activity.
+    var acts = G4_SLOTS.map(function (i) {
+      var x = { name: msumTxt(M["M_G4_" + i + "_NAME"]), w: M["M_G4_" + i + "_W"], t: M["M_G4_" + i + "_T"], d: M["M_G4_" + i + "_D"] };
+      x.used = !!x.name || msumHas(x.w) || msumHas(x.t) || msumHas(x.d);
+      return x;
+    }).filter(function (x) { return x.used; });
+    if (!acts.length) miss.push("G4 Other activities (add at least one)", "mG4", "");
+    else {
+      var wsum = Math.round(acts.reduce(function (a, x) { return a + (msumHas(x.w) ? num(x.w) : 0); }, 0) * 1000) / 1000;
+      if (wsum !== 10) miss.push("G4 weights add up to " + wsum + " (must be 10)", "mG4", "");
+      if (acts.some(function (x) { return !x.name || !msumHas(x.w) || !msumHas(x.t) || !msumHas(x.d); })) miss.push("G4 activity name / weight / target / done", "mG4", "");
+    }
+
+    if (!msumHas(H.H1)) mgrMiss.push("H1 Review held", "mH", "H1");
+    if (!msumHas(H.H2)) mgrMiss.push("H2 Manager status", "mH", "H2");
+
+    var self = !missAt.length, mgr = !mgrAt.length;
+    var started = ["A", "B", "G", "M", "H"].some(function (k) { return hasContent(sec[k]); });
+    var lbl = function (x) { return x.label; };
+    return { st: self ? (mgr ? "done" : "partial") : "none", self: self, mgr: mgr, started: started,
+             missing: missAt.map(lbl), mgrMissing: mgrAt.map(lbl), missingAt: missAt, mgrMissingAt: mgrAt,
+             selfAt: [A, B, G, M].map(function (s) { return s._at || ""; }).sort().pop() || "", mgrAt: H._at || "", mgrBy: H._by || "" };
+  }
+
+  // Who fills H for this person: next seat up that is filled (same chain as buildHeader).
+  function msumReviewerOf(p) {
+    if (!p) return null;
+    var dists = p.assigned_districts || [], mgr = null;
+    var chain = p.designation === "PO" ? ["PM", "DM", "COO"] : p.designation === "PM" ? ["DM", "COO"] : ["COO"];
+    chain.some(function (role) { mgr = peopleOver(role, dists)[0] || null; return !!mgr; });
+    return mgr || ORG.people.filter(function (x) { return x.designation === "COO"; })[0] || null;
+  }
+
+  /* ---------- data: one month, everyone (cached) ---------- */
+  async function sbGetMonthSummary(month) {
+    await loadOrg();
+    if (MSUM.cache[month]) return MSUM.cache[month];
+    var code = month + "00", prevCode = prevMonthCode(month) + "00";
+    var q = await Promise.all([
+      fetchAll(function () {
+        return db().from("review_responses").select("emp_id,period_code,section,field,value,updated_at,updated_by")
+          .in("period_code", [code, prevCode]);
+      }),
+      fetchAll(function () { return db().from("academic_targets").select("*").eq("plan_month", month); })
+        .catch(function (e) { console.warn("Academic plan not loaded:", e); return null; })
+    ]);
+    var byEmp = {};
+    q[0].forEach(function (r) { (byEmp[normId(r.emp_id)] = byEmp[normId(r.emp_id)] || []).push(r); });
+
+    var people = ORG.people.filter(function (p) { return MSUM_UNITS.indexOf(p.designation) >= 0; }).sort(byNameSort).map(function (p) {
+      var secs = sectionsByCode(byEmp[normId(p.emp_id)] || []);
+      var exams = q[1] ? acadTotal(acadFromRows(q[1], p.designation === "PO" ? "PO" : p.designation, p.emp_id)) : 0;
+      var dists = p.assigned_districts || [];
+      var states = [];
+      dists.forEach(function (d) { var r = ORG.distByKey[normDist(d)]; if (r && r.state && states.indexOf(r.state) < 0) states.push(r.state); });
+      var mgr = msumReviewerOf(p);
+      var ev = msumEvaluate(secs[code], secs[prevCode], exams);
+      return { id: p.emp_id, name: p.name, unit: p.designation, email: p.email || "",
+               districts: dists, distKeys: dists.map(normDist), states: states,
+               manager: mgr ? mgr.name + " (" + mgr.designation + ")" : "", exams: exams, acadOk: !!q[1], ev: ev };
+    });
+    var out = { month: month, people: people, acadOk: !!q[1] };
+    MSUM.cache[month] = out;
+    return out;
+  }
+
+  /* ---------- filters ---------- */
+  function msumStates() {
+    if (!ORG) return [];
+    var s = {}; ORG.districts.forEach(function (d) { if (d.state) s[d.state] = 1; });
+    return Object.keys(s).sort();
+  }
+  function msumFillDistricts() {
+    var sel = $("prMsDist"); if (!sel || !ORG) return;
+    var st = $("prMsState").value, keep = sel.value;
+    var list = ORG.districts.filter(function (d) { return !st || d.state === st; }).map(function (d) { return d.name; }).sort();
+    sel.innerHTML = ""; sel.appendChild(opt("", st ? "All districts of " + st : "All districts"));
+    list.forEach(function (n) { sel.appendChild(opt(n, n)); });
+    sel.value = list.indexOf(keep) >= 0 ? keep : "";
+    sel.disabled = false;
+  }
+  function msumFillFromBase() {
+    if (!$("prMsState") || !state.base) return;
+    var ss = $("prMsState"), keepS = ss.value;
+    ss.innerHTML = ""; ss.appendChild(opt("", "All states"));
+    msumStates().forEach(function (s) { ss.appendChild(opt(s, s)); });
+    ss.value = keepS && msumStates().indexOf(keepS) >= 0 ? keepS : ""; ss.disabled = false;
+    msumFillDistricts();
+    var mo = $("prMsMonth"), keepM = mo.value;
+    mo.innerHTML = "";
+    if (!state.base.months.length) mo.innerHTML = '<option value="">No months</option>';
+    else {
+      state.base.months.forEach(function (m) { mo.appendChild(opt(m.code, m.label)); });
+      var pick = state.base.months[Math.max(0, state.base.months.length - 2)];   // newest month with data
+      mo.value = keepM && state.base.months.some(function (m) { return m.code === keepM; }) ? keepM : (pick ? pick.code : "");
+    }
+    mo.disabled = false;
+    MSUM.cache = {}; MSUM.filled = true;
+    if ($("prMosum") && !$("prMosum").hidden) msumLoad();
+  }
+  function msumOnOpen() { if (MSUM.filled && !MSUM.data) msumLoad(); }
+  function msumWire() {
+    if (!$("prMsState")) return;
+    $("prMsState").addEventListener("change", function () { msumFillDistricts(); msumRender(); });
+    $("prMsDist").addEventListener("change", msumRender);
+    $("prMsUnit").addEventListener("change", msumRender);
+    $("prMsMonth").addEventListener("change", msumLoad);
+    $("prMsRefresh").addEventListener("click", function () { delete MSUM.cache[$("prMsMonth").value]; msumLoad(); });
+    $("prMsBody").addEventListener("click", function (e) {
+      var b = e.target.closest ? e.target.closest("[data-msdl]") : null;
+      if (b && !b.disabled) msumDownload(b.dataset.msdl);
+    });
+  }
+
+  function msumBody(html) { var b = $("prMsBody"); if (b) b.innerHTML = html; }
+  function msumLoad() {
+    var month = ($("prMsMonth") || {}).value;
+    if (!month) { msumBody('<div class="pr-empty">Pick a month.</div>'); return; }
+    msumBody('<div class="pr-empty pr-loading">Loading monthly review status…</div>');
+    sbGetMonthSummary(month).then(function (d) {
+      if (($("prMsMonth") || {}).value !== month) return;           // a newer pick is loading
+      MSUM.data = d; msumRender();
+    }).catch(function (e) { msumBody('<div class="pr-empty pr-error">Couldn\'t load: ' + esc(e.message || String(e)) + "</div>"); });
+  }
+
+  // People in scope for the current State / District / Review-unit filters.
+  function msumScope() {
+    var d = MSUM.data; if (!d) return [];
+    var st = $("prMsState").value, dist = $("prMsDist").value, unit = $("prMsUnit").value;
+    var dk = dist ? normDist(dist) : "";
+    var stateKeys = {};
+    if (st && !dist) ORG.districts.forEach(function (x) { if (x.state === st) stateKeys[normDist(x.name)] = 1; });
+    return d.people.filter(function (p) {
+      if (unit && p.unit !== unit) return false;
+      if (dk) return p.distKeys.indexOf(dk) >= 0;
+      if (st) return p.distKeys.some(function (k) { return stateKeys[k]; });
+      return true;
+    });
+  }
+  function msumScopeLabel() {
+    var st = $("prMsState").value, dist = $("prMsDist").value, unit = $("prMsUnit").value;
+    var mo = $("prMsMonth"), ml = mo && mo.selectedOptions[0] ? mo.selectedOptions[0].textContent.replace(/\s*\(no data yet\)/, "") : "";
+    return [ml, dist || st || "All states", unit || "PO · PM · DM"].filter(Boolean).join(" · ");
+  }
+
+  function msumRender() {
+    var d = MSUM.data;
+    if (!d) { msumBody('<div class="pr-empty">Pick a month to see who has written their monthly review.</div>'); return; }
+    var people = msumScope(), c = { done: [], partial: [], none: [] };
+    people.forEach(function (p) { c[p.ev.st].push(p); });
+    var tot = people.length, notStarted = c.none.filter(function (p) { return !p.ev.started; }).length;
+    var split = function (list) {
+      var n = {}; list.forEach(function (p) { n[p.unit] = (n[p.unit] || 0) + 1; });
+      return MSUM_UNITS.filter(function (u) { return n[u]; }).map(function (u) { return u + " " + n[u]; }).join(" · ") || "—";
+    };
+    var DEF = {
+      done:    "Self points and manager's points (H) both saved",
+      partial: "Self points saved · manager's points (H) pending",
+      none:    "Self points not complete yet"
+    };
+    var card = function (st) {
+      var n = c[st].length, pct = tot ? Math.round(n / tot * 100) : 0;
+      return '<div class="pr-card pr-msum-card pr-msum-' + st + '">'
+        + '<div class="pr-card-k"><span>' + MSUM_LBL[st] + '</span><span class="pr-msum-pct">' + pct + "%</span></div>"
+        + '<div class="pr-card-v">' + n + "<small>/ " + tot + "</small></div>"
+        + '<div class="pr-msum-def">' + DEF[st] + "</div>"
+        + '<div class="pr-msum-split">' + esc(split(c[st])) + "</div>"
+        + (st === "none" ? '<div class="pr-msum-def">' + notStarted + " of them not started (nothing saved yet)</div>" : "")
+        + '<button type="button" class="pr-btn pr-msum-dl" data-msdl="' + st + '"' + (n ? "" : " disabled") + ">Download Excel</button>"
+        + "</div>";
+    };
+    var html = '<div class="pr-msum-scope"><span class="pr-sum-period">' + esc(msumScopeLabel()) + "</span>"
+      + "<span>" + tot + (tot === 1 ? " person" : " people") + " in scope</span></div>";
+    if (!tot) html += '<div class="pr-panel"><div class="pr-empty">Nobody matches these filters.</div></div>';
+    else html += '<div class="pr-cards pr-msum-cards">' + card("done") + card("partial") + card("none") + "</div>";
+    html += '<p class="pr-sum-hint pr-msum-rule">Self points = A1 mood, a status for each action carried from last month, at least one action for next month, exams completed (when exams are planned), every typed goal entry (POM clusters, G5 Yes/No items, Case Study) and G4 activities with weights adding up to 10. '
+      + "Manager's points = H1 Review held + H2 Manager status.</p>";
+    if (!d.acadOk) html += '<p class="pr-sum-hint">The Academic Plan could not be loaded, so “G1 Exams completed” is not checked.</p>';
+    msumBody(html);
+  }
+
+  function msumDownload(st) {
+    var people = msumScope().filter(function (p) { return p.ev.st === st; });
+    if (!people.length) return;
+    var month = $("prMsMonth").value, scope = msumScopeLabel();
+    sumLoadXLSX().then(function (XLSX) {
+      var rows = [["Employee ID", "Employee Name", "Role", "State", "District(s)", "Reviewer (fills H)",
+                   "Status", "Self points", "Manager points", "Missing — self", "Missing — manager", "Month", "Filters"]];
+      people.forEach(function (p) {
+        rows.push([p.id, p.name, p.unit, p.states.join(", "), p.districts.join(", "), p.manager,
+                   MSUM_LBL[st] + (st === "none" && !p.ev.started ? " (not started)" : ""), p.ev.self ? "Complete" : "Incomplete", p.ev.mgr ? "Complete" : "Pending",
+                   p.ev.missing.join("; "), p.ev.mgrMissing.join("; "), month, scope]);
+      });
+      var place = ($("prMsDist").value || $("prMsState").value || "All").replace(/[^A-Za-z0-9]+/g, "_");
+      sumSave(XLSX, [{ name: MSUM_LBL[st].slice(0, 28), rows: rows }],
+        "Monthly_Review_" + month + "_" + place + ($("prMsUnit").value ? "_" + $("prMsUnit").value : "") + "_" + MSUM_LBL[st].replace(/\s+/g, ""));
+    }).catch(function (e) { toast(e.message || String(e)); });
+  }
+
+  /* ======================================================================
+     QUARTERLY · YEARLY · WHOLE YEAR TABS  (Nov 2026)
+     Academic year = June to May ("2026-27" = Jun 2026 to May 2027).
+       Q1 Jun-Aug · Q2 Sep-Nov · Q3 Dec-Feb · Q4 Mar-May
+     Only G1-G4 are shown (weights 40 / 20 / 20 / 10 = 90). G5 is not part of these views.
+     The total is scaled to 100 (G1-G4 total x 100 / 90); each goal keeps its own weight.
+
+     Where each number comes from
+       G1     Per exam program, added up over the period's months: target = the districts' exams in the
+              Academic Plan, done = exams ticked Completed (a month with no ticks uses the number typed
+              in the old box, spread over its programs). Core programs share the 40 equally; non-core
+              are listed only; no core exam in the period = G1 not scored and the rest scaled to 100.
+       G2/G3  Quarterly tab, Month 1-3 columns = that month's Monthly figures (as on the Monthly tab).
+              Quarter total / Yearly (Q1-Q4) / Whole Year = their own uploads:
+                achieved -> Admin > Data > "Quarter & Whole-Year data" (Vinoba + Staff Connect files)
+                targets  -> Admin > G2 · G3 · G5 Targets > "Quarter & Whole-Year targets"
+                            (PO view = PO rows, District view = district rows, PM / DM = their districts' rows)
+              Kathavli stories and POM transformed clusters are not used for a quarter / year: G3 there is
+              the Online + Offline community score (the other 9 metrics) scaled to G3's full weight of 20.
+       G4     Quarterly tab, Month 1-3 = Monthly G4. Quarter total and Whole Year = activities typed by
+              the reviewer (the person who fills H) on that review. Yearly shows each quarter's entry.
+
+     Review sections A / B / G / H are the Monthly ones with "quarter" / "year" wording, saved in
+     review_responses under their own period codes:
+       quarter  <AY>9<q>00   e.g. 20269100 = 2026-27 Q1
+       year     <AY>9900     e.g. 20269900 = 2026-27 whole year
+     A month code never has 9 as its 5th digit, so these never clash with weeks or months.
+     Status rules are the Monthly ones: Partially done = the person's own points saved,
+     Done = the reviewer's points (H, and G4 here) saved too.
+     ====================================================================== */
+  var QY_GOALS = MO_GOALS.filter(function (g) { return g.key !== "G5"; });
+  var QY_MAX = QY_GOALS.reduce(function (a, g) { return a + g.weight; }, 0);          // 90 (G1-G4 weights)
+  var QY_OUTOF = 100;                                                                  // totals are shown out of 100
+  function qyScale(total, max) { return total * QY_OUTOF / (max || QY_MAX); }
+  // G3 lines not used for a quarter / year
+  var QY_SKIP = { "G3|Vinoba Kathavli Stories": 1, "G3|POM transformed clusters": 1 };
+  var QY_QM = { 1: [6, 7, 8], 2: [9, 10, 11], 3: [12, 1, 2], 4: [3, 4, 5] };
+  var QY_YM = [6, 7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5];
+  var QDIRTY = {};                 // { periodCode: { fieldId: value } } — Quarterly + Whole Year reviews
+  var QV = { quarterly: null, yearly: null, wholeyear: null };   // last loaded payload per tab
+
+  function qyAyOf(code) { var y = Number(String(code).substring(0, 4)), m = Number(String(code).substring(4, 6)); return m >= 6 ? y : y - 1; }
+  function qyAyLabel(ay) { return ay + "-" + String(ay + 1).slice(2); }
+  function qyMonthCode(ay, m) { return "" + (m >= 6 ? ay : ay + 1) + pad2(m); }
+  function qyQMonths(ay, q) { return QY_QM[q].map(function (m) { return qyMonthCode(ay, m); }); }
+  function qyYMonths(ay) { return QY_YM.map(function (m) { return qyMonthCode(ay, m); }); }
+  function qyCode(ay, p) { return p === "FY" ? ay + "9900" : ay + "9" + p + "00"; }
+  function qyIsCode(c) { return /^\d{4}9\d00$/.test(String(c)); }
+  function qyWeekOf(p) { return p === "FY" ? 9 : Number(p); }      // "week" column of the quarter / year uploads
+  function qyMonLabel(code) { return MON_SHORT[Number(code.substring(4, 6)) - 1] + " " + code.substring(0, 4); }
+  function qyQRange(q) { var m = QY_QM[q]; return MON_SHORT[m[0] - 1] + "–" + MON_SHORT[m[2] - 1]; }
+  function qyCurAy() { var d = new Date(); return d.getMonth() + 1 >= 6 ? d.getFullYear() : d.getFullYear() - 1; }
+  function qyCurQ() { var m = new Date().getMonth() + 1; for (var q = 1; q <= 4; q++) if (QY_QM[q].indexOf(m) >= 0) return q; return 1; }
+  // true while the academic year is still running (Whole Year shows "year to date")
+  function qyYearOpen(ay) { var d = new Date(), c = "" + d.getFullYear() + pad2(d.getMonth() + 1); return c <= (ay + 1) + "05"; }
+  function qyNowCode() { var d = new Date(); return "" + d.getFullYear() + pad2(d.getMonth() + 1); }
+  function qyTnum(v) { var n = Number(v); return (v === null || v === undefined || v === "" || isNaN(n)) ? null : n; }
+
+  /* ---------- who / what is under review (same rules as sbGetWeeklyView) ---------- */
+  function qyScope(unit, value) {
+    var self = null, districts, blockNames, team = [];
+    if (unit === "PO") {
+      self = person(value);
+      if (!self) throw new Error("No active assignment found for " + value + ".");
+      districts = self.assigned_districts || [];
+      blockNames = self.assigned_blocks || [];
+    } else if (unit === "PM" || unit === "DM") {
+      self = person(value);
+      if (!self) throw new Error("No active assignment found for " + value + ".");
+      districts = self.assigned_districts || [];
+      blockNames = blocksOfDistricts(districts);
+      team = peopleOver("PO", districts);
+    } else {
+      districts = [value];
+      blockNames = blocksOfDistricts(districts);
+      team = peopleOver("PO", districts);
+    }
+    return { unit: unit, value: value, self: self, districts: districts, blockNames: blockNames, team: team,
+             blockKeys: blockNames.map(normBlock), distKeys: districts.map(normDist),
+             empId: self ? self.emp_id : "", header: buildHeader(unit, value, self, districts, blockNames, team) };
+  }
+
+  /* ---------- one academic year of quarter / year data for a unit ----------
+     -> { periods: { 1, 2, 3, 4, FY: period payload }, missing, acadOk }
+     A period payload looks like a Monthly payload (so the Monthly scoring code can run on it):
+       { p, ay, code, months, g1: {target, done}, prevSections,
+         view: { header, month: code, academic: null, targets, weeks: [{ week 0, code, sections, readPoints, carryForward }] } } */
+  async function sbGetQyYear(unit, value, ay) {
+    await loadOrg();
+    var sc = qyScope(unit, value), flag = { missing: [] };
+    var months = qyYMonths(ay);
+    var qCodes = [1, 2, 3, 4].map(function (q) { return qyCode(ay, q); }).concat([qyCode(ay, "FY"), qyCode(ay - 1, 4), qyCode(ay - 1, "FY")]);
+    var mCodes = months.map(function (m) { return m + "00"; });
+    var NONE = Promise.resolve([]);
+    var safe = function (name, p) { return p.catch(function (e) { console.warn(name + " not loaded:", e); flag.missing.push(name); return []; }); };
+    var q = await Promise.all([
+      fetchAll(function () { return db().from("academic_targets").select("*").in("plan_month", months); })
+        .catch(function (e) { console.warn("Academic plan not loaded:", e); return null; }),
+      sc.empId ? fetchAll(function () { return db().from("review_responses").select("*").eq("emp_id", sc.empId).in("period_code", qCodes.concat(mCodes)); }) : NONE,
+      sc.blockKeys.length ? safe("vinoba_qy_v", fetchAll(function () { return db().from("vinoba_qy_v").select("*").eq("year", ay).in("block_key", sc.blockKeys); })) : NONE,
+      sc.distKeys.length ? safe("staffconnect_qy_v", fetchAll(function () { return db().from("staffconnect_qy_v").select("*").eq("year", ay).in("district_key", sc.distKeys); })) : NONE,
+      safe("qy_targets", fetchAll(function () { return db().from("qy_targets").select("*").eq("year", ay); })),
+      sbGetAcadDone()
+    ]);
+    var acadRows = q[0], own = sectionsByCode(q[1]), vin = q[2], scr = q[3], tgt = q[4], acadDone = q[5];
+
+    // G1 per month exactly as the Monthly tab: planned = district exams, done = the district's ticks
+    // counted in that month (or, for a month with no ticks, the number typed in the old box).
+    function g1For(mcodes) {
+      if (!acadRows) return null;                     // plan not loaded: G1 unavailable
+      var map = {};
+      mcodes.forEach(function (m) {
+        var list = acadFromRows(acadRows.filter(function (r) { return String(r.plan_month) === m; }), unit, value, acadDone, m);
+        var P = acadPrograms(list, ((own[m + "00"] || {}).M || {}).M_G1_DONE);
+        P.progs.forEach(function (p) {
+          var q = map[p.label] = map[p.label] || { label: p.label, core: p.core, rank: p.rank, t: 0, d: 0 };
+          q.t += p.t; q.d += p.d;
+        });
+      });
+      // the period's core programs share the 40 (per program); none = G1 not scored
+      return acadScore(Object.keys(map).map(function (k) { return map[k]; }));
+    }
+    function rpFor(p, mcodes) {
+      var wk = qyWeekOf(p), rp = {};
+      var vrows = vin.filter(function (r) { return Number(r.week) === wk; }).map(function (r) { return Object.assign({}, r, { week: wk }); });
+      // the Staff Connect file of a quarter holds several months: count them all
+      var srows = scr.filter(function (r) { return Number(r.week) === wk; }).map(function (r) { return Object.assign({}, r, { week: wk, event_month: null }); });
+      if (vrows.length || srows.length) {
+        var out = buildReadPoints(wk, false, sc.blockKeys, sc.distKeys, "", vrows, srows, [], [], [], []);
+        if (vrows.length) rp.vinoba = out.vinoba;
+        if (srows.length) { rp.staffConnect = out.staffConnect; rp.extra = out.extra; }
+      }
+      return rp;
+    }
+    function targetsFor(p) {
+      var pname = p === "FY" ? "FY" : "Q" + p;           // qy_targets.period: 'Q1'..'Q4' / 'FY'
+      var rows = tgt.filter(function (r) { return String(r.period) === pname; }), pick;
+      if (unit === "PO") pick = rows.filter(function (r) { return r.level === "PO" && normId(r.po_id) === normId(value); });
+      else {
+        var dk = {}; sc.districts.forEach(function (d) { dk[normDist(d)] = 1; });
+        pick = rows.filter(function (r) { return r.level === "District" && dk[normDist(r.district)]; });
+      }
+      var out = { cols: {}, unit: unit, rowsInMonth: rows.length, unitRows: pick.length, qy: true };
+      TGT_KEYS.forEach(function (k) {
+        var total = 0, any = false, parts = [];
+        pick.forEach(function (r) {
+          var v = qyTnum(r[k]);
+          parts.push({ district: r.district || "", po: r.po_name || r.po_id || r.district || "", value: v, status: v > 0 ? "counted" : "zero" });
+          if (v > 0) { any = true; total = k === "posts_per_teacher" ? Math.max(total, v) : total + v; }   // a ratio is not added up
+        });
+        out.cols[k] = { value: any ? total : null, parts: parts };
+      });
+      return out;
+    }
+    function payload(p) {
+      var code = qyCode(ay, p), mcodes = p === "FY" ? months : qyQMonths(ay, p);
+      var prevCode = p === "FY" ? qyCode(ay - 1, "FY") : (p === 1 ? qyCode(ay - 1, 4) : qyCode(ay, p - 1));
+      var carry = { B1: "", B2: "", B3: "", B4: "", B5: "" };
+      applyCarry(carry, (own[prevCode] || {}).G);
+      return { p: p, ay: ay, code: code, months: mcodes, g1: g1For(mcodes), prevSections: own[prevCode] || {}, qy: true,
+               future: mcodes[0] > qyNowCode(),                 // not started yet: shown as "—", never scored
+               view: { header: sc.header, unitEmpId: sc.empId, month: code, academic: null, targets: targetsFor(p),
+                       weeks: [{ week: 0, code: code, sections: own[code] || {}, readPoints: rpFor(p, mcodes), prefill: {}, carryForward: carry }] } };
+    }
+    return { unit: unit, value: value, ay: ay, scope: sc, missing: flag.missing, acadOk: !!acadRows,
+             periods: { 1: payload(1), 2: payload(2), 3: payload(3), 4: payload(4), FY: payload("FY") } };
+  }
+
+  // One month exactly as the Monthly tab sees it
+  async function qyMonthPayload(unit, value, month) {
+    var r = await Promise.all([
+      sbGetWeeklyView(unit, value, month),
+      sbGetAcademic(unit, value, month).catch(function (e) { console.warn("Academic plan not loaded:", e); return null; }),
+      sbGetTargets(unit, value, month).catch(function (e) { console.warn("Targets not loaded:", e); return null; })
+    ]);
+    var v = r[0]; v.academic = r[1]; v.targets = r[2];
+    return { month: month, view: v, future: month > qyNowCode() };
+  }
+
+  /* ---------- scoring: run the Monthly rules on any payload ---------- */
+  function qyWith(view, dirty, fn) {
+    var sv = MVIEW, sd = MDIRTY;
+    MVIEW = view; MDIRTY = dirty || {};
+    try { return fn(); } finally { MVIEW = sv; MDIRTY = sd; }
+  }
+  // -> { goals: { G1: score|null, ... }, rows: { "G2|Storytelling": { t, d, p, s } }, total, n }
+  function qyEval(per, dirty) {
+    if (per.future) {
+      var none = { goals: {}, rows: {}, total: 0, n: 0, future: true };
+      QY_GOALS.forEach(function (g) { none.goals[g.key] = null; });
+      return none;
+    }
+    return qyWith(per.view, dirty, function () {
+      var rp = moW0().readPoints || {}, out = { goals: {}, rows: {}, total: 0, n: 0 };
+      QY_GOALS.forEach(function (g) {
+        var score = null;
+        if (g.key === "G1") {
+          // quarter / year: programs added up over the period's months (sbGetQyYear); a month column: that month
+          var P = per.g1 !== undefined ? per.g1 : (per.view.academic ? acadPrograms(per.view.academic, moG1Legacy()) : null);
+          out.g1 = P;
+          if (P) {
+            out.rows["G1|Core exams"] = { t: P.coreT, d: P.coreD, p: P.na ? null : P.score / g.weight, s: P.score, na: P.na };
+            P.progs.forEach(function (p) { out.rows["G1|" + (p.core ? "c:" : "n:") + p.label] = { t: p.t, d: p.d, p: p.pct, s: p.s }; });
+            if (P.noncore.length) out.rows["G1|Non-core exams"] = { t: P.ncT, d: P.ncD, p: P.ncT > 0 ? Math.min(P.ncD / P.ncT, 1) : null, s: null };
+            if (P.na) out.g1na = true;
+          }
+          score = P && !P.na ? P.score : null;
+        } else if (g.key === "G4") {
+          var e4 = moG4Eval();
+          out.rows["G4|Other activities"] = { t: null, d: null, p: null, s: e4.score, g4: e4 };
+          score = e4.score;
+        } else if (g.key === "G3" && per.qy) {
+          // Quarter / year: no Kathavli, no POM clusters. Community = average of the other 9 metrics, x 20.
+          var mets = g.rows.filter(function (x) { return x.lvl === 2 && x.t && !QY_SKIP["G3|" + x.label]; }), ach = [];
+          g.rows.forEach(function (r) {
+            if (r.head) return;
+            var k = "G3|" + r.label;
+            if (QY_SKIP[k]) { out.rows[k] = { skip: true }; return; }
+            if (r.community) return;
+            var ev = moEval(g, r, rp);
+            out.rows[k] = { t: ev.tg.state === "ok" ? ev.tg.value : (ev.full ? 0 : null), d: ev.st.kind === "num" ? ev.st.value : null, p: ev.pct, s: null };
+          });
+          mets.forEach(function (x) {
+            var t = moTarget(x), st = moRowState(x, rp);
+            if (t.state === "ok" && st.kind === "num") ach.push(Math.min(st.value / t.value, 1));
+            else if (t.state === "notset" && moNoTargetFull()) ach.push(1);
+          });
+          var cp = ach.length ? ach.reduce(function (a, b) { return a + b; }, 0) / ach.length : null;
+          var crow = g.rows.filter(function (x) { return x.community; })[0];
+          out.rows["G3|" + crow.label] = { t: null, d: null, p: cp, s: cp == null ? null : g.weight * cp };
+          score = cp == null ? null : g.weight * cp;
+        } else {
+          g.rows.forEach(function (r) {
+            if (r.head) return;
+            var ev = moEval(g, r, rp), weighted = (r.lvl === 0 && r.w > 0) || r.community;
+            var t2 = ev.tg.state === "ok" ? ev.tg.value : (ev.full ? 0 : null);
+            out.rows[g.key + "|" + r.label] = {
+              t: r.info ? null : t2, d: ev.st.kind === "num" ? ev.st.value : null,
+              p: r.info ? null : ev.pct, s: weighted ? ev.score : null };
+          });
+          score = moGoalScore(g, rp).score;
+        }
+        out.goals[g.key] = score;
+        if (score != null) { out.total += score; out.n++; }
+      });
+      // no core exam in the period: G1 is left out, the other goals (50) are scaled to 100
+      out.max = QY_MAX - (out.g1na ? QY_GOALS[0].weight : 0);
+      out.of = QY_GOALS.length - (out.g1na ? 1 : 0);
+      return out;
+    });
+  }
+
+  /* ---------- the goal matrix (rows G1-G4, one column group per period) ----------
+     cols: [{ label, sub, ev, tot }] · opts: { id, open: {i: true}, fixed: true (always open, no toggle) } */
+  function qyFmt(v, pct) {
+    if (v === null || v === undefined || v === "") return '<span class="pr-mut">—</span>';
+    return pct ? fmtNum(Math.round(v * 1000) / 10) + "%" : fmtNum(r2(v));
+  }
+  // Column groups take turns between two tints; the total column has its own colour.
+  function qyGrpCls(c, i) { return c.tot ? " qy-tot" : (i % 2 ? " qy-alt" : " qy-base"); }
+  function qyMatrix(cols, opts) {
+    var open = opts.open || {}, cls = "pr-tbl pr-mo-tbl qy-tbl";
+    cols.forEach(function (c, i) { if (open[i] || opts.fixed) cls += " qy-o" + i; });
+    var h1 = '<tr><th class="pr-item" rowspan="2">Item</th><th class="pr-num" rowspan="2">Weight</th>', h2 = "<tr>";
+    cols.forEach(function (c, i) {
+      var o = !!(open[i] || opts.fixed);
+      var gc = qyGrpCls(c, i);
+      h1 += '<th class="qy-ph' + gc + '" data-p="' + i + '" colspan="' + (o ? 4 : 1) + '"' + (c.tip ? ' title="' + esc(c.tip) + '"' : "") + '><div class="qy-phin">'
+        + (opts.fixed ? "" : '<button type="button" class="qy-tog" data-p="' + i + '" aria-expanded="' + o + '" title="Show / hide target, done and % done">' + (o ? "−" : "+") + "</button>")
+        + '<span class="qy-plbl">' + esc(c.label) + "</span>" + (c.future ? '<span class="qy-future">Not yet</span>' : "") + "</div></th>";
+      h2 += '<th class="pr-num qy-det' + gc + '" data-p="' + i + '">Target</th><th class="pr-num qy-det' + gc + '" data-p="' + i + '">Done</th>'
+        + '<th class="pr-num qy-det' + gc + '" data-p="' + i + '">% done</th><th class="pr-num qy-sc' + gc + '" data-p="' + i + '">Score</th>';
+    });
+    h1 += "</tr>"; h2 += "</tr>";
+    var cellsFor = function (get, scoreOnly) {
+      return cols.map(function (c, i) {
+        var x = get(c) || {};
+        var tc = qyGrpCls(c, i);
+        return '<td class="pr-num qy-det' + tc + '" data-p="' + i + '">' + (scoreOnly ? "" : qyFmt(x.t)) + "</td>"
+          + '<td class="pr-num qy-det' + tc + '" data-p="' + i + '">' + (scoreOnly ? "" : qyFmt(x.d)) + "</td>"
+          + '<td class="pr-num qy-det' + tc + '" data-p="' + i + '">' + (scoreOnly ? "" : qyFmt(x.p, true)) + "</td>"
+          + '<td class="pr-num qy-sc' + tc + '" data-p="' + i + '">' + (x.sHtml != null ? x.sHtml : (x.hideS ? "" : qyFmt(x.s))) + "</td>";
+      }).join("");
+    };
+    var body = '<tr class="qy-totrow"><td class="pr-item" title="G1\u2013G4 (out of ' + QY_MAX + ') scaled to ' + QY_OUTOF + '">Total score</td><td class="pr-num">' + QY_OUTOF + "</td>"
+      + cellsFor(function (c) { return { sHtml: c.ev.n ? fmtNum(r2(qyScale(c.ev.total, c.ev.max))) : '<span class="pr-mut">\u2014</span>' }; }, true) + "</tr>";
+    QY_GOALS.forEach(function (g) {
+      if (g.key === "G4") return;       // G4 is filled in and shown in its own table below (it still counts in the total)
+      var gid = opts.id + g.key;
+      body += '<tr class="pr-grp qy-goal" data-grp="' + gid + '" data-goal="' + g.key + '"><td class="pr-item"><span class="pr-caret">▸</span><span class="pr-grp-k">' + g.key + "</span>" + esc(g.title) + "</td>"
+        + '<td class="pr-num">' + g.weight + "</td>"
+        + cellsFor(function (c) { return { sHtml: c.ev.goals[g.key] != null ? "<b>" + fmtNum(r2(c.ev.goals[g.key])) + "</b>"
+            : (g.key === "G1" && c.ev.g1na) ? '<span class="pr-mut" title="No core exam in this period">Not scored</span>' : '<span class="pr-mut">—</span>' }; }, true) + "</tr>";
+      if (g.key === "G1") { body += qyG1Rows(cols, gid, cellsFor); return; }
+      g.rows.forEach(function (r) {
+        if (r.head) return;
+        var key = g.key + "|" + (g.key === "G4" ? "Other activities" : r.label);
+        var weighted = (r.lvl === 0 && r.w > 0) || r.community;
+        var skipNote = QY_SKIP[key] && opts.qy ? "Not used for a quarter / year (month columns only)." : "";
+        var sub = skipNote ? skipNote
+                : (r.community && opts.qy) ? "Quarter / year: the 9 metrics below (no POM clusters), scored out of 20 \u2014 G3's full weight, since Kathavli is not used."
+                : g.key === "G4" ? "Month columns: the Monthly G4. Quarter / year: activities entered by the reviewer."
+                : r.academic ? "Target: the district's exams in the Academic Plan for the period. Done: exams ticked Completed for the district on the Monthly tab."
+                : (r.note || "");
+        var lbl = r.academic ? "Exams planned vs completed" : r.label;
+        // Total streaks: folded by default (achieved only, no target) - click the line to show its clubs
+        var fcls = r.fold ? " pr-foldhead" : r.foldOf ? " pr-folded" : "";
+        var fattr = r.fold ? ' data-fold="' + r.fold + '"' : r.foldOf ? ' data-foldof="' + r.foldOf + '"' : "";
+        body += '<tr class="pr-row pr-hidden pr-mo-l' + r.lvl + fcls + '" data-secrow="' + gid + '"' + fattr + '><td class="pr-item"' + (sub ? ' title="' + esc(sub) + '"' : "") + ">"
+          + (r.fold ? '<span class="pr-fold-caret">\u25B8</span>' : "") + esc(lbl) + "</td>"
+          + '<td class="pr-num">' + (r.w != null ? r.w : "") + "</td>"
+          + cellsFor(function (c) { var x = c.ev.rows[key] || {};
+              if (x.skip) return { t: null, d: null, p: null, sHtml: weighted ? '<span class="pr-mut" title="Not used for a quarter / year">n/a</span>' : "" };
+              return { t: x.t, d: x.d, p: x.p, s: x.s, hideS: !weighted }; }, false) + "</tr>";
+      });
+    });
+    return '<div class="qy-wrap"><table class="' + cls + '" data-qy="' + opts.id + '"><thead>' + h1 + h2 + "</thead><tbody>" + body + "</tbody></table></div>";
+  }
+  // G1 rows of the matrix: Core exams + every core program any column has, then the non-core ones.
+  // A program's weight differs per column (40 split by that period's core programs), so only the
+  // Core exams row shows a weight.
+  function qyG1Rows(cols, gid, cellsFor) {
+    var seen = {}, core = [], nc = [], out = "";
+    cols.forEach(function (c) {
+      ((c.ev.g1 && c.ev.g1.progs) || []).forEach(function (p) { if (!seen[p.label]) { seen[p.label] = 1; (p.core ? core : nc).push(p); } });
+    });
+    var byRank = function (a, b) { return a.rank - b.rank || a.label.localeCompare(b.label); };
+    core.sort(byRank); nc.sort(byRank);
+    var row = function (key, lbl, lvl, wtxt, tip, weighted) {
+      out += '<tr class="pr-row pr-hidden pr-mo-l' + lvl + '" data-secrow="' + gid + '"><td class="pr-item"' + (tip ? ' title="' + esc(tip) + '"' : "") + ">" + esc(lbl) + "</td>"
+        + '<td class="pr-num">' + wtxt + "</td>"
+        + cellsFor(function (c) {
+            var x = c.ev.rows[key] || {};
+            if (key === "G1|Core exams" && x.na) return { t: x.t, d: null, p: null, sHtml: '<span class="pr-mut" title="No core exam in this period">Not scored</span>' };
+            return { t: x.t, d: x.d, p: x.p, s: x.s, hideS: !weighted };
+          }, false) + "</tr>";
+    };
+    row("G1|Core exams", "Core exams", 0, "40", "40 points shared equally by the period's core exam programs. No core exam = G1 not scored; the total then comes from the other goals.", true);
+    core.forEach(function (p) { row("G1|c:" + p.label, p.label, 1, "", "", true); });
+    if (nc.length) {
+      row("G1|Non-core exams", "Non-core exams", 0, "", "Listed for follow-up; not part of the G1 score.", false);
+      nc.forEach(function (p) { row("G1|n:" + p.label, p.label, 1, "", "", false); });
+    }
+    return out;
+  }
+  function qyBindMatrix(root) {
+    var tbl = document.querySelector(root + " table.qy-tbl"); if (!tbl) return;
+    tbl.querySelectorAll(".qy-tog").forEach(function (b) {
+      b.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var i = b.dataset.p, on = !tbl.classList.contains("qy-o" + i);
+        tbl.classList.toggle("qy-o" + i, on);
+        var th = tbl.querySelector('th.qy-ph[data-p="' + i + '"]'); if (th) th.colSpan = on ? 4 : 1;
+        b.textContent = on ? "−" : "+"; b.setAttribute("aria-expanded", on ? "true" : "false");
+        var st = QY_OPEN[tbl.dataset.qy] = QY_OPEN[tbl.dataset.qy] || {}; st[i] = on;
+      });
+    });
+    tbl.querySelectorAll("tr.qy-goal").forEach(function (g) {
+      g.addEventListener("click", function () {
+        var opened = g.classList.toggle("is-open");
+        tbl.querySelectorAll('tr.pr-row[data-secrow="' + g.dataset.grp + '"]').forEach(function (tr) { tr.classList.toggle("pr-hidden", !opened); });
+        var st = QY_GOPEN[tbl.dataset.qy] = QY_GOPEN[tbl.dataset.qy] || {}; st[g.dataset.grp] = opened;
+      });
+    });
+    // folded lines (Total streaks): click to show / hide the clubs; remembered across refreshes
+    var fo = QY_FOLD[tbl.dataset.qy] = QY_FOLD[tbl.dataset.qy] || {};
+    tbl.querySelectorAll("tr.pr-foldhead").forEach(function (h) {
+      var set = function (open) {
+        h.classList.toggle("is-unfolded", open);
+        h.querySelector(".pr-fold-caret").textContent = open ? "\u25BE" : "\u25B8";
+        tbl.querySelectorAll('tr[data-foldof="' + h.dataset.fold + '"]').forEach(function (tr) { tr.classList.toggle("pr-folded", !open); });
+      };
+      if (fo[h.dataset.fold]) set(true);
+      h.addEventListener("click", function () { var open = !h.classList.contains("is-unfolded"); fo[h.dataset.fold] = open; set(open); });
+    });
+    // keep open goals open after a refresh
+    var go = QY_GOPEN[tbl.dataset.qy] || {};
+    Object.keys(go).forEach(function (k) { if (!go[k]) return; var g = tbl.querySelector('tr.qy-goal[data-grp="' + k + '"]'); if (g) g.click(); });
+  }
+  var QY_OPEN = {}, QY_GOPEN = {}, QY_FOLD = {};
+
+  function qyCards(items) {
+    return '<div class="pr-cards pr-mo-cards qy-cards">' + items.map(function (it) {
+      return '<div class="pr-card" data-goal="' + (it.goal || "") + '"><div class="pr-card-k">' + esc(it.label) + '</div><div class="pr-card-v">'
+        + (it.v != null ? fmtNum(r2(it.v)) : "—") + "<small>/ " + it.max + '</small></div><div class="pr-wkcard-foot"><span>' + esc(it.foot || "") + "</span></div></div>";
+    }).join("") + "</div>";
+  }
+  function qyGoalCards(ev, totalLabel, foot) {
+    var of = ev.of || QY_GOALS.length;
+    var items = [{ goal: "TOTAL", label: totalLabel, v: ev.n ? qyScale(ev.total, ev.max) : null, max: QY_OUTOF,
+                   foot: foot || ((ev.n === of ? "All goals scored" : ev.n ? "Partial — " + ev.n + " of " + of + " goals scored" : "Shown once targets and data are in")
+                                  + (ev.g1na ? " · no core exams, G1 left out" : "")) }];
+    QY_GOALS.forEach(function (g) { items.push({ goal: g.key, label: g.key + " · " + g.title, v: ev.goals[g.key], max: g.weight }); });
+    return qyCards(items);
+  }
+  // What the quarter / year column is missing, said plainly
+  function qyDataNotes(per, label, missing) {
+    var notes = [], rp = per.view.weeks[0].readPoints || {}, T = per.view.targets;
+    if (missing && missing.length) notes.push("The quarter / year tables are not set up yet (" + missing.join(", ") + "). Run sql/2026-11-25-field-review-quarterly-yearly.sql in Supabase.");
+    else {
+      if (!rp.vinoba) notes.push("No Vinoba file uploaded for " + label + " (Admin → Data → Quarter & Whole-Year data).");
+      if (!rp.staffConnect) notes.push("No Staff Connect file uploaded for " + label + ".");
+      if (!T || !T.rowsInMonth) notes.push("No G2 · G3 targets uploaded for " + label + " (Admin → Targets → Quarter & Whole-Year targets).");
+      else if (!T.unitRows) notes.push("The " + label + " targets file has no row for this " + (per.view.header.unit === "PO" ? "PO" : "district") + ".");
+    }
+    if (!notes.length) return "";
+    return '<div class="pr-panel qy-notes"><b>For the ' + esc(label) + " column:</b><ul>" + notes.map(function (n) { return "<li>" + esc(n) + "</li>"; }).join("") + "</ul></div>";
+  }
+
+  /* ---------- review sections for a quarter / year (A, B, G3 entry, G4, G, H) ---------- */
+  function qySec(word) {
+    return {
+      A: { k: "A", title: "Check-in", who: "PO", write: true, rows: [
+        { id: "A1", label: "How are you feeling this " + word + "?", type: "mood" },
+        { id: "A2", label: "Anything on your mind?", type: "text" } ] },
+      B: { k: "B", title: "Last " + word + "'s actions", who: "PO", write: true, rows: [1, 2, 3, 4, 5].map(function (n) {
+        return { id: "B" + n, label: "Action " + n + " from last " + word, type: "prog" }; }) },
+      G: { k: "G", title: "Next " + word, who: "PO", write: true, rows: [{ id: "G1", label: "Blocker or escalation", type: "text" }]
+        .concat([1, 2, 3, 4, 5].map(function (n) { return { id: "G" + (n + 1), label: "Action " + n + " for next " + word, type: "text" }; })) },
+      H: { k: "H", title: "Review record", who: "PM", write: true, rows: [
+        { id: "H1", label: "Review held", type: "yn" },
+        { id: "H2", label: "Manager status", type: "status" },
+        { id: "H3", label: "Manager's remark", type: "text" } ] }
+    };
+  }
+  function qyRevName(word) { return word === "year" ? "whole-year" : "quarterly"; }
+  function qyGroupHead(id, key, title, who, extra) {
+    return '<tr class="pr-grp" data-grp="' + id + key + '"><td colspan="6"><span class="pr-caret">▸</span><span class="pr-grp-k">' + esc(key) + "</span>"
+      + esc(title) + ' <span class="pr-who-tag pr-who-' + whoClassOf(who) + '">' + esc(who) + "</span>" + (extra || "") + "</td></tr>";
+  }
+  function qyWriteSection(id, S, per, editable) {
+    var h = per.view.header, who = sectionWho(S, h.unit, h), w0 = per.view.weeks[0];
+    var out = qyGroupHead(id, S.k, S.title, who);
+    S.rows.forEach(function (r) {
+      out += '<tr class="pr-row pr-hidden" data-secrow="' + id + S.k + '"><td class="pr-item">' + esc(r.label) + '</td><td colspan="5">'
+        + renderCell(S, r, w0, editable) + "</td></tr>";
+    });
+    return out;
+  }
+  function qyVal(per, fid) { return qyWith(per.view, QDIRTY, function () { return moValue(fid); }); }
+  function qyG4Section(id, per, editable, word) {
+    var h = per.view.header, code = per.code;
+    var who = sectionWho({ k: "H", write: true }, h.unit, h);
+    return qyWith(per.view, QDIRTY, function () {
+      var e = moG4Eval(), all = moG4Items();
+      var out = qyGroupHead(id, "G4", "Other Goals — this " + word, who, '<span class="pr-grpcount">Weight 10</span>');
+      out += '<tr class="pr-row pr-hidden pr-mo-l0" data-secrow="' + id + 'G4" data-qyg4sum="1"><td class="pr-item">Other activities'
+        + '<div class="pr-mo-sub">Up to 3 activities, filled in by the reviewer. Their weights must add up to 10.</div></td>'
+        + moCell(moG4WsumHtml(e)) + moCell("Target") + moCell("Done") + moCell("% done") + moCell(e.score != null ? fmtNum(r2(e.score)) : moDash()) + "</tr>";
+      if (!editable) {
+        if (!e.items.length) return out + '<tr class="pr-row pr-hidden pr-mo-l1" data-secrow="' + id + 'G4"><td class="pr-item">'
+          + moPill("No activities added", "pr-mo-na", "Added by the reviewer") + '</td><td colspan="5"></td></tr>';
+        e.items.forEach(function (x) {
+          out += '<tr class="pr-row pr-hidden pr-mo-l1" data-secrow="' + id + 'G4"><td class="pr-item">' + esc(x.name || "(unnamed)") + "</td>"
+            + moCell(x.w === "" ? "" : fmtNum(x.w)) + moCell(x.t === "" ? "" : fmtNum(x.t)) + moCell(x.d === "" ? "" : fmtNum(x.d))
+            + moCell(x.sc ? fmtNum(x.sc.pct) + "%" : moDash()) + moCell(x.sc ? fmtNum(x.sc.score) : moDash()) + "</tr>";
+        });
+        return out;
+      }
+      var shown = all.filter(function (x) { return x.used; }).map(function (x) { return x.i; });
+      if (!shown.length) shown = [1];
+      all.forEach(function (x) {
+        var off = shown.indexOf(x.i) < 0, sc = x.used ? moPctScore(x.d, x.t, x.w === "" ? 0 : x.w) : null;
+        var numIn = function (k, v, ph) {
+          return '<input type="number" min="0" step="any" inputmode="decimal" class="pr-mo-g4n qy-g4n" data-wc="' + code + '" data-fid="M_G4_' + x.i + "_" + k
+            + '" placeholder="' + ph + '" value="' + (v === "" ? "" : v) + '">';
+        };
+        out += '<tr class="pr-row pr-hidden pr-mo-l1' + (off ? " pr-mo-g4off" : "") + '" data-secrow="' + id + 'G4" data-g4="' + x.i + '">'
+          + '<td class="pr-item"><div class="pr-mo-g4name"><input type="text" class="pr-mo-txt qy-g4t" maxlength="80" data-wc="' + code + '" data-fid="M_G4_' + x.i
+          + '_NAME" placeholder="Activity ' + x.i + ' — name" value="' + esc(x.name) + '">'
+          + '<button type="button" class="pr-mo-x qy-g4x" title="Remove this activity">✕</button></div></td>'
+          + moCell(numIn("W", x.w, "Weight")) + moCell(numIn("T", x.t, "Target")) + moCell(numIn("D", x.d, "Done"))
+          + moCell(sc ? fmtNum(sc.pct) + "%" : moDash()) + moCell(sc ? fmtNum(sc.score) : moDash()) + "</tr>";
+      });
+      out += '<tr class="pr-row pr-hidden" data-secrow="' + id + 'G4" data-g4add="1"' + (shown.length >= 3 ? ' style="display:none"' : "")
+        + '><td colspan="6"><button type="button" class="pr-btn pr-mo-add qy-g4add">+ Add activity</button>'
+        + ' <span class="pr-mo-sub" style="display:inline">Up to 3 · weights must add up to 10</span></td></tr>';
+      return out;
+    });
+  }
+
+  /* ---------- review status (same rule as Monthly; built from what is SAVED) ---------- */
+  function qyReviewStatus(per, word) {
+    var sec = per.view.weeks[0].sections || {}, PG = (per.prevSections || {}).G || {};
+    var A = sec.A || {}, B = sec.B || {}, G = sec.G || {}, H = sec.H || {}, M = sec.M || {};
+    var self = [], mgr = [];
+    if (!msumHas(A.A1)) self.push("A1 Mood");
+    [1, 2, 3, 4, 5].forEach(function (n) {
+      var b = msumObj(B["B" + n]), carried = msumTxt(PG["G" + (n + 1)]) || msumTxt(b.text);
+      if (carried && !msumHas(b.status)) self.push("B" + n + " status");
+    });
+    if (!["G2", "G3", "G4", "G5", "G6"].some(function (k) { return msumHas(G[k]); })) self.push("At least one action for next " + word);
+    var acts = G4_SLOTS.map(function (i) {
+      var x = { name: msumTxt(M["M_G4_" + i + "_NAME"]), w: M["M_G4_" + i + "_W"], t: M["M_G4_" + i + "_T"], d: M["M_G4_" + i + "_D"] };
+      x.used = !!x.name || msumHas(x.w) || msumHas(x.t) || msumHas(x.d);
+      return x;
+    }).filter(function (x) { return x.used; });
+    if (!acts.length) mgr.push("G4 activities (add at least one)");
+    else {
+      var wsum = Math.round(acts.reduce(function (a, x) { return a + (msumHas(x.w) ? num(x.w) : 0); }, 0) * 1000) / 1000;
+      if (wsum !== 10) mgr.push("G4 weights add up to " + wsum + " (must be 10)");
+      if (acts.some(function (x) { return !x.name || !msumHas(x.w) || !msumHas(x.t) || !msumHas(x.d); })) mgr.push("G4 activity name / weight / target / done");
+    }
+    if (!msumHas(H.H1)) mgr.push("H1 Review held");
+    if (!msumHas(H.H2)) mgr.push("H2 Manager status");
+    var started = ["A", "B", "G", "M", "H"].some(function (k) { return hasContent(sec[k]); });
+    return { st: !self.length ? (!mgr.length ? "done" : "partial") : "none", started: started, self: self, mgr: mgr };
+  }
+  function qyStatusBanner(per, word, label) {
+    var h = per.view.header || {};
+    if (!h.selfEmpId) return "";
+    var ev = qyReviewStatus(per, word);
+    var selfName = h.unit === "PO" ? ((h.po && h.po.name) || "the PO") : (h.manager || "the " + h.unit);
+    var rv = msumReviewerOf(person(h.selfEmpId)), rvName = rv ? rv.name + " (" + rv.designation + ")" : "the reviewer";
+    var cls, pill, text, list = [];
+    if (!ev.started) { cls = "is-new"; pill = "Not started"; text = "Nothing saved for " + label + " yet."; list = ev.self.concat(ev.mgr); }
+    else if (ev.st === "none") { cls = "is-none"; pill = "Not done"; text = ev.self.length + " item" + (ev.self.length === 1 ? "" : "s") + " still pending for " + selfName + "."; list = ev.self.concat(ev.mgr); }
+    else if (ev.st === "partial") { cls = "is-partial"; pill = "Partially done"; text = selfName + "'s points are complete — waiting for " + rvName + " (G4 and H)."; list = ev.mgr; }
+    else { cls = "is-done"; pill = "Review done"; text = selfName + "'s points and " + rvName + "'s points are saved."; }
+    return '<div class="pr-panel pr-mstat ' + cls + '"><div class="pr-mstat-line"><span class="pr-mstat-pill">' + pill + "</span>"
+      + '<span class="pr-mstat-text">' + esc(text) + "</span></div>"
+      + (list.length ? '<div class="qy-pending">Pending: ' + list.map(esc).join(" · ") + "</div>" : "") + "</div>";
+  }
+
+  function qyReviewTable(id, per, word) {
+    var h = per.view.header || {};
+    if (!h.selfEmpId) return '<div class="pr-panel"><div class="pr-empty">Reviews are written per PO, PM or DM — a district has no review of its own. Open a PO, PM or DM to write the ' + qyRevName(word) + " review.</div></div>";
+    var S = qySec(word), selfOk = canEditSelf(per.view), mgrOk = canEditManager(per.view);
+    var body = qyWriteSection(id, S.A, per, selfOk) + qyWriteSection(id, S.B, per, selfOk)
+      + qyG4Section(id, per, mgrOk, word)
+      + qyWriteSection(id, S.G, per, selfOk) + qyWriteSection(id, S.H, per, mgrOk);
+    var head = '<tr><th class="pr-item">Review — this ' + word + '</th><th class="pr-num">Weight</th><th class="pr-num">Target</th><th class="pr-num">Done</th><th class="pr-num">% done</th><th class="pr-num">Score</th></tr>';
+    var html = '<div class="pr-tablewrap qy-revwrap"><table class="pr-tbl pr-mo-tbl qy-rev"><thead>' + head + "</thead><tbody>" + body + "</tbody></table></div>";
+    if (selfOk || mgrOk) html += '<div class="pr-savebar"><span class="pr-savehint">You can edit the sections your role owns.</span>'
+      + '<button class="pr-btn pr-btn-primary qy-save">Save ' + qyRevName(word) + " review</button></div>";
+    return html;
+  }
+  // Bind the editable review table under root; onChange re-scores the page
+  function qyBindReview(root, per, onChange) {
+    bindTable(root + " .qy-revwrap");
+    var sel = function (s) { return document.querySelectorAll(root + " " + s); };
+    sel(".qy-ent").forEach(function (inp) {
+      inp.addEventListener("input", function () {
+        var raw = inp.value.trim(), val = raw === "" ? "" : Number(raw), bad = val !== "" && (isNaN(val) || val < 0);
+        inp.classList.toggle("is-bad", bad); if (bad) return;
+        markDirty(inp.dataset.wc, inp.dataset.fid, val); onChange();
+      });
+    });
+    var g4Row = function (tr) {
+      var i = Number(tr.dataset.g4);
+      qyWith(per.view, QDIRTY, function () {
+        var get = function (k) { return moNumVal("M_G4_" + i + "_" + k); }, w = get("W"), sc = moPctScore(get("D"), get("T"), w === "" ? 0 : w);
+        tr.cells[4].innerHTML = sc ? fmtNum(sc.pct) + "%" : moDash(); tr.cells[5].innerHTML = sc ? fmtNum(sc.score) : moDash();
+      });
+    };
+    var g4Sum = function () {
+      var tr = document.querySelector(root + ' tr[data-qyg4sum="1"]'); if (!tr) return;
+      qyWith(per.view, QDIRTY, function () { var e = moG4Eval(); tr.cells[1].innerHTML = moG4WsumHtml(e); tr.cells[5].innerHTML = e.score != null ? fmtNum(r2(e.score)) : moDash(); });
+    };
+    sel(".qy-g4n").forEach(function (inp) {
+      inp.addEventListener("input", function () {
+        var raw = inp.value.trim(), val = raw === "" ? "" : Number(raw), bad = val !== "" && (isNaN(val) || val < 0);
+        inp.classList.toggle("is-bad", bad); if (bad) return;
+        markDirty(inp.dataset.wc, inp.dataset.fid, val); g4Row(inp.closest("tr")); g4Sum(); onChange();
+      });
+    });
+    sel(".qy-g4t").forEach(function (inp) { inp.addEventListener("input", function () { markDirty(inp.dataset.wc, inp.dataset.fid, inp.value); g4Sum(); onChange(); }); });
+    sel(".qy-g4x").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var tr = b.closest("tr");
+        tr.querySelectorAll("input[data-fid]").forEach(function (inp) { inp.value = ""; inp.classList.remove("is-bad"); markDirty(inp.dataset.wc, inp.dataset.fid, ""); });
+        if (document.querySelectorAll(root + " tr[data-g4]:not(.pr-mo-g4off)").length > 1) tr.classList.add("pr-mo-g4off");
+        g4Row(tr); g4Sum(); onChange();
+        var add = document.querySelector(root + ' tr[data-g4add="1"]'); if (add) add.style.display = "";
+      });
+    });
+    sel(".qy-g4add").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var next = document.querySelector(root + " tr[data-g4].pr-mo-g4off");
+        if (next) { next.classList.remove("pr-mo-g4off"); var n = next.querySelector(".pr-mo-txt"); if (n) n.focus(); }
+        if (!document.querySelector(root + " tr[data-g4].pr-mo-g4off")) b.closest("tr").style.display = "none";
+      });
+    });
+  }
+  function qySave(root, per, word, reload) {
+    if (document.querySelector(root + " .qy-revwrap .is-bad")) { toast("Fix the highlighted number first — it must be 0 or more."); return; }
+    var e4 = qyWith(per.view, QDIRTY, function () { return moG4Eval(); });
+    if (e4.items.length && e4.items.some(function (x) { return !x.name.trim(); })) { toast("G4: give every activity a name (or remove it)."); return; }
+    if (e4.items.length && !e4.valid) { toast("G4: the activity weights add up to " + fmtNum(e4.wsum) + " — they must total exactly 10."); return; }
+    var fields = QDIRTY[per.code] || {};
+    if (!Object.keys(fields).length) { toast("Nothing to save yet."); return; }
+    var btn = document.querySelector(root + " .qy-save"); if (btn) { btn.disabled = true; btn.innerHTML = '<span class="pr-spin"></span>Saving…'; }
+    sbSaveWeekly(per.view.header.selfEmpId, per.code, fields, currentEmail()).then(function () {
+      delete QDIRTY[per.code]; toast("Saved."); reload();
+    }).catch(function (e) {
+      console.error("Save failed", e);
+      if (btn) { btn.disabled = false; btn.textContent = "Save " + qyRevName(word) + " review"; }
+      var hint = document.querySelector(root + " .pr-savehint");
+      if (hint) { hint.textContent = "Save failed — click Save again to retry. Your changes are NOT lost."; hint.classList.add("is-fail"); }
+      toast("Save failed — please click Save again to retry.");
+    });
+  }
+
+  /* ---------- filters (one set per tab) ---------- */
+  var QY_TABS = {
+    quarterly: { unit: "prQUnit", value: "prQValue", vlabel: "prQValueLabel", year: "prQYear", q: "prQQuarter", load: "prQLoad", body: "prQBody" },
+    yearly:    { unit: "prYUnit", value: "prYValue", vlabel: "prYValueLabel", year: "prYYear", load: "prYLoad", body: "prYBody" },
+    wholeyear: { unit: "prFUnit", value: "prFValue", vlabel: "prFValueLabel", year: "prFYear", load: "prFLoad", body: "prFBody" }
+  };
+  function qyAyList() {
+    var s = {}; s[qyCurAy()] = 1;
+    ((state.base && state.base.months) || []).forEach(function (m) { s[qyAyOf(m.code)] = 1; });
+    return Object.keys(s).map(Number).sort(function (a, b) { return b - a; });
+  }
+  function qyFillFromBase() {
+    if (!state.base) return;
+    Object.keys(QY_TABS).forEach(function (k) {
+      var t = QY_TABS[k], ys = $(t.year); if (!ys) return;
+      var keep = ys.value; ys.innerHTML = "";
+      qyAyList().forEach(function (ay) { ys.appendChild(opt(String(ay), qyAyLabel(ay))); });
+      ys.value = keep && ys.querySelector('option[value="' + keep + '"]') ? keep : String(qyCurAy());
+      ys.disabled = false;
+      if (t.q && $(t.q) && !$(t.q).dataset.init) { $(t.q).value = String(qyCurQ()); $(t.q).dataset.init = "1"; }
+      qyPopulateValue(k);
+    });
+  }
+  function qyPopulateValue(k) {
+    var t = QY_TABS[k], unit = $(t.unit).value, sel = $(t.value);
+    $(t.vlabel).textContent = UNIT_LABEL[unit] || "PO";
+    if (!state.base) { sel.innerHTML = ""; sel.disabled = true; sel.appendChild(opt("", "—")); return; }
+    fillUnitSelect(sel, unit);
+  }
+  function qyReady(k) { var t = QY_TABS[k]; return !!($(t.unit).value && $(t.value).value && $(t.year).value && (!t.q || $(t.q).value)); }
+  function qyRefreshBtn(k) { $(QY_TABS[k].load).disabled = !qyReady(k); }
+  function qyHasDirty() { return Object.keys(QDIRTY).some(function (c) { return Object.keys(QDIRTY[c]).length; }); }
+  function qyWire() {
+    Object.keys(QY_TABS).forEach(function (k) {
+      var t = QY_TABS[k]; if (!$(t.unit)) return;
+      var auto = function () { qyRefreshBtn(k); if (qyReady(k) && !qyHasDirty()) qyLoad(k); };
+      $(t.unit).addEventListener("change", function () { qyPopulateValue(k); qyRefreshBtn(k); });
+      $(t.value).addEventListener("change", auto);
+      $(t.year).addEventListener("change", auto);
+      if (t.q) $(t.q).addEventListener("change", auto);
+      $(t.load).addEventListener("click", function () { qyLoad(k); });
+    });
+  }
+  // Opening a tab for the first time carries over the Monthly (or Weekly) selection.
+  function qySyncFrom(k) {
+    var t = QY_TABS[k]; if (!$(t.value) || $(t.value).value) return;
+    var su = $("prMoValue") && $("prMoValue").value ? "prMo" : ($("prValue") && $("prValue").value ? "pr" : "");
+    if (!su) return;
+    $(t.unit).value = $(su + "Unit").value; qyPopulateValue(k);
+    $(t.value).value = $(su + "Value").value;
+    var mo = $(su === "prMo" ? "prMoMonth" : "prMonth").value;
+    if (mo) {
+      var ay = qyAyOf(mo); if ($(t.year).querySelector('option[value="' + ay + '"]')) $(t.year).value = String(ay);
+      if (t.q) { var mm = Number(mo.substring(4, 6)); for (var q = 1; q <= 4; q++) if (QY_QM[q].indexOf(mm) >= 0) $(t.q).value = String(q); }
+    }
+    qyRefreshBtn(k);
+  }
+
+  /* ---------- load + render ---------- */
+  var QY_SEQ = { quarterly: 0, yearly: 0, wholeyear: 0 };
+  function qyLoad(k) {
+    var t = QY_TABS[k]; if (!qyReady(k)) return;
+    var unit = $(t.unit).value, value = $(t.value).value, ay = Number($(t.year).value), q = t.q ? Number($(t.q).value) : null;
+    var ticket = ++QY_SEQ[k], body = $(t.body);
+    var what = k === "quarterly" ? "quarterly review" : (k === "yearly" ? "yearly view" : "whole-year review");
+    body.innerHTML = '<div class="pr-empty pr-loading">Loading ' + what + "…</div>";
+    var jobs = [sbGetQyYear(unit, value, ay)];
+    if (k === "quarterly") qyQMonths(ay, q).forEach(function (m) { jobs.push(qyMonthPayload(unit, value, m)); });
+    Promise.all(jobs).then(function (res) {
+      if (ticket !== QY_SEQ[k]) return;
+      var data = { unit: unit, value: value, ay: ay, q: q, year: res[0], months: res.slice(1) };
+      var code = k === "quarterly" ? qyCode(ay, q) : (k === "wholeyear" ? qyCode(ay, "FY") : null);
+      if (code) delete QDIRTY[code];
+      QV[k] = data;
+      qyRender(k);
+    }).catch(function (e) {
+      if (ticket !== QY_SEQ[k]) return;
+      body.innerHTML = '<div class="pr-empty pr-error">Couldn\'t load: ' + esc(e.message || String(e)) + "</div>";
+    });
+  }
+  function qyRender(k) {
+    var d = QV[k]; if (!d) return;
+    var body = $(QY_TABS[k].body), y = d.year, h = y.scope.header;
+    var html = renderHeader(h) + renderBlocks(h, { roster: null });
+    if (k === "quarterly") {
+      var per = y.periods[d.q], qLabel = "Q" + d.q + " " + qyAyLabel(d.ay);
+      html += '<div id="prQCards"></div>' + qyDataNotes(per, qLabel, y.missing) + '<div id="prQMatrix"></div>';
+      html += qyStatusBanner(per, "quarter", qLabel) + qyReviewTable("q", per, "quarter");
+      body.innerHTML = html;
+      var paint = function () {
+        var cols = d.months.map(function (mp, i) { return { label: qyMonLabel(mp.month), tip: "Month " + (i + 1) + " \u00B7 the Monthly figures", future: mp.future, ev: qyEval({ view: mp.view, future: mp.future }, {}) }; });
+        var qev = qyEval(per, QDIRTY);
+        cols.push({ label: "Q" + d.q + " total", tip: qLabel + " \u00B7 this quarter's own uploads and entries", ev: qev, tot: true });
+        $("prQCards").innerHTML = qyGoalCards(qev, "Quarter score · " + qLabel);
+        $("prQMatrix").innerHTML = qyMatrix(cols, { id: "q", qy: true, open: (QY_OPEN.q = QY_OPEN.q || { 3: true }) });
+        qyBindMatrix("#prQMatrix");
+      };
+      paint();
+      qyBindAfter("#prQBody", per, "quarter", paint, function () { qyLoad(k); });
+    } else if (k === "yearly") {
+      var cols = [1, 2, 3, 4].map(function (q) { return { label: "Q" + q + " \u00B7 " + qyQRange(q), future: y.periods[q].future, ev: qyEval(y.periods[q], {}) }; });
+      var cards = cols.map(function (c, i) { return { goal: "G" + (i + 1), label: "Q" + (i + 1) + " · " + qyQRange(i + 1), v: c.ev.n ? qyScale(c.ev.total, c.ev.max) : null, max: QY_OUTOF,
+        foot: c.ev.future ? "Not started yet" : c.ev.n ? c.ev.n + " of " + (c.ev.of || QY_GOALS.length) + " goals scored" + (c.ev.g1na ? " · G1 left out" : "") : "No data yet" }; });
+      html += qyCards(cards);
+      if (y.missing.length) html += qyDataNotes(y.periods[1], "quarter", y.missing);
+      html += '<div id="prYMatrix">' + qyMatrix(cols, { id: "y", qy: true, open: (QY_OPEN.y = QY_OPEN.y || {}) }) + "</div>";
+      body.innerHTML = html;
+      qyBindMatrix("#prYMatrix");
+    } else {
+      var fy = y.periods.FY, open = qyYearOpen(d.ay), yLabel = qyAyLabel(d.ay);
+      var fyLabel = "Whole year " + yLabel + (open ? " (year to date)" : "");
+      html += '<div id="prFCards"></div>';
+      if (open) html += '<div class="pr-panel qy-notes"><b>Year to date.</b> ' + esc(yLabel) + " runs until May " + (d.ay + 1) + ". Achieved numbers so far are compared with the full-year target, so the score will rise as the year goes on.</div>";
+      html += qyDataNotes(fy, "whole-year", y.missing) + '<div id="prFMatrix"></div>';
+      html += qyStatusBanner(fy, "year", fyLabel) + qyReviewTable("f", fy, "year");
+      body.innerHTML = html;
+      var paintF = function () {
+        var ev = qyEval(fy, QDIRTY);
+        $("prFCards").innerHTML = qyGoalCards(ev, open ? "Year to date · " + yLabel : "Year score · " + yLabel);
+        $("prFMatrix").innerHTML = qyMatrix([{ label: (open ? "Year to date" : "Whole year") + " \u00B7 " + yLabel, ev: ev, tot: true }], { id: "f", qy: true, fixed: true });
+        qyBindMatrix("#prFMatrix");
+      };
+      paintF();
+      qyBindAfter("#prFBody", fy, "year", paintF, function () { qyLoad(k); });
+    }
+  }
+  function qyBindAfter(root, per, word, paint, reload) {
+    var timer = null;
+    var onChange = function () { if (timer) clearTimeout(timer); timer = setTimeout(paint, 250); };
+    qyBindReview(root, per, onChange);
+    var sb = document.querySelector(root + " .qy-save");
+    if (sb) sb.addEventListener("click", function () { qySave(root, per, word, reload); });
+  }
+
+
+  /* ---------- Goal Numbers Fetcher for Progress Tab ---------- */
+  var _goalFetchChain = Promise.resolve();
+  function getMonthlyGoalNumbers(empId, month) {
+    return new Promise(function (resolve, reject) {
+      _goalFetchChain = _goalFetchChain.then(async function () {
+        try {
+          var res = await _getMonthlyGoalNumbersInternal(empId, month);
+          resolve(res);
+        } catch (err) {
+          reject(err);
+        }
+      });
+    });
+  }
+
+  async function _getMonthlyGoalNumbersInternal(empId, month) {
+    await loadOrg();
+    month = String(month || "").replace(/-/g, "").substring(0, 6);
+    if (!month && state.base && state.base.months && state.base.months[0]) {
+      month = state.base.months[0].code;
+    }
+    if (!month) month = "202610";
+
+    var id = normId(empId);
+    var p = ORG.people.filter(function (x) { return normId(x.emp_id) === id; })[0];
+    if (!p) {
+      p = ORG.people.filter(function (x) {
+        return (x.name && x.name.toLowerCase() === String(empId).toLowerCase()) ||
+               (x.email && x.email.toLowerCase() === String(empId).toLowerCase());
+      })[0];
+    }
+    var unit = "PO", value = empId;
+    if (p) {
+      unit = p.designation === "PM" ? "PM" : p.designation === "DM" ? "DM" : "PO";
+      value = p.emp_id;
+    } else if (String(empId).startsWith("d-")) {
+      unit = "District";
+      value = String(empId).replace(/^d-/, "");
+    }
+
+    var savedMView = MVIEW;
+    try {
+      var res = await Promise.all([
+        sbGetWeeklyView(unit, value, month),
+        sbGetAcademic(unit, value, month).catch(function () { return null; }),
+        sbGetTargets(unit, value, month).catch(function () { return null; })
+      ]);
+      var v = res[0];
+      v.academic = res[1];
+      v.targets = res[2];
+      MVIEW = v;
+
+      var w0 = (v.weeks || []).filter(function (w) { return w.week === 0; })[0] || { week: 0, code: month + "00", sections: {}, readPoints: {} };
+      var rp = w0.readPoints || {};
+
+      var TT = moTotals(rp);                          // G1 with no core exam is left out and the rest scaled to 100
+      var totalScore = TT.total != null ? Math.round(TT.total * 100) / 100 : 0, totalGoalsScored = TT.n;
+
+      var goalsData = [];
+      MO_GOALS.forEach(function (g) {
+        if (g.key !== "G1" && g.key !== "G2" && g.key !== "G3") return;
+        var gs = moGoalScore(g, rp);
+        var scoreVal = (gs && gs.score != null) ? Math.round(gs.score * 100) / 100 : null;
+
+        var foot = g.key === "G1"
+          ? moG1Foot()
+          : (gs && gs.scored ? gs.scored + " of " + gs.total + " parts scored" : "Needs data or targets");
+
+        var goalItem = {
+          key: g.key,
+          title: g.title,
+          weight: g.weight,
+          score: scoreVal,
+          scored: gs ? gs.scored : 0,
+          totalParts: gs ? gs.total : 0,
+          foot: foot,
+          rows: []
+        };
+
+        g.rows.forEach(function (r) {
+          if (r.head) {
+            goalItem.rows.push({
+              label: r.label,
+              isHead: true,
+              lvl: r.lvl
+            });
+            return;
+          }
+
+          var targetVal = null;
+          var doneVal = null;
+
+          if (r.academic) {
+            // G1: Core exams total, then each program (core first, then non-core)
+            var P = moG1P();
+            goalItem.rows.push({ label: "Core exams", lvl: 0, target: P ? P.coreT : 0, done: P ? P.coreD : 0, note: P && P.na ? "No core exams — not scored" : "" });
+            (P ? P.progs : []).forEach(function (p) {
+              goalItem.rows.push({ label: p.label + (p.core ? "" : " (non-core)"), lvl: 1, target: p.t, done: p.d, note: "" });
+            });
+            return;
+          } else {
+            var ev = moEval(g, r, rp);
+            if (ev.tg && ev.tg.state === "ok" && ev.tg.value != null) {
+              targetVal = ev.tg.value;
+            }
+            var st = ev.st;
+            if (st.kind === "num") {
+              doneVal = st.value;
+            } else if (st.kind === "yn") {
+              doneVal = st.yes ? "Yes" : "No";
+            } else if (st.kind === "ynentry") {
+              doneVal = st.value || "—";
+            } else if (st.value != null && st.value !== "") {
+              doneVal = st.value;
+            }
+          }
+
+          goalItem.rows.push({
+            label: r.label,
+            lvl: r.lvl,
+            target: targetVal,
+            done: doneVal,
+            note: r.note || ""
+          });
+        });
+
+        goalsData.push(goalItem);
+      });
+
+      return {
+        header: v.header,
+        month: month,
+        totalScore: totalScore,
+        totalGoalsScored: totalGoalsScored,
+        goals: goalsData
+      };
+    } finally {
+      MVIEW = savedMView;
+    }
+  }
+
+  window.FTRDashboard = { mount: mount, orgChanged: orgChanged, getMonthlyGoalNumbers: getMonthlyGoalNumbers };
+})();

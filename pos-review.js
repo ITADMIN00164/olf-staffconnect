@@ -658,20 +658,36 @@
   }
   function prBody(html) { var b = $("prBody"); if (b) b.innerHTML = html; }
 
-  /* ---------- nav ---------- */
+  /* ---------- nav ----------
+     Reviews: Weekly · Monthly · Quarterly · Yearly · Whole Year (one group).
+     Analytics: opens a small switch for Weekly Summary (view "summary") and Monthly Summary ("mosum"). */
+  var PR_VIEWS = ["weekly", "summary", "monthly", "mosum", "quarterly", "yearly", "wholeyear"];
+  function prShowView(v) {
+    PR_VIEWS.forEach(function (name) {
+      var el = $("pr" + name.charAt(0).toUpperCase() + name.slice(1)); if (el) el.hidden = (name !== v);
+    });
+    if (v === "monthly") moSyncFromWeekly();
+    if (QY_TABS[v]) qySyncFrom(v);
+    if (v === "mosum") msumOnOpen();
+  }
   function wireNav() {
-    var btns = document.querySelectorAll("#prNav .pr-navbtn");
+    var btns = document.querySelectorAll("#prNav .pr-navbtn"), sw = $("prAnaSwitch");
+    var subs = document.querySelectorAll("#prAnaSwitch .pr-anabtn"), anaView = "summary";
     btns.forEach(function (b) {
       b.addEventListener("click", function () {
         btns.forEach(function (x) { x.classList.remove("is-active"); });
         b.classList.add("is-active");
         var v = b.dataset.view;
-        ["weekly", "summary", "monthly", "mosum", "quarterly", "yearly", "wholeyear"].forEach(function (name) {
-          var el = $("pr" + name.charAt(0).toUpperCase() + name.slice(1)); if (el) el.hidden = (name !== v);
-        });
-        if (v === "monthly") moSyncFromWeekly();
-        if (QY_TABS[v]) qySyncFrom(v);
-        if (v === "mosum") msumOnOpen();
+        if (sw) sw.hidden = v !== "analytics";
+        prShowView(v === "analytics" ? anaView : v);
+      });
+    });
+    subs.forEach(function (s2) {
+      s2.addEventListener("click", function () {
+        subs.forEach(function (x) { x.classList.remove("is-on"); x.setAttribute("aria-selected", "false"); });
+        s2.classList.add("is-on"); s2.setAttribute("aria-selected", "true");
+        anaView = s2.dataset.ana;
+        prShowView(anaView);
       });
     });
   }
@@ -868,6 +884,16 @@
       + '<span class="pr-mut">view only</span></div>', h.unit || "District");
   }
 
+  // Blocks / districts / team chips under the person card: folded by default, click the heading to open.
+  // Open / closed is remembered while the page is open (all tabs share it).
+  var PR_BLOCKS_OPEN = false;
+  function prBlocksOpenCls() { return PR_BLOCKS_OPEN ? " is-open" : ""; }
+  document.addEventListener("click", function (e) {
+    var hd = e.target.closest && e.target.closest(".pr-blocks .pr-blocks-h");
+    if (!hd) return;
+    PR_BLOCKS_OPEN = !hd.closest(".pr-blocks").classList.contains("is-open");
+    document.querySelectorAll(".pr-blocks").forEach(function (p) { p.classList.toggle("is-open", PR_BLOCKS_OPEN); });
+  });
   function renderBlocks(h, v) {
     v = v || VIEW;
     if (v.roster && v.roster.members) {
@@ -875,7 +901,24 @@
       var mc = v.roster.members.map(function (m) {
         return '<span class="pr-chip">' + esc(m.name) + (m.total ? ' <code>' + m.total + ' PO' + (m.total > 1 ? "s" : "") + '</code>' : "") + '</span>';
       }).join("");
-      return '<div class="pr-panel pr-blocks"><div class="pr-blocks-h">Team — ' + kind + '<b>' + v.roster.members.length + '</b></div><div class="pr-chips">' + mc + '</div></div>';
+      return '<div class="pr-panel pr-blocks' + prBlocksOpenCls() + '"><div class="pr-blocks-h">Team — ' + kind + '<b>' + v.roster.members.length + '</b></div><div class="pr-chips">' + mc + '</div></div>';
+    }
+    // PM / DM / COO: the districts they review and their team, instead of a long list of blocks
+    if (h.unit === "PM" || h.unit === "DM" || h.unit === "COO") {
+      var ds = (h.districts || []).slice().sort();
+      var pms = h.unit === "PM" ? [] : peopleOver("PM", ds);
+      var pos = (h.pos || []).slice().sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); });
+      var who = function (name, empId) {
+        var pp = person(empId), dd = pp ? (pp.assigned_districts || []).join(", ") : "";
+        return '<span class="pr-chip"' + (dd ? ' title="' + esc(dd) + '"' : "") + ">" + esc(name) + (dd ? ' <code>' + esc(dd) + "</code>" : "") + "</span>";
+      };
+      var row = function (label, n, chipsHtml) {
+        return n ? '<div class="pr-blocks-h">' + label + "<b>" + n + '</b></div><div class="pr-chips">' + chipsHtml + "</div>" : "";
+      };
+      var out = row("Districts reviewed", ds.length, ds.map(function (d) { return '<span class="pr-chip">' + esc(d) + "</span>"; }).join(""))
+        + row("Team \u2014 PMs", pms.length, pms.map(function (p) { return who(p.name, p.emp_id); }).join(""))
+        + row("Team \u2014 POs", pos.length, pos.map(function (p) { return who(p.name, p.empId); }).join(""));
+      return out ? '<div class="pr-panel pr-blocks pr-team' + prBlocksOpenCls() + '">' + out + "</div>" : "";
     }
     var blocks = h.blocks || []; if (!blocks.length) return "";
     var chips = blocks.map(function (b) {
@@ -884,7 +927,7 @@
       if (m) { code = m[1].replace(/\s/g, ""); name = m[2]; }
       return '<span class="pr-chip">' + (code ? '<code>' + esc(code) + '</code>' : "") + esc(name) + '</span>';
     }).join("");
-    return '<div class="pr-panel pr-blocks"><div class="pr-blocks-h">Blocks reviewed<b>' + blocks.length + '</b></div>'
+    return '<div class="pr-panel pr-blocks' + prBlocksOpenCls() + '"><div class="pr-blocks-h">Blocks reviewed<b>' + blocks.length + '</b></div>'
       + '<div class="pr-chips">' + chips + '</div></div>';
   }
 
@@ -1481,18 +1524,18 @@
       { lvl: 0, label: "LS Program Cycle (Non-core)", w: 0, v: A(function (rp) { return mv(rp, "vinoba", "Morning Assembly"); }, "Vinoba \u00B7 Morning Assembly") },
       { lvl: 1, label: "Morning Assembly", v: A(function (rp) { return mv(rp, "vinoba", "Morning Assembly"); }, "Vinoba \u00B7 morning_assembly") },
       // Streak is scored on IMPROVED streaks of the 5 core clubs, compared with the sum of their 5 streak targets.
-      // Shown as two blocks: Total streaks (achieved only - no target, no score) with the 5 clubs under it,
-      // then Streaks improved (target + achieved) with the 5 clubs under it.
+      // Shown as: Streaks improved (target + achieved) with the 5 clubs, then Total streaks (achieved only,
+      // no target, no score) folded by default - click it to show its 5 clubs (Monthly and Quarterly / Yearly).
       { lvl: 0, label: "Streak", w: 10, note: "Scored on improved streaks of the 5 core clubs",
         v: A(function (rp) { return mv(rp, "vinoba", "Improved Streaks"); }, "Vinoba \u00B7 improved streaks, sum of the 5 core clubs") },
-      { lvl: 1, label: "Total streaks", info: true, note: "Achieved only \u2014 no target",
-        v: A(function (rp) { return mv(rp, "vinoba", "Total Streaks"); }, "Vinoba \u00B7 total streaks, sum of the 5 core clubs (information only)") }
-    ].concat(MO_STREAK_CLUBS.map(function (c) {
-      return { lvl: 2, label: "Total \u00B7 " + c[0], info: true, v: A(function (rp) { return mv(rp, "vinoba", "Total Streak \u00B7 " + c[1]); }, "Vinoba \u00B7 total streaks \u00B7 " + c[1] + " (information only)") };
-    })).concat([
       { lvl: 1, label: "Streaks improved", v: A(function (rp) { return mv(rp, "vinoba", "Improved Streaks"); }, "Vinoba \u00B7 improved streaks, sum of the 5 core clubs") }
-    ]).concat(MO_STREAK_CLUBS.map(function (c) {
+    ].concat(MO_STREAK_CLUBS.map(function (c) {
       return { lvl: 2, label: "Improved \u00B7 " + c[0], v: A(function (rp) { return mv(rp, "vinoba", "Improved Streak \u00B7 " + c[1]); }, "Vinoba \u00B7 improved streaks \u00B7 " + c[1]) };
+    })).concat([
+      { lvl: 1, label: "Total streaks", info: true, fold: "streakTotal", note: "Achieved only \u2014 no target. Click to show the clubs.",
+        v: A(function (rp) { return mv(rp, "vinoba", "Total Streaks"); }, "Vinoba \u00B7 total streaks, sum of the 5 core clubs (information only)") }
+    ]).concat(MO_STREAK_CLUBS.map(function (c) {
+      return { lvl: 2, label: "Total \u00B7 " + c[0], info: true, foldOf: "streakTotal", v: A(function (rp) { return mv(rp, "vinoba", "Total Streak \u00B7 " + c[1]); }, "Vinoba \u00B7 total streaks \u00B7 " + c[1] + " (information only)") };
     })) },
 
     { key: "G3", title: "Vibrant Teacher Community", weight: 20, rows: [
@@ -1624,6 +1667,7 @@
     MDIRTY = {};
     var ticket = ++MO_LOAD_SEQ;                     // only the latest pick may render
     $("prMoBody").innerHTML = '<div class="pr-empty pr-loading">Loading monthly review\u2026</div>';
+    prSetStatus("prMoLoad", "");
     Promise.all([
       sbGetWeeklyView(unit, value, month),
       sbGetAcademic(unit, value, month).catch(function (e) { console.warn("Academic plan not loaded:", e); return null; }),
@@ -1679,7 +1723,7 @@
   // so unsaved A / B / G / H edits stay exactly as typed).
   var MO_ENT = [];
   function moRefreshScores() {
-    var rp = moW0().readPoints || {}, total = 0, n = 0;
+    var rp = moW0().readPoints || {};
     document.querySelectorAll("#prMoBody tr[data-ent]").forEach(function (tr) {
       var it = MO_ENT[Number(tr.dataset.ent)]; if (!it) return;
       var ev = moEval(it.g, it.r, rp), weighted = (it.r.lvl === 0 && it.r.w > 0) || it.r.community;
@@ -1696,11 +1740,11 @@
     moG4SummaryRefresh();
     MO_GOALS.forEach(function (g) {
       var gs = moGoalScore(g, rp);
-      if (gs.score != null) { total += gs.score; n++; }
       var card = document.querySelector('#prMoBody .pr-card[data-goal="' + g.key + '"]');
       if (card) {
         card.querySelector(".pr-card-v").innerHTML = (gs.score != null ? fmtNum(r2(gs.score)) : "\u2014") + "<small>/ " + g.weight + "</small>";
         if (g.key === "G4") card.querySelector(".pr-wkcard-foot span").textContent = moG4Foot();
+        else if (g.key === "G1") card.querySelector(".pr-wkcard-foot span").textContent = moG1Foot();
         else if (g.key !== "G1" && gs.scored) card.querySelector(".pr-wkcard-foot span").textContent = gs.scored + " of " + gs.total + " parts scored";
       }
       if (g.key === "G5") {
@@ -1710,8 +1754,9 @@
     });
     var tc = document.querySelector('#prMoBody .pr-card[data-goal="TOTAL"]');
     if (tc) {
-      tc.querySelector(".pr-card-v").innerHTML = (n ? fmtNum(r2(total)) : "\u2014") + "<small>/ 100</small>";
-      tc.querySelector(".pr-wkcard-foot span").textContent = n === 5 ? "All goals scored" : n ? "Partial \u2014 " + n + " of 5 goals scored" : "Shown once targets and data are in";
+      var T = moTotals(rp);
+      tc.querySelector(".pr-card-v").innerHTML = (T.total != null ? fmtNum(r2(T.total)) : "\u2014") + "<small>/ 100</small>";
+      tc.querySelector(".pr-wkcard-foot span").textContent = moTotalFoot(T);
     }
   }
   var MO_WHY = [];
@@ -1852,60 +1897,83 @@
     var v = ((moW0().sections || {}).M || {})[fid];
     return v == null ? "" : v;
   }
-  // G1 done = exams ticked Completed for the unit's districts this month (shared, see acadFromRows).
+  // G1 done comes from the exams ticked Completed for the unit's districts (shared, see acadFromRows).
   // Months from before the ticks: nothing ticked + a number typed in the old box -> that number.
   function moG1Legacy() {
     var v = moValue("M_G1_DONE");
     return (v === undefined || v === null || v === "") ? "" : num(v);
   }
-  function moG1Done() {
-    var ac = MVIEW && MVIEW.academic;
-    if (!ac || ac.doneCount == null) return moG1Legacy();
-    if (ac.doneCount > 0) return ac.doneCount;
-    var old = moG1Legacy();
-    return old !== "" ? old : 0;
-  }
-  function moG1IsLegacy() { var ac = MVIEW && MVIEW.academic; return !!ac && ac.doneCount === 0 && moG1Legacy() !== ""; }
-  // The G1 row's Target / Done / % / Score cells
-  function moG1Cells(r) {
-    var ac = MVIEW.academic, n = ac ? acadTotal(ac) : 0, o = { target: "", done: moDash(), pct: moDash(), score: moDash() };
-    if (ac == null) { o.target = moPill("Unavailable", "pr-mo-na", "The Academic Plan could not be loaded"); return o; }
-    o.target = n ? '<button type="button" class="pr-mo-link" title="See the exams">' + n + "</button>" : "0";
-    var extra = (ac.extraDone || []).length;
-    if (!n && !extra) {               // no exams planned this month = nothing asked -> full score
-      o.done = '<span class="pr-mut" title="No exams in the Academic Plan for this month \u2014 full score">\u2014</span>';
-      o.pct = "100%"; o.score = fmtNum(r.w); return o;
-    }
-    var dv = moG1Done(), legacy = moG1IsLegacy();
-    var tip = legacy ? "Typed earlier in the old \u201Cexams completed\u201D box \u2014 tick the exams in the list to replace it"
-                     : "Exams ticked Completed for the district \u2014 click to see or tick them";
-    o.done = '<button type="button" class="pr-mo-link pr-mo-g1done" title="' + esc(tip) + '">' + (dv === "" ? "\u2014" : fmtNum(dv)) + "</button>"
-      + (legacy ? '<div class="pr-mo-sub">entered earlier</div>' : !ac.doneOk ? '<div class="pr-mo-sub pr-list-warn">ticks not available</div>' : "")
-      + (n && dv !== "" && dv > n ? '<div class="pr-mo-over">More than planned</div>' : "");
-    if (!n) { o.pct = "100%"; o.score = fmtNum(r.w); return o; }
-    var g1 = moPctScore(dv, n, r.w);
-    if (g1) { o.pct = fmtNum(g1.pct) + "%"; o.score = fmtNum(g1.score); }
-    return o;
-  }
+  // This month's G1 programs (core share the 40, non-core listed only); null when the plan didn't load
+  function moG1P() { var ac = MVIEW && MVIEW.academic; return ac ? acadPrograms(ac, moG1Legacy()) : null; }
   function moG1Foot() {
-    var ac = MVIEW.academic;
-    if (ac == null) return "Academic Plan unavailable";
-    var n = acadTotal(ac);
-    if (!n) return "No exams planned \u2014 full score";
-    var dv = moG1Done();
-    return n + " exam" + (n === 1 ? "" : "s") + " planned" + (dv !== "" ? " \u00B7 " + fmtNum(dv) + " completed" : "");
+    var P = moG1P();
+    if (!P) return "Academic Plan unavailable";
+    if (P.na) return "No core exams this month — not scored";
+    return P.n + " core exam" + (P.n === 1 ? "" : "s") + " · " + fmtNum(P.coreD) + " of " + fmtNum(P.coreT) + " done";
   }
-  // After a tick: redraw the G1 row and the score cards
+  // The G1 rows of the Monthly table: Core exams (weight 40, split equally per program) + each
+  // core program, then Non-core exams + each non-core program (listed, no weight).
+  function moG1Rows() {
+    var P = moG1P(), out = "";
+    var tr = function (lvl, label, tip, w, t, d, pct, s, link) {
+      var lk = function (v) { return link && v !== "" && v != null ? '<button type="button" class="pr-mo-link" title="See and tick the exams">' + fmtNum(v) + "</button>" : (v === "" || v == null ? moDash() : fmtNum(v)); };
+      return '<tr class="pr-row pr-hidden pr-mo-l' + lvl + '" data-secrow="mG1" data-g1row="1"><td class="pr-item"' + (tip ? ' title="' + esc(tip) + '"' : "") + ">" + esc(label) + "</td>"
+        + '<td class="pr-num">' + (w == null ? "" : fmtNum(r2(w))) + "</td>"
+        + '<td class="pr-num">' + lk(t) + "</td>" + '<td class="pr-num">' + lk(d) + "</td>"
+        + '<td class="pr-num">' + (pct == null ? moDash() : fmtNum(Math.round(pct * 1000) / 10) + "%") + "</td>"
+        + '<td class="pr-num">' + (s === "" ? "" : s == null ? moDash() : fmtNum(r2(s))) + "</td></tr>";
+    };
+    if (!P) return tr(0, "Core exams", "The Academic Plan could not be loaded", 40, "", "", null, null, false);
+    var legacyTip = P.legacy ? " Done here is the number typed earlier in the old “exams completed” box — tick the exams to replace it." : "";
+    if (P.na) {
+      out += '<tr class="pr-row pr-hidden pr-mo-l0" data-secrow="mG1" data-g1row="1"><td class="pr-item" title="No core exam in the Academic Plan this month, so G1 is left out and the monthly score is worked out from the other goals.">Core exams</td>'
+        + '<td class="pr-num">40</td><td class="pr-num">0</td><td class="pr-num">' + moDash() + '</td><td class="pr-num">' + moDash() + "</td>"
+        + '<td class="pr-num">' + moPill("Not scored", "pr-mo-na", "No core exam this month") + "</td></tr>";
+    } else {
+      out += tr(0, "Core exams", "40 points shared equally by this month's " + P.n + " core exam program" + (P.n === 1 ? "" : "s") + "." + legacyTip,
+                40, P.coreT, P.coreD, P.score / 40, P.score, true);
+      P.core.forEach(function (p) { out += tr(1, p.label, legacyTip.trim(), p.w, p.t, p.d, p.pct, p.w == null ? "" : p.s, true); });
+    }
+    if (P.noncore.length) {
+      out += tr(0, "Non-core exams", "Listed for follow-up; not part of the G1 score.", null, P.ncT, P.ncD, P.ncT > 0 ? Math.min(P.ncD / P.ncT, 1) : null, "", true);
+      P.noncore.forEach(function (p) { out += tr(1, p.label, "", null, p.t, p.d, p.pct, "", true); });
+    }
+    return out;
+  }
+  function moG1Section(g) {
+    return moGroupHead(g.key, '<span class="pr-grp-k">' + g.key + "</span>" + esc(g.title), "Goal", "auto", '<span class="pr-grpcount">Weight ' + g.weight + "</span>") + moG1Rows();
+  }
+  // After a tick: redraw the G1 rows (keeping the section open or closed) and the score cards
   function moRefreshG1() {
-    var tr = document.querySelector('#prMoBody tr[data-g1="1"]'), g = MO_GOALS[0];
-    if (tr) {
-      var c = moG1Cells(g.rows[0]);
-      tr.cells[2].innerHTML = c.target; tr.cells[3].innerHTML = c.done; tr.cells[4].innerHTML = c.pct; tr.cells[5].innerHTML = c.score;
-      tr.querySelectorAll(".pr-mo-link").forEach(function (b) { b.addEventListener("click", openAcadList); });
+    var head = document.querySelector('#prMoBody tr.pr-grp[data-grp="mG1"]');
+    if (head) {
+      document.querySelectorAll('#prMoBody tr[data-g1row]').forEach(function (tr) { tr.remove(); });
+      head.insertAdjacentHTML("afterend", moG1Rows());
+      var open = head.classList.contains("is-open");
+      document.querySelectorAll('#prMoBody tr[data-g1row]').forEach(function (tr) {
+        tr.classList.toggle("pr-hidden", !open);
+        tr.querySelectorAll(".pr-mo-link").forEach(function (b) { b.addEventListener("click", openAcadList); });
+      });
     }
     var foot = document.querySelector('#prMoBody .pr-card[data-goal="G1"] .pr-wkcard-foot span');
     if (foot) foot.textContent = moG1Foot();
     moRefreshScores();
+  }
+  // Monthly total: goals scored, out of 100. When G1 has no core exam it is left out and the
+  // other goals are scaled up to 100 (their weights add up to 60).
+  function moTotals(rp) {
+    var total = 0, n = 0, g1na = false;
+    MO_GOALS.forEach(function (g) {
+      var gs = moGoalScore(g, rp);
+      if (gs.na) { g1na = true; return; }
+      if (gs.score != null) { total += gs.score; n++; }
+    });
+    var of = g1na ? 100 - MO_GOALS[0].weight : 100;
+    return { total: n ? total * 100 / of : null, n: n, of: g1na ? 4 : 5, g1na: g1na };
+  }
+  function moTotalFoot(T) {
+    var s = T.n === T.of ? "All goals scored" : T.n ? "Partial — " + T.n + " of " + T.of + " goals scored" : "Shown once targets and data are in";
+    return T.g1na ? s + " · no core exams, G1 left out" : s;
   }
   // Sheet B rule: % done = done / target, capped at 100%; score = weight x % done
   function moPctScore(done, target, weight) {
@@ -1940,7 +2008,6 @@
     var selfOk = canEditSelf(v), mgrOk = canEditManager(v);
 
     var html = renderHeader(h) + renderBlocks(h, v);
-    html += moStatusBanner(v, w0);
     html += moCards(rp);
 
     var head = '<tr><th class="pr-item">Item</th><th class="pr-num">Weight</th><th class="pr-num">Target</th><th class="pr-num">Done</th><th class="pr-num">% done</th><th class="pr-num">Score</th></tr>';
@@ -1953,6 +2020,14 @@
       + '<button class="pr-btn pr-btn-primary" id="prMoSave">Save monthly review</button></div>';
     $("prMoBody").innerHTML = html;
     bindTable("#prMoBody");
+    // folded lines (Total streaks): click the line to show / hide its clubs
+    document.querySelectorAll("#prMoBody tr.pr-foldhead").forEach(function (h) {
+      h.addEventListener("click", function () {
+        var open = h.classList.toggle("is-unfolded");
+        h.querySelector(".pr-fold-caret").textContent = open ? "\u25BE" : "\u25B8";
+        document.querySelectorAll('#prMoBody tr[data-foldof="' + h.dataset.fold + '"]').forEach(function (tr) { tr.classList.toggle("pr-folded", !open); });
+      });
+    });
     document.querySelectorAll("#prMoBody .pr-mo-link").forEach(function (b) { b.addEventListener("click", openAcadList); });
     document.querySelectorAll("#prMoBody .pr-mo-num").forEach(function (i) { i.addEventListener("input", moOnNumInput); });
     document.querySelectorAll("#prMoBody .pr-mo-tlink").forEach(function (b) { b.addEventListener("click", function () { openTargetPopup(Number(b.dataset.ti)); }); });
@@ -1976,6 +2051,10 @@
         more.hidden = !open; t.setAttribute("aria-expanded", open ? "true" : "false");
         t.textContent = open ? "Hide pending items" : "Click here to see what\u2019s pending";
       });
+    });
+    var stSlot = prSetStatus("prMoLoad", moStatusBanner(v, w0));
+    if (stSlot) stSlot.querySelectorAll("[data-jgrp]").forEach(function (b) {
+      b.addEventListener("click", function () { prCloseStatus(); moJump(b.dataset.jgrp, b.dataset.jfid); });
     });
     document.querySelectorAll("#prMoBody [data-jgrp]").forEach(function (b) {
       b.addEventListener("click", function () { moJump(b.dataset.jgrp, b.dataset.jfid); });
@@ -2037,6 +2116,45 @@
       + (list.length ? '<div class="pr-mstat-more" hidden><div class="pr-mstat-hint">Click an item to go to it. Save monthly review after filling.</div>' + chips(list) + "</div>" : "")
       + "</div>";
   }
+  /* ---------- review status as a small button next to "Open review" ----------
+     The status banner (Not started / Not done / Partially done / Review done) is shown as a coloured
+     button after the filter's load button; clicking it opens the specifics (what's pending). */
+  function prStatusSlot(btnId) {
+    var btn = $(btnId); if (!btn || !btn.parentNode) return null;
+    var slot = btn.parentNode.querySelector('.pr-statslot[data-for="' + btnId + '"]');
+    if (!slot) {
+      slot = document.createElement("span"); slot.className = "pr-statslot"; slot.dataset.for = btnId;
+      btn.insertAdjacentElement("afterend", slot);
+    }
+    return slot;
+  }
+  function prCloseStatus() {
+    document.querySelectorAll(".pr-statpop").forEach(function (p) { p.hidden = true; });
+    document.querySelectorAll(".pr-statbtn").forEach(function (b) { b.setAttribute("aria-expanded", "false"); });
+  }
+  document.addEventListener("click", prCloseStatus);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") prCloseStatus(); });
+  function prSetStatus(btnId, bannerHtml) {
+    var slot = prStatusSlot(btnId); if (!slot) return null;
+    if (!bannerHtml) { slot.innerHTML = ""; return slot; }
+    var tmp = document.createElement("div"); tmp.innerHTML = bannerHtml;
+    var box = tmp.firstElementChild;
+    var cls = ["is-new", "is-none", "is-partial", "is-done"].filter(function (c) { return box.classList.contains(c); })[0] || "";
+    var pill = ((box.querySelector(".pr-mstat-pill") || {}).textContent || "").trim();
+    tmp.querySelectorAll(".pr-mstat-toggle").forEach(function (t) { t.remove(); });       // details are shown open here
+    tmp.querySelectorAll(".pr-mstat-more").forEach(function (m) { m.hidden = false; });
+    box.classList.remove("pr-panel");
+    slot.innerHTML = '<button type="button" class="pr-statbtn ' + cls + '" aria-expanded="false" title="Click to see the details">'
+      + '<span class="pr-statdot"></span>' + esc(pill) + '<span class="pr-statcar">\u25BE</span></button>'
+      + '<div class="pr-statpop" hidden>' + tmp.innerHTML + "</div>";
+    var b = slot.querySelector(".pr-statbtn"), pop = slot.querySelector(".pr-statpop");
+    b.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var open = pop.hidden; prCloseStatus(); pop.hidden = !open; b.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+    pop.addEventListener("click", function (e) { e.stopPropagation(); });
+    return slot;
+  }
   // Open a section of the Monthly table and bring one field into view.
   function moJump(grp, fid) {
     var head = document.querySelector('#prMoBody tr.pr-grp[data-grp="' + grp + '"]');
@@ -2061,10 +2179,9 @@
   }
 
   function moCards(rp) {
-    var total = 0, totalN = 0, others = 0, cards = "";
+    var cards = "", T = moTotals(rp);
     MO_GOALS.forEach(function (g) {
-      var gs = moGoalScore(g, rp), acad = MVIEW.academic;
-      if (gs.score != null) { total += gs.score; totalN++; if (g.key !== "G1") others += gs.score; }
+      var gs = moGoalScore(g, rp);
       var foot = g.key === "G1" ? moG1Foot()
                : g.key === "G4" ? moG4Foot()
                : (gs.scored ? gs.scored + " of " + gs.total + " parts scored" : (MVIEW.targets && MVIEW.targets.rowsInMonth ? "Needs data or targets" : "No targets for this month"));
@@ -2072,9 +2189,9 @@
         + (gs.score != null ? fmtNum(r2(gs.score)) : "\u2014") + "<small>/ " + g.weight + "</small></div>"
         + '<div class="pr-wkcard-foot"><span>' + esc(foot) + "</span></div></div>";
     });
-    var head = '<div class="pr-card" data-goal="TOTAL" data-others="' + others + '" data-othersn="' + (totalN - (moGoalScore(MO_GOALS[0], rp).score != null ? 1 : 0)) + '">'
-      + '<div class="pr-card-k">Monthly score</div><div class="pr-card-v">' + (totalN ? fmtNum(r2(total)) : "\u2014") + "<small>/ 100</small></div>"
-      + '<div class="pr-wkcard-foot"><span>' + (totalN === 5 ? "All goals scored" : totalN ? "Partial \u2014 " + totalN + " of 5 goals scored" : "Shown once targets and data are in") + "</span></div></div>";
+    var head = '<div class="pr-card" data-goal="TOTAL">'
+      + '<div class="pr-card-k">Monthly score</div><div class="pr-card-v">' + (T.total != null ? fmtNum(r2(T.total)) : "\u2014") + "<small>/ 100</small></div>"
+      + '<div class="pr-wkcard-foot"><span>' + esc(moTotalFoot(T)) + "</span></div></div>";
     return '<div class="pr-cards pr-mo-cards">' + head + cards + "</div>";
   }
 
@@ -2093,24 +2210,25 @@
   }
   function moGoalSection(g, rp) {
     if (g.key === "G4") return moG4Section(g);
+    if (g.key === "G1") return moG1Section(g);
     var out = moGroupHead(g.key, '<span class="pr-grp-k">' + g.key + "</span>" + esc(g.title), "Goal", "auto", '<span class="pr-grpcount">Weight ' + g.weight + "</span>");
     g.rows.forEach(function (r) {
-      var cls = "pr-row pr-hidden pr-mo-l" + r.lvl + (r.head ? " pr-mo-head" : "");
+      var cls = "pr-row pr-hidden pr-mo-l" + r.lvl + (r.head ? " pr-mo-head" : "") + (r.foldOf ? " pr-folded" : "") + (r.fold ? " pr-foldhead" : "");
       var ev = (r.head || r.academic || r.compliance) ? null : moEval(g, r, rp);
-      var sub = r.note || "";
+      var sub = r.fold ? "" : (r.note || "");
       if (r.community && ev) sub = "Average of the 10 metrics below (a metric with no target counts as 100%) \u2014 " + ev.used + " of " + ev.of + " scored now, \u00D7 15.";
       var item = esc(r.label) + (sub ? '<div class="pr-mo-sub">' + esc(sub) + "</div>" : "");
       var entIdx = null;
       if (r.community) { MO_ENT.push({ g: g, r: r }); entIdx = MO_ENT.length - 1; }
-      var rowOpen = '<tr class="' + cls + '" data-secrow="m' + g.key + '"' + (r.compliance ? ' data-comp="1"' : "") + (r.academic ? ' data-g1="1"' : "");
+      var rowOpen = '<tr class="' + cls + '" data-secrow="m' + g.key + '"' + (r.compliance ? ' data-comp="1"' : "");
+      if (r.fold) item = '<span class="pr-fold-caret">\u25B8</span>' + item;
+      if (r.fold) rowOpen += ' data-fold="' + r.fold + '" title="' + esc(r.note || "") + '"';
+      if (r.foldOf) rowOpen += ' data-foldof="' + r.foldOf + '"';
       var row = '<td class="pr-item">' + item + "</td>";
       if (r.head) return (out += rowOpen + ">" + row + '<td colspan="5"></td></tr>');
       var done, target = "", pct = moDash(), score = moDash();
 
-      if (r.academic) {
-        var g1c = moG1Cells(r);
-        target = g1c.target; done = g1c.done; pct = g1c.pct; score = g1c.score;
-      } else if (r.compliance) {
+      if (r.compliance) {
         var cc = moComplianceCells(g, r, rp);
         done = cc.done; target = String(r.target); pct = cc.pct; score = cc.score;
       } else {
@@ -2260,6 +2378,86 @@
   // Exams planned: one per district exam.
   function acadTotal(list) { return (list || []).reduce(function (a, it) { return a + (it.count || 1); }, 0); }
 
+  /* ---------- G1 exam programs: core / non-core (VP target sheet, Nov 2026) ----------
+     Core (Annex A) share G1's 40 points equally among the core programs that have exams in the
+     period (per program, not per test). Non-core (Annex B, and exams not in the VP sheet) are
+     listed with target / done but carry no weight. No core exam in the period = G1 is not scored
+     and the total is scaled to 100 from the other goals.
+     Plan names vary by district, so each is matched to one program label below (first match wins). */
+  var ACAD_PROGRAMS = [
+    // [label, core?, test on the program name: lower-case, punctuation turned into spaces].
+    // Listed in the VP sheet's order (rows are shown in this order); FLN ++ must stay above FLN.
+    ["FLN ++ (Class 6-8)", false, /^fln\s*(\+|plus)/],
+    ["FLN Program", true, /^fln\b/],
+    ["Class 10 Exam", true, /^class 10\b/],
+    ["Class 12 Exam", true, /^class 12\b/],
+    ["JNV", true, /^jnv\b/],
+    ["SE 04", true, /^s[ec] .*\b0?4( ?th)?\b/],
+    ["SE 07", true, /^s[ec] .*\b0?7( ?th)?\b/],
+    ["Scholarship (SE)", true, /^scholarship\b/],
+    ["NMMSE", true, /^nmms/],
+    ["JEE / NEET (Polestar)", true, /\bjee\b|\bneet\b/],
+    ["ISRO / NASA visit", false, /isro|nasa|iucaa|research station/],
+    ["K. Ajitdada Pawar SE", false, /ajitdada|अजितदादा/],
+    ["Balwadi", false, /balwadi/],
+    ["Utkrisht Class 5 Exam", false, /^class 0?5( ?th)?\b/],
+    ["Utkrisht Class 8 Exam", false, /^class 0?8( ?th)?\b/],
+    ["Utkrisht Class 9 Exam", false, /^class 0?9( ?th)?\b/],
+    ["Utkrisht Class 11 Exam", false, /^class 11( ?th)?\b/],
+    ["Pradhnyashodh", false, /pradhnyashodh|pradnyashodh/]
+  ];
+  // program name in the plan -> { label, core, rank }
+  function acadClass(name) {
+    var s = String(name || "").toLowerCase().replace(/[^a-z0-9ऀ-ॿ+]+/g, " ").trim();
+    for (var i = 0; i < ACAD_PROGRAMS.length; i++) {
+      var p = ACAD_PROGRAMS[i];
+      if (p[2].test(s)) return { label: p[0], core: p[1], rank: i };
+    }
+    return { label: String(name || "").replace(/\s+/g, " ").trim() || "Other exam", core: false, rank: 999 };
+  }
+  // Weights and score for a set of programs [{ label, core, rank, t, d }]
+  function acadScore(progs, weight) {
+    weight = weight || 40;
+    progs.sort(function (a, b) { return (a.core === b.core ? 0 : a.core ? -1 : 1) || a.rank - b.rank || a.label.localeCompare(b.label); });
+    var core = progs.filter(function (p) { return p.core; }), nc = progs.filter(function (p) { return !p.core; });
+    var scored = core.filter(function (p) { return p.t > 0; }), w = scored.length ? weight / scored.length : 0, score = 0;
+    progs.forEach(function (p) {
+      p.pct = p.t > 0 ? Math.min(p.d / p.t, 1) : null;
+      p.w = p.core && p.t > 0 ? w : null;
+      p.s = p.w != null ? p.w * p.pct : null;
+      if (p.s != null) score += p.s;
+    });
+    var sum = function (list, k) { return list.reduce(function (a, p) { return a + (p[k] || 0); }, 0); };
+    return { progs: progs, core: core, noncore: nc, n: scored.length, na: !scored.length, score: scored.length ? score : null,
+             coreT: sum(core, "t"), coreD: sum(core, "d"), ncT: sum(nc, "t"), ncD: sum(nc, "d"), weight: weight };
+  }
+  // A month's exam list (acadFromRows) -> programs with target / done.
+  // legacy: the old typed "exams completed" number, used only when nothing is ticked for the month;
+  // it is spread over the programs in order (core first), filling each one's target.
+  function acadPrograms(list, legacy) {
+    var month = String(list.month || ""), map = {};
+    var get = function (name) {
+      var c = acadClass(name);
+      return map[c.label] = map[c.label] || { label: c.label, core: c.core, rank: c.rank, t: 0, d: 0 };
+    };
+    list.forEach(function (it) {
+      var p = get(it.program); p.t += it.count || 1;
+      if (it.done && String(it.done.counts_in) === month) p.d++;
+    });
+    (list.extraDone || []).forEach(function (d) { get(d.program_name).d++; });
+    var progs = Object.keys(map).map(function (k) { return map[k]; });
+    var useLegacy = list.doneCount === 0 && legacy !== "" && legacy != null && Number(legacy) > 0;
+    if (useLegacy) acadSpread(progs, Number(legacy));
+    var out = acadScore(progs);
+    out.legacy = useLegacy;
+    return out;
+  }
+  function acadSpread(progs, n) {
+    progs.sort(function (a, b) { return (a.core === b.core ? 0 : a.core ? -1 : 1) || a.rank - b.rank; });
+    progs.forEach(function (p) { var take = Math.min(n, Math.max(p.t - p.d, 0)); p.d += take; n -= take; });
+    if (n > 0 && progs.length) progs[0].d += n;            // more than planned: keep it on the first program
+  }
+
   function fmtDay(iso) {
     if (!iso) return "";
     var p = iso.split("-"); return Number(p[2]) + " " + MON_SHORT[Number(p[1]) - 1] + " " + p[0];
@@ -2298,13 +2496,14 @@
       return '<label class="pr-acad-tick' + (on ? " is-on" : "") + (can ? "" : " is-ro") + '"><input type="checkbox" data-akey="' + esc(key) + '"'
         + (on ? " checked" : "") + (can ? "" : " disabled") + "><span>" + (on ? "Completed" : "Not done") + "</span></label>" + meta;
     };
-    var head = "<tr><th>#</th><th>Program</th><th>Test cycle</th>" + (showDist ? "<th>District</th>" : "") + "<th>Date</th><th>Status</th></tr>";
+    var head = "<tr><th>#</th><th>Program</th><th>Type</th><th>Test cycle</th>" + (showDist ? "<th>District</th>" : "") + "<th>Date</th><th>Status</th></tr>";
+    var typ = function (name) { var c = acadClass(name); return '<span class="pr-acad-type' + (c.core ? " is-core" : "") + '" title="' + esc(c.label) + '">' + (c.core ? "Core" : "Non-core") + "</span>"; };
     var body = list.map(function (e, i) {
-      return '<tr class="pr-row"><td>' + (i + 1) + "</td><td>" + esc(e.program) + "</td><td>" + esc(e.test || "—") + "</td>"
+      return '<tr class="pr-row"><td>' + (i + 1) + "</td><td>" + esc(e.program) + "</td><td>" + typ(e.program) + "</td><td>" + esc(e.test || "—") + "</td>"
         + (showDist ? "<td>" + esc(e.district) + "</td>" : "") + "<td>" + dateHtml(e) + "</td><td>" + tick(e.key, e.district, e.done) + "</td></tr>";
     }).join("");
     (list.extraDone || []).forEach(function (d) {
-      body += '<tr class="pr-row"><td>+</td><td>' + esc(d.program_name) + '<div class="pr-list-warn">Completed this month, no longer in this month’s plan</div></td><td>'
+      body += '<tr class="pr-row"><td>+</td><td>' + esc(d.program_name) + '<div class="pr-list-warn">Completed this month, no longer in this month’s plan</div></td><td>' + typ(d.program_name) + "</td><td>"
         + esc(d.test_cycle || "—") + "</td>" + (showDist ? "<td>" + esc(d.district) + "</td>" : "")
         + "<td>" + (d.exam_date ? esc(fmtDay(String(d.exam_date))) : '<span class="pr-mut">No date</span>') + "</td><td>" + tick(d.exam_key, d.district, d) + "</td></tr>";
     });
@@ -2402,6 +2601,30 @@
   };
   var TGT_KEYS = Object.keys(TGT_LABEL);
 
+  // The PO's districts when the PO's blocks cover every block of each of them (null otherwise)
+  function poWholeDistricts(empId) {
+    var p = person(empId); if (!p) return null;
+    var ds = p.assigned_districts || [], mine = {};
+    (p.assigned_blocks || []).forEach(function (b) { mine[normBlock(b)] = 1; });
+    if (!ds.length) return null;
+    var ok = ds.every(function (d) {
+      var dist = ORG.distByKey[normDist(d)], bl = dist ? dist.blocks : [];
+      return bl.length && bl.every(function (b) { return mine[normBlock(b)]; });
+    });
+    return ok ? ds : null;
+  }
+  // One target column from the district rows (summed; posts per teacher is a ratio: highest); null when all blank
+  function poDistrictValue(drs, k, tnum) {
+    if (!drs || !drs.length) return null;
+    var any = false, total = 0, parts = [];
+    drs.forEach(function (x) {
+      var v = tnum(x[k]);
+      parts.push({ district: x.district, po: "District target", value: v, status: v > 0 ? "counted" : "zero",
+                   note: "This PO covers the whole district, so the district target is used" });
+      if (v != null) { any = true; total = k === "posts_per_teacher" ? Math.max(total, v) : total + v; }
+    });
+    return any ? { value: total > 0 ? total : null, parts: parts } : null;
+  }
   async function sbGetTargets(unit, value, month) {
     await loadOrg();
     var y = Number(month.substring(0, 4)), m = Number(month.substring(4, 6));
@@ -2411,8 +2634,19 @@
 
     if (unit === "PO") {
       var r = rows.filter(function (x) { return normId(x.po_id) === normId(value); })[0] || null;
-      out.unitRows = r ? 1 : 0;
+      // A PO who covers every block of their district(s) gets the district's own targets (Level: District),
+      // column by column; a blank district cell (Kathawli, visits, case study...) keeps the PO row's value.
+      var whole = poWholeDistricts(value), drs = [];
+      if (whole) {
+        var dall = await fetchAll(function () { return db().from("district_targets").select("*").eq("year", y).eq("month", m); })
+          .catch(function (e) { console.warn("district_targets not loaded (PO row is used):", e); return []; });
+        drs = whole.map(function (d) { return dall.filter(function (x) { return normDist(x.district) === normDist(d); })[0]; });
+        if (drs.some(function (x) { return !x; })) drs = [];             // every district needs its own row
+      }
+      out.unitRows = (r || drs.length) ? 1 : 0;
       TGT_KEYS.forEach(function (k) {
+        var dv = poDistrictValue(drs, k, tnum);
+        if (dv) { out.cols[k] = dv; return; }
         var v = r ? tnum(r[k]) : null;
         out.cols[k] = { value: v > 0 ? v : null, parts: r ? [{ district: r.district, po: r.po_name || r.po_id, value: v, status: v > 0 ? "counted" : "zero" }] : [] };
       });
@@ -2588,10 +2822,10 @@
   function moGoalScore(g, rp) {
     if (g.key === "G4") { var e4 = moG4Eval(); return { score: e4.score, scored: e4.scored, total: e4.items.length }; }
     if (g.key === "G1") {
-      var ac = MVIEW.academic;
-      if (ac && !acadTotal(ac)) return { score: g.weight, scored: 1, total: 1 };   // no exams planned = full score
-      var gs = (ac && acadTotal(ac)) ? moPctScore(moG1Done(), acadTotal(ac), g.weight) : null;
-      return { score: gs ? gs.score : null, scored: gs ? 1 : 0, total: 1 };
+      var P = moG1P();
+      if (!P) return { score: null, scored: 0, total: 1 };
+      if (P.na) return { score: null, scored: 0, total: 0, na: true };   // no core exam: G1 left out of the total
+      return { score: P.score, scored: P.n, total: P.n };
     }
     var comps = g.rows.filter(function (r) { return r.lvl === 0 && r.w > 0; }), got = 0, n = 0;
     comps.forEach(function (r) {
@@ -3420,13 +3654,14 @@
      QUARTERLY · YEARLY · WHOLE YEAR TABS  (Nov 2026)
      Academic year = June to May ("2026-27" = Jun 2026 to May 2027).
        Q1 Jun-Aug · Q2 Sep-Nov · Q3 Dec-Feb · Q4 Mar-May
-     Only G1-G4 are shown (weights 40 / 20 / 20 / 10 = 90). G5 is not part of these views.
-     The total is scaled to 100 (G1-G4 total x 100 / 90); each goal keeps its own weight.
+     G1-G5 are shown (weights 40 / 20 / 20 / 10 / 10 = 100). G5 only for a PO / PM / DM (compiled from
+     the Monthly G5, see qyG5Agg). Without G5 (District) or G1 (no core exam) the total is scaled to 100.
 
      Where each number comes from
-       G1     Target = the districts' exams in the Academic Plan for the period's months, added up.
-              Done   = exams ticked Completed for those districts in each month, added up
-                       (a month with no ticks uses the number typed in the old box, if any).
+       G1     Per exam program, added up over the period's months: target = the districts' exams in the
+              Academic Plan, done = exams ticked Completed (a month with no ticks uses the number typed
+              in the old box, spread over its programs). Core programs share the 40 equally; non-core
+              are listed only; no core exam in the period = G1 not scored and the rest scaled to 100.
        G2/G3  Quarterly tab, Month 1-3 columns = that month's Monthly figures (as on the Monthly tab).
               Quarter total / Yearly (Q1-Q4) / Whole Year = their own uploads:
                 achieved -> Admin > Data > "Quarter & Whole-Year data" (Vinoba + Staff Connect files)
@@ -3445,10 +3680,12 @@
      Status rules are the Monthly ones: Partially done = the person's own points saved,
      Done = the reviewer's points (H, and G4 here) saved too.
      ====================================================================== */
-  var QY_GOALS = MO_GOALS.filter(function (g) { return g.key !== "G5"; });
-  var QY_MAX = QY_GOALS.reduce(function (a, g) { return a + g.weight; }, 0);          // 90 (G1-G4 weights)
+  // Nov 2026: G5 is shown too (PO / PM / DM only - a District has no G5). Weights add up to 100; a
+  // District view (no G5) and a period with no core exam (no G1) are scaled up to 100.
+  var QY_GOALS = MO_GOALS.slice();
+  var QY_MAX = QY_GOALS.reduce(function (a, g) { return a + g.weight; }, 0);          // 100 (G1-G5 weights)
   var QY_OUTOF = 100;                                                                  // totals are shown out of 100
-  function qyScale(total) { return total * QY_OUTOF / QY_MAX; }
+  function qyScale(total, max) { return total * QY_OUTOF / (max || QY_MAX); }
   // G3 lines not used for a quarter / year
   var QY_SKIP = { "G3|Vinoba Kathavli Stories": 1, "G3|POM transformed clusters": 1 };
   var QY_QM = { 1: [6, 7, 8], 2: [9, 10, 11], 3: [12, 1, 2], 4: [3, 4, 5] };
@@ -3524,17 +3761,18 @@
     // G1 per month exactly as the Monthly tab: planned = district exams, done = the district's ticks
     // counted in that month (or, for a month with no ticks, the number typed in the old box).
     function g1For(mcodes) {
-      var planned = null, done = 0, any = false;
+      if (!acadRows) return null;                     // plan not loaded: G1 unavailable
+      var map = {};
       mcodes.forEach(function (m) {
-        var list = acadRows ? acadFromRows(acadRows.filter(function (r) { return String(r.plan_month) === m; }), unit, value, acadDone, m) : null;
-        if (list) planned = (planned || 0) + acadTotal(list);
-        var ticked = list && list.doneCount != null ? list.doneCount : 0;
-        var v = ((own[m + "00"] || {}).M || {}).M_G1_DONE;
-        if (ticked > 0) { any = true; done += ticked; }
-        else if (v !== undefined && v !== null && v !== "") { any = true; done += num(v); }
-        else if (list && list.doneCount != null && acadTotal(list) > 0 && m <= qyNowCode()) any = true;   // planned, none ticked -> 0
+        var list = acadFromRows(acadRows.filter(function (r) { return String(r.plan_month) === m; }), unit, value, acadDone, m);
+        var P = acadPrograms(list, ((own[m + "00"] || {}).M || {}).M_G1_DONE);
+        P.progs.forEach(function (p) {
+          var q = map[p.label] = map[p.label] || { label: p.label, core: p.core, rank: p.rank, t: 0, d: 0 };
+          q.t += p.t; q.d += p.d;
+        });
       });
-      return { target: planned, done: any ? done : "" };
+      // the period's core programs share the 40 (per program); none = G1 not scored
+      return acadScore(Object.keys(map).map(function (k) { return map[k]; }));
     }
     function rpFor(p, mcodes) {
       var wk = qyWeekOf(p), rp = {};
@@ -3551,8 +3789,27 @@
     function targetsFor(p) {
       var pname = p === "FY" ? "FY" : "Q" + p;           // qy_targets.period: 'Q1'..'Q4' / 'FY'
       var rows = tgt.filter(function (r) { return String(r.period) === pname; }), pick;
-      if (unit === "PO") pick = rows.filter(function (r) { return r.level === "PO" && normId(r.po_id) === normId(value); });
-      else {
+      if (unit === "PO") {
+        pick = rows.filter(function (r) { return r.level === "PO" && normId(r.po_id) === normId(value); });
+        // a PO covering the whole district(s): the district rows win column by column (blank -> PO row)
+        var whole = poWholeDistricts(value), drs = [];
+        if (whole) {
+          drs = whole.map(function (d) { return rows.filter(function (r) { return r.level === "District" && normDist(r.district) === normDist(d); })[0]; });
+          if (drs.some(function (x) { return !x; })) drs = [];
+        }
+        if (drs.length) {
+          var o2 = { cols: {}, unit: unit, rowsInMonth: rows.length, unitRows: 1, qy: true };
+          TGT_KEYS.forEach(function (k) {
+            var dv = poDistrictValue(drs, k, qyTnum);
+            if (dv) { o2.cols[k] = dv; return; }
+            var tot = 0, an = false, pp = [];
+            pick.forEach(function (r) { var v = qyTnum(r[k]); pp.push({ district: r.district || "", po: r.po_name || r.po_id || "", value: v, status: v > 0 ? "counted" : "zero" });
+              if (v > 0) { an = true; tot = k === "posts_per_teacher" ? Math.max(tot, v) : tot + v; } });
+            o2.cols[k] = { value: an ? tot : null, parts: pp };
+          });
+          return o2;
+        }
+      } else {
         var dk = {}; sc.districts.forEach(function (d) { dk[normDist(d)] = 1; });
         pick = rows.filter(function (r) { return r.level === "District" && dk[normDist(r.district)]; });
       }
@@ -3592,6 +3849,79 @@
     var v = r[0]; v.academic = r[1]; v.targets = r[2];
     return { month: month, view: v, future: month > qyNowCode() };
   }
+  // Month payloads are reused for 3 minutes (Yearly / Whole Year read up to 12 of them for G5)
+  var QY_MCACHE = {};
+  function qyMonthCached(unit, value, month) {
+    var k = unit + "|" + value + "|" + month, c = QY_MCACHE[k];
+    if (c && Date.now() - c.at < 180000) return c.p;
+    var p = qyMonthPayload(unit, value, month);
+    QY_MCACHE[k] = { at: Date.now(), p: p };
+    p.catch(function () { delete QY_MCACHE[k]; });
+    return p;
+  }
+
+  /* ---------- G5 (Self-Development) for a quarter / year ----------
+     G5 is about one person, so it is shown for PO / PM / DM only (not for a District). There is no
+     quarter / year upload for it: it is compiled from that person's Monthly G5, months that have started:
+       each Yes / No point  target = months counted, done = months it was Yes
+       Compliance (4)       all Yes / No points together: Yes count / (12 points x months) x 4
+       Visits (4), School / Cluster / Block-District, Case Study (2)
+                            target = monthly targets added up, done = monthly figures added up,
+                            score = weight x done / target (capped); no target in any month = full score
+     The Monthly tab is where the points are filled in; a point not answered there counts as not Yes. */
+  var QY_G5 = MO_GOALS.filter(function (g) { return g.key === "G5"; })[0];
+  function qyG5Month(view) {
+    return qyWith(view, {}, function () {
+      var rp = moW0().readPoints || {}, out = { yn: {}, num: {} };
+      QY_G5.rows.forEach(function (r) {
+        if (r.head || r.compliance) return;
+        if (r.yn) {
+          var st = moRowState(r, rp);
+          out.yn[r.label] = st.kind === "yn" ? !!st.yes : st.kind === "ynentry" ? (st.value === "Y" ? true : st.value === "N" ? false : null) : null;
+        } else {
+          var ev = moEval(QY_G5, r, rp);
+          out.num[r.label] = { t: ev.tg && ev.tg.state === "ok" ? ev.tg.value : null, d: ev.st && ev.st.kind === "num" ? ev.st.value : null, full: !!ev.full };
+        }
+      });
+      return out;
+    });
+  }
+  function qyG5Agg(months) {
+    if (!months || !months.length) return null;
+    var n = months.length, rows = {}, yes = 0, ynN = 0, score = 0;
+    QY_G5.rows.forEach(function (r) {
+      if (r.head || r.compliance) return;
+      if (r.yn) {
+        ynN++;
+        var d = months.filter(function (m) { return m.yn[r.label] === true; }).length;
+        yes += d;
+        rows[r.label] = { t: n, d: d, p: d / n, s: null };
+      } else {
+        var t = null, dd = null, full = false;
+        months.forEach(function (m) {
+          var x = m.num[r.label] || {};
+          if (x.t != null) t = (t || 0) + x.t;
+          if (x.d != null) dd = (dd || 0) + x.d;
+          if (x.full) full = true;
+        });
+        var p = t > 0 ? Math.min((dd || 0) / t, 1) : (full ? 1 : null);
+        var s = (r.lvl === 0 && r.w > 0) ? (p != null ? r.w * p : null) : null;
+        rows[r.label] = { t: t, d: dd, p: p, s: s };
+        if (s != null) score += s;
+      }
+    });
+    var comp = QY_G5.rows.filter(function (r) { return r.compliance; })[0];
+    var cp = ynN ? yes / (ynN * n) : null;
+    rows[comp.label] = { t: ynN * n, d: yes, p: cp, s: cp != null ? comp.w * cp : null };
+    if (cp != null) score += comp.w * cp;
+    return { rows: rows, score: score, months: n };
+  }
+  // A period's G5 from the started months' payloads: { "YYYYMM": payload }
+  function qyG5ForMonths(mcodes, byMonth) {
+    var list = mcodes.filter(function (m) { return m <= qyNowCode() && byMonth[m]; }).map(function (m) { return qyG5Month(byMonth[m].view); });
+    return qyG5Agg(list);
+  }
+  function qyIsDistrict(per) { return ((per && per.view && per.view.header) || {}).unit === "District"; }
 
   /* ---------- scoring: run the Monthly rules on any payload ---------- */
   function qyWith(view, dirty, fn) {
@@ -3602,7 +3932,7 @@
   // -> { goals: { G1: score|null, ... }, rows: { "G2|Storytelling": { t, d, p, s } }, total, n }
   function qyEval(per, dirty) {
     if (per.future) {
-      var none = { goals: {}, rows: {}, total: 0, n: 0, future: true };
+      var none = { goals: {}, rows: {}, total: 0, n: 0, future: true, g5na: qyIsDistrict(per) };
       QY_GOALS.forEach(function (g) { none.goals[g.key] = null; });
       return none;
     }
@@ -3611,14 +3941,24 @@
       QY_GOALS.forEach(function (g) {
         var score = null;
         if (g.key === "G1") {
-          var r = g.rows[0], t, d;
-          if (per.g1) { t = per.g1.target; d = per.g1.done; }
-          else { t = per.view.academic ? acadTotal(per.view.academic) : null; d = moG1Done(); }
-          var cell = { t: t, d: d === "" ? null : d, p: null, s: null };
-          if (t === 0) { cell.p = 1; cell.s = r.w; }                       // nothing planned = full score
-          else if (t != null) { var ps = moPctScore(d, t, r.w); if (ps) { cell.p = ps.pct / 100; cell.s = ps.score; } }
-          out.rows["G1|" + r.label] = cell;
-          score = cell.s;
+          // quarter / year: programs added up over the period's months (sbGetQyYear); a month column: that month
+          var P = per.g1 !== undefined ? per.g1 : (per.view.academic ? acadPrograms(per.view.academic, moG1Legacy()) : null);
+          out.g1 = P;
+          if (P) {
+            out.rows["G1|Core exams"] = { t: P.coreT, d: P.coreD, p: P.na ? null : P.score / g.weight, s: P.score, na: P.na };
+            P.progs.forEach(function (p) { out.rows["G1|" + (p.core ? "c:" : "n:") + p.label] = { t: p.t, d: p.d, p: p.pct, s: p.s }; });
+            if (P.noncore.length) out.rows["G1|Non-core exams"] = { t: P.ncT, d: P.ncD, p: P.ncT > 0 ? Math.min(P.ncD / P.ncT, 1) : null, s: null };
+            if (P.na) out.g1na = true;
+          }
+          score = P && !P.na ? P.score : null;
+        } else if (g.key === "G5") {
+          if (qyIsDistrict(per)) out.g5na = true;          // no G5 for a District
+          else {
+            // a month column: that month; a quarter / year: compiled from its months (sbGetQyYear + qyLoad)
+            var G5r = per.qy ? per.g5 : qyG5Agg([qyG5Month(per.view)]);
+            if (G5r) Object.keys(G5r.rows).forEach(function (k) { out.rows["G5|" + k] = G5r.rows[k]; });
+            score = G5r ? G5r.score : null;
+          }
         } else if (g.key === "G4") {
           var e4 = moG4Eval();
           out.rows["G4|Other activities"] = { t: null, d: null, p: null, s: e4.score, g4: e4 };
@@ -3657,11 +3997,14 @@
         out.goals[g.key] = score;
         if (score != null) { out.total += score; out.n++; }
       });
+      // no core exam in the period: G1 is left out, the other goals (50) are scaled to 100
+      out.max = QY_MAX - (out.g1na ? QY_GOALS[0].weight : 0) - (out.g5na ? QY_G5.weight : 0);
+      out.of = QY_GOALS.length - (out.g1na ? 1 : 0) - (out.g5na ? 1 : 0);
       return out;
     });
   }
 
-  /* ---------- the goal matrix (rows G1-G4, one column group per period) ----------
+  /* ---------- the goal matrix (rows G1-G5, one column group per period; G4 has its own table) ----------
      cols: [{ label, sub, ev, tot }] · opts: { id, open: {i: true}, fixed: true (always open, no toggle) } */
   function qyFmt(v, pct) {
     if (v === null || v === undefined || v === "") return '<span class="pr-mut">—</span>';
@@ -3693,25 +4036,36 @@
           + '<td class="pr-num qy-sc' + tc + '" data-p="' + i + '">' + (x.sHtml != null ? x.sHtml : (x.hideS ? "" : qyFmt(x.s))) + "</td>";
       }).join("");
     };
-    var body = '<tr class="qy-totrow"><td class="pr-item" title="G1\u2013G4 (out of ' + QY_MAX + ') scaled to ' + QY_OUTOF + '">Total score</td><td class="pr-num">' + QY_OUTOF + "</td>"
-      + cellsFor(function (c) { return { sHtml: c.ev.n ? fmtNum(r2(qyScale(c.ev.total))) : '<span class="pr-mut">\u2014</span>' }; }, true) + "</tr>";
+    var body = '<tr class="qy-totrow"><td class="pr-item" title="G1\u2013G5 out of 100. A District has no G5, and a period with no core exam has no G1; then the other goals are scaled to 100.">Total score</td><td class="pr-num">' + QY_OUTOF + "</td>"
+      + cellsFor(function (c) { return { sHtml: c.ev.n ? fmtNum(r2(qyScale(c.ev.total, c.ev.max))) : '<span class="pr-mut">\u2014</span>' }; }, true) + "</tr>";
     QY_GOALS.forEach(function (g) {
+      if (g.key === "G4") return;       // G4 is filled in and shown in its own table below (it still counts in the total)
+      if (g.key === "G5" && cols.every(function (c) { return c.ev.g5na; })) return;   // District: no G5
       var gid = opts.id + g.key;
       body += '<tr class="pr-grp qy-goal" data-grp="' + gid + '" data-goal="' + g.key + '"><td class="pr-item"><span class="pr-caret">▸</span><span class="pr-grp-k">' + g.key + "</span>" + esc(g.title) + "</td>"
         + '<td class="pr-num">' + g.weight + "</td>"
-        + cellsFor(function (c) { return { sHtml: c.ev.goals[g.key] != null ? "<b>" + fmtNum(r2(c.ev.goals[g.key])) + "</b>" : '<span class="pr-mut">—</span>' }; }, true) + "</tr>";
+        + cellsFor(function (c) { return { sHtml: c.ev.goals[g.key] != null ? "<b>" + fmtNum(r2(c.ev.goals[g.key])) + "</b>"
+            : (g.key === "G1" && c.ev.g1na) ? '<span class="pr-mut" title="No core exam in this period">Not scored</span>' : '<span class="pr-mut">—</span>' }; }, true) + "</tr>";
+      if (g.key === "G1") { body += qyG1Rows(cols, gid, cellsFor); return; }
       g.rows.forEach(function (r) {
         if (r.head) return;
         var key = g.key + "|" + (g.key === "G4" ? "Other activities" : r.label);
         var weighted = (r.lvl === 0 && r.w > 0) || r.community;
         var skipNote = QY_SKIP[key] && opts.qy ? "Not used for a quarter / year (month columns only)." : "";
         var sub = skipNote ? skipNote
+                : (g.key === "G5" && r.yn && opts.qy) ? "Months with Yes out of the months counted (from the Monthly tab)."
+                : (g.key === "G5" && r.compliance && opts.qy) ? "All 12 Yes / No points over the months counted: Yes count \u00F7 (12 \u00D7 months), \u00D7 4."
+                : (g.key === "G5" && opts.qy && r.lvl === 0) ? "Monthly targets and figures added up over the months counted."
                 : (r.community && opts.qy) ? "Quarter / year: the 9 metrics below (no POM clusters), scored out of 20 \u2014 G3's full weight, since Kathavli is not used."
                 : g.key === "G4" ? "Month columns: the Monthly G4. Quarter / year: activities entered by the reviewer."
                 : r.academic ? "Target: the district's exams in the Academic Plan for the period. Done: exams ticked Completed for the district on the Monthly tab."
                 : (r.note || "");
         var lbl = r.academic ? "Exams planned vs completed" : r.label;
-        body += '<tr class="pr-row pr-hidden pr-mo-l' + r.lvl + '" data-secrow="' + gid + '"><td class="pr-item"' + (sub ? ' title="' + esc(sub) + '"' : "") + ">" + esc(lbl) + "</td>"
+        // Total streaks: folded by default (achieved only, no target) - click the line to show its clubs
+        var fcls = r.fold ? " pr-foldhead" : r.foldOf ? " pr-folded" : "";
+        var fattr = r.fold ? ' data-fold="' + r.fold + '"' : r.foldOf ? ' data-foldof="' + r.foldOf + '"' : "";
+        body += '<tr class="pr-row pr-hidden pr-mo-l' + r.lvl + fcls + '" data-secrow="' + gid + '"' + fattr + '><td class="pr-item"' + (sub ? ' title="' + esc(sub) + '"' : "") + ">"
+          + (r.fold ? '<span class="pr-fold-caret">\u25B8</span>' : "") + esc(lbl) + "</td>"
           + '<td class="pr-num">' + (r.w != null ? r.w : "") + "</td>"
           + cellsFor(function (c) { var x = c.ev.rows[key] || {};
               if (x.skip) return { t: null, d: null, p: null, sHtml: weighted ? '<span class="pr-mut" title="Not used for a quarter / year">n/a</span>' : "" };
@@ -3719,6 +4073,33 @@
       });
     });
     return '<div class="qy-wrap"><table class="' + cls + '" data-qy="' + opts.id + '"><thead>' + h1 + h2 + "</thead><tbody>" + body + "</tbody></table></div>";
+  }
+  // G1 rows of the matrix: Core exams + every core program any column has, then the non-core ones.
+  // A program's weight differs per column (40 split by that period's core programs), so only the
+  // Core exams row shows a weight.
+  function qyG1Rows(cols, gid, cellsFor) {
+    var seen = {}, core = [], nc = [], out = "";
+    cols.forEach(function (c) {
+      ((c.ev.g1 && c.ev.g1.progs) || []).forEach(function (p) { if (!seen[p.label]) { seen[p.label] = 1; (p.core ? core : nc).push(p); } });
+    });
+    var byRank = function (a, b) { return a.rank - b.rank || a.label.localeCompare(b.label); };
+    core.sort(byRank); nc.sort(byRank);
+    var row = function (key, lbl, lvl, wtxt, tip, weighted) {
+      out += '<tr class="pr-row pr-hidden pr-mo-l' + lvl + '" data-secrow="' + gid + '"><td class="pr-item"' + (tip ? ' title="' + esc(tip) + '"' : "") + ">" + esc(lbl) + "</td>"
+        + '<td class="pr-num">' + wtxt + "</td>"
+        + cellsFor(function (c) {
+            var x = c.ev.rows[key] || {};
+            if (key === "G1|Core exams" && x.na) return { t: x.t, d: null, p: null, sHtml: '<span class="pr-mut" title="No core exam in this period">Not scored</span>' };
+            return { t: x.t, d: x.d, p: x.p, s: x.s, hideS: !weighted };
+          }, false) + "</tr>";
+    };
+    row("G1|Core exams", "Core exams", 0, "40", "40 points shared equally by the period's core exam programs. No core exam = G1 not scored; the total then comes from the other goals.", true);
+    core.forEach(function (p) { row("G1|c:" + p.label, p.label, 1, "", "", true); });
+    if (nc.length) {
+      row("G1|Non-core exams", "Non-core exams", 0, "", "Listed for follow-up; not part of the G1 score.", false);
+      nc.forEach(function (p) { row("G1|n:" + p.label, p.label, 1, "", "", false); });
+    }
+    return out;
   }
   function qyBindMatrix(root) {
     var tbl = document.querySelector(root + " table.qy-tbl"); if (!tbl) return;
@@ -3739,11 +4120,22 @@
         var st = QY_GOPEN[tbl.dataset.qy] = QY_GOPEN[tbl.dataset.qy] || {}; st[g.dataset.grp] = opened;
       });
     });
+    // folded lines (Total streaks): click to show / hide the clubs; remembered across refreshes
+    var fo = QY_FOLD[tbl.dataset.qy] = QY_FOLD[tbl.dataset.qy] || {};
+    tbl.querySelectorAll("tr.pr-foldhead").forEach(function (h) {
+      var set = function (open) {
+        h.classList.toggle("is-unfolded", open);
+        h.querySelector(".pr-fold-caret").textContent = open ? "\u25BE" : "\u25B8";
+        tbl.querySelectorAll('tr[data-foldof="' + h.dataset.fold + '"]').forEach(function (tr) { tr.classList.toggle("pr-folded", !open); });
+      };
+      if (fo[h.dataset.fold]) set(true);
+      h.addEventListener("click", function () { var open = !h.classList.contains("is-unfolded"); fo[h.dataset.fold] = open; set(open); });
+    });
     // keep open goals open after a refresh
     var go = QY_GOPEN[tbl.dataset.qy] || {};
     Object.keys(go).forEach(function (k) { if (!go[k]) return; var g = tbl.querySelector('tr.qy-goal[data-grp="' + k + '"]'); if (g) g.click(); });
   }
-  var QY_OPEN = {}, QY_GOPEN = {};
+  var QY_OPEN = {}, QY_GOPEN = {}, QY_FOLD = {};
 
   function qyCards(items) {
     return '<div class="pr-cards pr-mo-cards qy-cards">' + items.map(function (it) {
@@ -3752,9 +4144,14 @@
     }).join("") + "</div>";
   }
   function qyGoalCards(ev, totalLabel, foot) {
-    var items = [{ goal: "TOTAL", label: totalLabel, v: ev.n ? qyScale(ev.total) : null, max: QY_OUTOF,
-                   foot: foot || (ev.n === QY_GOALS.length ? "All goals scored" : ev.n ? "Partial — " + ev.n + " of " + QY_GOALS.length + " goals scored" : "Shown once targets and data are in") }];
-    QY_GOALS.forEach(function (g) { items.push({ goal: g.key, label: g.key + " · " + g.title, v: ev.goals[g.key], max: g.weight }); });
+    var of = ev.of || QY_GOALS.length;
+    var items = [{ goal: "TOTAL", label: totalLabel, v: ev.n ? qyScale(ev.total, ev.max) : null, max: QY_OUTOF,
+                   foot: foot || ((ev.n === of ? "All goals scored" : ev.n ? "Partial — " + ev.n + " of " + of + " goals scored" : "Shown once targets and data are in")
+                                  + (ev.g1na ? " · no core exams, G1 left out" : "")) }];
+    QY_GOALS.forEach(function (g) {
+      if (g.key === "G5" && ev.g5na) return;
+      items.push({ goal: g.key, label: g.key + " · " + g.title, v: ev.goals[g.key], max: g.weight });
+    });
     return qyCards(items);
   }
   // What the quarter / year column is missing, said plainly
@@ -4031,12 +4428,24 @@
     var ticket = ++QY_SEQ[k], body = $(t.body);
     var what = k === "quarterly" ? "quarterly review" : (k === "yearly" ? "yearly view" : "whole-year review");
     body.innerHTML = '<div class="pr-empty pr-loading">Loading ' + what + "…</div>";
+    prSetStatus(t.load, "");
     var jobs = [sbGetQyYear(unit, value, ay)];
-    if (k === "quarterly") qyQMonths(ay, q).forEach(function (m) { jobs.push(qyMonthPayload(unit, value, m)); });
-    Promise.all(jobs).then(function (res) {
+    if (k === "quarterly") qyQMonths(ay, q).forEach(function (m) { jobs.push(qyMonthCached(unit, value, m)); });
+    // G5 is compiled from the Monthly G5 (PO / PM / DM): Yearly and Whole Year need every started month
+    var g5Months = unit === "District" ? [] : qyYMonths(ay).filter(function (m) { return m <= qyNowCode(); });
+    if (k === "quarterly") g5Months = g5Months.filter(function (m) { return qyQMonths(ay, q).indexOf(m) >= 0; });
+    var g5Jobs = k === "quarterly" ? [] : g5Months.map(function (m) { return qyMonthCached(unit, value, m).catch(function () { return null; }); });
+    Promise.all([Promise.all(jobs), Promise.all(g5Jobs)]).then(function (both) {
+      var res = both[0];
       if (ticket !== QY_SEQ[k]) return;
       var data = { unit: unit, value: value, ay: ay, q: q, year: res[0], months: res.slice(1) };
-      var code = k === "quarterly" ? qyCode(ay, q) : (k === "wholeyear" ? qyCode(ay, "FY") : null);
+      var byMonth = {};
+      data.months.concat(both[1]).forEach(function (mp) { if (mp) byMonth[mp.month] = mp; });
+      if (unit !== "District") [1, 2, 3, 4, "FY"].forEach(function (p) {
+        var per = data.year.periods[p];
+        per.g5 = qyG5ForMonths(per.months, byMonth);
+      });
+      var code = k === "quarterly" ? qyCode(ay, q) : qyCode(ay, "FY");     // Yearly shows the year's review too
       if (code) delete QDIRTY[code];
       QV[k] = data;
       qyRender(k);
@@ -4052,8 +4461,9 @@
     if (k === "quarterly") {
       var per = y.periods[d.q], qLabel = "Q" + d.q + " " + qyAyLabel(d.ay);
       html += '<div id="prQCards"></div>' + qyDataNotes(per, qLabel, y.missing) + '<div id="prQMatrix"></div>';
-      html += qyStatusBanner(per, "quarter", qLabel) + qyReviewTable("q", per, "quarter");
+      html += qyReviewTable("q", per, "quarter");
       body.innerHTML = html;
+      prSetStatus(QY_TABS[k].load, qyStatusBanner(per, "quarter", qLabel));
       var paint = function () {
         var cols = d.months.map(function (mp, i) { return { label: qyMonLabel(mp.month), tip: "Month " + (i + 1) + " \u00B7 the Monthly figures", future: mp.future, ev: qyEval({ view: mp.view, future: mp.future }, {}) }; });
         var qev = qyEval(per, QDIRTY);
@@ -4066,21 +4476,27 @@
       qyBindAfter("#prQBody", per, "quarter", paint, function () { qyLoad(k); });
     } else if (k === "yearly") {
       var cols = [1, 2, 3, 4].map(function (q) { return { label: "Q" + q + " \u00B7 " + qyQRange(q), future: y.periods[q].future, ev: qyEval(y.periods[q], {}) }; });
-      var cards = cols.map(function (c, i) { return { goal: "G" + (i + 1), label: "Q" + (i + 1) + " · " + qyQRange(i + 1), v: c.ev.n ? qyScale(c.ev.total) : null, max: QY_OUTOF,
-        foot: c.ev.future ? "Not started yet" : c.ev.n ? c.ev.n + " of " + QY_GOALS.length + " goals scored" : "No data yet" }; });
+      var cards = cols.map(function (c, i) { return { goal: "G" + (i + 1), label: "Q" + (i + 1) + " · " + qyQRange(i + 1), v: c.ev.n ? qyScale(c.ev.total, c.ev.max) : null, max: QY_OUTOF,
+        foot: c.ev.future ? "Not started yet" : c.ev.n ? c.ev.n + " of " + (c.ev.of || QY_GOALS.length) + " goals scored" + (c.ev.g1na ? " · G1 left out" : "") : "No data yet" }; });
       html += qyCards(cards);
       if (y.missing.length) html += qyDataNotes(y.periods[1], "quarter", y.missing);
       html += '<div id="prYMatrix">' + qyMatrix(cols, { id: "y", qy: true, open: (QY_OPEN.y = QY_OPEN.y || {}) }) + "</div>";
+      // the year's review (same record as the Whole Year tab: A, B, G4 for the year, G, H)
+      var fyY = y.periods.FY, yOpen = qyYearOpen(d.ay), fyLbl = "Whole year " + qyAyLabel(d.ay) + (yOpen ? " (year to date)" : "");
+      html += qyReviewTable("yr", fyY, "year");
       body.innerHTML = html;
+      prSetStatus(QY_TABS[k].load, qyStatusBanner(fyY, "year", fyLbl));
       qyBindMatrix("#prYMatrix");
+      qyBindAfter("#prYBody", fyY, "year", function () {}, function () { qyLoad(k); });
     } else {
       var fy = y.periods.FY, open = qyYearOpen(d.ay), yLabel = qyAyLabel(d.ay);
       var fyLabel = "Whole year " + yLabel + (open ? " (year to date)" : "");
       html += '<div id="prFCards"></div>';
       if (open) html += '<div class="pr-panel qy-notes"><b>Year to date.</b> ' + esc(yLabel) + " runs until May " + (d.ay + 1) + ". Achieved numbers so far are compared with the full-year target, so the score will rise as the year goes on.</div>";
       html += qyDataNotes(fy, "whole-year", y.missing) + '<div id="prFMatrix"></div>';
-      html += qyStatusBanner(fy, "year", fyLabel) + qyReviewTable("f", fy, "year");
+      html += qyReviewTable("f", fy, "year");
       body.innerHTML = html;
+      prSetStatus(QY_TABS[k].load, qyStatusBanner(fy, "year", fyLabel));
       var paintF = function () {
         var ev = qyEval(fy, QDIRTY);
         $("prFCards").innerHTML = qyGoalCards(ev, open ? "Year to date · " + yLabel : "Year score · " + yLabel);
@@ -4155,15 +4571,8 @@
       var w0 = (v.weeks || []).filter(function (w) { return w.week === 0; })[0] || { week: 0, code: month + "00", sections: {}, readPoints: {} };
       var rp = w0.readPoints || {};
 
-      var totalScore = 0, totalGoalsScored = 0;
-      MO_GOALS.forEach(function (g) {
-        var gs = moGoalScore(g, rp);
-        if (gs && gs.score != null) {
-          totalScore += gs.score;
-          totalGoalsScored++;
-        }
-      });
-      totalScore = Math.round(totalScore * 100) / 100;
+      var TT = moTotals(rp);                          // G1 with no core exam is left out and the rest scaled to 100
+      var totalScore = TT.total != null ? Math.round(TT.total * 100) / 100 : 0, totalGoalsScored = TT.n;
 
       var goalsData = [];
       MO_GOALS.forEach(function (g) {
@@ -4172,7 +4581,7 @@
         var scoreVal = (gs && gs.score != null) ? Math.round(gs.score * 100) / 100 : null;
 
         var foot = g.key === "G1"
-          ? ((v.academic ? acadTotal(v.academic) : 0) + " exam" + (acadTotal(v.academic) === 1 ? "" : "s") + " planned")
+          ? moG1Foot()
           : (gs && gs.scored ? gs.scored + " of " + gs.total + " parts scored" : "Needs data or targets");
 
         var goalItem = {
@@ -4200,10 +4609,13 @@
           var doneVal = null;
 
           if (r.academic) {
-            var ac = v.academic;
-            targetVal = ac ? acadTotal(ac) : 0;
-            var dv = moG1Done();
-            doneVal = dv === "" ? 0 : dv;
+            // G1: Core exams total, then each program (core first, then non-core)
+            var P = moG1P();
+            goalItem.rows.push({ label: "Core exams", lvl: 0, target: P ? P.coreT : 0, done: P ? P.coreD : 0, note: P && P.na ? "No core exams — not scored" : "" });
+            (P ? P.progs : []).forEach(function (p) {
+              goalItem.rows.push({ label: p.label + (p.core ? "" : " (non-core)"), lvl: 1, target: p.t, done: p.d, note: "" });
+            });
+            return;
           } else {
             var ev = moEval(g, r, rp);
             if (ev.tg && ev.tg.state === "ok" && ev.tg.value != null) {
