@@ -42,54 +42,62 @@
         </div>
     </section>
 
-    <!-- ── Review Pulse: this month's HO Plan & Review and Field Review completion, four cards (app.js renderHomePulse) ── -->
-    <section class="hm-pulse" id="homePulse" aria-label="Review Pulse" hidden>
-        <!-- Collapsed by default: the head is the toggle; while closed it shows a small split bar per card -->
-        <button type="button" class="hm-pulse-head" id="homePulseToggle" aria-expanded="false" aria-controls="homePulseGrid">
-            <span class="hm-pulse-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h4l2.5-6 5 12 2.5-6h4"/></svg></span>
-            <span class="hm-pulse-title">Review Pulse<small id="homePulseWhen"></small></span>
-            <span class="hm-pulse-peek" id="homePulsePeek" aria-hidden="true"></span>
-            <span class="hm-pulse-upd" id="homePulseUpd"></span>
-            <span class="hm-pulse-chev" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span>
-        </button>
-        <div class="hm-pulse-grid" id="homePulseGrid" hidden></div>
-    </section>
+    <!-- ── Dashboard: a main column (Review Pulse, Announcements) and a side rail (Book a Space,
+         Happening next). On narrow screens both fold into one column in that order. ── -->
+    <div class="hm-dash">
+        <div class="hm-main">
+            <!-- ── Review Pulse: this month's HO Plan & Review and Field Review completion, four cards (app.js renderHomePulse) ── -->
+            <section class="hm-pulse" id="homePulse" aria-label="Review Pulse" hidden>
+                <!-- Collapsed by default: the head is the toggle; while closed it shows a small split bar per card -->
+                <button type="button" class="hm-pulse-head" id="homePulseToggle" aria-expanded="false" aria-controls="homePulseGrid">
+                    <span class="hm-pulse-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h4l2.5-6 5 12 2.5-6h4"/></svg></span>
+                    <span class="hm-pulse-title">Review Pulse<small id="homePulseWhen"></small></span>
+                    <span class="hm-pulse-peek" id="homePulsePeek" aria-hidden="true"></span>
+                    <span class="hm-pulse-upd" id="homePulseUpd"></span>
+                    <span class="hm-pulse-chev" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span>
+                </button>
+                <div class="hm-pulse-grid" id="homePulseGrid" hidden></div>
+            </section>
 
-    <!-- ── Book a Space: opens the Spaces popup (rooms.js). Hidden unless the person is Pune HO staff. ── -->
-    <button type="button" class="hm-space" id="homeRooms" data-open-rooms hidden aria-label="Book a Space">
-        <span class="hm-space-ico" aria-hidden="true"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M18 6.500l6 2.500v17.500l-6 2.500z" fill="#C4B5FD"/><rect x="2.500" y="2.500" width="21" height="27.500" rx="4" fill="#7C3AED"/><path d="M6.500 6h13.500a1 1 0 0 1 1 1v21H6.500z" fill="#EDE9FE"/><g class="tbr-leaf"><path d="M6.500 6l8.500-2.600v26L6.500 28z" fill="#A78BFA"/><circle cx="12.200" cy="17.500" r="1.200" fill="#F5F3FF"/></g><circle cx="23" cy="23" r="8.300" fill="#fff"/><circle cx="23" cy="23" r="7" fill="#F59E0B"/><circle cx="23" cy="23" r="5.300" fill="#FFFBEB"/><path d="M23 19.600V23l2.500 1.600" stroke="#B45309" stroke-width="1.700" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-        <span class="hm-space-txt"><b>Book a Space</b><small>Interview, Meeting, CEO, COO and CoS spaces</small></span>
-        <span class="hm-space-pill" id="homeRoomsPill" hidden></span>
-        <span class="hm-space-go">Book now <i aria-hidden="true">→</i></span>
-    </button>
-
-    <!-- ── Upcoming events (from Program Calendar) ──
-         Hidden until app.js finds something in the today/tomorrow window. -->
-    <div class="upcoming-section hm-section" id="upcomingSection" style="display:none;">
-        <div class="hm-head">
-            <div class="hm-head-title"><span class="hm-head-ico hm-ico--pink"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2.500"/><path d="M4 10h16M8.500 3v4M15.500 3v4"/></svg></span>Happening next</div>
-            <button class="btn-add-news-inline hm-pill" id="upcomingViewAll" type="button">
-                Open calendar →
-            </button>
-        </div>
-        <div class="upcoming-grid" id="upcomingGrid"></div>
-    </div>
-
-    <!-- ── News Section ── -->
-    <div class="news-section hm-section">
-        <div class="hm-head">
-            <div class="hm-head-title"><span class="hm-head-ico hm-ico--amber"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4a1 1 0 0 0 1 1h2l5 4V5L7 9H5a1 1 0 0 0-1 1z"/><path d="M16 9a4 4 0 0 1 0 6M18.500 6.500a8 8 0 0 1 0 11"/></svg></span>Announcements</div>
-            <!-- Admin only — rendered by app.js -->
-            <button class="btn-add-news-inline hm-pill" id="addNewsBtn" style="display:none;">
-                + Add News
-            </button>
-        </div>
-        <div class="news-cards-grid" id="newsCardsGrid">
-            <div class="news-empty-state hm-empty">
-                <span class="hm-spin" aria-hidden="true"></span>
-                <span class="hm-empty-sub">Loading announcements…</span>
+            <!-- ── News Section ── -->
+            <div class="news-section hm-section">
+                <div class="hm-head">
+                    <div class="hm-head-title"><span class="hm-head-ico hm-ico--amber"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4a1 1 0 0 0 1 1h2l5 4V5L7 9H5a1 1 0 0 0-1 1z"/><path d="M16 9a4 4 0 0 1 0 6M18.500 6.500a8 8 0 0 1 0 11"/></svg></span>Announcements</div>
+                    <!-- Admin only — rendered by app.js -->
+                    <button class="btn-add-news-inline hm-pill" id="addNewsBtn" style="display:none;">
+                        + Add News
+                    </button>
+                </div>
+                <div class="news-cards-grid" id="newsCardsGrid">
+                    <div class="news-empty-state hm-empty">
+                        <span class="hm-spin" aria-hidden="true"></span>
+                        <span class="hm-empty-sub">Loading announcements…</span>
+                    </div>
+                </div>
             </div>
         </div>
+
+        <aside class="hm-side" aria-label="Spaces and events">
+            <!-- ── Book a Space: opens the Spaces popup (rooms.js). Hidden unless the person is Pune HO staff. ── -->
+            <button type="button" class="hm-space" id="homeRooms" data-open-rooms hidden aria-label="Book a Space">
+                <span class="hm-space-ico" aria-hidden="true"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M18 6.500l6 2.500v17.500l-6 2.500z" fill="#C4B5FD"/><rect x="2.500" y="2.500" width="21" height="27.500" rx="4" fill="#7C3AED"/><path d="M6.500 6h13.500a1 1 0 0 1 1 1v21H6.500z" fill="#EDE9FE"/><g class="tbr-leaf"><path d="M6.500 6l8.500-2.600v26L6.500 28z" fill="#A78BFA"/><circle cx="12.200" cy="17.500" r="1.200" fill="#F5F3FF"/></g><circle cx="23" cy="23" r="8.300" fill="#fff"/><circle cx="23" cy="23" r="7" fill="#F59E0B"/><circle cx="23" cy="23" r="5.300" fill="#FFFBEB"/><path d="M23 19.600V23l2.500 1.600" stroke="#B45309" stroke-width="1.700" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                <span class="hm-space-txt"><b>Book a Space</b><small>Interview, Meeting, CEO, COO and CoS spaces</small></span>
+                <span class="hm-space-pill" id="homeRoomsPill" hidden></span>
+                <span class="hm-space-go">Book now <i aria-hidden="true">→</i></span>
+            </button>
+
+            <!-- ── Upcoming events (from Program Calendar) ──
+                 Hidden until app.js finds something in the today/tomorrow window. -->
+            <div class="upcoming-section hm-section" id="upcomingSection" style="display:none;">
+                <div class="hm-head">
+                    <div class="hm-head-title"><span class="hm-head-ico hm-ico--pink"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2.500"/><path d="M4 10h16M8.500 3v4M15.500 3v4"/></svg></span>Happening next</div>
+                    <button class="btn-add-news-inline hm-pill" id="upcomingViewAll" type="button">
+                        Open calendar →
+                    </button>
+                </div>
+                <div class="upcoming-grid" id="upcomingGrid"></div>
+            </div>
+        </aside>
     </div>
 
 </div>
@@ -515,13 +523,17 @@ html[data-theme="dark"] .hm-pulse-head { border-bottom-color: var(--hairline); }
 html[data-theme="dark"] .hm-pc { border-color: var(--hairline); border-top-color: var(--tc); }
 html[data-theme="dark"] .hm-pc { --r: #FB7185; --a: #FBBF24; --g: #4ADE80; }
 
-@media (max-width: 1180px) {
-    .hm-pulse-grid { grid-template-columns: 1fr; }
+/* Sized by the column the card sits in (container queries), not by the window. */
+@container hmmain (max-width: 1060px) {
     .hm-pulse:not(.is-open) .hm-pulse-upd { display: none; }
 }
-@media (max-width: 860px) {
+@container hmmain (max-width: 900px) {
+    .hm-pulse-grid { grid-template-columns: 1fr; }
+}
+@container hmmain (max-width: 720px) {
     .hm-pulse-peek { display: none; }
     .hm-pulse-chev { margin-left: auto; }
+    .hm-pulse.is-open .hm-pulse-upd { display: none; }
 }
 @media (max-width: 640px) {
     .hm-pulse { border-radius: 20px; margin-bottom: 18px; }
@@ -672,6 +684,96 @@ html[data-theme="dark"] .hm-facts-lead { border-bottom-color: var(--hairline); }
     .hm-space { padding: 12px 14px; gap: 12px; border-radius: 16px; margin-bottom: 14px; }
     .hm-space-txt small { display: none; }
     .hm-space-go { padding: 8px 12px; font-size: 13px; }
+}
+/* ══ Home as one dashboard ═════════════════════════════════════════
+   Banner and insights strip run full width. Below them a two-column
+   dashboard: the main column (Review Pulse, then Announcements) and a
+   fixed-width side rail (Book a Space, then Happening next), so Review
+   Pulse and Book a Space share the first row and every panel lines up on
+   the same two edges. One spacing scale (18px) and one panel style
+   (surface, hairline border, 18px corners, header strip with a divider)
+   for every block. Under 1024px the two columns fold into one, in the
+   order Review Pulse, Book a Space, Happening next, Announcements. */
+.hm { --hm-gap: 18px; --hm-rail: 360px; --hm-radius: 18px; }
+.hm .hm-hero { margin-bottom: var(--hm-gap); }
+.hm .hm-facts { margin-bottom: var(--hm-gap); }
+
+.hm-dash { display: grid; grid-template-columns: minmax(0, 1fr) var(--hm-rail); gap: var(--hm-gap); align-items: start; }
+.hm-main, .hm-side { display: flex; flex-direction: column; gap: var(--hm-gap); min-width: 0; }
+.hm-main { container: hmmain / inline-size; }
+/* nothing in the rail (not Pune HO staff, no events in the window): the main column takes the full width */
+.hm-dash:has(#homeRooms[hidden]):has(#upcomingSection[style*="none"]) { grid-template-columns: minmax(0, 1fr); }
+.hm-dash:has(#homeRooms[hidden]):has(#upcomingSection[style*="none"]) .hm-side { display: none; }
+.hm-dash .hm-pulse, .hm-dash .hm-space, .hm-dash .hm-section { margin: 0; }
+
+/* one panel style */
+.hm-dash .hm-pulse, .hm-dash .hm-space, .hm .hm-dash .news-section, .hm .hm-dash .upcoming-section {
+    background: var(--surface, #fff); border: 1px solid var(--hairline, rgba(15,23,42,.08));
+    border-radius: var(--hm-radius); box-shadow: var(--shadow-sm, 0 1px 3px rgba(15,23,42,.06));
+}
+.hm .hm-dash .news-section, .hm .hm-dash .upcoming-section { padding: 0; overflow: hidden; }
+.hm .hm-dash .hm-head { min-height: 58px; margin: 0; padding: 10px 16px 10px 14px; border-bottom: 1px solid var(--hairline, rgba(15,23,42,.08)); }
+.hm .hm-dash .hm-head-title { font-size: 14px; letter-spacing: -.2px; gap: 10px; }
+.hm .hm-dash .hm-head-ico { width: 32px; height: 32px; border-radius: 10px; }
+.hm .hm-dash .hm-pill { padding: 6px 13px !important; font-size: 12px; }
+.hm .hm-dash .news-cards-grid { padding: 16px; }
+.hm .hm-dash .news-section .news-empty-state { padding: 34px 20px 30px; }
+
+/* Review Pulse head and the Book a Space tile are the same height, so the first row reads as one */
+.hm-dash .hm-pulse-head { min-height: 58px; }
+.hm-dash .hm-space { min-height: 60px; padding: 9px 12px 9px 12px; gap: 12px; }
+.hm-dash .hm-space:hover { transform: none; border-color: rgba(124,58,237,.35); box-shadow: 0 10px 22px -14px rgba(124,58,237,.55); }
+.hm-side .hm-space-ico { width: 40px; height: 40px; border-radius: 12px; }
+.hm-side .hm-space-ico svg { width: 26px; height: 26px; }
+.hm-side .hm-space-txt b { font-size: 14px; }
+.hm-side .hm-space-txt small { font-size: 11.5px; }
+.hm-side .hm-space-pill { padding: 3px 9px; font-size: 11px; }
+.hm-side .hm-space-go { width: 34px; height: 34px; padding: 0; justify-content: center; border-radius: 10px; font-size: 0; }
+.hm-side .hm-space-go i { font-size: 16px; }
+
+/* Happening next in the rail: a list inside its panel, not separate floating cards */
+.hm-side .upcoming-grid { display: flex; flex-direction: column; gap: 0; padding: 6px 8px 8px; }
+.hm .hm-side .upcoming-card {
+    padding: 11px 10px 11px 16px; gap: 12px; align-items: center; border: 0; border-radius: 12px;
+    background: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.hm .hm-side .upcoming-card + .upcoming-card { border-top: 1px solid var(--hairline, rgba(15,23,42,.06)); border-radius: 0 0 12px 12px; }
+.hm .hm-side .upcoming-card:hover { transform: none; box-shadow: none; background: color-mix(in srgb, var(--brand, #4F8EF7) 6%, transparent); }
+.hm-side .upcoming-accent { top: 12px; bottom: 12px; left: 4px; width: 3px; border-radius: 3px; }
+.hm .hm-side .upcoming-when { flex: 0 0 46px; padding: 6px 0 5px; border-radius: 11px; }
+.hm .hm-side .upcoming-day { font-size: 18px; }
+.hm .hm-side .upcoming-mon { font-size: 9.5px; margin-top: 2px; }
+.hm .hm-side .upcoming-title { font-size: 13px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.hm .hm-side .upcoming-chip { margin-top: 6px; }
+
+html[data-theme="dark"] .hm-dash .hm-pulse, html[data-theme="dark"] .hm-dash .hm-space,
+html[data-theme="dark"] .hm .hm-dash .news-section, html[data-theme="dark"] .hm .hm-dash .upcoming-section { border-color: var(--hairline); }
+
+/* Narrower screens: one column, in reading order */
+@media (max-width: 1023px) {
+    .hm-dash { display: flex; flex-direction: column; align-items: stretch; gap: var(--hm-gap); }
+    .hm-main, .hm-side { display: contents; }
+    .hm-main { container: none; }   /* a folded-away column cannot be measured; the dashboard is, below */
+    .hm-dash .hm-pulse { order: 1; }
+    .hm-dash .hm-space { order: 2; }
+    .hm-dash .upcoming-section { order: 3; }
+    .hm-dash .news-section { order: 4; }
+    .hm-dash:has(#homeRooms[hidden]):has(#upcomingSection[style*="none"]) .hm-side { display: contents; }
+    .hm-side .upcoming-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0 8px; }
+    .hm .hm-side .upcoming-card + .upcoming-card { border-top: 0; border-radius: 12px; }
+    .hm-side .hm-space-txt small { display: block; }
+    .hm-side .hm-space-go { width: auto; height: auto; padding: 8px 14px; font-size: 13px; gap: 6px; }
+    .hm-side .hm-space-go i { font-size: inherit; }
+}
+@media (max-width: 1023px) {
+    /* the columns are folded away (display: contents), so the dashboard itself is what the cards measure */
+    .hm-dash { container: hmmain / inline-size; }
+}
+@media (max-width: 640px) {
+    .hm { --hm-gap: 14px; --hm-radius: 18px; }
+    .hm-side .upcoming-grid { grid-template-columns: 1fr; }
+    .hm .hm-dash .news-cards-grid { padding: 12px; }
+    .hm-side .hm-space-txt small { display: none; }
 }
 </style>
 

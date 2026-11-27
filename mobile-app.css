@@ -1,0 +1,371 @@
+/* ==========================================================================
+   Phone app shell — loaded after mobile.css. Everything is inside a
+   max-width: 768px query (or hidden outside it), so laptops are not touched.
+
+   The design system on a phone:
+   - Real size: the 0.8 "UI scale" the laptop layout uses is lifted on a phone,
+     so text and buttons are full size (readable, and 44px touch targets).
+   - Tab bar: five fixed tabs (four main pages + More), icon over label, the page
+     you are on tinted in its own colour. More opens a sheet with every other page
+     and the Light / Dark / System choice (which leaves the header).
+   - Pages: the coloured page banner becomes a slim toolbar: its big title and
+     description go (the header already names the page); its buttons and tabs stay.
+   - Dialogs rise from the bottom as sheets, full width, with a grab handle.
+   - One rhythm: 14px page margins, 14px between blocks.
+   ========================================================================== */
+
+.mx-tabbar, .mx-sheet-back { display: none; }
+.mx-top-acts { display: contents; }   /* empty on a laptop: takes no room in the header */
+
+@media (max-width: 768px) {
+
+  /* ---- real size on a phone ------------------------------------------ */
+  html { zoom: 1 !important; }
+
+  /* ---- the old sliding bar and the header's theme button give way ---- */
+  #appShell .m-nav { display: none !important; }
+  #appShell .theme-switch { display: none !important; }
+
+  .content-area { padding: 14px 14px calc(92px + env(safe-area-inset-bottom, 0px)) !important; }
+
+  /* ---- tab bar ---------------------------------------------------------- */
+  #appShell.visible ~ .mx-tabbar, #appShell.visible .mx-tabbar {
+    display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr));
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 960;
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+    background: rgba(255, 255, 255, .94);
+    -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%);
+    border-top: 1px solid rgba(15, 23, 42, .08);
+    box-shadow: 0 -6px 20px rgba(15, 23, 42, .05);
+  }
+  .mx-tab {
+    display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; padding: 3px 0 1px;
+    border: 0; background: none; font: inherit; color: #64748B; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .mx-tab-ico {
+    width: 58px; height: 32px; border-radius: 999px; display: grid; place-items: center;
+    transition: background-color .25s ease, transform .15s ease;
+  }
+  .mx-tab-ico svg { width: 24px; height: 24px; display: block; filter: grayscale(1) opacity(.6); transition: filter .25s ease, transform .3s cubic-bezier(.34, 1.56, .64, 1); }
+  .mx-tab--more .mx-tab-ico svg { filter: none; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linejoin: round; }
+  .mx-tab-lbl { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 700; letter-spacing: -.05px; line-height: 1.2; }
+  .mx-tab.is-active { color: var(--pg, #2F6FE4); }
+  .mx-tab.is-active .mx-tab-ico { background: color-mix(in srgb, var(--pg, #2F6FE4) 15%, transparent); }
+  .mx-tab.is-active .mx-tab-ico svg { filter: none; transform: scale(1.06); }
+  .mx-tab.is-active .mx-tab-lbl { font-weight: 800; }
+  .mx-tab:active .mx-tab-ico { transform: scale(.9); }
+  .mx-tab:focus-visible { outline: none; }
+  .mx-tab:focus-visible .mx-tab-ico { outline: 2px solid var(--pg, #2F6FE4); outline-offset: 1px; }
+
+  html[data-theme="dark"] #appShell.visible .mx-tabbar { background: rgba(20, 26, 36, .94); border-top-color: rgba(255, 255, 255, .08); box-shadow: 0 -6px 20px rgba(0, 0, 0, .35); }
+  html[data-theme="dark"] .mx-tab { color: #94A3B8; }
+  html[data-theme="dark"] .mx-tab.is-active { color: color-mix(in srgb, var(--pg, #2F6FE4) 55%, #fff); }
+
+  /* the keyboard is up: the bar steps aside (mobile.js sets m-typing) */
+  html.m-typing #appShell.visible .mx-tabbar { display: none; }
+  /* a dialog covers the screen: the bar steps aside (mobile-app.js sets mx-dialog) */
+  html.mx-dialog #appShell.visible .mx-tabbar { display: none; }
+
+  /* things that sit at the bottom move above the bar */
+  #appShell.visible ~ .olf-install { bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important; }
+  #appShell.visible ~ #toastContainer { bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important; }
+
+  /* ---- More sheet ------------------------------------------------------- */
+  .mx-sheet-back {
+    display: block; position: fixed; inset: 0; z-index: 950; background: rgba(15, 23, 42, .42);
+    opacity: 0; pointer-events: none; transition: opacity .25s ease;
+  }
+  .mx-sheet-back.is-open { opacity: 1; pointer-events: auto; }
+  .mx-sheet {
+    position: absolute; left: 0; right: 0; bottom: 0; max-height: 82vh; overflow-y: auto; overscroll-behavior: contain;
+    padding: 8px 18px calc(86px + env(safe-area-inset-bottom, 0px));
+    background: var(--surface, #fff); border-radius: 26px 26px 0 0; box-shadow: 0 -16px 40px rgba(15, 23, 42, .2);
+    transform: translateY(105%); transition: transform .34s cubic-bezier(.22, 1, .36, 1);
+  }
+  .mx-sheet-back.is-open .mx-sheet { transform: none; }
+  .mx-grab { display: block; width: 40px; height: 5px; margin: 2px auto 12px; border-radius: 3px; background: rgba(100, 116, 139, .35); }
+  .mx-sheet-h { margin: 0 4px 12px; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint, #7A8599); }
+  .mx-sheet-h--sub { margin-top: 22px; }
+  .mx-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .mx-tile {
+    display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; padding: 14px 6px 12px;
+    border: 1px solid rgba(15, 23, 42, .07); border-radius: 18px; background: color-mix(in srgb, var(--pg, #2F6FE4) 5%, var(--surface, #fff));
+    font: inherit; color: var(--text, #0F172A); cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform .12s ease;
+  }
+  .mx-tile:active { transform: scale(.96); }
+  .mx-tile.is-active { border-color: color-mix(in srgb, var(--pg, #2F6FE4) 45%, transparent); background: color-mix(in srgb, var(--pg, #2F6FE4) 12%, var(--surface, #fff)); }
+  .mx-tile-ico { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 15px; background: color-mix(in srgb, var(--pg, #2F6FE4) 14%, transparent); }
+  .mx-tile-ico svg { width: 28px; height: 28px; display: block; }
+  .mx-tile-lbl { font-size: 12.5px; font-weight: 700; line-height: 1.25; text-align: center; letter-spacing: -.1px; }
+  .mx-seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border-radius: 14px; background: rgba(15, 23, 42, .06); }
+  .mx-seg button { height: 40px; border: 0; border-radius: 11px; background: none; font: inherit; font-size: 14px; font-weight: 700; color: var(--text-soft, #475467); cursor: pointer; }
+  .mx-seg button.is-on { background: var(--surface, #fff); color: var(--text, #0F172A); box-shadow: 0 1px 4px rgba(15, 23, 42, .14); }
+  html[data-theme="dark"] .mx-tile { border-color: rgba(255, 255, 255, .08); }
+  html[data-theme="dark"] .mx-seg { background: rgba(255, 255, 255, .08); }
+  html[data-theme="dark"] .mx-seg button.is-on { background: rgba(255, 255, 255, .14); }
+  html.mx-sheet-open .content-area { overflow: hidden !important; }
+
+  /* ---- page banners become slim toolbars --------------------------------
+     Not Home's greeting banner. The title and description go (the header names
+     the page); buttons and tabs inside the banner stay. A banner with nothing
+     else in it disappears. */
+  .content-area .pg-hero:not(.hm-hero) {
+    padding: 10px !important; gap: 8px !important; margin-bottom: 14px !important; border-radius: 18px !important;
+    box-shadow: 0 10px 22px -14px rgba(36, 87, 197, .55) !important; min-height: 0 !important;
+  }
+  .content-area .pg-hero:not(.hm-hero) > .pg-blob { display: none !important; }
+  .content-area .pg-hero:not(.hm-hero) > .pg-hero-lead { display: none !important; }
+  .content-area .pg-hero:not(.hm-hero):not(:has(> :not(.pg-blob):not(.pg-hero-lead):not(style):not(script))) { display: none !important; }
+  .content-area .pg-hero:not(.hm-hero) .pg-hero-actions { width: 100%; gap: 8px !important; }
+
+  /* ---- dialogs rise from the bottom ------------------------------------- */
+  .modal-overlay.open { align-items: flex-end !important; padding: 0 !important; overflow: hidden !important; }
+  .modal-overlay .modal-box {
+    width: 100% !important; max-width: 100% !important; margin: 0 !important; border-radius: 24px 24px 0 0 !important;
+    max-height: 92dvh !important; overflow-y: auto !important; overscroll-behavior: contain;
+    padding-bottom: env(safe-area-inset-bottom, 0px); box-shadow: 0 -16px 40px rgba(15, 23, 42, .25) !important;
+  }
+  .modal-overlay .modal-box::before {
+    content: ""; display: block; width: 40px; height: 5px; margin: 8px auto 0; border-radius: 3px; background: rgba(100, 116, 139, .35);
+  }
+  .modal-overlay .modal-header { padding: 12px 18px 14px !important; }
+  .modal-overlay.open .modal-box { animation: mx-sheet-up .32s cubic-bezier(.22, 1, .36, 1); }
+  @keyframes mx-sheet-up { from { transform: translateY(40%); opacity: .4; } }
+}
+
+@media (max-width: 768px) {
+  /* ---- page actions lifted into the header (mobile-app.js) ------------- */
+  .content-area .pg-hero.mx-hero-lifted { display: none !important; }
+  #appShell .mx-top-acts { display: contents; }
+  #appShell .mx-top-btn {
+    width: 38px; height: 38px; flex: none; display: grid; place-items: center; padding: 0; border-radius: 50%; cursor: pointer;
+    background: var(--tb-card, #fff); border: 1px solid var(--tb-line, rgba(15, 23, 42, .1)); box-shadow: var(--tb-ctl-shadow, none);
+    color: var(--tb-ink, #0F172A); -webkit-tap-highlight-color: transparent;
+  }
+  #appShell .mx-top-btn:active { transform: scale(.92); }
+  #appShell .mx-top-btn svg, #appShell .mx-top-btn i, #appShell .mx-top-btn span { width: 18px; height: 18px; max-width: 18px; color: currentColor; }
+  #appShell .mx-top-btn :is(span, b, em, small):not(:has(svg)):not([class*=ico]) { display: none; }
+
+  /* ---- Home: the greeting banner, phone sized --------------------------- */
+  .content-area .hm-hero { min-height: 0 !important; padding: 18px 18px !important; border-radius: 22px !important; }
+  .content-area .hm-hero .pg-hero-title { font-size: 22px !important; line-height: 1.25 !important; letter-spacing: -.5px !important; }
+
+  /* ---- HO Plan & Review: the banner keeps its tabs, not its description -- */
+  #sg-app .sg-hero-sub, #sg-app .app-nav .sg-hero-lead { display: none !important; }
+  /* their refresh buttons are in the header now (mobile-app.js) */
+  #sg-app #sg-refresh-btn, .award-page #aw-refresh-all { display: none !important; }
+
+  /* ---- dropdowns: room for the text, an ellipsis when it still does not fit */
+  .content-area select { padding-left: 12px !important; padding-right: 30px !important; text-overflow: ellipsis; }
+
+  /* ---- Employees: a long name ends with an ellipsis before the ID chip --- */
+  .employees-page .col-name, .employees-page .emp-person { min-width: 0; }
+  .employees-page .emp-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+/* ---- ER & Dashboards: each app as one tidy row (icon · name and line · Open) ---- */
+@media (max-width: 768px) {
+  #appShell .content-area .erd-grid { gap: 10px !important; }
+  #appShell .content-area .erd-tile {
+    display: grid !important; grid-template-columns: 46px minmax(0, 1fr) auto !important; align-items: center !important; gap: 12px !important;
+    min-height: 0 !important; padding: 14px 14px 14px 14px !important; border-radius: 16px !important;
+    background: var(--mx-surface) !important; border: 1px solid var(--mx-line) !important; box-shadow: none !important; overflow: hidden;
+  }
+  #appShell .content-area .erd-tile::before, #appShell .content-area .erd-tile::after { display: none !important; }
+  #appShell .content-area .erd-tile .erd-icon { width: 46px !important; height: 46px !important; border-radius: 13px !important; margin: 0 !important; align-self: center; }
+  #appShell .content-area .erd-tile .erd-icon svg { width: 24px !important; height: 24px !important; }
+  #appShell .content-area .erd-tile .erd-body { display: grid !important; gap: 2px !important; min-width: 0; }
+  #appShell .content-area .erd-tile .erd-tag { justify-self: start; padding: 0 !important; background: none !important; border: 0 !important; font-size: 11px !important; font-weight: 700 !important; letter-spacing: .04em; color: var(--mx-ink-3) !important; }
+  #appShell .content-area .erd-tile .erd-name { font-size: 15.5px !important; font-weight: 800 !important; letter-spacing: -.2px; color: var(--mx-ink) !important; margin: 0 !important; }
+  #appShell .content-area .erd-tile .erd-desc { font-size: 13px !important; line-height: 1.35 !important; color: var(--mx-ink-2) !important; margin: 0 !important;
+    display: -webkit-box !important; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  #appShell .content-area .erd-tile .erd-chips, #appShell .content-area .erd-tile .erd-host { display: none !important; }
+  #appShell .content-area .erd-tile .erd-foot { display: contents !important; }
+  #appShell .content-area .erd-tile .erd-go {
+    padding: 7px 12px !important; border-radius: 999px !important; font-size: 12.5px !important; font-weight: 800 !important;
+    background: color-mix(in srgb, var(--mx-brand) 10%, transparent) !important; color: var(--mx-brand) !important; border: 0 !important; box-shadow: none !important; white-space: nowrap;
+  }
+  /* the featured app keeps a soft tint so it still stands first */
+  #appShell .content-area .erd-tile--feature { background: color-mix(in srgb, var(--mx-brand) 5%, var(--mx-surface)) !important; border-color: color-mix(in srgb, var(--mx-brand) 22%, transparent) !important; }
+
+  /* ---- Insight: the Table / Flowchart switch as a segmented control ---- */
+  #appShell #tpRoot .tp-segmented-control { display: flex !important; gap: 3px !important; padding: 3px !important; border-radius: 12px !important; background: var(--mx-chip) !important; border: 0 !important; box-shadow: none !important; }
+  #appShell #tpRoot .tp-segmented-control > * {
+    flex: 1 1 0 !important; min-height: 38px !important; border: 0 !important; border-radius: 10px !important; background: transparent !important; background-image: none !important;
+    box-shadow: none !important; color: var(--mx-ink-2) !important; font-size: 14px !important; font-weight: 700 !important;
+  }
+  #appShell #tpRoot .tp-segmented-control > :is(.active, .is-active, [aria-selected="true"], [aria-pressed="true"]) {
+    background: var(--mx-surface) !important; color: var(--mx-ink) !important; box-shadow: 0 1px 3px rgba(15, 23, 42, .14) !important;
+  }
+}
+
+@media (max-width: 768px) and (prefers-reduced-motion: reduce) {
+  .mx-sheet, .mx-sheet-back, .mx-tab-ico, .mx-tab-ico svg { transition: none !important; }
+  .modal-overlay.open .modal-box { animation: none !important; }
+}
+
+/* ==========================================================================
+   DESIGN SYSTEM v2 (phone) — one app, every page
+   - Canvas: flat light grey (dark: deep slate). No gradient washes or blobs.
+   - Surfaces: white cards, 16px corners, one hairline, a whisper of shadow.
+   - Page header: the app bar, then (where a page has sections) a white tab
+     strip joined to it: scrollable text tabs with an underline, and below it,
+     if the section has its own views, a row of pill chips. The strip stays
+     at the top while the page scrolls.
+   - The coloured banners are gone on a phone (Home's greeting stays); what
+     they held (buttons, the signed-in chip) becomes ordinary content.
+   - Buttons: solid brand blue for the main action, white with a hairline for
+     the rest. 44px tall.
+   ========================================================================== */
+@media (max-width: 768px) {
+  :root, html[data-theme] {
+    --mx-bg: #F2F4F8; --mx-surface: #FFFFFF; --mx-line: rgba(15, 23, 42, .08); --mx-line-2: rgba(15, 23, 42, .12);
+    --mx-ink: #0F172A; --mx-ink-2: #475467; --mx-ink-3: #8A94A6; --mx-brand: #2F6FE4; --mx-brand-ink: #1D4FC4;
+    --mx-chip: rgba(15, 23, 42, .06); --mx-r: 16px;
+    --glass: var(--mx-surface); --glass-strong: var(--mx-surface); --surface: var(--mx-surface);
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, .05); --shadow-md: 0 1px 3px rgba(15, 23, 42, .06), 0 4px 12px rgba(15, 23, 42, .04);
+  }
+  html[data-theme="dark"] {
+    --mx-bg: #0E131B; --mx-surface: #18202B; --mx-line: rgba(255, 255, 255, .08); --mx-line-2: rgba(255, 255, 255, .14);
+    --mx-ink: #E8ECF2; --mx-ink-2: #B4BECD; --mx-ink-3: #7F8BA1; --mx-brand: #6F9DFF; --mx-brand-ink: #9DBDFF;
+    --mx-chip: rgba(255, 255, 255, .08);
+    --shadow-sm: none; --shadow-md: none;
+  }
+
+  /* ---- canvas ---- */
+  html[data-theme] body, html[data-theme] .app-body, html[data-theme] #appShell { background: var(--mx-bg) !important; background-image: none !important; }
+  html[data-theme] #appShell .topbar { background: var(--mx-surface) !important; }
+  .content-area .pg-blob, .content-area .pg-hero::before, .content-area .pg-hero::after { display: none !important; }
+
+  /* ---- banners become plain content (not Home's greeting) ---- */
+  html[data-theme] .content-area .pg-hero:not(.hm-hero),
+  #appShell #sg-app #sgHero {
+    background: transparent !important; box-shadow: none !important; border: 0 !important; border-radius: 0 !important;
+    padding: 0 !important; margin: 0 0 12px !important; min-height: 0 !important; color: var(--mx-ink) !important; overflow: visible !important;
+  }
+  /* what was white-on-colour inside them */
+  html[data-theme] .content-area .pg-hero:not(.hm-hero) .pg-btn {
+    flex: 1 1 0; justify-content: center; height: 44px; min-height: 44px; padding: 0 14px !important; border-radius: 12px !important;
+    background: var(--mx-surface) !important; color: var(--mx-ink) !important; border: 1px solid var(--mx-line-2) !important;
+    box-shadow: none !important; font-size: 14.5px !important; font-weight: 700 !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+  }
+  html[data-theme] .content-area .pg-hero:not(.hm-hero) .pg-btn svg { color: var(--mx-brand) !important; }
+  html[data-theme] .content-area .pg-hero:not(.hm-hero) .pg-btn--solid { background: var(--mx-brand) !important; color: #fff !important; border-color: var(--mx-brand) !important; }
+  html[data-theme] .content-area .pg-hero:not(.hm-hero) .pg-btn--solid svg { color: #fff !important; }
+  html[data-theme] .content-area .pg-hero:not(.hm-hero) .pg-glass {
+    background: var(--mx-surface) !important; color: var(--mx-ink-2) !important; border: 1px solid var(--mx-line) !important; box-shadow: none !important;
+    -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+  }
+  html[data-theme] .content-area .pg-hero:not(.hm-hero) .pg-glass * { color: inherit !important; }
+  html[data-theme] .content-area .pg-hero:not(.hm-hero) .pg-glass b, html[data-theme] .content-area .pg-hero:not(.hm-hero) .pg-glass strong { color: var(--mx-ink) !important; }
+
+  /* ---- the tab strip: joined to the app bar, stays at the top ----
+     Pages whose sections sit in a header block: HO Plan (#sgHero), Awards (#awHero),
+     Insight (#tpHero), Field Review (.pr-head); GRs has its tab row on its own. */
+  #appShell #sg-app #sgHero, #appShell .award-page #awHero, #appShell #tpRoot #tpHero, #appShell #ftrRoot > .pr-head, #appShell #grPage > .gr-tabs {
+    position: sticky !important; top: 0 !important; z-index: 60 !important;
+    margin: -14px -14px 14px !important; padding: 0 0 2px !important; width: calc(100% + 28px) !important; max-width: none !important; box-sizing: border-box !important;
+    background: var(--mx-surface) !important; border-bottom: 1px solid var(--mx-line) !important; border-radius: 0 !important;
+    box-shadow: 0 6px 16px -14px rgba(15, 23, 42, .35) !important;
+  }
+  #appShell #sg-app #sgHero .sg-hero-nav, #appShell .award-page #awHero .aw-hero-nav { display: block !important; padding: 0 !important; margin: 0 !important; background: none !important; border: 0 !important; box-shadow: none !important; }
+
+  /* primary tabs: text with an underline, scroll sideways when they do not fit */
+  #appShell #sg-app #sgHero .nav-tabs, #appShell .award-page #awHero .aw-toptabs, #appShell #tpRoot #tpHero .tp-view-tabs,
+  #appShell #ftrRoot #prNav, #appShell #grPage > .gr-tabs {
+    display: flex !important; flex-wrap: nowrap !important; grid-template-columns: none !important; gap: 2px !important;
+    width: 100% !important; max-width: none !important; margin: 0 !important; padding: 0 10px !important; overflow-x: auto !important; overflow-y: hidden !important;
+    background: transparent !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; scrollbar-width: none;
+    -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+  }
+  #appShell #grPage > .gr-tabs { padding: 0 10px !important; }
+  #sgHero .nav-tabs::-webkit-scrollbar, #awHero .aw-toptabs::-webkit-scrollbar, #tpHero .tp-view-tabs::-webkit-scrollbar, #prNav::-webkit-scrollbar, #grPage > .gr-tabs::-webkit-scrollbar { display: none; }
+  .content-area .has-tab-glider > .tab-glider { display: none !important; }
+  #appShell #sg-app #sgHero .nav-tabs > button, #appShell .award-page #awHero .aw-toptabs button, #appShell #tpRoot #tpHero .tp-view-tabs > button,
+  #appShell #ftrRoot #prNav button, #appShell #grPage > .gr-tabs > button {
+    flex: none !important; display: inline-flex !important; flex-direction: row !important; align-items: center !important; justify-content: center !important; gap: 6px !important;
+    width: auto !important; min-width: 0 !important; height: 46px !important; min-height: 46px !important; margin: 0 !important; padding: 0 12px !important;
+    background: none !important; border: 0 !important; border-bottom: 2.5px solid transparent !important; border-radius: 0 !important; box-shadow: none !important;
+    color: var(--mx-ink-3) !important; font-size: 14.5px !important; font-weight: 650 !important; letter-spacing: -.1px !important; white-space: nowrap !important; line-height: 1 !important;
+    transform: none !important;
+  }
+  #appShell #sg-app #sgHero .nav-tabs > button :is(svg, i, [class*=ico]), #appShell .award-page #awHero .aw-toptabs button :is(svg, i, [class*=ico]),
+  #appShell #tpRoot #tpHero .tp-view-tabs > button :is(svg, i, [class*=ico]), #appShell #ftrRoot #prNav button :is(svg, i, [class*=ico]),
+  #appShell #grPage > .gr-tabs > button :is(svg, i, [class*=ico]) { width: 17px !important; height: 17px !important; margin: 0 !important; flex: none; }
+  #appShell #sg-app #sgHero .nav-tabs > button:is(.active, .is-active, [aria-selected="true"]),
+  #appShell .award-page #awHero .aw-toptabs :is(button.active, button.is-active, button[aria-selected="true"], .is-active > button, .active > button),
+  #appShell #tpRoot #tpHero .tp-view-tabs > button:is(.active, .is-active, [aria-selected="true"]),
+  #appShell #ftrRoot #prNav button:is(.active, .is-active, [aria-selected="true"], [aria-current]),
+  #appShell #grPage > .gr-tabs > button:is(.active, .is-active, [aria-selected="true"]) {
+    color: var(--mx-brand) !important; border-bottom-color: var(--mx-brand) !important; font-weight: 800 !important; background: none !important;
+  }
+  #appShell #ftrRoot #prNav .pr-navgrp { display: contents !important; }
+  #appShell .award-page #awHero .aw-toptabs .aw-tabwrap { flex: none !important; display: inline-flex !important; width: auto !important; }
+
+  /* section views: pill chips under the tabs */
+  #appShell #sg-app #sgHero .dash-subtabs, #appShell .award-page #awHero .aw-subtabs {
+    flex-wrap: nowrap !important; gap: 8px !important; width: 100% !important; max-width: none !important; box-sizing: border-box !important;
+    margin: 0 !important; padding: 8px 14px 10px !important; overflow-x: auto !important; scrollbar-width: none;
+    background: transparent !important; border: 0 !important; border-top: 1px solid var(--mx-line) !important; border-radius: 0 !important; box-shadow: none !important;
+  }
+  #appShell #sg-app #sgHero .dash-subtabs > button, #appShell .award-page #awHero .aw-subtabs > button {
+    flex: none !important; width: auto !important; height: 34px !important; min-height: 34px !important; padding: 0 14px !important; margin: 0 !important;
+    border: 0 !important; border-radius: 999px !important; background: var(--mx-chip) !important; box-shadow: none !important;
+    color: var(--mx-ink-2) !important; font-size: 13.5px !important; font-weight: 700 !important; white-space: nowrap !important; transform: none !important;
+  }
+  #appShell #sg-app #sgHero .dash-subtabs > button:is(.active, .is-active), #appShell .award-page #awHero .aw-subtabs > button:is(.active, .is-active) {
+    background: var(--mx-ink) !important; color: var(--mx-surface) !important;
+  }
+  html[data-theme="dark"] #appShell #sg-app #sgHero .dash-subtabs > button:is(.active, .is-active), html[data-theme="dark"] #appShell .award-page #awHero .aw-subtabs > button:is(.active, .is-active) {
+    background: var(--mx-brand) !important; color: #fff !important;
+  }
+
+  /* any other two- or three-way switch inside a page: a quiet segmented control */
+  html[data-theme] .content-area .has-tab-glider:not(.nav-tabs):not(.aw-toptabs):not(.tp-view-tabs):not(#prNav):not(.gr-tabs):not(.dash-subtabs):not(.aw-subtabs) {
+    gap: 3px !important; padding: 3px !important; border-radius: 12px !important;
+    background: var(--mx-chip) !important; border: 0 !important; box-shadow: none !important;
+  }
+  html[data-theme] .content-area .has-tab-glider:not(.nav-tabs):not(.aw-toptabs):not(.tp-view-tabs):not(#prNav):not(.gr-tabs):not(.dash-subtabs):not(.aw-subtabs) > button {
+    flex: 1 1 0 !important; min-height: 36px !important; border: 0 !important; border-radius: 10px !important; background: transparent !important; box-shadow: none !important;
+    color: var(--mx-ink-2) !important; font-size: 13.5px !important; font-weight: 700 !important;
+  }
+  html[data-theme] .content-area .has-tab-glider:not(.nav-tabs):not(.aw-toptabs):not(.tp-view-tabs):not(#prNav):not(.gr-tabs):not(.dash-subtabs):not(.aw-subtabs) > button:is(.active, .is-active, [aria-selected="true"]) {
+    background: var(--mx-surface) !important; color: var(--mx-ink) !important; box-shadow: 0 1px 3px rgba(15, 23, 42, .14) !important;
+  }
+
+  /* ---- buttons: one primary look ---- */
+  html[data-theme] .content-area :is(.btn-primary, .pr-btn-primary, .btn.btn-primary) {
+    background: var(--mx-brand) !important; background-image: none !important; color: #fff !important; border: 0 !important;
+    border-radius: 12px !important; min-height: 44px; box-shadow: none !important; font-weight: 800 !important;
+  }
+  html[data-theme] .content-area :is(.btn-primary, .pr-btn-primary):disabled { opacity: .45 !important; }
+
+  /* ---- empty states: calm, no dashed boxes ---- */
+  html[data-theme] .content-area :is(.empty, .pr-empty, .empty-state) {
+    border: 0 !important; background: transparent !important; box-shadow: none !important;
+  }
+
+  /* ---- Filters (mobile-app.js): one line that opens the page's filters ---- */
+  .mx-fbar {
+    display: flex; align-items: center; gap: 10px; width: 100%; min-height: 46px; padding: 6px 12px 6px 14px; margin: 0;
+    border: 1px solid var(--mx-line); border-radius: 14px; background: var(--mx-surface); color: var(--mx-ink);
+    font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; grid-column: 1 / -1; flex-basis: 100%;
+  }
+  .mx-fbar-ico { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: 9px; background: color-mix(in srgb, var(--mx-brand) 12%, transparent); color: var(--mx-brand); }
+  .mx-fbar-ico svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+  .mx-fbar-txt { flex: 1 1 auto; min-width: 0; display: grid; gap: 1px; }
+  .mx-fbar-txt b { font-size: 14.5px; font-weight: 800; }
+  .mx-fbar-txt small { font-size: 12.5px; font-weight: 600; color: var(--mx-ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mx-fbar-chev { width: 18px; height: 18px; flex: none; fill: none; stroke: var(--mx-ink-3); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; transition: transform .25s ease; }
+  .mx-fpanel:not(.mx-fcollapsed) .mx-fbar-chev { transform: rotate(180deg); }
+  /* collapsed: the fields (and anything holding one) step away; buttons such as Add Task stay */
+  #appShell #pageContent .mx-fpanel.mx-fcollapsed > :is(select, input, textarea, label):not(#mx0),
+  #appShell #pageContent .mx-fpanel.mx-fcollapsed > :not(.mx-fbar):not(#mx0):has(select, input, textarea) { display: none !important; }
+  #appShell #pageContent tr.mx-fpanel.mx-fcollapsed:not(#mx0) { display: none !important; }
+  .content-area .has-tab-glider.mx-single { display: none !important; }
+  .content-area .mx-more-r { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); }
+  .content-area .mx-more-l { -webkit-mask-image: linear-gradient(90deg, transparent, #000 36px); mask-image: linear-gradient(90deg, transparent, #000 36px); }
+  .content-area .mx-more-l.mx-more-r { -webkit-mask-image: linear-gradient(90deg, transparent, #000 36px, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, transparent, #000 36px, #000 calc(100% - 36px), transparent); }
+  .mx-fbar.is-open .mx-fbar-chev { transform: rotate(180deg); }
+  .mx-fbar--outside { margin: 0 0 10px; }
+}
