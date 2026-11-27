@@ -3119,7 +3119,7 @@ async function renderHomeFacts() {
    reused by everyone for 30 minutes, so only one visit in 30 minutes reads the
    review tables. Without that table each visitor works it out (10-minute page cache). */
 const PULSE_TTL = 30 * 60 * 1000;
-const PULSE_VERSION = 2;
+const PULSE_VERSION = 3;   // bump when the saved shape or rules change, so old snapshots are recomputed
 let homePulseCache = null;
 const PULSE_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -3139,11 +3139,30 @@ async function loadHoPulse(y, m) {
             from += 1000;
         }
     };
-    const [members, tasks, reviews] = await Promise.all([
-        pages(() => sb.from("members").select("id,name,dept").order("id")),
+    const [members, tasks, reviews, staff] = await Promise.all([
+        pages(() => sb.from("members").select("id,name,dept,email").order("id")),
         pages(() => sb.from("tasks").select("id,member").eq("year", ay).eq("month", month).order("id")),
-        pages(() => sb.from("reviews").select("id,member").eq("year", ay).eq("month", month).order("id"))
+        pages(() => sb.from("reviews").select("id,member").eq("year", ay).eq("month", month).order("id")),
+        (window.olfGetEmployees ? window.olfGetEmployees() : Promise.resolve([]))
+            .catch(e => { console.warn("Review Pulse: Employees list not read, inactive staff not filtered:", e); return []; })
     ]);
+    // Leave out members who are Inactive in the Employees tab. Matched by email first
+    // (accounts get renamed when staff change, so an active record with the email wins),
+    // then by name; a member not found in Employees at all is kept.
+    const low = (s) => String(s || "").trim().toLowerCase();
+    const actE = new Set(), offE = new Set(), actN = new Set(), offN = new Set();
+    staff.forEach(e => {
+        const on = isActiveEmployee(e), em = low(e.Email), nm = low(e.Name);
+        if (em) (on ? actE : offE).add(em);
+        if (nm) (on ? actN : offN).add(nm);
+    });
+    const isOut = (m) => {
+        const em = low(m.email), nm = low(m.name);
+        if (em && actE.has(em)) return false;
+        if (em && offE.has(em)) return true;
+        if (nm && actN.has(nm)) return false;
+        return !!(nm && offN.has(nm));
+    };
     // manager scores of this month's reviews (a few dozen reviews -> one or two requests)
     let items = [];
     const ids = reviews.map(r => r.id);
@@ -3153,7 +3172,7 @@ async function loadHoPulse(y, m) {
     }
     const key = (s) => String(s || "").trim().toLowerCase();
     const people = new Map();                                   // one entry per member name
-    members.forEach(r => { const k = key(r.name); if (k && !people.has(k)) people.set(k, { name: String(r.name).trim(), where: r.dept || "" }); });
+    members.forEach(r => { const k = key(r.name); if (k && !people.has(k) && !isOut(r)) people.set(k, { name: String(r.name).trim(), where: r.dept || "" }); });
 
     const taskCount = {};
     tasks.forEach(t => { const k = key(t.member); taskCount[k] = (taskCount[k] || 0) + 1; });
