@@ -2877,6 +2877,9 @@ async function initHomePage() {
     // Field snapshot: headline numbers from the Field Review System
     renderHomeFacts();
 
+    // Review Pulse: this month's HO Plan & Review and Field Review completion
+    renderHomePulse();
+
     // Local weather: the banner's sky follows it (refreshed every 30 minutes while Home is open)
     renderHomeWeather();
     clearInterval(homeWxTimer);
@@ -3038,18 +3041,23 @@ async function loadHomeFacts(sb) {
         }
     };
     // Programme reach only (no state / district / block counts or field-team numbers on Home)
+    // Newest "All Month" periods first. A month can be listed before its Vinoba report is
+    // uploaded (another report came in first), so step back to the newest month that has rows.
     const periods = await sb.from("data_periods").select("year,month").eq("week", 0)
-        .order("year", { ascending: false }).order("month", { ascending: false }).limit(1);
+        .order("year", { ascending: false }).order("month", { ascending: false }).limit(6);
     const facts = [];
     const add = (icon, color, value, label) => { if (value > 0) facts.push({ icon, color, value, label }); };
 
-    let when = "";
-    const p = periods && !periods.error && periods.data && periods.data[0];
-    if (p) {
-        const rows = await pages(() => sb.from("vinoba_v")            // the same view the Field Review dashboard reads
+    let when = "", p = null, rows = [];
+    const list = (periods && !periods.error && periods.data) || [];
+    for (const cand of list) {
+        const got = await pages(() => sb.from("vinoba_v")            // the same view the Field Review dashboard reads
             .select("total_schools,total_teachers,unique_schools_posting,unique_teachers_posting,total_posts,total_lifeskills,star_teachers,"
                   + "creative_writing,storytelling,poetry_recitation,spoken_english,spelling_bee")
-            .eq("year", p.year).eq("month", p.month).eq("week", 0));
+            .eq("year", cand.year).eq("month", cand.month).eq("week", 0));
+        if (got.some(r => (Number(r.total_schools) || 0) + (Number(r.total_posts) || 0) > 0)) { p = cand; rows = got; break; }
+    }
+    if (p) {
         const sum = (k) => rows.reduce((t, r) => t + (Number(r[k]) || 0), 0);
         const mon = MON[p.month - 1];
         when = mon + " " + p.year;
@@ -3097,6 +3105,239 @@ async function renderHomeFacts() {
         run.style.setProperty("--roll", Math.max(20, Math.round(half / 45)) + "s");   // ~45px a second
         box.classList.add("is-rolling");
     });
+}
+
+/* ── Home: Review Pulse ─────────────────────────────────────────────────
+   This calendar month's planning and review completion, as four cards. Each card
+   splits its whole team into three groups (red / amber / green) that add up to
+   the total; Admins can click a number to see the people in that group.
+     HO Monthly Plan      0 tasks · 1–10 tasks · more than 10 tasks
+     HO Monthly Review    not filled · filled, not fully scored by manager · every goal scored by manager
+     Field Weekly Review  0 weeks Done · some weeks · all weeks so far   (Weekly Summary rule)
+     Field Monthly Review not filled / incomplete · waiting for manager · done   (Monthly Summary rule)
+   Shared snapshot: the result is saved in home_pulse (Field Review project) and
+   reused by everyone for 30 minutes, so only one visit in 30 minutes reads the
+   review tables. Without that table each visitor works it out (10-minute page cache). */
+const PULSE_TTL = 30 * 60 * 1000;
+const PULSE_VERSION = 2;
+let homePulseCache = null;
+const PULSE_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+async function loadHoPulse(y, m) {
+    const sb = window.SG_SUPA && window.SG_SUPA._client;
+    if (!sb) return null;
+    const month = PULSE_MONTHS[m - 1];
+    const startY = m >= 6 ? y : y - 1;
+    const ay = `June ${startY} - May ${startY + 1}`;          // how HO Plan & Review stores the academic year
+    const pages = async (build) => {
+        let out = [], from = 0;
+        for (;;) {
+            const { data, error } = await build().range(from, from + 999);
+            if (error) throw error;
+            out = out.concat(data || []);
+            if (!data || data.length < 1000) return out;
+            from += 1000;
+        }
+    };
+    const [members, tasks, reviews] = await Promise.all([
+        pages(() => sb.from("members").select("id,name,dept").order("id")),
+        pages(() => sb.from("tasks").select("id,member").eq("year", ay).eq("month", month).order("id")),
+        pages(() => sb.from("reviews").select("id,member").eq("year", ay).eq("month", month).order("id"))
+    ]);
+    // manager scores of this month's reviews (a few dozen reviews -> one or two requests)
+    let items = [];
+    const ids = reviews.map(r => r.id);
+    for (let i = 0; i < ids.length; i += 100) {
+        const part = ids.slice(i, i + 100);
+        items = items.concat(await pages(() => sb.from("review_items").select("pk,review_id,mgr_score").in("review_id", part).order("pk")));
+    }
+    const key = (s) => String(s || "").trim().toLowerCase();
+    const people = new Map();                                   // one entry per member name
+    members.forEach(r => { const k = key(r.name); if (k && !people.has(k)) people.set(k, { name: String(r.name).trim(), where: r.dept || "" }); });
+
+    const taskCount = {};
+    tasks.forEach(t => { const k = key(t.member); taskCount[k] = (taskCount[k] || 0) + 1; });
+    const itemsBy = {};
+    items.forEach(it => { (itemsBy[it.review_id] = itemsBy[it.review_id] || []).push(it); });
+    const best = {};                                            // a member's most complete review this month
+    reviews.forEach(r => {
+        const k = key(r.member), its = itemsBy[r.id] || [];
+        const scored = its.filter(it => it.mgr_score !== null && it.mgr_score !== undefined).length;
+        const st = its.length && scored === its.length ? 2 : 1;
+        if (!best[k] || st > best[k].st || (st === best[k].st && scored > best[k].scored)) best[k] = { st, scored, total: its.length };
+    });
+
+    const plan = { zero: [], few: [], many: [] }, review = { none: [], self: [], mgr: [] };
+    people.forEach((p, k) => {
+        const n = taskCount[k] || 0;
+        plan[n === 0 ? "zero" : (n <= 10 ? "few" : "many")].push({ ...p, note: n + (n === 1 ? " task" : " tasks") });
+        const b = best[k];
+        if (!b) review.none.push({ ...p, note: "No review this month" });
+        else if (b.st === 2) review.mgr.push({ ...p, note: `All ${b.total} goal rows scored by manager` });
+        else review.self.push({ ...p, note: b.total ? `${b.scored} of ${b.total} goal rows scored by manager` : "Filled, no goal rows yet" });
+    });
+    const byName = (a, b) => a.name.localeCompare(b.name);
+    [plan, review].forEach(g => Object.values(g).forEach(list => list.sort(byName)));
+    return { members: people.size, plan, review };
+}
+
+async function loadHomePulse() {
+    const now = new Date(), y = now.getFullYear(), m = now.getMonth() + 1;
+    const ym = String(y) + String(m).padStart(2, "0");
+    const fsb = window.posSupabase;
+    let snap = null;
+    if (fsb) {
+        try {
+            const r = await fsb.from("home_pulse").select("data,computed_at").eq("period", ym).maybeSingle();
+            if (!r.error && r.data && r.data.data && r.data.data.v === PULSE_VERSION) snap = r.data;
+        } catch (e) { /* table not set up yet: work it out below */ }
+    }
+    if (snap && Date.now() - Date.parse(snap.computed_at) < PULSE_TTL) return { ...snap.data, at: snap.computed_at };
+
+    const [field, ho] = await Promise.all([
+        (window.FTRDashboard && window.FTRDashboard.homePulse && fsb)
+            ? window.FTRDashboard.homePulse(y, m).catch(e => { console.warn("Review Pulse (Field) not loaded:", e); return null; })
+            : null,
+        loadHoPulse(y, m).catch(e => { console.warn("Review Pulse (HO) not loaded:", e); return null; })
+    ]);
+    if (!field && !ho) return snap ? { ...snap.data, at: snap.computed_at } : null;
+    const data = { v: PULSE_VERSION, ym, field, ho };
+    const at = new Date().toISOString();
+    if (fsb && field && ho) {   // only share a complete result
+        fsb.from("home_pulse").upsert({ period: ym, data, computed_at: at }, { onConflict: "period" })
+            .then(r => { if (r.error && !/home_pulse/.test(r.error.message || "")) console.warn("Review Pulse not saved:", r.error); }, () => {});
+    }
+    return { ...data, at };
+}
+
+// The four cards, built from the loaded data. Each segment: [group key, tone, label].
+function homePulseCards(d) {
+    const mon = PULSE_MONTHS[Number(String(d.ym).slice(4, 6)) - 1] || "";
+    const cards = [];
+    if (d.ho && d.ho.members > 0) {
+        const n = d.ho.members;
+        cards.push({ id: "hoPlan", team: "ho", title: "HO Monthly Plan", sub: `${mon} plan · ${n} members`, total: n, groups: d.ho.plan,
+            segs: [["zero", "red", "have filled 0 tasks"], ["few", "amber", "have filled 1–10 tasks"], ["many", "green", "have filled more than 10 tasks"]] });
+        cards.push({ id: "hoRev", team: "ho", title: "HO Monthly Review", sub: `${mon} review · ${n} members`, total: n, groups: d.ho.review,
+            segs: [["none", "red", "have not filled the monthly review"], ["self", "amber", "filled, not yet scored by manager"], ["mgr", "green", "filled and scored by manager"]] });
+    }
+    if (d.field && d.field.people > 0 && d.field.weekGroups) {
+        const f = d.field, n = f.people, wk = (f.weeks || []).length;
+        if (wk) cards.push({ id: "fWeek", team: "field", title: "Field Weekly Review", sub: `${wk} week${wk > 1 ? "s" : ""} so far this month · ${n} PO · PM · DM`, total: n, groups: f.weekGroups,
+            segs: [["none", "red", "completed 0 weeks"], ["some", "amber", "completed some weeks"], ["all", "green", `completed all ${wk} week${wk > 1 ? "s" : ""}`]] });
+        cards.push({ id: "fMon", team: "field", title: "Field Monthly Review", sub: `${mon} review · ${n} PO · PM · DM`, total: n, groups: f.monthGroups,
+            segs: [["none", "red", "not filled / incomplete"], ["partial", "amber", "filled, waiting for manager"], ["done", "green", "filled and reviewed by manager"]] });
+    }
+    return cards;
+}
+
+async function renderHomePulse() {
+    const box = document.getElementById("homePulse"), grid = document.getElementById("homePulseGrid");
+    if (!box || !grid) return;
+    try {
+        if (!homePulseCache || Date.now() - homePulseCache.t > 10 * 60 * 1000) {
+            homePulseCache = { t: Date.now(), data: await loadHomePulse() };
+        }
+    } catch (err) {
+        console.warn("Review Pulse not loaded:", err);
+        return;
+    }
+    const d = homePulseCache.data;
+    if (!d || !document.body.contains(box)) return;
+    const cards = homePulseCards(d);
+    if (!cards.length) return;
+
+    const fmt = (v) => Number(v || 0).toLocaleString("en-IN");
+    const canOpen = currentRole === "Admin";
+    grid.innerHTML = cards.map(c => {
+        const counts = c.segs.map(s => (c.groups[s[0]] || []).length);
+        const stats = c.segs.map((s, i) => {
+            const inner = `<span class="hm-pc-num"><b>${fmt(counts[i])}</b><span>/ ${fmt(c.total)}</span></span><span class="hm-pc-lbl">${escHtml(s[2])}</span>`;
+            return canOpen && counts[i]
+                ? `<button type="button" class="hm-pc-stat is-${s[1]}" data-pulse="${c.id}|${s[0]}" title="See who">${inner}</button>`
+                : `<div class="hm-pc-stat is-${s[1]}">${inner}</div>`;
+        }).join("");
+        const bar = c.segs.map((s, i) => counts[i] ? `<i class="is-${s[1]}" style="flex:${counts[i]}"></i>` : "").join("");
+        return `<article class="hm-pc hm-pc--${c.team}"><header class="hm-pc-head"><span class="hm-pc-title">${escHtml(c.title)}</span>`
+            + `<span class="hm-pc-sub">${escHtml(c.sub)}</span></header>`
+            + `<div class="hm-pc-stats">${stats}</div><div class="hm-pc-bar" aria-hidden="true">${bar}</div></article>`;
+    }).join("");
+
+    const [yy, mm] = [Number(String(d.ym).slice(0, 4)), Number(String(d.ym).slice(4, 6))];
+    document.getElementById("homePulseWhen").textContent = `${PULSE_MONTHS[mm - 1] || ""} ${yy}`;
+    const at = d.at ? new Date(d.at) : null;
+    document.getElementById("homePulseUpd").textContent = (at && !isNaN(at)
+        ? "Updated " + at.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true }) : "")
+        + (canOpen ? " · click a number to see who" : "");
+
+    // Collapsed by default (every visit). While closed, the head shows one small
+    // red / amber / green bar per card; clicking the head opens the four cards.
+    const short = { hoPlan: "HO Plan", hoRev: "HO Review", fWeek: "Field Weekly", fMon: "Field Monthly" };
+    document.getElementById("homePulsePeek").innerHTML = cards.map(c => {
+        const bar = c.segs.map(s => {
+            const n = (c.groups[s[0]] || []).length;
+            return n ? `<i class="is-${s[1]}" style="flex:${n}"></i>` : "";
+        }).join("");
+        return `<span class="hm-peek">${escHtml(short[c.id] || c.title)}<span class="hm-peek-bar">${bar}</span></span>`;
+    }).join("");
+    const toggle = document.getElementById("homePulseToggle");
+    if (toggle && !toggle.dataset.wired) {
+        toggle.dataset.wired = "1";
+        toggle.addEventListener("click", () => {
+            const open = !box.classList.contains("is-open");
+            box.classList.toggle("is-open", open);
+            grid.hidden = !open;
+            toggle.setAttribute("aria-expanded", String(open));
+        });
+    }
+    box.hidden = false;
+
+    if (canOpen && !grid.dataset.wired) {
+        grid.dataset.wired = "1";
+        grid.addEventListener("click", (e) => {
+            const btn = e.target.closest("[data-pulse]");
+            if (!btn) return;
+            const [cid, seg] = btn.dataset.pulse.split("|");
+            const card = homePulseCards(homePulseCache.data).find(c => c.id === cid);
+            const s = card && card.segs.find(x => x[0] === seg);
+            if (card && s) openPulseList(card, s);
+        });
+    }
+}
+
+// Admin pop-up: the people in one group, searchable.
+function openPulseList(card, seg) {
+    let modal = document.getElementById("hmPulseModal");
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "hmPulseModal";
+        modal.className = "hm-pl-back";
+        modal.innerHTML = `<div class="hm-pl" role="dialog" aria-modal="true" aria-labelledby="hmPlTitle">
+            <div class="hm-pl-head"><div><div class="hm-pl-kicker" id="hmPlKicker"></div><div class="hm-pl-title" id="hmPlTitle"></div></div>
+            <button type="button" class="hm-pl-x" id="hmPlClose" aria-label="Close">×</button></div>
+            <input type="search" class="hm-pl-q" id="hmPlQ" placeholder="Search name, department or district…">
+            <div class="hm-pl-list" id="hmPlList"></div></div>`;
+        document.body.appendChild(modal);
+        const close = () => { modal.hidden = true; };
+        modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
+        modal.querySelector("#hmPlClose").addEventListener("click", close);
+        document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !modal.hidden) close(); });
+    }
+    const people = card.groups[seg[0]] || [];
+    const paint = () => {
+        const q = (modal.querySelector("#hmPlQ").value || "").trim().toLowerCase();
+        const rows = people.filter(p => !q || [p.name, p.where, p.role].join(" ").toLowerCase().includes(q));
+        modal.querySelector("#hmPlList").innerHTML = rows.length
+            ? rows.map((p, i) => `<div class="hm-pl-row"><span class="hm-pl-n">${i + 1}</span><div class="hm-pl-who"><b>${escHtml(p.name)}</b>`
+                + `<small>${escHtml([p.role, p.where].filter(Boolean).join(" · "))}</small></div><span class="hm-pl-note">${escHtml(p.note || "")}</span></div>`).join("")
+            : `<div class="hm-pl-empty">No one matches.</div>`;
+    };
+    modal.querySelector("#hmPlKicker").textContent = card.title;
+    modal.querySelector("#hmPlTitle").innerHTML = `<span class="hm-pl-dot is-${seg[1]}"></span>${people.length} ${people.length === 1 ? "person" : "people"} ${escHtml(seg[2])}`;
+    modal.querySelector("#hmPlQ").value = "";
+    modal.querySelector("#hmPlQ").oninput = paint;
+    paint();
+    modal.hidden = false;
 }
 
 /* ====================================

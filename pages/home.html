@@ -42,6 +42,19 @@
         </div>
     </section>
 
+    <!-- ── Review Pulse: this month's HO Plan & Review and Field Review completion, four cards (app.js renderHomePulse) ── -->
+    <section class="hm-pulse" id="homePulse" aria-label="Review Pulse" hidden>
+        <!-- Collapsed by default: the head is the toggle; while closed it shows a small split bar per card -->
+        <button type="button" class="hm-pulse-head" id="homePulseToggle" aria-expanded="false" aria-controls="homePulseGrid">
+            <span class="hm-pulse-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 12h4l2.5-6 5 12 2.5-6h4"/></svg></span>
+            <span class="hm-pulse-title">Review Pulse<small id="homePulseWhen"></small></span>
+            <span class="hm-pulse-peek" id="homePulsePeek" aria-hidden="true"></span>
+            <span class="hm-pulse-upd" id="homePulseUpd"></span>
+            <span class="hm-pulse-chev" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span>
+        </button>
+        <div class="hm-pulse-grid" id="homePulseGrid" hidden></div>
+    </section>
+
     <!-- ── Book a Space: opens the Spaces popup (rooms.js). Hidden unless the person is Pune HO staff. ── -->
     <button type="button" class="hm-space" id="homeRooms" data-open-rooms hidden aria-label="Book a Space">
         <span class="hm-space-ico" aria-hidden="true"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M18 6.500l6 2.500v17.500l-6 2.500z" fill="#C4B5FD"/><rect x="2.500" y="2.500" width="21" height="27.500" rx="4" fill="#7C3AED"/><path d="M6.500 6h13.500a1 1 0 0 1 1 1v21H6.500z" fill="#EDE9FE"/><g class="tbr-leaf"><path d="M6.500 6l8.500-2.600v26L6.500 28z" fill="#A78BFA"/><circle cx="12.200" cy="17.500" r="1.200" fill="#F5F3FF"/></g><circle cx="23" cy="23" r="8.300" fill="#fff"/><circle cx="23" cy="23" r="7" fill="#F59E0B"/><circle cx="23" cy="23" r="5.300" fill="#FFFBEB"/><path d="M23 19.600V23l2.500 1.600" stroke="#B45309" stroke-width="1.700" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
@@ -413,6 +426,114 @@ html[data-theme="dark"] .hm .upcoming-card { border-color: var(--hairline); box-
     .hm-facts-lead { padding: 0 12px 0 10px; }
     .hm-facts-title small { display: none; }
     .hm-hero .pg-hero-title { font-size: 24px; }
+}
+
+/* ── Review Pulse ──────────────────────────────────────────────────
+   Four cards in a 2 x 2 grid (HO on top, Field below). Each card: three
+   numbers out of the team total (red / amber / green, they add up to the total)
+   and a thin bar split the same way. Admins can click a number (button). */
+.hm-pulse {
+    margin: 0 0 22px; overflow: hidden;
+    background: var(--surface, #fff); border: 1px solid rgba(15,23,42,.07); border-radius: 18px;
+    box-shadow: 0 2px 10px rgba(15,23,42,.05);
+}
+.hm-pulse[hidden] { display: none; }
+.hm-pulse-head {
+    display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 16px 11px 14px;
+    font: inherit; color: inherit; text-align: left; cursor: pointer; border: 0;
+    background: linear-gradient(90deg, rgba(124,58,237,.07), rgba(14,165,233,.04));
+}
+.hm-pulse-head:focus-visible { outline: 2px solid #8B5CF6; outline-offset: -2px; border-radius: 18px; }
+.hm-pulse.is-open .hm-pulse-head { border-bottom: 1px solid rgba(15,23,42,.07); }
+.hm-pulse-grid[hidden] { display: none; }
+.hm-pulse-chev { width: 28px; height: 28px; flex: none; display: grid; place-items: center; border-radius: 9px;
+    color: var(--text-soft, #475467); background: rgba(15,23,42,.05); transition: background .15s; }
+.hm-pulse-chev svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; transition: transform .25s ease; }
+.hm-pulse-head:hover .hm-pulse-chev { background: rgba(124,58,237,.12); color: #6D28D9; }
+.hm-pulse.is-open .hm-pulse-chev svg { transform: rotate(180deg); }
+/* closed: one tiny red / amber / green bar per card, so the state still shows */
+.hm-pulse-peek { display: flex; align-items: center; gap: 14px; margin-left: 10px; min-width: 0; overflow: hidden; }
+.hm-pulse.is-open .hm-pulse-peek { display: none; }
+.hm-peek { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: var(--text-soft, #475467); white-space: nowrap; }
+.hm-peek-bar { display: flex; gap: 2px; width: 54px; height: 6px; border-radius: 999px; overflow: hidden; background: rgba(15,23,42,.06); }
+.hm-peek-bar i { display: block; min-width: 3px; }
+.hm-peek-bar i.is-red { background: #E11D48; } .hm-peek-bar i.is-amber { background: #F59E0B; } .hm-peek-bar i.is-green { background: #16A34A; }
+.hm-pulse-ico { width: 32px; height: 32px; flex: none; border-radius: 10px; display: grid; place-items: center; color: #fff;
+    background: linear-gradient(135deg, #8B5CF6, #6D28D9); box-shadow: 0 4px 10px rgba(109,40,217,.28); }
+.hm-pulse-ico svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.hm-pulse-title { display: flex; align-items: baseline; gap: 8px; font-size: 13.5px; font-weight: 800; letter-spacing: -.2px; color: var(--text, #0F172A); white-space: nowrap; }
+.hm-pulse-title small { font-size: 11px; font-weight: 600; letter-spacing: .02em; color: var(--text-faint, #7A8599); }
+.hm-pulse-upd { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--text-faint, #7A8599); text-align: right; }
+.hm-pulse-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 14px; }
+
+.hm-pc { --r: #E11D48; --a: #D97706; --g: #16A34A; min-width: 0; padding: 13px 14px 14px; border-radius: 14px;
+    border: 1px solid rgba(15,23,42,.07); border-top: 3px solid var(--tc); background: color-mix(in srgb, var(--tc) 3%, var(--surface, #fff)); }
+.hm-pc--ho    { --tc: #7C3AED; }
+.hm-pc--field { --tc: #0E9F8E; }
+.hm-pc-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 10px; margin-bottom: 10px; }
+.hm-pc-title { font-size: 13.5px; font-weight: 800; letter-spacing: -.2px; color: var(--text, #0F172A); }
+.hm-pc-sub { font-size: 11px; font-weight: 600; color: var(--text-faint, #7A8599); }
+.hm-pc-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.hm-pc-stat { display: grid; align-content: start; gap: 4px; min-width: 0; padding: 8px 10px; border-radius: 11px; text-align: left;
+    font: inherit; color: inherit; background: none; border: 1px solid transparent; }
+.hm-pc-stat.is-red   { --c: var(--r); }
+.hm-pc-stat.is-amber { --c: var(--a); }
+.hm-pc-stat.is-green { --c: var(--g); }
+button.hm-pc-stat { cursor: pointer; transition: background .15s, border-color .15s, transform .15s; }
+button.hm-pc-stat:hover, button.hm-pc-stat:focus-visible { outline: none; background: color-mix(in srgb, var(--c) 8%, transparent); border-color: color-mix(in srgb, var(--c) 30%, transparent); transform: translateY(-1px); }
+.hm-pc-num { display: flex; align-items: baseline; gap: 4px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hm-pc-num b { font-size: 24px; font-weight: 800; letter-spacing: -.6px; line-height: 1; color: var(--c); }
+.hm-pc-num span { font-size: 13px; font-weight: 700; color: var(--text-faint, #7A8599); }
+.hm-pc-lbl { font-size: 11.5px; font-weight: 600; line-height: 1.3; color: var(--text-soft, #475467); }
+button.hm-pc-stat .hm-pc-num b { text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--c) 35%, transparent); text-underline-offset: 4px; text-decoration-thickness: 2px; }
+.hm-pc-bar { display: flex; gap: 3px; height: 7px; margin-top: 10px; border-radius: 999px; overflow: hidden; background: rgba(15,23,42,.06); }
+.hm-pc-bar i { display: block; min-width: 4px; }
+.hm-pc-bar i.is-red { background: var(--r); } .hm-pc-bar i.is-amber { background: #F59E0B; } .hm-pc-bar i.is-green { background: var(--g); }
+
+/* Admin pop-up: the people behind a number */
+.hm-pl-back { position: fixed; inset: 0; z-index: 3000; display: grid; place-items: center; padding: 20px; background: rgba(15,23,42,.45); backdrop-filter: blur(3px); }
+.hm-pl-back[hidden] { display: none; }
+.hm-pl { width: min(620px, 100%); max-height: min(78vh, 720px); display: flex; flex-direction: column; overflow: hidden;
+    background: var(--surface, #fff); border-radius: 18px; box-shadow: 0 24px 60px rgba(15,23,42,.3); }
+.hm-pl-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 18px 10px; }
+.hm-pl-kicker { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint, #7A8599); }
+.hm-pl-title { display: flex; align-items: center; gap: 8px; margin-top: 3px; font-size: 16px; font-weight: 800; letter-spacing: -.3px; color: var(--text, #0F172A); }
+.hm-pl-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.hm-pl-dot.is-red { background: #E11D48; } .hm-pl-dot.is-amber { background: #F59E0B; } .hm-pl-dot.is-green { background: #16A34A; }
+.hm-pl-x { width: 32px; height: 32px; flex: none; border: 0; border-radius: 10px; background: rgba(15,23,42,.06); color: var(--text, #0F172A); font-size: 20px; line-height: 1; cursor: pointer; }
+.hm-pl-q { margin: 0 18px 10px; padding: 9px 12px; border-radius: 10px; border: 1px solid rgba(15,23,42,.12); background: transparent; color: var(--text, #0F172A); font: inherit; font-size: 13px; }
+.hm-pl-list { overflow: auto; padding: 0 10px 14px; }
+.hm-pl-row { display: grid; grid-template-columns: 26px 1fr auto; align-items: center; gap: 10px; padding: 9px 8px; border-top: 1px solid rgba(15,23,42,.06); }
+.hm-pl-n { font-size: 11px; font-weight: 700; color: var(--text-faint, #7A8599); text-align: right; font-variant-numeric: tabular-nums; }
+.hm-pl-who { display: grid; min-width: 0; }
+.hm-pl-who b { font-size: 13.5px; font-weight: 700; color: var(--text, #0F172A); }
+.hm-pl-who small { font-size: 11.5px; color: var(--text-faint, #7A8599); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hm-pl-note { font-size: 11.5px; font-weight: 600; color: var(--text-soft, #475467); text-align: right; max-width: 230px; }
+.hm-pl-empty { padding: 24px; text-align: center; color: var(--text-faint, #7A8599); font-size: 13px; }
+
+html[data-theme="dark"] .hm-pulse-head { border-bottom-color: var(--hairline); }
+html[data-theme="dark"] .hm-pc { border-color: var(--hairline); border-top-color: var(--tc); }
+html[data-theme="dark"] .hm-pc { --r: #FB7185; --a: #FBBF24; --g: #4ADE80; }
+
+@media (max-width: 1180px) {
+    .hm-pulse-grid { grid-template-columns: 1fr; }
+    .hm-pulse:not(.is-open) .hm-pulse-upd { display: none; }
+}
+@media (max-width: 860px) {
+    .hm-pulse-peek { display: none; }
+    .hm-pulse-chev { margin-left: auto; }
+}
+@media (max-width: 640px) {
+    .hm-pulse { border-radius: 20px; margin-bottom: 18px; }
+    .hm-pulse-head { padding: 13px 14px 11px 16px; background: none; }
+    .hm-pulse.is-open .hm-pulse-head { border-bottom-color: var(--hairline, rgba(15,23,42,.08)); }
+    .hm-pulse-upd { display: none; }
+    .hm-pulse-grid { padding: 12px; gap: 10px; }
+    .hm-pc-stat { padding: 6px 6px; }
+    .hm-pc-num b { font-size: 21px; }
+    .hm-pc-lbl { font-size: 11px; }
+    .hm-pl-row { grid-template-columns: 22px 1fr; }
+    .hm-pl-note { grid-column: 2; text-align: left; max-width: none; }
 }
 
 /* ── Weather in the banner (picture only, no text) ──────────────────

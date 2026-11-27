@@ -755,6 +755,7 @@
     DIRTY = {};
     SELWK = { 1: true, 2: true, 3: true, 4: true, 5: true };
     prBody('<div class="pr-empty pr-loading">Loading review…</div>');
+    prSetMember("prLoad", "");
     sbGetWeeklyView(unit, value, month).then(function (data) {
       VIEW = data; renderWeeklyView();
     }).catch(function (e) { prBody('<div class="pr-empty pr-error">Couldn\'t load: ' + esc(e.message || String(e)) + "</div>"); });
@@ -830,7 +831,8 @@
     computeCalendar();
     Object.keys(CELL_VALS).forEach(function (k) { if (!/00\|/.test(k)) delete CELL_VALS[k]; });   // keep Monthly's
     var h = VIEW.header || {};
-    var html = renderHeader(h) + renderBlocks(h) + phoneWeekBarHtml() + renderCards() + renderTable();
+    prSetMember("prLoad", renderHeader(h) + renderBlocks(h));
+    var html = phoneWeekBarHtml() + renderCards() + renderTable();
     var canEdit = canEditSelf() || canEditManager();
     if (canEdit) html += '<div class="pr-savebar"><span class="pr-savehint">You can edit the sections your role owns.</span>'
       + '<button class="pr-btn pr-btn-primary" id="prSave">Save review</button></div>';
@@ -1667,7 +1669,7 @@
     MDIRTY = {};
     var ticket = ++MO_LOAD_SEQ;                     // only the latest pick may render
     $("prMoBody").innerHTML = '<div class="pr-empty pr-loading">Loading monthly review\u2026</div>';
-    prSetStatus("prMoLoad", "");
+    prSetStatus("prMoLoad", ""); prSetMember("prMoLoad", "");
     Promise.all([
       sbGetWeeklyView(unit, value, month),
       sbGetAcademic(unit, value, month).catch(function (e) { console.warn("Academic plan not loaded:", e); return null; }),
@@ -2007,7 +2009,8 @@
     var label = monthLabel(month);
     var selfOk = canEditSelf(v), mgrOk = canEditManager(v);
 
-    var html = renderHeader(h) + renderBlocks(h, v);
+    prSetMember("prMoLoad", renderHeader(h) + renderBlocks(h, v));
+    var html = "";
     html += moCards(rp);
 
     var head = '<tr><th class="pr-item">Item</th><th class="pr-num">Weight</th><th class="pr-num">Target</th><th class="pr-num">Done</th><th class="pr-num">% done</th><th class="pr-num">Score</th></tr>';
@@ -2148,6 +2151,27 @@
       + '<span class="pr-statdot"></span>' + esc(pill) + '<span class="pr-statcar">\u25BE</span></button>'
       + '<div class="pr-statpop" hidden>' + tmp.innerHTML + "</div>";
     var b = slot.querySelector(".pr-statbtn"), pop = slot.querySelector(".pr-statpop");
+    b.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var open = pop.hidden; prCloseStatus(); pop.hidden = !open; b.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+    pop.addEventListener("click", function (e) { e.stopPropagation(); });
+    return slot;
+  }
+  // "Member information": the person / district card (name, district, PM / DM, blocks or team) sits
+  // behind a button after the status button; clicking it opens the card in a pop-over.
+  function prSetMember(btnId, cardHtml) {
+    var stat = prStatusSlot(btnId); if (!stat) return null;
+    var slot = stat.parentNode.querySelector('.pr-memslot[data-for="' + btnId + '"]');
+    if (!slot) {
+      slot = document.createElement("span"); slot.className = "pr-statslot pr-memslot"; slot.dataset.for = btnId;
+      stat.insertAdjacentElement("afterend", slot);
+    }
+    if (!cardHtml) { slot.innerHTML = ""; return slot; }
+    slot.innerHTML = '<button type="button" class="pr-statbtn pr-membtn" aria-expanded="false" title="Name, district, PM / DM and blocks or team">'
+      + '<span class="pr-memico" aria-hidden="true"></span>Member information<span class="pr-statcar">\u25BE</span></button>'
+      + '<div class="pr-statpop pr-mempop" hidden>' + cardHtml + "</div>";
+    var b = slot.querySelector(".pr-membtn"), pop = slot.querySelector(".pr-mempop");
     b.addEventListener("click", function (e) {
       e.stopPropagation();
       var open = pop.hidden; prCloseStatus(); pop.hidden = !open; b.setAttribute("aria-expanded", open ? "true" : "false");
@@ -4428,7 +4452,7 @@
     var ticket = ++QY_SEQ[k], body = $(t.body);
     var what = k === "quarterly" ? "quarterly review" : (k === "yearly" ? "yearly view" : "whole-year review");
     body.innerHTML = '<div class="pr-empty pr-loading">Loading ' + what + "…</div>";
-    prSetStatus(t.load, "");
+    prSetStatus(t.load, ""); prSetMember(t.load, "");
     var jobs = [sbGetQyYear(unit, value, ay)];
     if (k === "quarterly") qyQMonths(ay, q).forEach(function (m) { jobs.push(qyMonthCached(unit, value, m)); });
     // G5 is compiled from the Monthly G5 (PO / PM / DM): Yearly and Whole Year need every started month
@@ -4457,7 +4481,8 @@
   function qyRender(k) {
     var d = QV[k]; if (!d) return;
     var body = $(QY_TABS[k].body), y = d.year, h = y.scope.header;
-    var html = renderHeader(h) + renderBlocks(h, { roster: null });
+    prSetMember(QY_TABS[k].load, renderHeader(h) + renderBlocks(h, { roster: null }));
+    var html = "";
     if (k === "quarterly") {
       var per = y.periods[d.q], qLabel = "Q" + d.q + " " + qyAyLabel(d.ay);
       html += '<div id="prQCards"></div>' + qyDataNotes(per, qLabel, y.missing) + '<div id="prQMatrix"></div>';
@@ -4657,5 +4682,91 @@
     }
   }
 
-  window.FTRDashboard = { mount: mount, orgChanged: orgChanged, getMonthlyGoalNumbers: getMonthlyGoalNumbers };
-})();
+  /* =====================================================================
+     HOME "REVIEW PULSE" (app.js)
+     This month's review counts for every active PO, PM and DM, using the very
+     same rules as Analytics: Weekly Summary (reviewStatusOf) and Monthly
+     Summary (msumEvaluate). Reads only the fields those rules look at, so it
+     stays light.
+       weeks:   one entry per week of the month that has started and is not
+                removed -> { week, done, partial, expected }
+       monthly: the month's own review (period YYYYMM00) -> { done, partial, total }
+     ===================================================================== */
+  var PULSE_WEEK_FIELDS = ["A1", "B1", "B2", "B3", "G1", "G2", "G3", "G4", "H1"];
+  function pulseMonthFields() {
+    var f = ["A1", "B1", "B2", "B3", "B4", "B5", "G2", "G3", "G4", "G5", "G6", "H1", "H2"];
+    msumGoalFields().forEach(function (g) { f.push(g.fid); });
+    G4_SLOTS.forEach(function (i) { ["NAME", "W", "T", "D"].forEach(function (k) { f.push("M_G4_" + i + "_" + k); }); });
+    return f;
+  }
+  async function homePulse(y, m) {
+    await loadOrg();
+    var seen = {};
+    var people = ORG.people.filter(function (p) {
+      var k = normId(p.emp_id);
+      if (MSUM_UNITS.indexOf(p.designation) < 0 || !k || seen[k]) return false;
+      seen[k] = 1; return true;
+    });
+    var ym = "" + y + pad2(m), now = new Date();
+    var todayIso = now.getFullYear() + "-" + pad2(now.getMonth() + 1) + "-" + pad2(now.getDate());
+    var isCur = now.getFullYear() === y && now.getMonth() + 1 === m;
+    var wk = await Promise.all([sbGetRemovedWeeks(y, m), sbGetWeekDates(y, m)]);
+    var removed = wk[0], dates = wk[1], weeks = [];
+    for (var w = 1; w <= 5; w++) {
+      if (removed[w]) continue;
+      // Started = its From date has come (itadmin's dates), else day 1 / 8 / 15 / 22 / 29 of the month.
+      var started = dates[w] ? String(dates[w].from) <= todayIso : (!isCur || (w - 1) * 7 + 1 <= now.getDate());
+      if (started) weeks.push(w);
+    }
+    var codes = weeks.map(function (x) { return ym + pad2(x); });
+    var mCode = ym + "00", pCode = prevMonthCode(ym) + "00";
+    var cols = "emp_id,period_code,section,field,value,updated_at";
+    var got = await Promise.all([
+      codes.length ? fetchAll(function () {
+        return db().from("review_responses").select(cols).in("period_code", codes).in("field", PULSE_WEEK_FIELDS)
+          .order("emp_id").order("period_code").order("field");
+      }) : [],
+      fetchAll(function () {
+        return db().from("review_responses").select(cols).in("period_code", [mCode, pCode]).in("field", pulseMonthFields())
+          .order("emp_id").order("period_code").order("field");
+      })
+    ]);
+    var group = function (rows) {
+      var out = {};
+      rows.forEach(function (r) { var k = normId(r.emp_id); (out[k] = out[k] || []).push(r); });
+      return out;
+    };
+    var wBy = group(got[0]), mBy = group(got[1]);
+    var wOut = weeks.map(function (x) { return { week: x, done: 0, partial: 0, expected: people.length }; });
+    var mOut = { done: 0, partial: 0, total: people.length };
+    // Per-person groups for the Home cards (names are listed for Admin only).
+    //   weekly:  none = no week's review Done · some = some weeks · all = every week so far
+    //   monthly: none = not filled / incomplete · partial = waiting for manager · done
+    var wGroups = { none: [], some: [], all: [] }, mGroups = { none: [], partial: [], done: [] };
+    people.forEach(function (p) {
+      var k = normId(p.emp_id);
+      var who = { name: p.name || p.emp_id, role: p.designation, where: (p.assigned_districts || []).join(", ") };
+      var ws = sectionsByCode(wBy[k] || []), doneWeeks = [];
+      wOut.forEach(function (o, i) {
+        var st = reviewStatusOf(ws[codes[i]]);
+        if (st === "done") { o.done++; doneWeeks.push(o.week); } else if (st === "partial") o.partial++;
+      });
+      if (weeks.length) {
+        var wg = !doneWeeks.length ? "none" : (doneWeeks.length === weeks.length ? "all" : "some");
+        var missing = weeks.filter(function (x) { return doneWeeks.indexOf(x) < 0; });
+        wGroups[wg].push(Object.assign({ note: doneWeeks.length + " of " + weeks.length + " weeks done"
+          + (missing.length ? " \u00B7 pending W" + missing.join(", W") : "") }, who));
+      }
+      var ms = sectionsByCode(mBy[k] || []);
+      var ev = msumEvaluate(ms[mCode], ms[pCode], 0);
+      if (ev.st === "done") mOut.done++; else if (ev.st === "partial") mOut.partial++;
+      mGroups[ev.st].push(Object.assign({ note: ev.st === "done" ? "Review done"
+        : ev.st === "partial" ? "Waiting for manager (H)" : (ev.started ? "Started, " + ev.missing.length + " point(s) missing" : "Not started") }, who));
+    });
+    var byName = function (a, b) { return String(a.name).localeCompare(String(b.name)); };
+    [wGroups, mGroups].forEach(function (g) { Object.keys(g).forEach(function (k) { g[k].sort(byName); }); });
+    return { ym: ym, people: people.length, weeks: wOut, monthly: mOut, weekGroups: wGroups, monthGroups: mGroups };
+  }
+
+  window.FTRDashboard = { mount: mount, orgChanged: orgChanged, getMonthlyGoalNumbers: getMonthlyGoalNumbers, homePulse: homePulse };
+})();

@@ -360,7 +360,7 @@ function switchRole(idx) {
   toast(`Viewing as: ${r.label}`);
 }
 
-function save() { saveUiPrefs(); saveSnapshot(); if (syncEnabled) syncDiff(); }
+function save() { saveUiPrefs(); scheduleSnapshot(); if (syncEnabled) syncDiff(); }
 
 // ── HELPERS ──
 function uid() { return 'id_' + Math.random().toString(36).slice(2,10); }
@@ -639,6 +639,34 @@ function scopedMemberNames(dept) {
 // user themselves and everyone who reports to them (their reportees), even
 // across departments. Used only by the Reviews tab so a Manager can pick a
 // reportee to view/score. Does NOT widen Monthly Plan / SMART Goals scope.
+// The signed-in person's own HO member row (by login email; by name as a fallback).
+function sgMyMemberRow() {
+  const members = (DB.settings && DB.settings.members) || [];
+  const email = String(currentEmail || '').toLowerCase();
+  return members.find(function(m){ return email && String(m.email || '').toLowerCase() === email; })
+      || members.find(function(m){ return m.name && m.name === currentUser.name; }) || null;
+}
+// After a review is saved, point the Reviews filters at it so it shows straight away
+// (a filter left on another month / member used to hide the review just saved).
+function sgShowReviewInFilters(rec) {
+  if (!rec) return;
+  const el = function(id){ return document.getElementById(id); };
+  const has = function(sel, v){ return !!sel && [...sel.options].some(function(o){ return o.value === v; }); };
+  const y = el('rv-year'), mo = el('rv-month'), d = el('rv-dept'), mem = el('rv-member');
+  if (y && y.value && y.value !== rec.year && has(y, rec.year)) y.value = rec.year;
+  if (mo && mo.value && mo.value !== rec.month && has(mo, rec.month)) mo.value = rec.month;
+  if (!mem || mem.style.display === 'none') return;            // own reviews only: no member filter
+  if (d && d.value && d.value !== rec.dept && has(d, rec.dept)) {
+    d.value = rec.dept;
+    populateSelect('rv-member', reviewScopedMemberNames(rec.dept), 'Select Member…');
+  }
+  if (!has(mem, rec.member) && d && d.value) {
+    d.value = '';
+    populateSelect('rv-member', reviewScopedMemberNames(''), 'Select Member…');
+  }
+  if (has(mem, rec.member)) mem.value = rec.member;
+}
+
 function reviewScopedMemberNames(dept) {
   if (currentUser.role === ROLES.ADMIN) return membersInDept(dept).map(function(m){return m.name;});
   var set = {}, order = [];
@@ -690,6 +718,18 @@ function applyFilterDefaults() {
   if (typeof setSgMemberOptions === 'function') setSgMemberOptions();
   const rvDept = (document.getElementById('rv-dept') || {}).value || '';
   if (document.getElementById('rv-member')) populateSelect('rv-member', reviewScopedMemberNames(rvDept), 'Select Member…');
+  // Reviews opens on the signed-in person's own review (this AY + month set above),
+  // once per visit like the Monthly Plan member below, so picking someone else sticks.
+  const rvMem = document.getElementById('rv-member');
+  const me = sgMyMemberRow();
+  if (rvMem && me && !rvMem.dataset.selfDefault && !rvMem.value) {
+    if (![...rvMem.options].some(function(o){ return o.value === me.name; })) {
+      const rvDeptEl = document.getElementById('rv-dept');
+      if (rvDeptEl && me.dept && !rvDeptEl.value) { rvDeptEl.value = me.dept; populateSelect('rv-member', reviewScopedMemberNames(me.dept), 'Select Member…'); }
+    }
+    if ([...rvMem.options].some(function(o){ return o.value === me.name; })) rvMem.value = me.name;
+    rvMem.dataset.selfDefault = '1';
+  }
   refreshMpDeptScopedDropdowns();
   // Monthly Plan opens on the signed-in person's own plan. Done once per visit to the
   // page (marked on the dropdown itself), so choosing "All Members" afterwards is never
@@ -2560,7 +2600,8 @@ function saveReview() {
   };
   if (existingId) { const i=DB.reviews.findIndex(x=>x.id===existingId); if(i>-1) DB.reviews[i]=rec; }
   else DB.reviews.push(rec);
-  save(); closeModal('review-modal'); renderReviews();
+  closeModal('review-modal'); sgShowReviewInFilters(rec); renderReviews();
+  save();   // sync after the list shows the review, so the page answers at once
 }
 
 // ── Progressive disclosure of a review's per-SMART-Goal detail tables ──
@@ -3352,6 +3393,35 @@ var _flushing = false;   // an outbox flush pass is currently running
 var _flushTimer = null;  // pending scheduled retry
 var _outbox = null;      // in-memory mirror of the durable localStorage outbox
 var _noBatch = false;    // set true if the deployed backend predates saveBatch
+// Every change queued in the last few minutes, kept after the server confirms it.
+// A background refresh that was already reading when the change was saved returns
+// data without it; these are laid back on top so a just-saved row never vanishes.
+var _recentWrites = {};
+var RECENT_WRITE_MS = 5 * 60 * 1000;
+
+// Sync baseline: the last-synced state of every record as its JSON text (by id),
+// plus copies of the small name lists. Building it costs one JSON.stringify per
+// record; the diff then reuses the text it just made, instead of copying the whole
+// data set and stringifying both sides again on every save (that froze the page).
+function _jsonById(arr) { var m = {}; (arr || []).forEach(function (x) { if (x) m[x.id] = JSON.stringify(x); }); return m; }
+function makeShadow(db) {
+  db = db || {}; var s = db.settings || {};
+  return {
+    goal: _jsonById(db.goals), task: _jsonById(db.tasks), review: _jsonById(db.reviews),
+    member: _jsonById(s.members), admin: _jsonById(s.admins),
+    depts: (s.depts || []).slice(), goalNames: (s.goalNames || []).slice(), categories: (s.categories || []).slice()
+  };
+}
+// Snapshot write (localStorage, for instant paint next time) is slow on big data,
+// so it is batched to once a second and done when the page is hidden.
+var _snapTimer = null;
+function scheduleSnapshot() {
+  if (_snapTimer) return;
+  _snapTimer = setTimeout(function () { _snapTimer = null; saveSnapshot(); }, 1000);
+}
+try {
+  window.addEventListener('pagehide', function () { if (_snapTimer) { clearTimeout(_snapTimer); _snapTimer = null; saveSnapshot(); } });
+} catch (e) {}
 
 function sgShowLoader() { var o = document.getElementById('sg-loader'); if (o) o.classList.add('open'); }
 function sgHideLoader() { var o = document.getElementById('sg-loader'); if (o) o.classList.remove('open'); }
@@ -3492,7 +3562,9 @@ function loadSnapshot() {
 function loadAll(fresh) {
   // Deliver anything still queued (from this or a previous session) BEFORE
   // pulling server truth, so a refresh can't race past an unsaved change.
+  var readFrom = 0;   // when this server read started
   return flushOutbox().then(function () {
+    readFrom = Date.now();
     return api('getAll', fresh ? { fresh: 1 } : null);
   }).then(function (data) {
     data = data || {};
@@ -3521,13 +3593,23 @@ function loadAll(fresh) {
       syncEnabled = true; loadedOnce = true; updateUnsavedBanner();
       return;
     }
-    // Overlay still-pending writes so a refresh never hides an unsaved edit.
+    // Lay recent writes back on top first: a change saved while this read was in
+    // flight (or just before it, while a flush was still sending) may be missing
+    // from what the server returned, even though it is saved. Then the still-pending
+    // writes, so a refresh never hides an unsaved edit either.
+    var since = (readFrom || Date.now()) - 2 * 60 * 1000, recent = {}, cutoff = Date.now() - RECENT_WRITE_MS;
+    Object.keys(_recentWrites).forEach(function (k) {
+      var e = _recentWrites[k];
+      if (!e || e.ts < cutoff) { delete _recentWrites[k]; return; }
+      if (e.ts >= since) recent[k] = e;
+    });
+    applyOutboxTo(next, recent);
     applyOutboxTo(next);
     DB = next;
-    _shadow = deepCopy(DB);
+    _shadow = makeShadow(DB);
     syncEnabled = true;
     loadedOnce = true;
-    saveSnapshot();
+    scheduleSnapshot();
     updateUnsavedBanner();
   });
 }
@@ -3644,7 +3726,7 @@ function _outboxLoad() { try { var v = JSON.parse(localStorage.getItem(_outboxKe
 function _outboxSave(m) { try { localStorage.setItem(_outboxKey(), JSON.stringify(m)); } catch (e) { /* quota — keep in-memory copy */ } }
 function outbox() { if (!_outbox) _outbox = _outboxLoad(); return _outbox; }
 function outboxCount() { return Object.keys(outbox()).length; }
-function outboxAdd(key, action, payload) { var m = outbox(); m[key] = { action: action, payload: payload, ts: Date.now(), tries: 0 }; _outboxSave(m); }
+function outboxAdd(key, action, payload) { var m = outbox(); var ts = Date.now(); m[key] = { action: action, payload: payload, ts: ts, tries: 0 }; _outboxSave(m); _recentWrites[key] = { action: action, payload: payload, ts: ts }; }
 
 // Persistent, tappable 'not yet saved' indicator so a failed write is never
 // mistaken for a successful one. Hidden automatically once the queue drains.
@@ -3730,8 +3812,8 @@ function _upsertInto(arr, obj) { if (!obj || obj.id == null) return; for (var i 
 function _removeFrom(arr, id) { for (var i = arr.length - 1; i >= 0; i--) { if (arr[i].id === id) arr.splice(i, 1); } }
 function _addToList(settings, type, value) { var k = _listKeyFor(type); if (!k) return; settings[k] = settings[k] || []; if (settings[k].indexOf(value) === -1) settings[k].push(value); }
 function _removeFromList(settings, type, value) { var k = _listKeyFor(type); if (!k || !settings[k]) return; settings[k] = settings[k].filter(function (v) { return v !== value; }); }
-function applyOutboxTo(db) {
-  var m = outbox();
+function applyOutboxTo(db, entries) {
+  var m = entries || outbox();
   Object.keys(m).forEach(function (key) {
     var e = m[key]; if (!e) return; var a = e.action, p = e.payload || {};
     try {
@@ -3765,25 +3847,29 @@ function queuePush(action, payload) {
       if (_inflight <= 0) { _inflight = 0; sgSavePill('saved'); setTimeout(function () { sgSavePill('hide'); }, 1200); }
     });
 }
-function diffById(saveAction, delAction, kind, cur, prev) {
-  cur = cur || []; prev = prev || [];
-  var byId = {}; prev.forEach(function (x) { byId[x.id] = x; });
-  var seen = {};
+// prevJson: { id: JSON text } from the sync baseline. Returns the same map for cur,
+// which becomes the new baseline, so each record is stringified once per save.
+function diffById(saveAction, delAction, kind, cur, prevJson) {
+  cur = cur || []; prevJson = prevJson || {};
+  var curJson = {};
   cur.forEach(function (x) {
-    seen[x.id] = 1;
-    var was = byId[x.id];
-    if (!was || JSON.stringify(was) !== JSON.stringify(x)) outboxAdd(kind + ':' + x.id, saveAction, x);
+    if (!x) return;
+    var j = JSON.stringify(x);
+    curJson[x.id] = j;
+    if (prevJson[x.id] !== j) outboxAdd(kind + ':' + x.id, saveAction, x);
   });
-  var dels = prev.filter(function (x) { return !seen[x.id]; });
+  var prevIds = Object.keys(prevJson);
+  var dels = prevIds.filter(function (id) { return !Object.prototype.hasOwnProperty.call(curJson, id); });
   // SAFETY GUARD: real deletions happen one row at a time via the UI. A pass
   // that would delete many rows at once (or wipe a whole collection) is almost
   // certainly a bad refresh or bug, so we refuse it — no saved data is lost.
-  if (dels.length >= 5 || (cur.length === 0 && prev.length >= 3)) {
+  if (dels.length >= 5 || (cur.length === 0 && prevIds.length >= 3)) {
     console.warn('[SmartGoals] safety: skipped bulk delete of ' + dels.length + ' ' + kind + ' record(s)');
     try { toast('Safety guard: skipped an unexpected bulk delete (' + dels.length + ' ' + kind + '). Your data is intact.'); } catch (e) {}
-    return;
+    return curJson;
   }
-  dels.forEach(function (x) { outboxAdd(kind + ':' + x.id, delAction, { id: x.id }); });
+  dels.forEach(function (id) { outboxAdd(kind + ':' + id, delAction, { id: JSON.parse(prevJson[id]).id }); });
+  return curJson;
 }
 function diffList(type, cur, prev) {
   cur = cur || []; prev = prev || [];
@@ -3791,18 +3877,23 @@ function diffList(type, cur, prev) {
   prev.forEach(function (v) { if (cur.indexOf(v) === -1) outboxAdd('list:' + type + ':' + v, 'removeListItem', { type: type, value: v }); });
 }
 function syncDiff() {
-  if (!_shadow) { _shadow = deepCopy(DB); return; }
+  if (!_shadow) { _shadow = makeShadow(DB); return; }
   var _obBefore = {}; try { var _oB = outbox(); Object.keys(_oB).forEach(function (k) { _obBefore[k] = _oB[k].ts; }); } catch (e) {}
+  var next = null;
   try {
-    diffById('saveGoal', 'deleteGoal', 'goal', DB.goals, _shadow.goals);
-    diffById('saveTask', 'deleteTask', 'task', DB.tasks, _shadow.tasks);
-    diffById('saveReview', 'deleteReview', 'review', DB.reviews, _shadow.reviews);
-    diffById('saveMember', 'removeMember', 'member', DB.settings.members, _shadow.settings.members);
-    diffById('saveAdmin', 'removeAdmin', 'admin', DB.settings.admins, _shadow.settings.admins);
-    diffList('dept',     DB.settings.depts,      _shadow.settings.depts);
-    diffList('goalName', DB.settings.goalNames,  _shadow.settings.goalNames);
-    diffList('category', DB.settings.categories, _shadow.settings.categories);
-  } catch (e) { console.warn('[SmartGoals] sync error', e); }
+    var st = DB.settings || {};
+    next = {
+      goal:   diffById('saveGoal', 'deleteGoal', 'goal', DB.goals, _shadow.goal),
+      task:   diffById('saveTask', 'deleteTask', 'task', DB.tasks, _shadow.task),
+      review: diffById('saveReview', 'deleteReview', 'review', DB.reviews, _shadow.review),
+      member: diffById('saveMember', 'removeMember', 'member', st.members, _shadow.member),
+      admin:  diffById('saveAdmin', 'removeAdmin', 'admin', st.admins, _shadow.admin)
+    };
+    diffList('dept',     st.depts,      _shadow.depts);
+    diffList('goalName', st.goalNames,  _shadow.goalNames);
+    diffList('category', st.categories, _shadow.categories);
+    next.depts = (st.depts || []).slice(); next.goalNames = (st.goalNames || []).slice(); next.categories = (st.categories || []).slice();
+  } catch (e) { console.warn('[SmartGoals] sync error', e); next = null; }
   // Shadow can advance now: the change is durably queued in the outbox, which
   // keeps retrying until the server confirms it — so nothing is lost even if
   // the write below fails.
@@ -3811,7 +3902,7 @@ function syncDiff() {
     Object.keys(_oA).forEach(function (k) { if (_obBefore[k] !== _oA[k].ts) _touched.push({ key: k, ts: _oA[k].ts }); });
     if (_touched.length && typeof sgSaveToast === 'function') sgSaveToast(_touched);
   } catch (e) {}
-  _shadow = deepCopy(DB);
+  _shadow = next || makeShadow(DB);
   flushOutbox();
 }
 
@@ -3871,7 +3962,7 @@ function mount() {
       reviews: snap.reviews || [],
       uiPrefs: loadUiPrefs()
     };
-    _shadow = deepCopy(DB);     // baseline so any edit during refresh diffs correctly
+    _shadow = makeShadow(DB);   // baseline so any edit during refresh diffs correctly
     syncEnabled = true;         // edits made before the refresh still sync — no lost writes
     afterLoadRender();          // paint instantly, no spinner
     return loadAll(true).then(afterLoadRender)
